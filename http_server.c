@@ -231,6 +231,71 @@ static void handle_api_groups_create(struct mg_connection *nc, HttpServer *serve
     mg_http_reply(nc, 200, "Content-Type: application/json\r\n", "%s", buf);
 }
 
+static void handle_api_group_message(struct mg_connection *nc, HttpServer *server, const char *group_id_str, const char *message)
+{
+    if (!group_id_str || !message) {
+        send_error(nc, 400, "missing parameters");
+        return;
+    }
+    
+    uint32_t group_id = atoi(group_id_str);
+    uint32_t msg_id = tox_core_group_send_message(server->tox_core, group_id, message);
+    
+    fprintf(stderr, "group_send: group_id=%u msg_id=%u\n", group_id, msg_id);
+    
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"message_id\":%u}", msg_id);
+    send_json(nc, buf);
+}
+
+static void handle_api_conferences(struct mg_connection *nc, HttpServer *server)
+{
+    uint32_t conf_list[64];
+    int count = tox_core_get_conference_list(server->tox_core, conf_list, 64);
+
+    char buf[512] = {"{\"conferences\":["};
+    for (int i = 0; i < count; i++) {
+        if (i > 0) strcat(buf, ",");
+        char tmp[32];
+        snprintf(tmp, sizeof(tmp), "%u", conf_list[i]);
+        strcat(buf, tmp);
+    }
+    strcat(buf, "]}");
+    send_json(nc, buf);
+}
+
+static void handle_api_conferences_create(struct mg_connection *nc, HttpServer *server)
+{
+    uint32_t conf_id = tox_core_conference_new(server->tox_core);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"conference_id\":%u}", conf_id);
+    send_json(nc, buf);
+}
+
+static void handle_api_conference_message(struct mg_connection *nc, HttpServer *server, const char *conf_id_str, const char *message)
+{
+    if (!conf_id_str || !message) {
+        send_error(nc, 400, "missing parameters");
+        return;
+    }
+    
+    uint32_t conf_id = atoi(conf_id_str);
+    uint32_t msg_id = tox_core_conference_send_message(server->tox_core, conf_id, message);
+    
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"message_id\":%u}", msg_id);
+    send_json(nc, buf);
+}
+
+static void handle_api_conference_invite(struct mg_connection *nc, HttpServer *server, uint32_t friend_id, uint32_t conf_id)
+{
+    bool ok = tox_core_conference_invite(server->tox_core, friend_id, conf_id);
+    fprintf(stderr, "conference_invite friend_id=%u conf_id=%u result=%s\n", friend_id, conf_id, ok ? "ok" : "fail");
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"success\":%s}", ok ? "true" : "false");
+    send_json(nc, buf);
+}
+
 static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
 {
     HttpServer *server = global_server;
@@ -252,6 +317,9 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
                 }
                 else if (mg_strcmp(hm->uri, mg_str("/api/groups")) == 0) {
                     handle_api_groups(nc, server);
+                }
+                else if (mg_strcmp(hm->uri, mg_str("/api/conferences")) == 0) {
+                    handle_api_conferences(nc, server);
                 }
                 else if (mg_strcmp(hm->uri, mg_str("/events/sse")) == 0) {
                     handle_sse(nc, server);
@@ -311,6 +379,34 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
                 }
                 else if (mg_strcmp(hm->uri, mg_str("/api/groups")) == 0) {
                     handle_api_groups_create(nc, server);
+                }
+                else if (mg_strcmp(hm->uri, mg_str("/api/group_messages")) == 0) {
+                    char group_id[32] = {0};
+                    char message[1024] = {0};
+                    mg_http_get_var(&hm->body, "group_id", group_id, sizeof(group_id));
+                    mg_http_get_var(&hm->body, "message", message, sizeof(message));
+                    handle_api_group_message(nc, server, group_id, message);
+                }
+                else if (mg_strcmp(hm->uri, mg_str("/api/conferences")) == 0) {
+                    handle_api_conferences_create(nc, server);
+                }
+                else if (mg_strcmp(hm->uri, mg_str("/api/conference_invite")) == 0) {
+                    char friend_id[32] = {0};
+                    char conf_id[32] = {0};
+                    mg_http_get_var(&hm->body, "friend_id", friend_id, sizeof(friend_id));
+                    mg_http_get_var(&hm->body, "conference_id", conf_id, sizeof(conf_id));
+                    if (friend_id[0] && conf_id[0]) {
+                        handle_api_conference_invite(nc, server, atoi(friend_id), atoi(conf_id));
+                    } else {
+                        send_error(nc, 400, "missing friend_id or conference_id");
+                    }
+                }
+                else if (mg_strcmp(hm->uri, mg_str("/api/conference_messages")) == 0) {
+                    char conf_id[32] = {0};
+                    char message[1024] = {0};
+                    mg_http_get_var(&hm->body, "conference_id", conf_id, sizeof(conf_id));
+                    mg_http_get_var(&hm->body, "message", message, sizeof(message));
+                    handle_api_conference_message(nc, server, conf_id, message);
                 }
                 else {
                     mg_http_reply(nc, 404, "Content-Type: application/json\r\n", "{\"error\":404,\"message\":\"not found\"}");

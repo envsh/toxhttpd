@@ -152,6 +152,25 @@ static void callback_file_recv_control(Tox *tox, uint32_t friend_id, uint32_t fi
     dispatch_event(core, "file_recv_control", data);
 }
 
+static void callback_conference_message(Tox *tox, Tox_Conference_Number conf_num, Tox_Friend_Number peer_id, 
+    Tox_Message_Type type, const uint8_t *message, size_t length, void *user_data)
+{
+    (void)tox;
+    (void)type;
+    char msg[1024] = {0};
+    strncpy(msg, (const char *)message, length < 1023 ? length : 1023);
+    fprintf(stderr, "[Tox] 收到会议消息 conf=%u peer=%u: %s\n", conf_num, peer_id, msg);
+}
+
+static void callback_conference_invite(Tox *tox, Tox_Friend_Number friend_num, 
+    const uint8_t *data, size_t length, const uint8_t *name, size_t name_len, void *user_data)
+{
+    (void)tox;
+    char name_str[256] = {0};
+    strncpy(name_str, (const char *)name, name_len < 255 ? name_len : 255);
+    fprintf(stderr, "[Tox] 收到会议邀请 friend=%u name=%s\n", friend_num, name_str);
+}
+
 static void *iterate_thread_func(void *arg)
 {
     ToxCore *core = (ToxCore *)arg;
@@ -250,6 +269,8 @@ ToxCore *tox_core_init(EventQueue *event_queue)
     tox_callback_friend_typing(core->tox, callback_friend_typing);
     tox_callback_file_recv(core->tox, callback_file_recv);
     tox_callback_file_recv_control(core->tox, callback_file_recv_control);
+    tox_callback_conference_message(core->tox, callback_conference_message);
+    tox_callback_conference_invite(core->tox, callback_conference_invite);
 
     core->running = true;
     pthread_create(&core->iterate_thread, NULL, iterate_thread_func, core);
@@ -425,12 +446,54 @@ int tox_core_get_group_list(ToxCore *core, uint32_t *groups, size_t max_count)
 uint32_t tox_core_group_new(ToxCore *core)
 {
     Tox_Err_Group_New err;
-    // Groups require network connection - return error for now
-    Tox_Group_Number gn = tox_group_new(core->tox, TOX_GROUP_PRIVACY_STATE_PUBLIC, NULL, 0, NULL, 0, &err);
+    Tox_Group_Number gn = tox_group_new(core->tox, TOX_GROUP_PRIVACY_STATE_PUBLIC, 
+        (const uint8_t *)"test", 4, (const uint8_t *)"topic", 5, &err);
     if (err != TOX_ERR_GROUP_NEW_OK) {
         fprintf(stderr, "group_new err=%d\n", err);
     }
     return (err == TOX_ERR_GROUP_NEW_OK) ? gn : 0;
+}
+
+int tox_core_get_conference_list(ToxCore *core, uint32_t *conf_list, size_t max_count)
+{
+    size_t count = tox_conference_get_chatlist_size(core->tox);
+    if (count > max_count) count = max_count;
+    tox_conference_get_chatlist(core->tox, conf_list);
+    return (int)count;
+}
+
+uint32_t tox_core_conference_new(ToxCore *core)
+{
+    Tox_Err_Conference_New err;
+    Tox_Conference_Number cn = tox_conference_new(core->tox, &err);
+    fprintf(stderr, "conference_new err=%d\n", err);
+    return (err == TOX_ERR_CONFERENCE_NEW_OK) ? cn : 0;
+}
+
+bool tox_core_conference_delete(ToxCore *core, uint32_t conf_id)
+{
+    Tox_Err_Conference_Delete err;
+    bool ok = tox_conference_delete(core->tox, conf_id, &err);
+    fprintf(stderr, "conference_delete conf_id=%u err=%d\n", conf_id, err);
+    return ok;
+}
+
+uint32_t tox_core_conference_send_message(ToxCore *core, uint32_t conf_id, const char *message)
+{
+    Tox_Err_Conference_Send_Message err;
+    size_t len = strlen(message);
+    uint32_t msg_id = tox_conference_send_message(core->tox, conf_id, TOX_MESSAGE_TYPE_NORMAL, 
+        (const uint8_t *)message, len, &err);
+    fprintf(stderr, "conference_send conf_id=%u msg_id=%u err=%d\n", conf_id, msg_id, err);
+    return msg_id;
+}
+
+bool tox_core_conference_invite(ToxCore *core, uint32_t friend_id, uint32_t conf_id)
+{
+    Tox_Err_Conference_Invite err;
+    bool ok = tox_conference_invite(core->tox, friend_id, conf_id, &err);
+    fprintf(stderr, "conference_invite friend_id=%u conf_id=%u err=%d\n", friend_id, conf_id, err);
+    return ok;
 }
 
 bool tox_core_group_join(ToxCore *core, const uint8_t *chat_id, size_t length)

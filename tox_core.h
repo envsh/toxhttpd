@@ -43,4 +43,10 @@ int tox_core_group_get_peers(ToxCore *core, uint32_t group_id, uint32_t *peer_id
 char *tox_core_group_get_peer_name(ToxCore *core, uint32_t group_id, uint32_t peer_id);
 uint32_t tox_core_group_send_message(ToxCore *core, uint32_t group_id, const char *message);
 
+int tox_core_get_conference_list(ToxCore *core, uint32_t *conf_list, size_t max_count);
+uint32_t tox_core_conference_new(ToxCore *core);
+bool tox_core_conference_delete(ToxCore *core, uint32_t conf_id);
+uint32_t tox_core_conference_send_message(ToxCore *core, uint32_t conf_id, const char *message);
+bool tox_core_conference_invite(ToxCore *core, uint32_t friend_id, uint32_t conf_id);
+
 #endif /* TOX_CORE_H */
