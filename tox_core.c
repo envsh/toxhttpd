@@ -164,12 +164,12 @@ static void callback_conference_message(Tox *tox, Tox_Conference_Number conf_num
 }
 
 static void callback_conference_invite(Tox *tox, Tox_Friend_Number friend_num, 
-    const uint8_t *data, size_t length, const uint8_t *name, size_t name_len, void *user_data)
+    Tox_Conference_Type type, const uint8_t *cookie, size_t length, void *user_data)
 {
     (void)tox;
-    char name_str[256] = {0};
-    strncpy(name_str, (const char *)name, name_len < 255 ? name_len : 255);
-    LOGI("Tox: conference invite: friend=%u name=%s", friend_num, name_str);
+    (void)cookie;
+    (void)user_data;
+    LOGI("Tox: conference invite: friend=%u type=%d cookie_len=%zu", friend_num, type, length);
 }
 
 static void *iterate_thread_func(void *arg)
@@ -271,7 +271,7 @@ ToxCore *tox_core_init(EventQueue *event_queue)
     tox_callback_file_recv(core->tox, callback_file_recv);
     tox_callback_file_recv_control(core->tox, callback_file_recv_control);
     tox_callback_conference_message(core->tox, callback_conference_message);
-    // tox_callback_conference_invite disabled - signature issue
+    tox_callback_conference_invite(core->tox, callback_conference_invite);
 
     core->running = true;
     pthread_create(&core->iterate_thread, NULL, iterate_thread_func, core);
