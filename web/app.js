@@ -1,14 +1,14 @@
 let currentFriendId = null;
 let currentChatType = 'friend'; // 'friend' or 'group'
-let sse = null;
-let selfInfo = null;
+let lastEventId = 0;
 
 // 加载自己信息
 function loadSelfInfo() {
+    console.log('Loading self info...');
     fetch('/api/self')
         .then(r => r.json())
         .then(data => {
-            selfInfo = data;
+            console.log('Self info:', data);
             const connClass = data.connection_status === 'offline' ? 'offline' : 'online';
             document.getElementById('selfInfo').innerHTML = `
                 <div class="name">${data.name || '未设置名称'}</div>
@@ -16,6 +16,10 @@ function loadSelfInfo() {
                 <div class="address">${data.address}</div>
                 <div class="status ${connClass}">连接: ${data.connection_status}</div>
             `;
+        })
+        .catch(err => {
+            console.error('loadSelfInfo error:', err);
+            document.getElementById('selfInfo').innerHTML = '加载失败';
         });
 }
 
@@ -36,23 +40,26 @@ function showTab(tab) {
 
 // 加载好友列表
 function loadFriends() {
+    console.log('Loading friends...');
     fetch('/api/friends')
         .then(r => r.json())
         .then(data => {
+            console.log('Friends API response:', data);
             const list = document.getElementById('friendList');
             if (!data.friends || data.friends.length === 0) {
                 list.innerHTML = '<div style="padding:10px;color:#6e7681;">暂无好友</div>';
                 return;
             }
-            // 获取每个好友的详细信息
-            const promises = data.friends.map(f => 
+            // data.friends 是数组 [0, 1, 2, ...]，f 就是 friend_id
+            const promises = data.friends.map(friendId => 
                 fetch('/api/friend', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: `friend_id=${f}`
+                    body: `friend_id=${friendId}`
                 }).then(r => r.json())
             );
             Promise.all(promises).then(friends => {
+                console.log('Friends details:', friends);
                 list.innerHTML = friends.map(f => {
                     const isSelected = f.friend_id == currentFriendId;
                     const dotClass = f.connection_status === 'offline' ? 'offline-dot' : 'online-dot';
@@ -63,7 +70,18 @@ function loadFriends() {
                         </div>
                     `;
                 }).join('');
+                
+                // 如果没有选中的好友，自动选中第一个
+                if (currentFriendId === null && friends.length > 0) {
+                    selectFriend(friends[0].friend_id);
+                }
+            }).catch(err => {
+                console.error('loadFriends details error:', err);
+                list.innerHTML = '<div style="padding:10px;color:#f85149;">加载好友详情失败</div>';
             });
+        }).catch(err => {
+            console.error('loadFriends API error:', err);
+            document.getElementById('friendList').innerHTML = '<div style="padding:10px;color:#f85149;">加载好友列表失败</div>';
         });
 }
 
@@ -106,90 +124,42 @@ function selectGroup(groupId) {
     document.getElementById('messageArea').innerHTML = '';
 }
 
-// 显示邀请好友对话框
-function showInviteDialog(groupId) {
-    const friendList = document.getElementById('friendList');
-    const friends = friendList.querySelectorAll('.list-item');
-    if (friends.length === 0) {
-        alert('请先添加好友');
-        return;
-    }
-    
-    let friendOptions = '';
-    friends.forEach(f => {
-        const friendId = f.getAttribute('onclick').match(/\d+/)[0];
-        const friendName = f.querySelector('.item-text').textContent;
-        friendOptions += `<option value="${friendId}">${friendName}</option>`;
-    });
-    
-    const dialog = document.createElement('div');
-    dialog.className = 'modal';
-    dialog.innerHTML = `
-        <div class="modal-content">
-            <h3>邀请好友到群组</h3>
-            <div class="form-group">
-                <label>选择好友:</label>
-                <select id="inviteFriendSelect" style="width:100%;padding:8px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;">
-                    ${friendOptions}
-                </select>
-            </div>
-            <div class="modal-actions">
-                <button onclick="inviteToGroup(${groupId}, this)">邀请</button>
-                <button onclick="this.closest('.modal').remove()">取消</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(dialog);
-}
-
-// 邀请好友到群组
-function inviteToGroup(groupId, btn) {
-    const select = document.getElementById('inviteFriendSelect');
-    const friendId = select.value;
-    
-    fetch('/api/conference_invite', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `friend_id=${friendId}&conference_id=${groupId}`
-    }).then(r => r.json())
-      .then(data => {
-          alert('邀请成功！');
-          btn.closest('.modal').remove();
-      }).catch(err => {
-          alert('邀请失败: ' + err);
-      });
-}
-
-// SSE接收实时消息和状态更新
-function initSSE() {
-    if (sse) sse.close();
-    sse = new EventSource('/events/sse');
-    sse.onmessage = (e) => {
-        try {
-            const event = JSON.parse(e.data);
-            console.log('SSE event:', event);
-            if (event.event_type === 'friend_message') {
-                const data = JSON.parse(event.data);
-                if (data.friend_id == currentFriendId && currentChatType === 'friend') {
-                    appendMessage(data.message, 'other', data.friend_id);
-                }
-            } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
-                // 好友信息更新，刷新列表
-                if (currentChatType === 'friends') loadFriends();
-            } else if (event.event_type === 'connection_status') {
-                // 自己的连接状态更新
-                loadSelfInfo();
+// 长轮询获取事件
+function longPollEvents() {
+    fetch(`/api/events?after=${lastEventId}`)
+        .then(r => r.json())
+        .then(events => {
+            if (events && events.length > 0) {
+                events.forEach(event => {
+                    console.log('Event:', event);
+                    lastEventId = event.event_id;
+                    
+                    if (event.event_type === 'friend_message') {
+                        const data = JSON.parse(event.data);
+                        if (data.friend_id == currentFriendId && currentChatType === 'friend') {
+                            appendMessage(data.message, 'other', data.friend_id);
+                        }
+                    } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
+                        if (currentChatType === 'friends') loadFriends();
+                    } else if (event.event_type === 'connection_status') {
+                        loadSelfInfo();
+                    }
+                });
+                // 有事件，立即继续轮询
+                longPollEvents();
+            } else {
+                // 没有事件，等待 2 秒再轮询，避免请求过于频繁
+                setTimeout(longPollEvents, 2000);
             }
-        } catch (err) {
-            console.error('SSE parse error:', err);
-        }
-    };
-    sse.onerror = () => {
-        console.log('SSE connection lost, reconnecting...');
-        setTimeout(initSSE, 3000); // 断线重连
-    };
+        })
+        .catch(err => {
+            console.error('Long poll error:', err);
+            // 出错后延迟重试
+            setTimeout(longPollEvents, 3000);
+        });
 }
-initSSE();
+
+longPollEvents();
 
 // 追加消息到聊天区域
 function appendMessage(text, type, senderId) {
@@ -265,7 +235,7 @@ function addFriend() {
       .then(data => {
           alert('添加成功！');
           input.value = '';
-          loadFriends();
+          loadFriends(); // 刷新好友列表
       }).catch(err => {
           alert('添加失败: ' + err);
       });
@@ -286,11 +256,13 @@ function createGroup() {
 
 // 显示编辑自己信息模态框
 function showEditSelf() {
-    if (selfInfo) {
-        document.getElementById('editName').value = selfInfo.name || '';
-        document.getElementById('editStatus').value = selfInfo.status_message || '';
-    }
-    document.getElementById('editSelfModal').classList.remove('hidden');
+    fetch('/api/self')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('editName').value = data.name || '';
+            document.getElementById('editStatus').value = data.status_message || '';
+            document.getElementById('editSelfModal').classList.remove('hidden');
+        });
 }
 
 // 隐藏编辑模态框
@@ -345,14 +317,66 @@ function bootstrap() {
     });
 }
 
+// 显示邀请好友对话框
+function showInviteDialog(groupId) {
+    const friendList = document.getElementById('friendList');
+    const friends = friendList.querySelectorAll('.list-item');
+    if (friends.length === 0) {
+        alert('请先添加好友');
+        return;
+    }
+    
+    let friendOptions = '';
+    friends.forEach(f => {
+        const friendId = f.getAttribute('onclick').match(/\d+/)[0];
+        const friendName = f.querySelector('.item-text').textContent;
+        friendOptions += `<option value="${friendId}">${friendName}</option>`;
+    });
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'modal';
+    dialog.innerHTML = `
+        <div class="modal-content">
+            <h3>邀请好友到群组</h3>
+            <div class="form-group">
+                <label>选择好友:</label>
+                <select id="inviteFriendSelect" style="width:100%;padding:8px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;">
+                    ${friendOptions}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button onclick="inviteToGroup(${groupId}, this)">邀请</button>
+                <button onclick="this.closest('.modal').remove()">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(dialog);
+}
+
+// 邀请好友到群组
+function inviteToGroup(groupId, btn) {
+    const select = document.getElementById('inviteFriendSelect');
+    const friendId = select.value;
+    
+    fetch('/api/conference_invite', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `friend_id=${friendId}&conference_id=${groupId}`
+    }).then(r => r.json())
+      .then(data => {
+          alert('邀请成功！');
+          btn.closest('.modal').remove();
+      }).catch(err => {
+          alert('邀请失败: ' + err);
+      });
+}
+
 // 回车发送
 document.getElementById('messageInput').addEventListener('keypress', e => {
     if (e.key === 'Enter') sendMessage();
 });
 
-// 定时刷新
+// 定时刷新自己信息
 setInterval(() => {
-    if (currentChatType === 'friends') loadFriends();
     loadSelfInfo();
 }, 5000);
-loadFriends();

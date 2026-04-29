@@ -7,6 +7,13 @@
 #include "event_queue.h"
 #include "mongoose.h"
 
+typedef struct PendingRequest {
+    struct mg_connection *nc;
+    uint64_t              after;
+    uint64_t              timestamp;  // 用于超时检测
+    struct PendingRequest *next;
+} PendingRequest;
+
 typedef struct HttpServer {
     struct mg_mgr     mgr;
     ToxCore          *tox_core;
@@ -15,6 +22,7 @@ typedef struct HttpServer {
     EventQueue       event_queue;
     int               running;
     uint64_t          last_event_id;  // 用于跟踪已处理的事件
+    PendingRequest   *pending_requests;  // 挂起的长轮询请求
 } HttpServer;
 
 int http_server_init(HttpServer *server, const char *port);

@@ -64,7 +64,14 @@ void sse_driver_broadcast(SSEDriver *driver, const Event *event)
         SSEClient *client = &driver->clients[i];
         if (client->nc && !client->nc->is_closing) {
             char *json = json_event_with_id(event->event_type, event->data);
-            mg_printf(client->nc, "data: %s\r\n\r\n", json);
+            // 构造完整消息，避免 % 被解析为格式说明符
+            int msg_len = 6 + strlen(json) + 4; // "data: " + json + "\r\n\r\n"
+            char *msg = malloc(msg_len);
+            if (msg) {
+                snprintf(msg, msg_len, "data: %s\r\n\r\n", json);
+                mg_send(client->nc, msg, strlen(msg));
+                free(msg);
+            }
             free(json);
         }
     }

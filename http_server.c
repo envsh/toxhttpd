@@ -320,6 +320,66 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
                 else if (mg_strcmp(hm->uri, mg_str("/api/conferences")) == 0) {
                     handle_api_conferences(nc, server);
                 }
+                else if (mg_strcmp(hm->uri, mg_str("/api/events")) == 0) {
+                    // 长轮询：挂起连接直到有新事件或超时
+                    char after_str[32] = {0};
+                    mg_http_get_var(&hm->query, "after", after_str, sizeof(after_str));
+                    uint64_t after = after_str[0] ? (uint64_t)atoll(after_str) : 0;
+                    
+                    // 先检查队列中是否有新事件
+                    Event tmp;
+                    bool has_new = false;
+                    Event *events[64];
+                    int count = 0;
+                    
+                    // 尝试非阻塞弹出
+                    while (count < 64 && event_queue_try_pop(&server->event_queue, &tmp) > 0) {
+                        if (tmp.event_id > after) {
+                            events[count++] = malloc(sizeof(Event));
+                            *events[count-1] = tmp;
+                            has_new = true;
+                        }
+                    }
+                    
+                    if (has_new) {
+                        // 有事件，立即返回
+                        char *json = malloc(8192);
+                        json[0] = '[';
+                        json[1] = '\0';
+                        int off = 1;
+                        for (int i = 0; i < count; i++) {
+                            if (off > 1) {
+                                json[off++] = ',';
+                                json[off] = '\0';
+                            }
+                            char event_json[512];
+                            snprintf(event_json, sizeof(event_json), 
+                                "{\"event_id\":%llu,\"event_type\":\"%s\",\"data\":\"%s\"}",
+                                (unsigned long long)events[i]->event_id,
+                                events[i]->event_type,
+                                events[i]->data);
+                            strcat(json + off, event_json);
+                            off = strlen(json);
+                            free(events[i]);
+                        }
+                        json[off++] = ']';
+                        json[off] = '\0';
+                        
+                        mg_http_reply(nc, 200, "Content-Type: application/json\r\n", "%s", json);
+                        free(json);
+                    } else {
+                        // 无事件，挂起连接
+                        PendingRequest *req = malloc(sizeof(PendingRequest));
+                        req->nc = nc;
+                        req->after = after;
+                        req->timestamp = (uint64_t)time(NULL);
+                        req->next = server->pending_requests;
+                        server->pending_requests = req;
+                        
+                        // 设置连接的上下文，用于关闭时清理
+                        nc->fn_data = req;
+                    }
+                }
                 else if (mg_strcmp(hm->uri, mg_str("/events/sse")) == 0) {
                     handle_sse(nc, server);
                 }
@@ -436,6 +496,18 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
         }
         case MG_EV_CLOSE: {
             ws_driver_remove_client(server->ws_driver, nc);
+            
+            // 清理挂起的长轮询请求
+            PendingRequest **p = &server->pending_requests;
+            while (*p) {
+                if ((*p)->nc == nc) {
+                    PendingRequest *to_free = *p;
+                    *p = to_free->next;
+                    free(to_free);
+                    break;
+                }
+                p = &(*p)->next;
+            }
             break;
         }
     }
@@ -507,6 +579,44 @@ void http_server_poll(HttpServer *server, int timeout_ms)
     while (event_queue_try_pop(&server->event_queue, &event) == 0) {
         sse_driver_broadcast(server->sse_driver, &event);
         ws_driver_broadcast(server->ws_driver, &event);
+        
+        // 检查挂起的长轮询请求
+        PendingRequest **p = &server->pending_requests;
+        while (*p) {
+            PendingRequest *req = *p;
+            if (req->after < event.event_id) {
+                // 有匹配的事件，响应该请求
+                char json[1024];
+                snprintf(json, sizeof(json), 
+                    "[{\"event_id\":%llu,\"event_type\":\"%s\",\"data\":\"%s\"}]",
+                    (unsigned long long)event.event_id,
+                    event.event_type,
+                    event.data);
+                
+                mg_http_reply(req->nc, 200, "Content-Type: application/json\r\n", "%s", json);
+                
+                // 从链表中移除
+                *p = req->next;
+                free(req);
+            } else {
+                p = &req->next;
+            }
+        }
+    }
+    
+    // 检查超时（30秒）
+    uint64_t now = (uint64_t)time(NULL);
+    PendingRequest **p = &server->pending_requests;
+    while (*p) {
+        PendingRequest *req = *p;
+        if (now - req->timestamp > 30) {
+            // 超时，返回空数组
+            mg_http_reply(req->nc, 200, "Content-Type: application/json\r\n", "[]");
+            *p = req->next;
+            free(req);
+        } else {
+            p = &req->next;
+        }
     }
 }
 

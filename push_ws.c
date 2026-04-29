@@ -60,16 +60,35 @@ void ws_driver_broadcast(WSPushDriver *driver, const Event *event)
 {
     pthread_mutex_lock(&driver->lock);
 
-    char ws_frame[4096];
-    snprintf(ws_frame, sizeof(ws_frame),
-        "{\"type\":\"event\",\"event_type\":\"%s\",\"data\":%s}",
-        event->event_type, event->data);
+    // 构造 JSON，用固定字符串拼接，避免 % 被解析为格式说明符
+    // event->data 已经是 JSON 字符串（来自 json_event_with_id）
+    // 格式: {"type":"event","event_type":"xxx","data":{...}}
+    
+    // 计算长度
+    int fixed_part_len = 45; // {"type":"event","event_type":"", "data":
+    int event_type_len = strlen(event->event_type);
+    int data_len = strlen(event->data);
+    int total_len = fixed_part_len + event_type_len + data_len + 2; // +2 for " and }
+    
+    char *ws_frame = malloc(total_len);
+    if (ws_frame) {
+        // 直接拼接，不用 snprintf 格式化
+        char *p = ws_frame;
+        p += sprintf(p, "{\"type\":\"event\",\"event_type\":\"%s\",\"data\":", event->event_type);
+        // event->data 本身已经是 JSON，直接拷贝
+        strcpy(p, event->data);
+        p += data_len;
+        *p = '}';
+        p++;
+        *p = '\0';
 
-    for (int i = 0; i < driver->client_count; i++) {
-        WSClient *client = &driver->clients[i];
-        if (client->nc && !client->nc->is_closing) {
-            mg_ws_send(client->nc, ws_frame, strlen(ws_frame), WEBSOCKET_OP_TEXT);
+        for (int i = 0; i < driver->client_count; i++) {
+            WSClient *client = &driver->clients[i];
+            if (client->nc && !client->nc->is_closing) {
+                mg_ws_send(client->nc, ws_frame, strlen(ws_frame), WEBSOCKET_OP_TEXT);
+            }
         }
+        free(ws_frame);
     }
 
     pthread_mutex_unlock(&driver->lock);
