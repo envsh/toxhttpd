@@ -19,5 +19,6 @@ typedef struct HttpServer {
 int http_server_init(HttpServer *server, const char *port);
 void http_server_destroy(HttpServer *server);
 void http_server_poll(HttpServer *server, int timeout_ms);
+void http_server_stop(HttpServer *server);
 
 #endif /* HTTP_SERVER_H */

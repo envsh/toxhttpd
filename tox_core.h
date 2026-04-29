@@ -11,6 +11,7 @@ typedef struct ToxCore ToxCore;
 ToxCore *tox_core_init(EventQueue *event_queue);
 void tox_core_destroy(ToxCore *core);
 Tox *tox_core_get_tox(ToxCore *core);
+void tox_core_save(ToxCore *core);
 
 bool tox_core_bootstrap(ToxCore *core, const char *address, uint16_t port, const uint8_t *pubkey);
 
@@ -23,6 +24,8 @@ bool tox_core_set_self_status(ToxCore *core, const char *status);
 int tox_core_get_friend_list(ToxCore *core, uint32_t *friends, size_t max_count);
 char *tox_core_get_friend_name(ToxCore *core, uint32_t friend_id);
 char *tox_core_get_friend_status(ToxCore *core, uint32_t friend_id);
+int tox_core_get_friend_connection_status(ToxCore *core, uint32_t friend_id);
+bool tox_core_get_friend_public_key(ToxCore *core, uint32_t friend_id, uint8_t *pubkey);
 bool tox_core_friend_add_norequest(ToxCore *core, const uint8_t *pubkey);
 bool tox_core_friend_delete(ToxCore *core, uint32_t friend_id);
 

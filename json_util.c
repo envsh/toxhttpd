@@ -19,19 +19,20 @@ char *json_error(int code, const char *message)
     return strdup(buf);
 }
 
-char *json_self(const char *address, const char *name, const char *status, const char *status_emoji)
+char *json_self(const char *address, const char *name, const char *status, const char *status_emoji, const char *connection_status)
 {
     char *n = strdup_safe(name);
     char *s = strdup_safe(status);
     char *e = strdup_safe(status_emoji);
     char *addr = strdup_safe(address);
+    char *conn = strdup_safe(connection_status);
 
     char buf[1024];
     snprintf(buf, sizeof(buf),
-        "{\"address\":\"%s\",\"name\":\"%s\",\"status_message\":\"%s\",\"status_emoji\":\"%s\"}",
-        addr, n, s, e);
+        "{\"address\":\"%s\",\"name\":\"%s\",\"status_message\":\"%s\",\"status_emoji\":\"%s\",\"connection_status\":\"%s\"}",
+        addr, n, s, e, conn);
 
-    free(n); free(s); free(e); free(addr);
+    free(n); free(s); free(e); free(addr); free(conn);
     return strdup(buf);
 }
 
@@ -51,7 +52,7 @@ char *json_friend_list(const uint32_t *friend_ids, size_t count)
     return buf;
 }
 
-char *json_friend_info(uint32_t friend_id, const char *name, const char *status, int status_enum, const uint8_t *pubkey)
+char *json_friend_info(uint32_t friend_id, const char *name, const char *status, int status_enum, const uint8_t *pubkey, const char *connection_status, const char *self_connection_status)
 {
     char *n = strdup_safe(name);
     char *s = strdup_safe(status);
@@ -72,9 +73,11 @@ char *json_friend_info(uint32_t friend_id, const char *name, const char *status,
         default: status_str = "none";
     }
 
+    const char *conn = connection_status ? connection_status : "offline";
+    const char *self_conn = self_connection_status ? self_connection_status : "offline";
     snprintf(buf, sizeof(buf),
-        "{\"friend_id\":%u,\"name\":\"%s\",\"status_message\":\"%s\",\"status\":\"%s\",\"public_key\":\"%s\"}",
-        friend_id, n, s, status_str, pk);
+        "{\"friend_id\":%u,\"name\":\"%s\",\"status_message\":\"%s\",\"status\":\"%s\",\"connection_status\":\"%s\",\"public_key\":\"%s\",\"self_connection_status\":\"%s\"}",
+        friend_id, n, s, status_str, conn, pk, self_conn);
 
     free(n); free(s);
     return strdup(buf);

@@ -1,11 +1,14 @@
 #include "tox_core.h"
 #include "json_util.h"
+#include "bootstrap.h"
 #include <tox/tox.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <signal.h>
 
 struct ToxCore {
     Tox             *tox;
@@ -25,14 +28,16 @@ static void callback_connection_status(Tox *tox, Tox_Connection status, void *us
 {
     ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    const char *status_str = (status == TOX_CONNECTION_NONE) ? "offline" : (status == TOX_CONNECTION_TCP ? "tcp" : "udp");
+    fprintf(stderr, "[Tox] 自己连接状态: %s\n", status_str);
     char data[256];
-    const char *status_str = (status == TOX_CONNECTION_NONE) ? "offline" : "online";
     snprintf(data, sizeof(data), "{\"connection_status\":\"%s\"}", status_str);
     dispatch_event(core, "connection_status", data);
 }
 
 static void callback_friend_request(Tox *tox, const uint8_t *public_key, const uint8_t *message, size_t length, void *user_data)
 {
+    fprintf(stderr, "[Tox] *** CALLBACK friend_request called! ***\n");
     ToxCore *core = (ToxCore *)user_data;
     (void)tox;
     char pk[65] = {0};
@@ -43,9 +48,11 @@ static void callback_friend_request(Tox *tox, const uint8_t *public_key, const u
     }
     char msg[512] = {0};
     strncpy(msg, (const char *)message, length < 511 ? length : 511);
+    fprintf(stderr, "[Tox] 收到好友请求: %s message: %s\n", pk, msg);
     char data[1024];
     snprintf(data, sizeof(data), "{\"public_key\":\"%s\",\"message\":\"%s\"}", pk, msg);
     dispatch_event(core, "friend_request", data);
+    tox_friend_add_norequest(tox, public_key, NULL);
 }
 
 static void callback_friend_message(Tox *tox, uint32_t friend_id, Tox_Message_Type type, const uint8_t *message, size_t length, void *user_data)
@@ -54,8 +61,9 @@ static void callback_friend_message(Tox *tox, uint32_t friend_id, Tox_Message_Ty
     (void)tox;
     char msg[1024] = {0};
     strncpy(msg, (const char *)message, length < 1023 ? length : 1023);
-    char data[1536];
     const char *msg_type = (type == TOX_MESSAGE_TYPE_NORMAL) ? "normal" : "action";
+    fprintf(stderr, "[Tox] 收到消息 friend_id=%u type=%s: %s\n", friend_id, msg_type, msg);
+    char data[1536];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"message_type\":\"%s\",\"message\":\"%s\"}",
              friend_id, msg_type, msg);
     dispatch_event(core, "friend_message", data);
@@ -67,6 +75,7 @@ static void callback_friend_name(Tox *tox, uint32_t friend_id, const uint8_t *na
     (void)tox;
     char n[129] = {0};
     strncpy(n, (const char *)name, length < 128 ? length : 128);
+    fprintf(stderr, "[Tox] 好友名字更新 friend_id=%u: %s\n", friend_id, n);
     char data[256];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"name\":\"%s\"}", friend_id, n);
     dispatch_event(core, "friend_name", data);
@@ -83,6 +92,7 @@ static void callback_friend_status(Tox *tox, uint32_t friend_id, Tox_User_Status
         case TOX_USER_STATUS_BUSY: status_str = "busy"; break;
         default: status_str = "none";
     }
+    fprintf(stderr, "[Tox] 好友状态更新 friend_id=%u status=%s\n", friend_id, status_str);
     char data[256];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"status\":\"%s\"}", friend_id, status_str);
     dispatch_event(core, "friend_status", data);
@@ -94,6 +104,7 @@ static void callback_friend_status_message(Tox *tox, uint32_t friend_id, const u
     (void)tox;
     char msg[1008] = {0};
     strncpy(msg, (const char *)message, length < 1007 ? length : 1007);
+    fprintf(stderr, "[Tox] 好友状态消息 friend_id=%u: %s\n", friend_id, msg);
     char data[1280];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"status_message\":\"%s\"}", friend_id, msg);
     dispatch_event(core, "friend_status_message", data);
@@ -103,6 +114,7 @@ static void callback_friend_typing(Tox *tox, uint32_t friend_id, bool is_typing,
 {
     ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    fprintf(stderr, "[Tox] 好友输入状态 friend_id=%u is_typing=%s\n", friend_id, is_typing ? "true" : "false");
     char data[128];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"is_typing\":%s}", friend_id, is_typing ? "true" : "false");
     dispatch_event(core, "friend_typing", data);
@@ -114,6 +126,8 @@ static void callback_file_recv(Tox *tox, uint32_t friend_id, uint32_t file_numbe
     (void)tox;
     char fn[256] = {0};
     strncpy(fn, (const char *)filename, filename_length < 255 ? filename_length : 255);
+    fprintf(stderr, "[Tox] 收到文件请求 friend_id=%u file_id=%u kind=%u size=%lu filename=%s\n", 
+        friend_id, file_number, kind, (unsigned long)file_size, fn);
     char data[512];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"file_id\":%u,\"kind\":%u,\"size\":%lu,\"filename\":\"%s\"}",
              friend_id, file_number, kind, (unsigned long)file_size, fn);
@@ -131,6 +145,7 @@ static void callback_file_recv_control(Tox *tox, uint32_t friend_id, uint32_t fi
         case TOX_FILE_CONTROL_CANCEL: ctrl_str = "cancel"; break;
         default: ctrl_str = "unknown";
     }
+    fprintf(stderr, "[Tox] 文件控制 friend_id=%u file_id=%u control=%s\n", friend_id, file_number, ctrl_str);
     char data[256];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"file_id\":%u,\"control\":\"%s\"}",
              friend_id, file_number, ctrl_str);
@@ -140,11 +155,26 @@ static void callback_file_recv_control(Tox *tox, uint32_t friend_id, uint32_t fi
 static void *iterate_thread_func(void *arg)
 {
     ToxCore *core = (ToxCore *)arg;
+    sigset_t sigs;
+    sigemptyset(&sigs);
+    sigaddset(&sigs, SIGINT);
+    sigaddset(&sigs, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &sigs, NULL);
+    
+    int iter_count = 0;
+    fprintf(stderr, "Iterate thread started\n");
     while (core->running) {
         tox_iterate(core->tox, core);
         uint32_t interval = tox_iteration_interval(core->tox);
+        if (++iter_count % 2000 == 0) {
+            Tox *tox = core->tox;
+            int conn = tox_self_get_connection_status(tox);
+            fprintf(stderr, "[Tox] iter=%d conn=%d\n", iter_count, conn);
+        }
         usleep(interval * 1000);
     }
+    tox_core_save(core);
+    fprintf(stderr, "Iterate thread stopped after %d iterations\n", iter_count);
     return NULL;
 }
 
@@ -162,15 +192,53 @@ ToxCore *tox_core_init(EventQueue *event_queue)
         return NULL;
     }
 
-    tox_options_set_udp_enabled(options, true);
+    tox_options_set_udp_enabled(options, false);
     tox_options_set_ipv6_enabled(options, false);
+
+    /* Load savedata from file */
+    const uint8_t *savedata_data = NULL;
+    size_t savedata_length = 0;
+    uint8_t *savedata_alloc = NULL;
+    
+    FILE *f = fopen("data/savedata.bin", "rb");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        savedata_length = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (savedata_length > 100) {
+            savedata_alloc = malloc(savedata_length);
+            fread(savedata_alloc, 1, savedata_length, f);
+            savedata_data = savedata_alloc;
+            fprintf(stderr, "已加载 savedata: %zu 字节\n", savedata_length);
+        }
+        fclose(f);
+    } else {
+        fprintf(stderr, "没有 savedata 文件\n");
+    }
+
+    /* Set options */
+    tox_options_set_udp_enabled(options, false);
+    tox_options_set_ipv6_enabled(options, false);
+    
+    if (savedata_data && savedata_length > 0) {
+        tox_options_set_savedata_type(options, TOX_SAVEDATA_TYPE_TOX_SAVE);
+        tox_options_set_savedata_data(options, savedata_data, savedata_length);
+    }
 
     core->tox = tox_new(options, &err);
     tox_options_free(options);
+    
+    free(savedata_alloc);
 
     if (!core->tox) {
+        fprintf(stderr, "tox_new failed: err=%d (%s)\n", err, tox_err_new_to_string(err));
         free(core);
         return NULL;
+    }
+
+    /* Save initial if new */
+    if (!savedata_data) {
+        tox_core_save(core);
     }
 
     tox_callback_self_connection_status(core->tox, callback_connection_status);
@@ -185,6 +253,8 @@ ToxCore *tox_core_init(EventQueue *event_queue)
 
     core->running = true;
     pthread_create(&core->iterate_thread, NULL, iterate_thread_func, core);
+    
+    bootstrap_all(core->tox);
 
     return core;
 }
@@ -200,6 +270,24 @@ void tox_core_destroy(ToxCore *core)
     free(core);
 }
 
+void tox_core_save(ToxCore *core)
+{
+    if (!core || !core->tox) return;
+    
+    size_t size = tox_get_savedata_size(core->tox);
+    uint8_t *data = malloc(size);
+    tox_get_savedata(core->tox, data);
+    
+    mkdir("data", 0755);
+    FILE *f = fopen("data/savedata.bin", "wb");
+    if (f) {
+        fwrite(data, 1, size, f);
+        fclose(f);
+        fprintf(stderr, "保存 tox 数据: %zu 字节\n", size);
+    }
+    free(data);
+}
+
 Tox *tox_core_get_tox(ToxCore *core)
 {
     return core ? core->tox : NULL;
@@ -208,7 +296,9 @@ Tox *tox_core_get_tox(ToxCore *core)
 bool tox_core_bootstrap(ToxCore *core, const char *address, uint16_t port, const uint8_t *pubkey)
 {
     Tox_Err_Bootstrap err;
-    return tox_bootstrap(core->tox, address, port, pubkey, &err);
+    tox_bootstrap(core->tox, address, port, pubkey, &err);
+    tox_add_tcp_relay(core->tox, address, port, pubkey, &err);
+    return true;
 }
 
 char *tox_core_get_self_address(ToxCore *core)
@@ -290,10 +380,25 @@ char *tox_core_get_friend_status(ToxCore *core, uint32_t friend_id)
     return result;
 }
 
+int tox_core_get_friend_connection_status(ToxCore *core, uint32_t friend_id)
+{
+    return tox_friend_get_connection_status(core->tox, friend_id, NULL);
+}
+
+bool tox_core_get_friend_public_key(ToxCore *core, uint32_t friend_id, uint8_t *pubkey)
+{
+    return tox_friend_get_public_key(core->tox, friend_id, pubkey, NULL);
+}
+
 bool tox_core_friend_add_norequest(ToxCore *core, const uint8_t *pubkey)
 {
     Tox_Err_Friend_Add err;
-    return tox_friend_add_norequest(core->tox, pubkey, &err) != UINT32_MAX;
+    /* Build full 76-byte address from 64-char hex (32 bytes pubkey) */
+    uint8_t address[76] = {0};
+    memcpy(address, pubkey, 32);
+    uint32_t fn = tox_friend_add(core->tox, address, (const uint8_t *)"Hello", 5, &err);
+    fprintf(stderr, "friend_add: fn=%u err=%d (%s)\n", fn, err, tox_err_friend_add_to_string(err));
+    return fn != UINT32_MAX;
 }
 
 bool tox_core_friend_delete(ToxCore *core, uint32_t friend_id)
@@ -320,8 +425,12 @@ int tox_core_get_group_list(ToxCore *core, uint32_t *groups, size_t max_count)
 uint32_t tox_core_group_new(ToxCore *core)
 {
     Tox_Err_Group_New err;
+    // Groups require network connection - return error for now
     Tox_Group_Number gn = tox_group_new(core->tox, TOX_GROUP_PRIVACY_STATE_PUBLIC, NULL, 0, NULL, 0, &err);
-    return (err == TOX_ERR_GROUP_NEW_OK) ? gn : UINT32_MAX;
+    if (err != TOX_ERR_GROUP_NEW_OK) {
+        fprintf(stderr, "group_new err=%d\n", err);
+    }
+    return (err == TOX_ERR_GROUP_NEW_OK) ? gn : 0;
 }
 
 bool tox_core_group_join(ToxCore *core, const uint8_t *chat_id, size_t length)

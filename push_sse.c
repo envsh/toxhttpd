@@ -64,7 +64,7 @@ void sse_driver_broadcast(SSEDriver *driver, const Event *event)
         SSEClient *client = &driver->clients[i];
         if (client->nc && !client->nc->is_closing) {
             char *json = json_event_with_id(event->event_type, event->data);
-            mg_printf(client->nc, "data: %s\n\n", json);
+            mg_printf(client->nc, "data: %s\r\n\r\n", json);
             free(json);
         }
     }
