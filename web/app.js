@@ -2,9 +2,16 @@ let currentFriendId = null;
 let currentChatType = 'friend'; // 'friend' or 'group'
 let lastEventId = 0;
 
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
+    loadSelfInfo();
+    loadFriends(); // 默认加载好友列表
+    longPollEvents();
+});
+
 // 加载自己信息
 function loadSelfInfo() {
-    console.log('Loading self info...');
     fetch('/api/self')
         .then(r => r.json())
         .then(data => {
@@ -21,10 +28,6 @@ function loadSelfInfo() {
             console.error('loadSelfInfo error:', err);
             document.getElementById('selfInfo').innerHTML = '加载失败';
         });
-}
-
-loadSelfInfo();
-
 // Tab切换
 function showTab(tab) {
     currentChatType = tab;
@@ -377,6 +380,6 @@ document.getElementById('messageInput').addEventListener('keypress', e => {
 });
 
 // 定时刷新自己信息
-setInterval(() => {
+setInterval(function() {
     loadSelfInfo();
 }, 5000);

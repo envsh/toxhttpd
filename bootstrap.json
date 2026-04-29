@@ -1,0 +1,25 @@
+{
+  "bootstrap_nodes": [
+    {
+      "ipv4": "144.217.167.73",
+      "ipv6": "-",
+      "port": 33445,
+      "public_key": "7E5668E0EE09E19F320AD47902419331FFEE147BB3606769CFBE921A2A2FD34C",
+      "maintainer": "velusip"
+    },
+    {
+      "ipv4": "tox.abilinski.com",
+      "ipv6": "-",
+      "port": 33445,
+      "public_key": "10C00EB250C3233E343E2AEBA07115A5C28920E9C8D29492F6D00B29049EDC7E",
+      "maintainer": "AnthonyBilinski"
+    },
+    {
+      "ipv4": "tox1.mf-net.eu",
+      "ipv6": "tox1.mf-net.eu",
+      "port": 33445,
+      "public_key": "B3E5FA80DC8EBD1149AD2AB35ED8B85BD546DEDE261CA593234C619249419506",
+      "maintainer": "2mf"
+    }
+  ]
+}
