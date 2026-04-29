@@ -1,4 +1,5 @@
 #include "bootstrap.h"
+#include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,16 +22,16 @@ void bootstrap_all(Tox *tox)
             pubkey[j] = strtol(tmp, NULL, 16);
         }
         tox_bootstrap(tox, nodes[i].ipv4, nodes[i].port, pubkey, &err);
-        fprintf(stderr, "Bootstrap %d: UDP %s:%d\n", i, nodes[i].ipv4, nodes[i].port);
+        LOGI("Bootstrap %d: UDP %s:%d", i, nodes[i].ipv4, nodes[i].port);
         tox_add_tcp_relay(tox, nodes[i].ipv4, nodes[i].port, pubkey, &err);
-        fprintf(stderr, "Bootstrap %d: TCP relay %s:%d\n", i, nodes[i].ipv4, nodes[i].port);
+        LOGI("Bootstrap %d: TCP relay %s:%d", i, nodes[i].ipv4, nodes[i].port);
     }
 }
 
 int bootstrap_load(const char *filename)
 {
     (void)filename;
-    fprintf(stderr, "bootstrap: using 3 hardcoded nodes\n");
+    LOGI("bootstrap: using 3 hardcoded nodes");;
     return 0;
 }
 
@@ -48,5 +49,5 @@ void bootstrap_random(uint8_t *pubkey, uint16_t *port, char *address)
         pubkey[i] = strtol(tmp, NULL, 16);
     }
     
-    fprintf(stderr, "bootstrap: node %d - %s:%d\n", idx, address, *port);
+    LOGI("bootstrap: node %d - %s:%d", idx, address, *port);
 }

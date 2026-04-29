@@ -1,5 +1,6 @@
 #include "http_server.h"
 #include "config.h"
+#include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -31,7 +32,9 @@ int main(int argc, char *argv[])
 
     log_file = fopen("log.txt", "a");
     
-    fprintf(stderr, "正在启动 toxhttpd 端口 %s\n", port);
+    log_init(LOG_INFO);
+    log_set_file(stderr);
+    LOGI("Starting toxhttpd port %s", port);
     
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -39,7 +42,7 @@ int main(int argc, char *argv[])
     HttpServer server;
     g_server = &server;
     if (http_server_init(&server, port) != 0) {
-        fprintf(stderr, "ERROR: Failed to initialize HTTP server\n");
+        LOGE("Failed to initialize HTTP server");
         return 1;
     }
 
@@ -47,7 +50,7 @@ int main(int argc, char *argv[])
         http_server_poll(&server, 100);
     }
 
-    fprintf(stderr, "正在关闭...\n");
+    LOGI("Shutting down...");
     http_server_destroy(&server);
     
     if (log_file) {

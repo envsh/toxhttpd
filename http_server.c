@@ -1,6 +1,7 @@
 #include "http_server.h"
 #include "json_util.h"
 #include "bootstrap.h"
+#include "log.h"
 #include <tox/tox.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,6 +158,7 @@ static void handle_api_friends_add(struct mg_connection *nc, HttpServer *server,
 
     size_t len = strlen(pubkey_str);
     fprintf(stderr, "DEBUG: pubkey_str len=%zu\n", len);
+    LOGD("pubkey_str len=%zu", len);
 
     Tox *tox = tox_core_get_tox(server->tox_core);
     Tox_Err_Friend_Add err;
@@ -166,12 +168,12 @@ static void handle_api_friends_add(struct mg_connection *nc, HttpServer *server,
         uint8_t pubkey[32];
         parse_hex_to_pubkey(pubkey_str, pubkey, 32);
         fn = tox_friend_add_norequest(tox, pubkey, &err);
-        fprintf(stderr, "DEBUG: friend_add (norequest): fn=%u err=%d (%s)\n", fn, err, tox_err_friend_add_to_string(err));
+        LOGD("friend_add (norequest): fn=%u err=%d (%s)", fn, err, tox_err_friend_add_to_string(err));
     } else {
         uint8_t address[TOX_ADDRESS_SIZE];
         parse_hex_to_pubkey(pubkey_str, address, TOX_ADDRESS_SIZE);
         fn = tox_friend_add(tox, address, (const uint8_t *)"Hello!", 6, &err);
-        fprintf(stderr, "DEBUG: friend_add (request): fn=%u err=%d (%s)\n", fn, err, tox_err_friend_add_to_string(err));
+        LOGD("friend_add (request): fn=%u err=%d (%s)", fn, err, tox_err_friend_add_to_string(err));
     }
     
     if (fn != UINT32_MAX) {
@@ -199,7 +201,7 @@ static void handle_api_messages(struct mg_connection *nc, HttpServer *server, co
     uint32_t msg_id = tox_friend_send_message(tox, friend_id, TOX_MESSAGE_TYPE_NORMAL, 
         (const uint8_t *)message, strlen(message), &err);
     
-    fprintf(stderr, "send_message: friend_id=%u msg_id=%u err=%d\n", friend_id, msg_id, err);
+    LOGD("send_message: friend_id=%u msg_id=%u err=%d", friend_id, msg_id, err);
     
     if (err == TOX_ERR_FRIEND_SEND_MESSAGE_OK) {
         char *json = json_message_sent(msg_id);
@@ -241,7 +243,7 @@ static void handle_api_group_message(struct mg_connection *nc, HttpServer *serve
     uint32_t group_id = atoi(group_id_str);
     uint32_t msg_id = tox_core_group_send_message(server->tox_core, group_id, message);
     
-    fprintf(stderr, "group_send: group_id=%u msg_id=%u\n", group_id, msg_id);
+    LOGD("group_send: group_id=%u msg_id=%u", group_id, msg_id);
     
     char buf[128];
     snprintf(buf, sizeof(buf), "{\"message_id\":%u}", msg_id);
@@ -290,7 +292,7 @@ static void handle_api_conference_message(struct mg_connection *nc, HttpServer *
 static void handle_api_conference_invite(struct mg_connection *nc, HttpServer *server, uint32_t friend_id, uint32_t conf_id)
 {
     bool ok = tox_core_conference_invite(server->tox_core, friend_id, conf_id);
-    fprintf(stderr, "conference_invite friend_id=%u conf_id=%u result=%s\n", friend_id, conf_id, ok ? "ok" : "fail");
+    LOGI("conference_invite friend_id=%u conf_id=%u result=%s", friend_id, conf_id, ok ? "ok" : "fail");
     char buf[128];
     snprintf(buf, sizeof(buf), "{\"success\":%s}", ok ? "true" : "false");
     send_json(nc, buf);
@@ -454,7 +456,7 @@ int http_server_init(HttpServer *server, const char *port)
 
     server->tox_core = tox_core_init(&server->event_queue);
     if (!server->tox_core) {
-        fprintf(stderr, "ERROR: Failed to init tox_core\n");
+        LOGE("Failed to init tox_core");
         return -1;
     }
 
@@ -474,16 +476,16 @@ int http_server_init(HttpServer *server, const char *port)
     snprintf(url, sizeof(url), "http://0.0.0.0:%s", port);
     
     if (!mg_http_listen(&server->mgr, url, ev_handler, server)) {
-        fprintf(stderr, "ERROR: Failed to listen on %s\n", url);
+        LOGE("Failed to listen on %s", url);
         return -1;
     }
     
-    fprintf(stderr, "服务启动在 http://localhost:%s\n", port);
+    LOGI("Server listening on http://localhost:%s", port);
     
     Tox *tox = tox_core_get_tox(server->tox_core);
     uint8_t address[TOX_ADDRESS_SIZE];
     tox_self_get_address(tox, address);
-    fprintf(stderr, "我的 Tox ID: ");
+    LOGI("My Tox ID: ");
     for (int i = 0; i < TOX_ADDRESS_SIZE; i++) {
         fprintf(stderr, "%02x", address[i]);
     }
