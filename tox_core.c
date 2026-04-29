@@ -27,8 +27,8 @@ static void dispatch_event(ToxCore *core, const char *event_type, const char *da
 
 static void callback_connection_status(Tox *tox, Tox_Connection status, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     const char *status_str = (status == TOX_CONNECTION_NONE) ? "offline" : (status == TOX_CONNECTION_TCP ? "tcp" : "udp");
     LOGI("Tox: connection status: %s", status_str);
     char data[256];
@@ -38,9 +38,8 @@ static void callback_connection_status(Tox *tox, Tox_Connection status, void *us
 
 static void callback_friend_request(Tox *tox, const uint8_t *public_key, const uint8_t *message, size_t length, void *user_data)
 {
-    LOGI("Tox: friend_request callback called");
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     char pk[65] = {0};
     for (int i = 0; i < 32; i++) {
         char tmp[4];
@@ -58,8 +57,8 @@ static void callback_friend_request(Tox *tox, const uint8_t *public_key, const u
 
 static void callback_friend_message(Tox *tox, uint32_t friend_id, Tox_Message_Type type, const uint8_t *message, size_t length, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     char msg[1024] = {0};
     strncpy(msg, (const char *)message, length < 1023 ? length : 1023);
     const char *msg_type = (type == TOX_MESSAGE_TYPE_NORMAL) ? "normal" : "action";
@@ -72,8 +71,8 @@ static void callback_friend_message(Tox *tox, uint32_t friend_id, Tox_Message_Ty
 
 static void callback_friend_name(Tox *tox, uint32_t friend_id, const uint8_t *name, size_t length, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     char n[129] = {0};
     strncpy(n, (const char *)name, length < 128 ? length : 128);
     LOGI("Tox: friend name: friend_id=%u: %s", friend_id, n);
@@ -84,8 +83,8 @@ static void callback_friend_name(Tox *tox, uint32_t friend_id, const uint8_t *na
 
 static void callback_friend_status(Tox *tox, uint32_t friend_id, Tox_User_Status status, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     const char *status_str;
     switch (status) {
         case TOX_USER_STATUS_NONE: status_str = "none"; break;
@@ -101,8 +100,8 @@ static void callback_friend_status(Tox *tox, uint32_t friend_id, Tox_User_Status
 
 static void callback_friend_status_message(Tox *tox, uint32_t friend_id, const uint8_t *message, size_t length, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     char msg[1008] = {0};
     strncpy(msg, (const char *)message, length < 1007 ? length : 1007);
     LOGI("Tox: friend status message: friend_id=%u: %s", friend_id, msg);
@@ -113,8 +112,8 @@ static void callback_friend_status_message(Tox *tox, uint32_t friend_id, const u
 
 static void callback_friend_typing(Tox *tox, uint32_t friend_id, bool is_typing, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     LOGI("Tox: friend typing: friend_id=%u is_typing=%s", friend_id, is_typing ? "true" : "false");
     char data[128];
     snprintf(data, sizeof(data), "{\"friend_id\":%u,\"is_typing\":%s}", friend_id, is_typing ? "true" : "false");
@@ -123,8 +122,8 @@ static void callback_friend_typing(Tox *tox, uint32_t friend_id, bool is_typing,
 
 static void callback_file_recv(Tox *tox, uint32_t friend_id, uint32_t file_number, uint32_t kind, uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     char fn[256] = {0};
     strncpy(fn, (const char *)filename, filename_length < 255 ? filename_length : 255);
     LOGI("Tox: file recv request: friend_id=%u file_id=%u kind=%u size=%lu filename=%s", 
@@ -137,8 +136,8 @@ static void callback_file_recv(Tox *tox, uint32_t friend_id, uint32_t file_numbe
 
 static void callback_file_recv_control(Tox *tox, uint32_t friend_id, uint32_t file_number, Tox_File_Control control, void *user_data)
 {
-    ToxCore *core = (ToxCore *)user_data;
     (void)tox;
+    ToxCore *core = (ToxCore *)user_data;
     const char *ctrl_str;
     switch (control) {
         case TOX_FILE_CONTROL_RESUME: ctrl_str = "resume"; break;
@@ -158,6 +157,7 @@ static void callback_conference_message(Tox *tox, Tox_Conference_Number conf_num
 {
     (void)tox;
     (void)type;
+    (void)user_data;
     char msg[1024] = {0};
     strncpy(msg, (const char *)message, length < 1023 ? length : 1023);
     LOGI("Tox: conference message: conf=%u peer=%u: %s", conf_num, peer_id, msg);
@@ -184,7 +184,7 @@ static void *iterate_thread_func(void *arg)
     int iter_count = 0;
     LOGI("Iterate thread started");
     while (core->running) {
-        tox_iterate(core->tox, core);
+        tox_iterate(core->tox, core);  // core 作为 user_data 传入
         uint32_t interval = tox_iteration_interval(core->tox);
         if (++iter_count % 2000 == 0) {
             Tox *tox = core->tox;
@@ -415,7 +415,6 @@ bool tox_core_get_friend_public_key(ToxCore *core, uint32_t friend_id, uint8_t *
 bool tox_core_friend_add_norequest(ToxCore *core, const uint8_t *pubkey)
 {
     Tox_Err_Friend_Add err;
-    /* Build full 76-byte address from 64-char hex (32 bytes pubkey) */
     uint8_t address[76] = {0};
     memcpy(address, pubkey, 32);
     uint32_t fn = tox_friend_add(core->tox, address, (const uint8_t *)"Hello", 5, &err);
@@ -453,48 +452,6 @@ uint32_t tox_core_group_new(ToxCore *core)
         fprintf(stderr, "group_new err=%d\n", err);
     }
     return (err == TOX_ERR_GROUP_NEW_OK) ? gn : 0;
-}
-
-int tox_core_get_conference_list(ToxCore *core, uint32_t *conf_list, size_t max_count)
-{
-    size_t count = tox_conference_get_chatlist_size(core->tox);
-    if (count > max_count) count = max_count;
-    tox_conference_get_chatlist(core->tox, conf_list);
-    return (int)count;
-}
-
-uint32_t tox_core_conference_new(ToxCore *core)
-{
-    Tox_Err_Conference_New err;
-    Tox_Conference_Number cn = tox_conference_new(core->tox, &err);
-    fprintf(stderr, "conference_new err=%d\n", err);
-    return (err == TOX_ERR_CONFERENCE_NEW_OK) ? cn : 0;
-}
-
-bool tox_core_conference_delete(ToxCore *core, uint32_t conf_id)
-{
-    Tox_Err_Conference_Delete err;
-    bool ok = tox_conference_delete(core->tox, conf_id, &err);
-    fprintf(stderr, "conference_delete conf_id=%u err=%d\n", conf_id, err);
-    return ok;
-}
-
-uint32_t tox_core_conference_send_message(ToxCore *core, uint32_t conf_id, const char *message)
-{
-    Tox_Err_Conference_Send_Message err;
-    size_t len = strlen(message);
-    uint32_t msg_id = tox_conference_send_message(core->tox, conf_id, TOX_MESSAGE_TYPE_NORMAL, 
-        (const uint8_t *)message, len, &err);
-    fprintf(stderr, "conference_send conf_id=%u msg_id=%u err=%d\n", conf_id, msg_id, err);
-    return msg_id;
-}
-
-bool tox_core_conference_invite(ToxCore *core, uint32_t friend_id, uint32_t conf_id)
-{
-    Tox_Err_Conference_Invite err;
-    bool ok = tox_conference_invite(core->tox, friend_id, conf_id, &err);
-    fprintf(stderr, "conference_invite friend_id=%u conf_id=%u err=%d\n", friend_id, conf_id, err);
-    return ok;
 }
 
 bool tox_core_group_join(ToxCore *core, const uint8_t *chat_id, size_t length)
@@ -573,4 +530,46 @@ uint32_t tox_core_group_send_message(ToxCore *core, uint32_t group_id, const cha
     Tox_Err_Group_Send_Message err;
     size_t len = strlen(message);
     return tox_group_send_message(core->tox, group_id, TOX_MESSAGE_TYPE_NORMAL, (const uint8_t *)message, len, &err);
+}
+
+int tox_core_get_conference_list(ToxCore *core, uint32_t *conf_list, size_t max_count)
+{
+    size_t count = tox_conference_get_chatlist_size(core->tox);
+    if (count > max_count) count = max_count;
+    tox_conference_get_chatlist(core->tox, conf_list);
+    return (int)count;
+}
+
+uint32_t tox_core_conference_new(ToxCore *core)
+{
+    Tox_Err_Conference_New err;
+    Tox_Conference_Number cn = tox_conference_new(core->tox, &err);
+    fprintf(stderr, "conference_new err=%d\n", err);
+    return (err == TOX_ERR_CONFERENCE_NEW_OK) ? cn : 0;
+}
+
+bool tox_core_conference_delete(ToxCore *core, uint32_t conf_id)
+{
+    Tox_Err_Conference_Delete err;
+    bool ok = tox_conference_delete(core->tox, conf_id, &err);
+    fprintf(stderr, "conference_delete conf_id=%u err=%d\n", conf_id, err);
+    return ok;
+}
+
+uint32_t tox_core_conference_send_message(ToxCore *core, uint32_t conf_id, const char *message)
+{
+    Tox_Err_Conference_Send_Message err;
+    size_t len = strlen(message);
+    uint32_t msg_id = tox_conference_send_message(core->tox, conf_id, TOX_MESSAGE_TYPE_NORMAL, 
+        (const uint8_t *)message, len, &err);
+    fprintf(stderr, "conference_send conf_id=%u msg_id=%u err=%d\n", conf_id, msg_id, err);
+    return msg_id;
+}
+
+bool tox_core_conference_invite(ToxCore *core, uint32_t friend_id, uint32_t conf_id)
+{
+    Tox_Err_Conference_Invite err;
+    bool ok = tox_conference_invite(core->tox, friend_id, conf_id, &err);
+    fprintf(stderr, "conference_invite friend_id=%u conf_id=%u err=%d\n", friend_id, conf_id, err);
+    return ok;
 }

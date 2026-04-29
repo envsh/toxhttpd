@@ -29,14 +29,11 @@ static void handle_sse(struct mg_connection *nc, HttpServer *server)
     mg_printf(nc, "Connection: keep-alive\r\n");
     mg_printf(nc, "Cache-Control: no-cache\r\n");
     mg_printf(nc, "\r\n");
+    fflush(stdout);
 
     sse_driver_add_client(server->sse_driver, nc);
-
-    while (!nc->is_closing) {
-        usleep(100000);
-    }
-
-    sse_driver_remove_client(server->sse_driver, nc);
+    // 不要阻塞！直接返回，Mongoose 会保持连接打开
+    // 连接关闭时会触发 MG_EV_CLOSE 事件
 }
 
 static void handle_api_self(struct mg_connection *nc, HttpServer *server)
@@ -330,6 +327,10 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
                     mg_ws_upgrade(nc, hm, NULL);
                     ws_driver_add_client(server->ws_driver, nc);
                 }
+                else if (mg_match(hm->uri, mg_str("/web/*"), NULL)) {
+                    struct mg_http_serve_opts opts = {.root_dir = "."};
+                    mg_http_serve_dir(nc, hm, &opts);
+                }
                 else {
                     mg_http_reply(nc, 404, "Content-Type: application/json\r\n", "{\"error\":404,\"message\":\"not found\"}");
                 }
@@ -410,6 +411,17 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
                     mg_http_get_var(&hm->body, "message", message, sizeof(message));
                     handle_api_conference_message(nc, server, conf_id, message);
                 }
+                else if (mg_strcmp(hm->uri, mg_str("/api/conference_invite")) == 0) {
+                    char friend_id[32] = {0};
+                    char conf_id[32] = {0};
+                    mg_http_get_var(&hm->body, "friend_id", friend_id, sizeof(friend_id));
+                    mg_http_get_var(&hm->body, "conference_id", conf_id, sizeof(conf_id));
+                    if (friend_id[0] && conf_id[0]) {
+                        handle_api_conference_invite(nc, server, atoi(friend_id), atoi(conf_id));
+                    } else {
+                        send_error(nc, 400, "missing friend_id or conference_id");
+                    }
+                }
                 else {
                     mg_http_reply(nc, 404, "Content-Type: application/json\r\n", "{\"error\":404,\"message\":\"not found\"}");
                 }
@@ -427,22 +439,6 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data)
             break;
         }
     }
-}
-
-static void *dispatch_thread_func(void *arg)
-{
-    HttpServer *server = (HttpServer *)arg;
-    EventQueue *queue = &server->event_queue;
-
-    while (server->running) {
-        Event event;
-        int ret = event_queue_pop(queue, &event);
-        if (ret == 0) {
-            sse_driver_broadcast(server->sse_driver, &event);
-            ws_driver_broadcast(server->ws_driver, &event);
-        }
-    }
-    return NULL;
 }
 
 int http_server_init(HttpServer *server, const char *port)
@@ -466,9 +462,6 @@ int http_server_init(HttpServer *server, const char *port)
     server->running = 1;
 
     global_server = server;
-
-    pthread_t dispatch_thread;
-    pthread_create(&dispatch_thread, NULL, dispatch_thread_func, server);
 
     mg_mgr_init(&server->mgr);
     
@@ -508,6 +501,13 @@ void http_server_destroy(HttpServer *server)
 void http_server_poll(HttpServer *server, int timeout_ms)
 {
     mg_mgr_poll(&server->mgr, timeout_ms);
+    
+    // 在主线程（Mongoose事件循环）中消费队列并广播事件
+    Event event;
+    while (event_queue_try_pop(&server->event_queue, &event) == 0) {
+        sse_driver_broadcast(server->sse_driver, &event);
+        ws_driver_broadcast(server->ws_driver, &event);
+    }
 }
 
 void http_server_stop(HttpServer *server)

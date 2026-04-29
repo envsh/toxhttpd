@@ -30,6 +30,7 @@ int event_queue_init(EventQueue *q);
 void event_queue_destroy(EventQueue *q);
 int event_queue_push(EventQueue *q, const char *event_type, const char *data);
 int event_queue_pop(EventQueue *q, Event *event);
+int event_queue_try_pop(EventQueue *q, Event *event);
 int event_queue_get(EventQueue *q, uint64_t after_id, Event *events, int max_events);
 
 #endif /* EVENT_QUEUE_H */

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Tox Chat</title>
+    <link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="self-info" id="selfInfo">加载中...</div>
+            <div class="self-actions">
+                <button class="action-btn" onclick="showEditSelf()">编辑信息</button>
+                <button class="action-btn" onclick="bootstrap()">连接网络</button>
+            </div>
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('friends')">好友</button>
+                <button class="tab" onclick="showTab('groups')">群组</button>
+            </div>
+            <div class="add-friend-area">
+                <input type="text" id="addFriendInput" placeholder="输入好友公钥 (64/76字符)">
+                <button onclick="addFriend()">添加</button>
+            </div>
+            <div class="add-group-area hidden">
+                <button onclick="createGroup()">创建群组</button>
+            </div>
+            <div class="list" id="friendList"></div>
+            <div class="list hidden" id="groupList"></div>
+        </div>
+        <div class="chat-area">
+            <div class="chat-header" id="chatHeader">选择聊天对象</div>
+            <div class="messages" id="messageArea"></div>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="输入消息...">
+                <button onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑自己信息模态框 -->
+    <div class="modal hidden" id="editSelfModal">
+        <div class="modal-content">
+            <h3>编辑个人信息</h3>
+            <div class="form-group">
+                <label>名称:</label>
+                <input type="text" id="editName" placeholder="输入名称">
+            </div>
+            <div class="form-group">
+                <label>状态消息:</label>
+                <input type="text" id="editStatus" placeholder="输入状态消息">
+            </div>
+            <div class="modal-actions">
+                <button onclick="saveSelfInfo()">保存</button>
+                <button onclick="hideEditSelf()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/web/app.js"></script>
+</body>
+</html>

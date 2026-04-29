@@ -14,6 +14,7 @@ typedef struct HttpServer {
     WSPushDriver     *ws_driver;
     EventQueue       event_queue;
     int               running;
+    uint64_t          last_event_id;  // 用于跟踪已处理的事件
 } HttpServer;
 
 int http_server_init(HttpServer *server, const char *port);

@@ -66,6 +66,24 @@ int event_queue_pop(EventQueue *q, Event *event)
     return 0;
 }
 
+int event_queue_try_pop(EventQueue *q, Event *event)
+{
+    pthread_mutex_lock(&q->lock);
+
+    if (q->read_pos == q->write_pos) {
+        pthread_mutex_unlock(&q->lock);
+        return -1; // 队列为空
+    }
+
+    Event *e = &q->events[q->read_pos % MAX_EVENTS];
+    *event = *e;
+    q->read_pos++;
+
+    pthread_cond_signal(&q->not_full);
+    pthread_mutex_unlock(&q->lock);
+    return 0;
+}
+
 int event_queue_get(EventQueue *q, uint64_t after_id, Event *events, int max_events)
 {
     pthread_mutex_lock(&q->lock);
