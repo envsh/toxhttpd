@@ -6,19 +6,19 @@
 InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent) 
     : QDialog(parent), friendNumber(friendNumber), cookie(cookie), result(Ignore) {
     
-    setCaption(tr("conference.invitation_received"));
+    setCaption(_("conference.invitation_received"));
     resize(400, 200);
     
     QBoxLayout* mainLayout = new QBoxLayout(this, QBoxLayout::TopToBottom, 10, 10, 0);
     
     // 标题
-    QLabel* titleLabel = new QLabel(tr("conference.invitation_received"), this);
+    QLabel* titleLabel = new QLabel(_("conference.invitation_received"), this);
     QFont titleFont("Helvetica", 16, QFont::Bold);
     titleLabel->setFont(titleFont);
     mainLayout->addWidget(titleLabel);
     
     // 邀请信息
-    QString infoText = tr("conference.invitation_from").arg(friendNumber) + " " + tr("conference.invite_message");
+    QString infoText = _("conference.invitation_from").arg(friendNumber) + " " + _("conference.invite_message");
     QLabel* infoLabel = new QLabel(infoText, this);
     mainLayout->addWidget(infoLabel);
     
@@ -28,17 +28,17 @@ InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, Q
     QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
     btnLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum));
     
-    QPushButton* acceptBtn = new QPushButton(tr("conference.accept"), this, "acceptBtn");
+    QPushButton* acceptBtn = new QPushButton(_("conference.accept"), this, "acceptBtn");
     acceptBtn->setFixedSize(80, 35);
     connect(acceptBtn, SIGNAL(clicked()), this, SLOT(onAccept()));
     btnLayout->addWidget(acceptBtn);
     
-    QPushButton* rejectBtn = new QPushButton(tr("conference.reject"), this, "rejectBtn");
+    QPushButton* rejectBtn = new QPushButton(_("conference.reject"), this, "rejectBtn");
     rejectBtn->setFixedSize(80, 35);
     connect(rejectBtn, SIGNAL(clicked()), this, SLOT(onReject()));
     btnLayout->addWidget(rejectBtn);
     
-    QPushButton* ignoreBtn = new QPushButton(tr("conference.ignore"), this, "ignoreBtn");
+    QPushButton* ignoreBtn = new QPushButton(_("conference.ignore"), this, "ignoreBtn");
     ignoreBtn->setFixedSize(80, 35);
     connect(ignoreBtn, SIGNAL(clicked()), this, SLOT(onIgnore()));
     btnLayout->addWidget(ignoreBtn);

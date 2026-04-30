@@ -41,8 +41,10 @@ static void saveLanguage(const QString& lang) {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), 
     currentChatId(-1), currentChatType("") {
+    qWarning("MainWindow: constructor started");
+    
     // 设置窗口
-    setCaption(tr("app_title"));
+    setCaption(_("app_title"));
     setGeometry(100, 100, 1100, 700);
     
     // 设置 UTF-8 编解码器
@@ -144,7 +146,7 @@ void MainWindow::customEvent(QCustomEvent* event) {
         if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage) {
             MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);
             if (!evt->success) {
-                QMessageBox::warning(this, tr("send_failed"), tr("send_failed"));
+                QMessageBox::warning(this, _("send_failed"), _("send_failed"));
             }
             return;
         }
@@ -175,11 +177,11 @@ void MainWindow::onContactSelected(int id, const QString& type) {
     
     QString headerText;
     if (type == "friend") {
-        headerText = tr("chat_with_friend").arg(QString::number(id));
+        headerText = _("chat_with_friend").arg(QString::number(id));
     } else if (type == "group") {
-        headerText = tr("group") + " " + QString::number(id);
+        headerText = _("group") + " " + QString::number(id);
     } else if (type == "conference") {
-        headerText = tr("conference_item") + " " + QString::number(id);
+        headerText = _("conference_item") + " " + QString::number(id);
     }
     
     chatWidget->setHeaderText(headerText);
@@ -188,7 +190,7 @@ void MainWindow::onContactSelected(int id, const QString& type) {
 
 void MainWindow::onMessageSent(const QString& message) {
     if (currentChatId == -1 || currentChatType.isEmpty()) {
-        QMessageBox::warning(this, tr("select_chat_first"), tr("select_chat_first"));
+        QMessageBox::warning(this, _("select_chat_first"), _("select_chat_first"));
         return;
     }
     
@@ -219,7 +221,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
                     if (friendId == currentChatId && currentChatType == "friend") {
                         chatWidget->appendMessage(message, "other", 
-                                         tr("friend_label").arg(QString::number(friendId)));
+                                         _("friend_label").arg(QString::number(friendId)));
                     }
                 }
                 cJSON_Delete(root);
@@ -243,8 +245,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         req->message = std::string(cookie.utf8());
                         eventPoller->postApiRequest(req);
                         
-                        QMessageBox::information(this, tr("conference_joined"), 
-                                                        tr("conference_joined").arg(dialog.getCookie()));
+                        QMessageBox::information(this, _("conference_joined"), 
+                                                        _("conference_joined").arg(dialog.getCookie()));
                     } else if (dialog.getResult() == InviteDialog::Reject) {
                         // ✅ 改为异步请求
                         ApiRequestEvent* req = new ApiRequestEvent(ApiRejectConference);
@@ -273,7 +275,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     
                     if (confNumber == currentChatId && currentChatType == "conference") {
                         QString sender = (peerNumber >= 0) ? 
-                            QString("Peer %1").arg(peerNumber) : tr("conference_item");
+                            QString("Peer %1").arg(peerNumber) : _("conference_item");
                         qWarning("Appending conference message: %s", message.utf8().data());
                         chatWidget->appendMessage(message, "other", sender);
                     }
@@ -302,18 +304,22 @@ void MainWindow::onLanguageChanged(const QString& langCode) {
 }
 
 void MainWindow::updateUIStrings() {
-    setCaption(tr("app_title"));
+    setCaption(_("app_title"));
+    
+    // 更新子控件
+    if (selfInfoWidget) selfInfoWidget->updateUIStrings();
+    if (contactListWidget) contactListWidget->updateUIStrings();
     
     if (currentChatId == -1) {
-        chatWidget->setHeaderText(tr("select_chat_object"));
+        chatWidget->setHeaderText(_("select_chat_object"));
     } else {
         QString headerText;
         if (currentChatType == "friend") {
-            headerText = tr("chat_with_friend").arg(QString::number(currentChatId));
+            headerText = _("chat_with_friend").arg(QString::number(currentChatId));
         } else if (currentChatType == "group") {
-            headerText = tr("group") + " " + QString::number(currentChatId);
+            headerText = _("group") + " " + QString::number(currentChatId);
         } else if (currentChatType == "conference") {
-            headerText = tr("conference_item") + " " + QString::number(currentChatId);
+            headerText = _("conference_item") + " " + QString::number(currentChatId);
         }
         chatWidget->setHeaderText(headerText);
     }

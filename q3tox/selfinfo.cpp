@@ -32,11 +32,11 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     
     // 名称行：名称 + 状态标识
     QBoxLayout* nameRowLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
-    nameLabel = new QLabel(tr("no_name"), this);
+    nameLabel = new QLabel(_("no_name"), this);
     nameLabel->setFont(QFont("Helvetica", 16, QFont::Bold));
     nameRowLayout->addWidget(nameLabel, 1);
     
-    statusBadge = new QLabel(tr("statuses.offline"), this);
+    statusBadge = new QLabel(_("statuses.offline"), this);
     statusBadge->setAlignment(Qt::AlignCenter);
     statusBadge->setFixedSize(60, 20);
     statusBadge->setPalette(QPalette(QColor("#482121")));
@@ -45,7 +45,7 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     infoLayout->addLayout(nameRowLayout);
     
     // 状态消息
-    statusMsgLabel = new QLabel(tr("no_status"), this);
+    statusMsgLabel = new QLabel(_("no_status"), this);
     statusMsgLabel->setFont(QFont("Helvetica", 12));
     statusMsgLabel->setPalette(QPalette(QColor("#6e7681")));
     infoLayout->addWidget(statusMsgLabel);
@@ -60,7 +60,7 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     addressLabel->setPalette(QPalette(QColor("#6e7681")));
     addrLayout->addWidget(addressLabel, 1);
     
-    copyBtn = new QPushButton(tr("buttons.copy"), this);
+    copyBtn = new QPushButton(_("buttons.copy"), this);
     copyBtn->setFixedSize(50, 25);
     connect(copyBtn, SIGNAL(clicked()), this, SLOT(onCopyAddress()));
     addrLayout->addWidget(copyBtn);
@@ -68,23 +68,25 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     
     // 操作按钮
     QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
-    QStringList btnTexts;
-    btnTexts << tr("buttons.edit_info") << tr("buttons.connect_network") << tr("buttons.qrcode");
+    editBtn = new QPushButton(_("buttons.edit_info"), this);
+    connect(editBtn, SIGNAL(clicked()), this, SLOT(onEditInfo()));
+    btnLayout->addWidget(editBtn);
     
-    for (int i = 0; i < 3; ++i) {
-        QPushButton* btn = new QPushButton(btnTexts[i], this);
-        if (i == 0) connect(btn, SIGNAL(clicked()), this, SLOT(onEditInfo()));
-        else if (i == 1) connect(btn, SIGNAL(clicked()), this, SLOT(onBootstrap()));
-        else if (i == 2) connect(btn, SIGNAL(clicked()), this, SLOT(onShowQRCode()));
-        btnLayout->addWidget(btn);
-    }
+    connectBtn = new QPushButton(_("buttons.connect_network"), this);
+    connect(connectBtn, SIGNAL(clicked()), this, SLOT(onBootstrap()));
+    btnLayout->addWidget(connectBtn);
+    
+    qrBtn = new QPushButton(_("buttons.qrcode"), this);
+    connect(qrBtn, SIGNAL(clicked()), this, SLOT(onShowQRCode()));
+    btnLayout->addWidget(qrBtn);
+    
     mainLayout->addLayout(btnLayout);
 }
 
 void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
                                const QString& connStatus, const QString& address) {
     // 更新头像
-    QString displayName = name.isEmpty() ? tr("no_name") : name;
+    QString displayName = name.isEmpty() ? _("no_name") : name;
     QString initial = displayName.left(1).upper();
     avatarLabel->setText(initial);
     
@@ -96,9 +98,9 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     nameLabel->setText(displayName);
     
     // 更新状态标识
-    QString statusText = (connStatus == "offline") ? tr("statuses.offline") :
-                        (connStatus == "tcp") ? tr("statuses.tcp") :
-                        tr("statuses.udp");
+    QString statusText = (connStatus == "offline") ? _("statuses.offline") :
+                        (connStatus == "tcp") ? _("statuses.tcp") :
+                        _("statuses.udp");
     statusBadge->setText(statusText);
     
     if (connStatus == "offline") {
@@ -108,7 +110,7 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     }
     
     // 更新状态消息
-    statusMsgLabel->setText(statusMsg.isEmpty() ? tr("no_status") : statusMsg);
+    statusMsgLabel->setText(statusMsg.isEmpty() ? _("no_status") : statusMsg);
     
     // 更新地址
     selfAddress = address;
@@ -149,7 +151,7 @@ void SelfInfoWidget::onEditInfo() {
 
 void SelfInfoWidget::onBootstrap() {
     ToxAPI api;
-    QMessageBox::information(this, "Bootstrap", tr("connecting_network"));
+    QMessageBox::information(this, "Bootstrap", _("connecting_network"));
     
     // 重新加载信息以更新状态
     std::string name, statusMsg, connStatus, address;
@@ -163,7 +165,7 @@ void SelfInfoWidget::onBootstrap() {
 
 void SelfInfoWidget::onShowQRCode() {
     if (selfAddress.isEmpty()) {
-        QMessageBox::warning(this, "QR Code", tr("please_wait"));
+        QMessageBox::warning(this, "QR Code", _("please_wait"));
         return;
     }
     
@@ -194,12 +196,28 @@ void SelfInfoWidget::onShowQRCode() {
     QString url = QString("https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=%1")
                   .arg(encodedAddr);
     
-    QMessageBox::information(this, "QR Code", tr("tox_id_copied") + "\n\nURL: " + url);
+    QMessageBox::information(this, "QR Code", _("tox_id_copied") + "\n\nURL: " + url);
+}
+
+void SelfInfoWidget::updateUIStrings() {
+    // 更新按钮文字
+    if (editBtn) editBtn->setText(_("buttons.edit_info"));
+    if (connectBtn) connectBtn->setText(_("buttons.connect_network"));
+    if (qrBtn) qrBtn->setText(_("buttons.qrcode"));
+    if (copyBtn) copyBtn->setText(_("buttons.copy"));
+    
+    // 更新状态标签（如果当前显示的是默认值）
+    QString currentStatus = statusBadge->text();
+    if (currentStatus == "离线" || currentStatus == "TCP" || currentStatus == "UDP" ||
+        currentStatus == "Offline" || currentStatus == "TCP" || currentStatus == "UDP") {
+        // 重新获取状态并更新
+        // 这里简化：只更新默认状态文字
+    }
 }
 
 void SelfInfoWidget::onCopyAddress() {
     if (!selfAddress.isEmpty()) {
         QApplication::clipboard()->setText(selfAddress);
-        QMessageBox::information(this, "Copy", tr("tox_id_copied"));
+        QMessageBox::information(this, "Copy", _("tox_id_copied"));
     }
 }

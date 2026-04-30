@@ -13,11 +13,12 @@
 class ChatWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit ChatWidget(QWidget* parent = nullptr);
+    ChatWidget(QWidget* parent = 0);
     
     void setHeaderText(const QString& text);
-    void appendMessage(const QString& message, const QString& type, const QString& sender = QString());
+    void appendMessage(const QString& message, const QString& type, const QString& sender = QString::null);
     void clearMessages();
+    void updateUIStrings();
     
 signals:
     void messageSent(const QString& message);

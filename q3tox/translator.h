@@ -26,9 +26,8 @@ private:
     void* m_root; // cJSON root object
 };
 
-// 便捷函数
-inline QString tr(const QString& key, const QStringList& args = QStringList()) {
-    return Translator::instance().t(key, args);
-}
+// 便捷宏：避免与 QObject::tr() 冲突
+#define _(key) Translator::instance().t(key)
+#define _A(key, args) Translator::instance().t(key, args)
 
 #endif // TRANSLATOR_H

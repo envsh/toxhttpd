@@ -22,6 +22,7 @@ public:
     
     void setContacts(const QPtrList<Contact>& contacts);
     void clear();
+    void updateUIStrings();
     
 signals:
     void contactSelected(int id, const QString& type);
