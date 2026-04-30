@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -117,8 +118,11 @@ type Server struct {
 	mu                   sync.RWMutex
 }
 
-func NewServer() (*Server, error) {
-	t := tox.NewTox(nil)
+func NewServer(udpEnabled bool) (*Server, error) {
+	// Create Tox instance
+	opts := tox.NewToxOptions()
+	opts.Udp_enabled = udpEnabled
+	t := tox.NewTox(opts)
 	if t == nil {
 		return nil, fmt.Errorf("failed to create tox instance")
 	}
@@ -515,7 +519,12 @@ func (s *Server) Start(port string) error {
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	server, err := NewServer()
+	// Command line flags
+	udpEnabled := flag.Bool("udp", false, "Enable UDP mode (default: TCP only)")
+	port := flag.String("port", "8181", "HTTP server port")
+	flag.Parse()
+
+	server, err := NewServer(*udpEnabled)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
@@ -552,7 +561,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	log.Fatal(server.Start("8181"))
+	log.Printf("[TOX] UDP enabled: %v", *udpEnabled)
+	log.Fatal(server.Start(*port))
 }
 
 // logToxStatus logs the current status of the Tox instance
