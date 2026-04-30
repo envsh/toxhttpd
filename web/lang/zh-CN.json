@@ -1,0 +1,83 @@
+{
+    "app_title": "Tox Chat",
+    "no_contacts": "暂无联系人",
+    "chat_with_friend": "与好友 {0} 聊天",
+    "group": "群组",
+    "conference_item": "会议",
+    "friend": "好友",
+    "conference_joined": "已加入会议 {0}",
+    "conference_join_failed": "加入会议失败",
+    "tabs": {
+        "all": "全部",
+        "friends": "好友",
+        "groups": "群组",
+        "conferences": "会议"
+    },
+    "buttons": {
+        "edit_info": "编辑信息",
+        "connect_network": "连接网络",
+        "qrcode": "二维码",
+        "create_conference": "创建会议",
+        "create_group": "创建群组",
+        "send": "发送",
+        "save": "保存",
+        "cancel": "取消",
+        "close": "关闭"
+    },
+    "placeholders": {
+        "add_friend": "输入 Tox ID 添加好友"
+    },
+    "modals": {
+        "edit_info_title": "编辑个人信息",
+        "friend_info_title": "好友信息",
+        "labels": {
+            "name": "名称",
+            "status_message": "状态消息",
+            "friend_id": "好友 ID",
+            "status": "状态",
+            "connection": "连接",
+            "public_key": "公钥"
+        }
+    },
+    "statuses": {
+        "offline": "离线",
+        "tcp": "TCP",
+        "udp": "UDP"
+    },
+    "no_name": "未设置名称",
+    "no_status": "无状态消息",
+    "tox_id_copied": "Tox ID 已复制到剪贴板",
+    "please_wait": "请等待加载完成",
+    "load_failed": "加载失败",
+    "load_contacts_failed": "加载联系人失败",
+    "conference": {
+        "invitation_received": "收到会议邀请",
+        "invitation_from": "来自 {0}",
+        "invite_message": "会议邀请",
+        "accept": "同意",
+        "reject": "拒绝",
+        "ignore": "忽略"
+    },
+    "friend_label": "好友 {0}",
+    "select_chat_first": "请先选择聊天对象",
+    "send_failed": "发送失败",
+    "add_friend_prompt": "请输入有效的公钥 (64字符) 或地址 (76字符)",
+    "add_friend_success": "添加成功！",
+    "add_friend_failed": "添加失败",
+    "group_created": "群组创建成功！",
+    "group_create_failed": "创建失败",
+    "conference_created": "会议创建成功！",
+    "conference_create_failed": "创建失败",
+    "conference_connected": "已连接会议",
+    "conference_connect_failed": "连接会议失败",
+    "friend_deleted": "好友已删除",
+    "delete_failed": "删除失败",
+    "save_failed": "保存失败",
+    "connecting_network": "正在连接网络...",
+    "connect_failed": "连接失败",
+    "context_menu": {
+        "view_info": "查看信息",
+        "delete_friend": "删除好友"
+    },
+    "select_chat_object": "选择聊天对象"
+}
