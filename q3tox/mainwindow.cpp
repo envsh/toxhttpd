@@ -39,7 +39,7 @@ static void saveLanguage(const QString& lang) {
 }
 
 // 静态回调函数
-void MainWindow::onEventsReceivedStatic(EventList events, void* userData) {
+void MainWindow::onEventsReceivedStatic(const EventList& events, void* userData) {
     MainWindow* self = static_cast<MainWindow*>(userData);
     if (self) {
         self->handleEvents(events);
@@ -190,8 +190,8 @@ void MainWindow::onMessageSent(const QString& message) {
     }
 }
 
-void MainWindow::handleEvents(const QArray<Event>& events) {
-    for (int i = 0; i < (int)events.size(); ++i) {
+void MainWindow::handleEvents(const EventList& events) {
+    for (size_t i = 0; i < events.size(); ++i) {
         const Event& e = events[i];
         qWarning("Event: %s", e.type.c_str());
         

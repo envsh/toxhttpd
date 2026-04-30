@@ -1,9 +1,10 @@
-# ToxHTTPd - Tox HTTP REST API Server (Go)
+# ToxHTTPd - Tox HTTP REST API Server (Go) + Qt3 GUI Client
 
 ## Goal
-实现会议功能（使用 `group.go` Conference API）、会议邀请处理（同意/拒绝/忽略）、修复会议消息显示、优化Web布局（头像+状态标识+底部按钮）、添加多语言支持（简/繁/英）。
+实现完整的 Tox 客户端：Go 后端（toxhttpd）提供 REST API，Qt3 前端（q3tox）提供 GUI 界面。功能包括：会议、好友管理、消息收发、多语言支持（简/繁/英）。
 
 ## Constraints & Preferences
+### 后端 (toxhttpd)
 - 使用 `github.com/!Tok!Tok/go-toxcore-c` 包（已迁移）
 - 不要动 `build.sh`
 - 会议功能使用 `group.go` 的 `Conference*` 方法（非 `group_legacy.go` 的 `Group*`）
@@ -13,16 +14,23 @@
 - 多语言：简体中文（默认）、繁体中文、英文；默认简体，自动检测浏览器语言，切换后记住（localStorage）
 - 布局不变形：所有文本容器使用 `min-width` + `white-space: nowrap`
 
+### 前端 (q3tox)
+- 使用 Qt3（头文件路径：`/opt/qt338sh/include`）
+- UI参照 web 端（avatar、status badge、tabs、language selector）
+- 使用 REST API（ToxAPI 类封装）
+- 不要动 `build.sh`
+- 多语言支持：简体中文（默认）、繁体中文、英文
+- 使用 cJSON 解析 JSON，libcurl 进行 HTTP 请求
+
 ## Progress
 
-### Done
+### 后端 (toxhttpd) - Done
 - 会议功能：修改 `handleConferences` 使用 `ConferenceGetChatlist()` 和 `ConferenceNew()`
 - 会议消息：添加 `handleConferenceMessages`，注册路由 `/api/conference_messages`
 - 会议邀请：添加 `handleConferenceJoin`（同意+保存savedata）、`handleConferenceReject`、`handleConferenceIgnore`
 - 注册路由：`/api/conferences/join`、`/api/conferences/reject`、`/api/conferences/ignore`
 - 所有事件推送改为 JSON 格式（14处），字段名统一为 `conference_number`
-- 前端添加 `conference_message` 事件处理
-- Web布局优化：添加头像（40px圆形，显示名称首字母）、连接状态移到名称行右侧（带颜色标识）
+- Web 布局优化：添加头像（40px圆形，显示名称首字母）、连接状态移到名称行右侧（带颜色标识）
 - 底部区域：添加好友在第二行（上方），创建按钮在第一行（最底部），按钮顺序：🎥 创建会议(左)、👥 创建群组(右)
 - 多语言文件：`web/lang/zh-CN.json`、`web/lang/zh-TW.json`、`web/lang/en-US.json`
 - `web/app.js` 添加：`loadLanguage()`、`t()`、`applyLanguage()`、`initLanguage()`、`switchLanguage()`
@@ -33,18 +41,54 @@
 - `applyLanguage()` 更新逻辑：根据聊天状态动态更新 `#chatHeaderText`
 - `selectContact()` 更新：使用 `#chatHeaderText` 而非 `#chatHeader`
 
+### 前端 (q3tox) - Done
+- 创建 q3tox 子项目基础文件结构
+- 实现 `api.h/cpp`（ToxAPI 类，REST API 调用，使用 libcurl）
+- 实现 `translator.h/cpp`（多语言支持，使用 cJSON 解析）
+- 创建 `editinfodialog.h/cpp`（编辑个人信息对话框）
+- 创建 `invitedialog.h/cpp`（会议邀请对话框，三个按钮：同意/拒绝/忽略）
+- 实现 `mainwindow.h/cpp`（主窗口，左右分割布局）
+- 实现 `selfinfo.h/cpp`（个人信息 widget：avatar、名称、状态、地址）
+- 实现 `contactlist.h/cpp`（联系人列表：tabs 过滤、QListBox 显示）
+- 实现 `chatwidget.h/cpp`（聊天区域：头部、消息区、输入区、语言选择器）
+- 实现 `eventpoller.h/cpp`（事件轮询器，继承 QThread，使用回调函数）
+- 深入研究 Qt3 API 架构：QBoxLayout vs QVBox/QHBox 区别
+- 修复所有 Qt3 兼容性问题：
+  - QBoxLayout 构造函数：`QBoxLayout(QWidget*, Direction, border, spacing, name)`
+  - QLabel/QLineEdit 构造函数：第一个参数必须是 QWidget*
+  - QThread + Q_OBJECT 不兼容：改用回调函数机制
+  - cJSON 函数调用语法：`cJSON_GetObjectItem(root, "key")`（需逗号）
+  - URL 拼接问题：`httpGet`/`httpPost` 内部已拼接，调用者只传相对路径
+  - 内存管理：将 `QArray<Event>` 改为 `std::vector<Event>`
+  - moc 工具：设置 `QTDIR=/opt/qt338sh` 使用正确的 Qt3 moc
+- 项目编译成功，可执行文件 `q3tox` 已生成（1891920 字节）
+- 运行时错误修复：`free(): invalid pointer` 已解决
+- 程序可正常运行并接收事件
+
 ### In Progress
 - 无
 
-### TODO
+### TODO (后端)
 - 测试：验证中/繁/英切换 + 布局不变形
 - 测试会议功能：创建、加入、消息显示
 - 测试语言切换后 localStorage 持久化
 - 修复 `web/app.js` 中 `applyLanguage()` 的变量名错误（`tabs` vs `tabs`）
+- 命令标志代理支持
+- 命令标志翻译支持
+- Web 页面添加群组(NGC)
+
+### TODO (前端)
+- 创建多语言 JSON 文件（zh-CN、zh-TW、en-US）
+- 测试完整工作流程（添加好友、发消息、会议）
+- UI 样式调整（参考 web 端）
+- 头像显示（当前显示名称首字母）
+- 状态标识颜色（online/tcp 绿色，offline 红色）
 
 ## Key Decisions
-- 会议邀请不自动加入，由Web用户选择（方案B）
-- 保存savedata使用原有 `saveToxData()`，不做错误检测增强
+
+### 后端
+- 会议邀请不自动加入，由 Web 用户选择（方案B）
+- 保存 savedata 使用原有 `saveToxData()`，不做错误检测增强
 - 会议事件字段名使用 `conference_number`（非 `group_number`）保持语义一致
 - 头像显示名称首字母（大写），未设置时显示"?"灰色
 - 连接状态标识：`online`/`tcp` 绿色，`offline` 红色
@@ -52,22 +96,52 @@
 - 语言文件放在 `web/lang/` 目录
 - 聊天头部使用 flex 布局，文本左对齐（`#chatHeaderText`），语言选择器右对齐
 
+### 前端
+- 使用 `QWidget + QBoxLayout` 替代 `QVBox/QHBox`（因为后者没有 `addWidget` 方法）
+- QBoxLayout 正确构造函数：`QBoxLayout(QWidget *parent, Direction, int border=0, int spacing=-1, const char *name=0)`
+- QLabel 在 Qt3 中构造函数不同：需要 `QLabel(parent, name)` 或 `QLabel(text, parent, name)`
+- 使用 `std::vector<Event>` 替代 `QArray<Event>`（Qt3 的 QArray 对包含 std::string 的对象支持有问题）
+- 事件轮询使用 `QThread` + libcurl 长轮询，通过回调函数传递事件
+- 翻译文件使用 cJSON 解析，支持点号分隔的键（如 `modals.labels.name`）
+- 语言文件放在 `q3tox/lang/` 目录，通过 `/proc/self/exe` 获取可执行文件路径来定位
+
 ## Next Steps
+
+### 后端
 1. 修复 `web/app.js` 第66-69行的变量名错误（`tabs` 误写为 `tabs`）
 2. 测试：验证中/繁/英切换 + 布局不变形
 3. 测试会议功能：创建、加入、消息显示
 4. 考虑添加更多翻译键（如错误提示等）
 
+### 前端
+1. 测试完整工作流程（确保 toxhttpd 服务在 `http://localhost:8181` 运行）
+2. 完善 UI 样式（头像、状态标识、颜色等）
+3. 添加更多错误处理
+4. 考虑添加系统托盘图标
+
 ## Critical Context
+
+### 后端
 - `go-toxcore-c` 会议API：`ConferenceNew()`、`ConferenceJoin()`、`ConferenceSendMessage()`、`ConferenceGetChatlist()` 等
 - 事件JSON格式：`{"conference_number":1,"peer_number":0,"message":"..."}`
 - 语言文件格式：嵌套JSON，`t('modals.labels.name')` 支持点号访问
 - 布局变形预防：`.tab {min-width: 60px; white-space: nowrap;}`，`.create-btn {min-width: 120px;}`
 - 语言检测逻辑：繁体（`zh-TW`/`zh-HK`/`zh-MO`）→繁体中文，其他中文→简体，英文→English，默认简体
 - 语言选择器位置：聊天头部（`#chatHeader`）最右侧
-- **注意**：`web/app.js` 中 `applyLanguage()` 函数存在变量名错误，需修正（第65行定义 `tabs`，第66-69行误用 `tabs`）
+
+### 前端 (Qt3)
+- Qt3 布局系统核心发现：
+  - `QBoxLayout` 是布局管理器（继承 QLayout），有 `addWidget()` 方法
+  - `QHBox/QVBox` 是容器 widget（继承 QFrame），内部私有成员 `QBoxLayout *lay`，但无法直接访问
+  - 正确用法：`QWidget* container = new QWidget(parent); QBoxLayout* layout = new QBoxLayout(container, dir, 0, -1, 0);`
+- cJSON 函数调用：`cJSON_GetObjectItem(root, "key")` 必须有逗号分隔参数
+- 翻译文件格式：嵌套 JSON，使用 `cJSON_GetObjectItem` 递归查找
+- 可执行文件路径获取：通过 `readlink("/proc/self/exe", ...)` 获取，用于定位 `lang/` 目录
+- 事件回调：`void (*callback)(const EventList&, void*)` 函数指针，避免使用信号槽（QThread 不兼容 Q_OBJECT）
 
 ## Relevant Files
+
+### 后端
 - `go-toxhttpd/main.go`：会议API处理、回调注册、事件推送JSON化
 - `web/app.js`：多语言支持、会议消息处理、布局逻辑、所有硬编码文本改用 `t()`
 - `web/index.html`：语言选择器（移至聊天头部）、头像结构、底部按钮布局
@@ -77,19 +151,32 @@
 - `web/lang/en-US.json`：英文
 - `/opt/golib/pkg/mod/github.com/!tok!tok/go-toxcore-c@v0.2.18-0.20250216202442-0f7463080d5c/group.go`：Conference API实现
 
+### 前端 (q3tox)
+- `q3tox/api.h/cpp`：REST API 封装，使用 libcurl
+- `q3tox/translator.h/cpp`：多语言支持，使用 cJSON
+- `q3tox/mainwindow.h/cpp`：主窗口，左右分割布局
+- `q3tox/selfinfo.h/cpp`：个人信息 widget
+- `q3tox/contactlist.h/cpp`：联系人列表
+- `q3tox/chatwidget.h/cpp`：聊天区域
+- `q3tox/eventpoller.h/cpp`：事件轮询器
+- `q3tox/editinfodialog.h/cpp`：编辑个人信息对话框
+- `q3tox/invitedialog.h/cpp`：会议邀请对话框
+- `q3tox/lang/zh-CN.json`：简体中文（默认）
+- `q3tox/lang/zh-TW.json`：繁体中文
+- `q3tox/lang/en-US.json`：英文
+
 ## Architecture
 
-### Go Version (Current)
+### 后端 (Go)
 - HTTP server: Go standard library / custom router
 - Tox core: `github.com/!Tok!Tok/go-toxcore-c`
 - Event push: Long polling via `/api/events`
 
-### Components
-- `go-toxhttpd/main.go`: Entry point, HTTP routing, Tox event handling
-- `web/app.js`: Frontend logic, multi-language support, UI interactions
-- `web/index.html`: Main UI structure
-- `web/style.css`: Styles and layout
-- `web/lang/*.json`: Language files
+### 前端 (C++/Qt3)
+- GUI framework: Qt3 (http://qt.nokia.com)
+- HTTP client: libcurl
+- JSON parser: cJSON
+- Multi-language: cJSON + custom Translator class
 
 ## REST API Endpoints
 
@@ -145,16 +232,36 @@
 | `/api/events` | Long Polling | Get events (friend messages, conference invites, etc.) |
 
 ## Build
+
+### 后端
 ```bash
+cd /home/gzleo/aprog/toxhttpd
 make
 ```
 
-## Run
+### 前端 (q3tox)
 ```bash
-./toxhttpd [port]
+cd /home/gzleo/aprog/toxhttpd/q3tox
+QTDIR=/opt/qt338sh make
+```
+
+## Run
+
+### 后端
+```bash
+cd /home/gzleo/aprog/toxhttpd
+./toxhttpd 8181
+```
+
+### 前端
+```bash
+cd /home/gzleo/aprog/toxhttpd/q3tox
+./q3tox
 ```
 
 ## Example Usage
+
+### 后端
 ```bash
 # Start server
 ./toxhttpd 8181
@@ -173,6 +280,8 @@ curl -X POST http://localhost:8181/api/conferences
 ```
 
 ## Features Working
+
+### 后端
 - [x] TCP connection (UDP disabled for stability)
 - [x] Add friend with pubkey (64-char) or address (76-char)
 - [x] Send messages
@@ -183,5 +292,18 @@ curl -X POST http://localhost:8181/api/conferences
 - [x] Web UI with avatar, status badge, language selector
 - [x] Layout optimization (no deformation)
 - [ ] Command flag proxy support
-- [ ] Command flag translate supprt
+- [ ] Command flag translate support
 - [ ] Web page add group(NGC)
+
+### 前端 (q3tox)
+- [x] Qt3 GUI with split layout (sidebar + chat area)
+- [x] Self info widget (avatar, name, status, address)
+- [x] Contact list with tabs (all/friends/groups/conferences)
+- [x] Chat widget (header, message area, input area)
+- [x] Multi-language support (zh-CN, zh-TW, en-US)
+- [x] Event polling via QThread + libcurl
+- [x] Conference invite dialog (accept/reject/ignore)
+- [x] Edit self info dialog
+- [ ] Complete workflow testing
+- [ ] UI style refinement (avatar, status colors)
+- [ ] System tray icon (optional)
