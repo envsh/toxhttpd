@@ -190,14 +190,49 @@ body {
     border-color: #00d4aa;
 }
 
-.add-friend-area, .add-group-area {
+/* 底部操作区域（推到最下方） */
+.sidebar-bottom {
+    margin-top: auto;  /* 关键：推到底部 */
     padding: 8px 12px;
-    border-bottom: 1px solid #30363d;
+    border-top: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 创建按钮行：会议左，群组右 */
+.create-buttons-row {
     display: flex;
     gap: 8px;
 }
 
-.add-friend-area input, .add-group-area input {
+/* 创建按钮样式（带emoji） */
+.create-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.create-btn:hover {
+    background: #30363d;
+    border-color: #00d4aa;
+}
+
+/* 底部添加好友区域（右侧对齐） */
+.add-friend-bottom {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;  /* 右对齐 */
+}
+
+.add-friend-bottom input {
     flex: 1;
     padding: 6px 10px;
     background: #0d1117;
@@ -208,11 +243,11 @@ body {
     outline: none;
 }
 
-.add-friend-area input:focus, .add-group-area input:focus {
+.add-friend-bottom input:focus {
     border-color: #00d4aa;
 }
 
-.add-friend-area button, .add-group-area button {
+.add-friend-bottom button {
     padding: 6px 12px;
     background: #00d4aa;
     border: none;
@@ -224,7 +259,7 @@ body {
     transition: opacity 0.2s;
 }
 
-.add-friend-area button:hover, .add-group-area button:hover {
+.add-friend-bottom button:hover {
     opacity: 0.9;
 }
 
