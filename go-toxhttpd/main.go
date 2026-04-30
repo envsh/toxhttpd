@@ -269,6 +269,36 @@ func setupCallbacks(s *Server) {
 		log.Printf("[TOX_CALLBACK] FileChunkRequest: friend=%d, file=%d, position=%d, length=%d", friendNumber, fileNumber, position, length)
 	}, nil)
 
+	// Conference invite callback
+	s.tox.CallbackConferenceInvite(func(this *tox.Tox, friendNumber uint32, itype uint8, cookie string, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] ConferenceInvite: friend=%d, type=%d, cookie=%s", friendNumber, itype, cookie)
+		s.eventQueue.Push("conference_invite", fmt.Sprintf("%d:%d:%s", friendNumber, itype, cookie))
+	}, nil)
+
+	// Conference message callback
+	s.tox.CallbackConferenceMessage(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, message string, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] ConferenceMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
+		s.eventQueue.Push("conference_message", fmt.Sprintf("%d:%d:%s", groupNumber, peerNumber, message))
+	}, nil)
+
+	// Conference title callback
+	s.tox.CallbackConferenceTitle(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, title string, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] ConferenceTitle: group=%d, peer=%d, title=%s", groupNumber, peerNumber, title)
+		s.eventQueue.Push("conference_title", fmt.Sprintf("%d:%d:%s", groupNumber, peerNumber, title))
+	}, nil)
+
+	// Conference peer name callback
+	s.tox.CallbackConferencePeerName(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, name string, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] ConferencePeerName: group=%d, peer=%d, name=%s", groupNumber, peerNumber, name)
+		s.eventQueue.Push("conference_peer_name", fmt.Sprintf("%d:%d:%s", groupNumber, peerNumber, name))
+	}, nil)
+
+	// Conference peer list changed callback
+	s.tox.CallbackConferencePeerListChanged(func(this *tox.Tox, groupNumber uint32, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] ConferencePeerListChanged: group=%d", groupNumber)
+		s.eventQueue.Push("conference_peer_list_changed", fmt.Sprintf("%d", groupNumber))
+	}, nil)
+
 	log.Println("[TOX] All callbacks registered")
 }
 
@@ -435,17 +465,52 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == http.MethodGet {
-		// go-toxcore-c may need to track conference list ourselves
+		// Use ConferenceGetChatlist() from group.go to get all conferences
+		conferences := s.tox.ConferenceGetChatlist()
 		resp := map[string]interface{}{
-			"conferences": []uint32{},
+			"conferences": conferences,
 		}
 		json.NewEncoder(w).Encode(resp)
 	} else if r.Method == http.MethodPost {
+		// Create new conference using ConferenceNew() from group.go
+		confID, err := s.tox.ConferenceNew()
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+			return
+		}
 		resp := map[string]interface{}{
-			"conference_id": 0,
+			"conference_id": confID,
+			"message":       "Conference created successfully",
 		}
 		json.NewEncoder(w).Encode(resp)
 	}
+}
+
+func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.ParseForm()
+	confIDStr := r.FormValue("conference_id")
+	message := r.FormValue("message")
+
+	var confID uint32
+	fmt.Sscanf(confIDStr, "%d", &confID)
+
+	_, err := s.tox.ConferenceSendMessage(confID, tox.MESSAGE_TYPE_NORMAL, message)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"conference_id": confID,
+		"message":       "sent",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
@@ -522,6 +587,7 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/messages", loggingMiddleware(s.handleSendMessage))
 	http.HandleFunc("/api/groups", loggingMiddleware(s.handleGroups))
 	http.HandleFunc("/api/conferences", loggingMiddleware(s.handleConferences))
+	http.HandleFunc("/api/conference_messages", loggingMiddleware(s.handleConferenceMessages))
 	http.HandleFunc("/api/bootstrap", loggingMiddleware(s.handleBootstrap))
 	http.HandleFunc("/api/events", loggingMiddleware(s.handleEvents))
 	http.HandleFunc("/", loggingMiddleware(s.handleWeb))
