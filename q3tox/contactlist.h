@@ -32,12 +32,18 @@ private slots:
     
 private:
     void updateView();
+    void setTabFilter(int index);
     
     QListBox* listBox;
     QPtrList<Contact> allContacts;
     QString currentFilter;
     int currentTab;
     QLineEdit* addInput;
+    
+    // Tab 按钮和过滤器映射
+    QPushButton* tabButtons[4];
+    static const char* tabFilters[4];
+    static const char* tabNames[4];
 };
 
 #endif // CONTACTLIST_H
