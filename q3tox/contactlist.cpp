@@ -30,6 +30,8 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     
     // 联系人列表 - 使用 QListBox 而不是 QListView
     listBox = new QListBox(this);
+    listBox->setSelectionMode(QListBox::Single);
+    connect(listBox, SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
     layout->addWidget(listBox, 1); // stretch
     
     // 底部添加好友区域
@@ -110,13 +112,65 @@ void ContactListWidget::onItemClicked(QListBoxItem* item) {
     }
 }
 
-void ContactListWidget::updateView() {
-    listBox->clear();
+void ContactListWidget::onSelectionChanged() {
+    qWarning("onSelectionChanged called");
+    QListBoxItem* item = listBox->selectedItem();
+    if (!item) {
+        qWarning("onSelectionChanged: no item selected");
+        return;
+    }
     
+    int index = listBox->index(item);
+    int count = 0;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         
-        // 使用单数形式，与 Contact.type 一致
+        if (currentFilter != "all") {
+            if (currentFilter == "friend" && c->type != "friend") continue;
+            if (currentFilter == "group" && c->type != "group") continue;
+            if (currentFilter == "conference" && c->type != "conference") continue;
+        }
+        
+        if (count == index) {
+            qWarning("Emitting contactSelected: id=%d, type=%s", c->id, c->type.utf8().data());
+            emit contactSelected(c->id, c->type);
+            return;
+        }
+        ++count;
+    }
+}
+
+void ContactListWidget::updateView() {
+    // 保存当前选中的联系人信息
+    int selectedId = -1;
+    QString selectedType;
+    QListBoxItem* selItem = listBox->selectedItem();
+    if (selItem) {
+        int index = listBox->index(selItem);
+        int count = 0;
+        for (uint i = 0; i < allContacts.count(); ++i) {
+            Contact* c = allContacts.at(i);
+            if (currentFilter != "all") {
+                if (currentFilter == "friend" && c->type != "friend") continue;
+                if (currentFilter == "group" && c->type != "group") continue;
+                if (currentFilter == "conference" && c->type != "conference") continue;
+            }
+            if (count == index) {
+                selectedId = c->id;
+                selectedType = c->type;
+                break;
+            }
+            ++count;
+        }
+    }
+    
+    listBox->clear();
+    
+    int newIndex = 0;
+    int targetIndex = -1;
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        
         if (currentFilter != "all") {
             if (currentFilter == "friend" && c->type != "friend") continue;
             if (currentFilter == "group" && c->type != "group") continue;
@@ -133,9 +187,16 @@ void ContactListWidget::updateView() {
         }
         
         listBox->insertItem(QString("%1 %2 %3").arg(statusDot, emoji, displayName));
+        
+        if (c->id == selectedId && c->type == selectedType) {
+            targetIndex = newIndex;
+        }
+        ++newIndex;
     }
     
     if (listBox->count() == 0) {
         listBox->insertItem(tr("no_contacts"));
+    } else if (targetIndex >= 0) {
+        listBox->setSelected(targetIndex, TRUE);
     }
 }
