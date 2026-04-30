@@ -17,14 +17,14 @@ public:
     ~MainWindow();
     
     // 静态回调函数，供EventPoller使用
-    static void onEventsReceivedStatic(EventList events, void* userData);
+    static void onEventsReceivedStatic(const EventList& events, void* userData);
     
 public slots:
     void onContactSelected(int id, const QString& type);
     void onMessageSent(const QString& message);
     void onLanguageChanged(const QString& langCode);
     void updateUIStrings();
-    void handleEvents(const QArray<Event>& events);  // 实际处理事件的成员函数
+    void handleEvents(const EventList& events);  // 实际处理事件的成员函数
     
 private:
     void loadSelfInfo();

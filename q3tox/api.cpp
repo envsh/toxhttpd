@@ -63,7 +63,7 @@ ToxAPI::ToxAPI(const std::string& baseUrl) : baseUrl(baseUrl) {
 }
 
 bool ToxAPI::getSelf(std::string& name, std::string& statusMsg, std::string& connStatus, std::string& address) {
-    std::string response = httpGet(baseUrl + "/api/self");
+    std::string response = httpGet("/api/self");
     if (response.empty()) return false;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -103,19 +103,19 @@ bool ToxAPI::getSelf(std::string& name, std::string& statusMsg, std::string& con
 
 bool ToxAPI::setSelfName(const std::string& name) {
     std::string postData = "name=" + name;
-    std::string response = httpPost(baseUrl + "/api/self/name", postData);
+    std::string response = httpPost("/api/self/name", postData);
     return !response.empty();
 }
 
 bool ToxAPI::setSelfStatus(const std::string& status) {
     std::string postData = "status_message=" + status;
-    std::string response = httpPost(baseUrl + "/api/self/status", postData);
+    std::string response = httpPost("/api/self/status", postData);
     return !response.empty();
 }
 
 std::vector<int> ToxAPI::getFriends() {
     std::vector<int> friends;
-    std::string response = httpGet(baseUrl + "/api/friends");
+    std::string response = httpGet("/api/friends");
     if (response.empty()) return friends;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -134,10 +134,8 @@ std::vector<int> ToxAPI::getFriends() {
 }
 
 bool ToxAPI::getFriendInfo(int friendId, FriendInfo& info) {
-    std::stringstream ss;
-    ss << baseUrl << "/api/friend";
-    // 注意：实际应该 POST，这里简化处理
-    std::string response = httpGet(ss.str());
+    std::string endpoint = "/api/friend/" + std::to_string(friendId);
+    std::string response = httpGet(endpoint);
     if (response.empty()) return false;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -179,7 +177,7 @@ bool ToxAPI::getFriendInfo(int friendId, FriendInfo& info) {
 
 int ToxAPI::addFriend(const std::string& publicKey) {
     std::string postData = "public_key=" + publicKey;
-    std::string response = httpPost(baseUrl + "/api/friends", postData);
+    std::string response = httpPost("/api/friends", postData);
     if (response.empty()) return -1;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -193,24 +191,20 @@ int ToxAPI::addFriend(const std::string& publicKey) {
 }
 
 bool ToxAPI::deleteFriend(int friendId) {
-    std::stringstream ss;
-    ss << baseUrl << "/api/friend_delete";
     std::string postData = "friend_id=" + std::to_string(friendId);
-    std::string response = httpPost(ss.str(), postData);
+    std::string response = httpPost("/api/friend_delete", postData);
     return !response.empty();
 }
 
 bool ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
-    std::stringstream ss;
-    ss << baseUrl << "/api/messages";
     std::string postData = "friend_id=" + std::to_string(friendId) + "&message=" + message;
-    std::string response = httpPost(ss.str(), postData);
+    std::string response = httpPost("/api/messages", postData);
     return !response.empty();
 }
 
 std::vector<int> ToxAPI::getConferences() {
     std::vector<int> conferences;
-    std::string response = httpGet(baseUrl + "/api/conferences");
+    std::string response = httpGet("/api/conferences");
     if (response.empty()) return conferences;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -230,7 +224,7 @@ std::vector<int> ToxAPI::getConferences() {
 }
 
 int ToxAPI::createConference() {
-    std::string response = httpPost(baseUrl + "/api/conferences", "");
+    std::string response = httpPost("/api/conferences", "");
     if (response.empty()) return -1;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -245,28 +239,27 @@ int ToxAPI::createConference() {
 
 bool ToxAPI::joinConference(int friendNumber, const std::string& cookie) {
     std::string postData = "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie;
-    std::string response = httpPost(baseUrl + "/api/conferences/join", postData);
+    std::string response = httpPost("/api/conferences/join", postData);
     return !response.empty();
 }
 
 bool ToxAPI::rejectConference(int friendNumber) {
     std::string postData = "friend_number=" + std::to_string(friendNumber);
-    std::string response = httpPost(baseUrl + "/api/conferences/reject", postData);
+    std::string response = httpPost("/api/conferences/reject", postData);
     return !response.empty();
 }
 
 bool ToxAPI::ignoreConference(int friendNumber) {
     std::string postData = "friend_number=" + std::to_string(friendNumber);
-    std::string response = httpPost(baseUrl + "/api/conferences/ignore", postData);
+    std::string response = httpPost("/api/conferences/ignore", postData);
     return !response.empty();
 }
 
 std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
     std::vector<Event> events;
-    std::stringstream ss;
-    ss << baseUrl << "/api/events?after=" << after;
+    std::string endpoint = "/api/events?after=" + std::to_string(after);
     
-    std::string response = httpGet(ss.str());
+    std::string response = httpGet(endpoint);
     if (response.empty()) return events;
     
     cJSON* root = cJSON_Parse(response.c_str());
@@ -283,10 +276,12 @@ std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
             event.id = idItem ? idItem->valueint : 0;
             
             cJSON* typeItem = cJSON_GetObjectItem(item, "event_type");
-            event.type = typeItem ? cJSON_GetStringValue(typeItem) : "";
+            const char* typeStr = typeItem ? cJSON_GetStringValue(typeItem) : "";
+            event.type = typeStr ? typeStr : "";
             
             cJSON* dataItem = cJSON_GetObjectItem(item, "data");
-            event.data = dataItem ? cJSON_GetStringValue(dataItem) : "";
+            const char* dataStr = dataItem ? cJSON_GetStringValue(dataItem) : "";
+            event.data = dataStr ? dataStr : "";
             
             events.push_back(event);
         }

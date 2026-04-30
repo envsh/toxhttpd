@@ -12,19 +12,15 @@ void EventPoller::run() {
         std::vector<Event> events = api->pollEvents(lastEventId);
         
         if (!events.empty()) {
-            EventList qtEvents;
-            qtEvents.resize(events.size());
-            for (uint i = 0; i < events.size(); ++i) {
-                qtEvents[i].id = events[i].id;
-                qtEvents[i].type = events[i].type;  // std::string 直接赋值
-                qtEvents[i].data = events[i].data;
-                
-                if (events[i].id > lastEventId) {
-                    lastEventId = events[i].id;
-                }
-            }
+            EventList qtEvents = events;  // 直接用 std::vector，让编译器处理拷贝
             if (callbackFunc) {
                 callbackFunc(qtEvents, callbackData);
+            }
+            // 更新 lastEventId
+            for (const auto& e : events) {
+                if (e.id > lastEventId) {
+                    lastEventId = e.id;
+                }
             }
         } else {
             // 无事件：等待 2 秒后重试
@@ -42,7 +38,7 @@ void EventPoller::setLastEventId(uint64_t id) {
     lastEventId = id;
 }
 
-void EventPoller::setCallback(void (*callback)(EventList, void*), void* userData) {
+void EventPoller::setCallback(void (*callback)(const EventList&, void*), void* userData) {
     callbackFunc = callback;
     callbackData = userData;
 }

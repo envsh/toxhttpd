@@ -4,6 +4,7 @@
 #include <qtextstream.h>
 #include <qapplication.h>
 #include <qtextcodec.h>
+#include <unistd.h>
 
 Translator& Translator::instance() {
     static Translator instance;
@@ -21,8 +22,22 @@ Translator::~Translator() {
 
 bool Translator::loadLanguage(const QString& langCode) {
     // 加载 lang 目录下的 JSON 文件
-    // Qt3 没有 applicationDirPath，使用当前目录
-    QString filepath = "./lang/" + langCode + ".json";
+    // 使用当前可执行文件的路径（通过 /proc/self/exe 获取）
+    char exePath[1024];
+    int len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+    QString filepath;
+    if (len != -1) {
+        exePath[len] = '\0';
+        QString exeStr(exePath);
+        int lastSlash = exeStr.findRev('/');
+        if (lastSlash >= 0) {
+            filepath = exeStr.left(lastSlash + 1) + "lang/" + langCode + ".json";
+        } else {
+            filepath = "lang/" + langCode + ".json";
+        }
+    } else {
+        filepath = "lang/" + langCode + ".json";
+    }
     QFile file(filepath);
     if (!file.exists()) {
         qWarning("Language file not found: %s", (const char*)filepath.local8Bit());
