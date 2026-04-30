@@ -175,7 +175,8 @@ func setupCallbacks(s *Server) {
 			statusStr = "UNKNOWN"
 		}
 		log.Printf("[TOX_CALLBACK] SelfConnectionStatus: %s (%d)", statusStr, status)
-		s.eventQueue.Push("self_connection_status", s.selfConnectionStatus)
+		data, _ := json.Marshal(map[string]interface{}{"status": s.selfConnectionStatus})
+		s.eventQueue.Push("self_connection_status", string(data))
 	}, nil)
 
 	// Friend request callback
@@ -186,14 +187,19 @@ func setupCallbacks(s *Server) {
 		if err != nil {
 			log.Printf("Failed to accept friend request: %v", err)
 		} else {
-			s.eventQueue.Push("friend_request", pubkey)
+			data, _ := json.Marshal(map[string]interface{}{"public_key": pubkey})
+			s.eventQueue.Push("friend_request", string(data))
 		}
 	}, nil)
 
 	// Friend message callback
 	s.tox.CallbackFriendMessage(func(this *tox.Tox, friendNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendMessage: friend=%d, message=%s", friendNumber, message)
-		s.eventQueue.Push("friend_message", fmt.Sprintf("%d:%s", friendNumber, message))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id": friendNumber,
+			"message":   message,
+		})
+		s.eventQueue.Push("friend_message", string(data))
 	}, nil)
 
 	// Friend connection status callback
@@ -216,37 +222,61 @@ func setupCallbacks(s *Server) {
 			log.Printf("[TOX_CALLBACK] FriendConnectionStatus: friend=%d, UNKNOWN (%d)", friendNumber, connectionStatus)
 		}
 		s.friendStatuses[friendNumber] = status
-		s.eventQueue.Push("friend_connection_status", fmt.Sprintf("%d:%s", friendNumber, status))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id": friendNumber,
+			"status":    status,
+		})
+		s.eventQueue.Push("friend_connection_status", string(data))
 	}, nil)
 
 	// Friend name callback
 	s.tox.CallbackFriendName(func(this *tox.Tox, friendNumber uint32, newName string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendName: friend=%d, name=%s", friendNumber, newName)
-		s.eventQueue.Push("friend_name", fmt.Sprintf("%d:%s", friendNumber, newName))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id": friendNumber,
+			"name":      newName,
+		})
+		s.eventQueue.Push("friend_name", string(data))
 	}, nil)
 
 	// Friend status message callback (stub)
 	s.tox.CallbackFriendStatusMessage(func(this *tox.Tox, friendNumber uint32, newStatus string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendStatusMessage: friend=%d, status=%s", friendNumber, newStatus)
-		s.eventQueue.Push("friend_status_message", fmt.Sprintf("%d:%s", friendNumber, newStatus))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id":      friendNumber,
+			"status_message": newStatus,
+		})
+		s.eventQueue.Push("friend_status_message", string(data))
 	}, nil)
 
 	// Friend status callback (stub)
 	s.tox.CallbackFriendStatus(func(this *tox.Tox, friendNumber uint32, status int, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendStatus: friend=%d, status=%d", friendNumber, status)
-		s.eventQueue.Push("friend_status", fmt.Sprintf("%d:%d", friendNumber, status))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id": friendNumber,
+			"status":    status,
+		})
+		s.eventQueue.Push("friend_status", string(data))
 	}, nil)
 
 	// Friend typing callback (stub)
 	s.tox.CallbackFriendTyping(func(this *tox.Tox, friendNumber uint32, isTyping uint8, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendTyping: friend=%d, typing=%v", friendNumber, isTyping)
-		s.eventQueue.Push("friend_typing", fmt.Sprintf("%d:%v", friendNumber, isTyping))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id": friendNumber,
+			"typing":    isTyping,
+		})
+		s.eventQueue.Push("friend_typing", string(data))
 	}, nil)
 
 	// Friend read receipt callback (stub)
 	s.tox.CallbackFriendReadReceipt(func(this *tox.Tox, friendNumber uint32, receipt uint32, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendReadReceipt: friend=%d, receipt=%d", friendNumber, receipt)
-		s.eventQueue.Push("friend_read_receipt", fmt.Sprintf("%d:%d", friendNumber, receipt))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_id": friendNumber,
+			"receipt":   receipt,
+		})
+		s.eventQueue.Push("friend_read_receipt", string(data))
 	}, nil)
 
 	// File recv control callback (stub)
@@ -272,31 +302,54 @@ func setupCallbacks(s *Server) {
 	// Conference invite callback
 	s.tox.CallbackConferenceInvite(func(this *tox.Tox, friendNumber uint32, itype uint8, cookie string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceInvite: friend=%d, type=%d, cookie=%s", friendNumber, itype, cookie)
-		s.eventQueue.Push("conference_invite", fmt.Sprintf("%d:%d:%s", friendNumber, itype, cookie))
+		data, _ := json.Marshal(map[string]interface{}{
+			"friend_number": friendNumber,
+			"type":         itype,
+			"cookie":       cookie,
+		})
+		s.eventQueue.Push("conference_invite", string(data))
 	}, nil)
 
 	// Conference message callback
 	s.tox.CallbackConferenceMessage(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
-		s.eventQueue.Push("conference_message", fmt.Sprintf("%d:%d:%s", groupNumber, peerNumber, message))
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": groupNumber,
+			"peer_number": peerNumber,
+			"message":     message,
+		})
+		s.eventQueue.Push("conference_message", string(data))
 	}, nil)
 
 	// Conference title callback
 	s.tox.CallbackConferenceTitle(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, title string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceTitle: group=%d, peer=%d, title=%s", groupNumber, peerNumber, title)
-		s.eventQueue.Push("conference_title", fmt.Sprintf("%d:%d:%s", groupNumber, peerNumber, title))
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": groupNumber,
+			"peer_number": peerNumber,
+			"title":       title,
+		})
+		s.eventQueue.Push("conference_title", string(data))
 	}, nil)
 
 	// Conference peer name callback
 	s.tox.CallbackConferencePeerName(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, name string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferencePeerName: group=%d, peer=%d, name=%s", groupNumber, peerNumber, name)
-		s.eventQueue.Push("conference_peer_name", fmt.Sprintf("%d:%d:%s", groupNumber, peerNumber, name))
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": groupNumber,
+			"peer_number": peerNumber,
+			"name":        name,
+		})
+		s.eventQueue.Push("conference_peer_name", string(data))
 	}, nil)
 
 	// Conference peer list changed callback
 	s.tox.CallbackConferencePeerListChanged(func(this *tox.Tox, groupNumber uint32, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferencePeerListChanged: group=%d", groupNumber)
-		s.eventQueue.Push("conference_peer_list_changed", fmt.Sprintf("%d", groupNumber))
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": groupNumber,
+		})
+		s.eventQueue.Push("conference_peer_list_changed", string(data))
 	}, nil)
 
 	log.Println("[TOX] All callbacks registered")
