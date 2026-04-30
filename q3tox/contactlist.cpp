@@ -6,6 +6,10 @@
 #include <qlineedit.h>
 #include <qlistbox.h>
 
+// 静态数组定义
+const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
+const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.groups", "tabs.conferences"};
+
 ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0) {
     QBoxLayout* layout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
     layout->setSpacing(2);
@@ -13,16 +17,12 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     
     // Tab 标签
     QBoxLayout* tabLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    QString tabNames[4];
-    tabNames[0] = tr("tabs.all");
-    tabNames[1] = tr("tabs.friends");
-    tabNames[2] = tr("tabs.groups");
-    tabNames[3] = tr("tabs.conferences");
     
     for (int i = 0; i < 4; ++i) {
-        QPushButton* tab = new QPushButton(tabNames[i], this);
+        QPushButton* tab = new QPushButton(tr(tabNames[i]), this);
         tab->setToggleButton(true);
         if (i == 0) tab->setOn(true);
+        tabButtons[i] = tab;
         connect(tab, SIGNAL(clicked()), this, SLOT(onTabClicked()));
         tabLayout->addWidget(tab);
     }
@@ -63,7 +63,29 @@ void ContactListWidget::clear() {
 }
 
 void ContactListWidget::onTabClicked() {
-    // 简化：通过 sender() 判断哪个按钮被点击
+    QPushButton* senderBtn = (QPushButton*) sender();
+    if (!senderBtn) return;
+    
+    // 查找是哪个按钮被点击
+    for (int i = 0; i < 4; ++i) {
+        if (tabButtons[i] == senderBtn) {
+            setTabFilter(i);
+            break;
+        }
+    }
+}
+
+void ContactListWidget::setTabFilter(int index) {
+    if (index < 0 || index >= 4) return;
+    
+    currentFilter = tabFilters[index];
+    currentTab = index;
+    
+    // 更新按钮状态
+    for (int i = 0; i < 4; ++i) {
+        tabButtons[i]->setOn(i == index);
+    }
+    
     updateView();
 }
 
@@ -72,11 +94,12 @@ void ContactListWidget::onItemClicked(QListBoxItem* item) {
     int count = 0;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
-        if (currentFilter != "all" &&
-            !(currentFilter == "friends" && c->type == "friend") &&
-            !(currentFilter == "groups" && c->type == "group") &&
-            !(currentFilter == "conferences" && c->type == "conference")) {
-            continue;
+        
+        // 使用相同的过滤逻辑（单数形式）
+        if (currentFilter != "all") {
+            if (currentFilter == "friend" && c->type != "friend") continue;
+            if (currentFilter == "group" && c->type != "group") continue;
+            if (currentFilter == "conference" && c->type != "conference") continue;
         }
         
         if (count == index) {
@@ -92,11 +115,12 @@ void ContactListWidget::updateView() {
     
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
-        if (currentFilter != "all" &&
-            !(currentFilter == "friends" && c->type == "friend") &&
-            !(currentFilter == "groups" && c->type == "group") &&
-            !(currentFilter == "conferences" && c->type == "conference")) {
-            continue;
+        
+        // 使用单数形式，与 Contact.type 一致
+        if (currentFilter != "all") {
+            if (currentFilter == "friend" && c->type != "friend") continue;
+            if (currentFilter == "group" && c->type != "group") continue;
+            if (currentFilter == "conference" && c->type != "conference") continue;
         }
         
         QString emoji = (c->type == "friend") ? "👤" :

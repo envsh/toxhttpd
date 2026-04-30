@@ -117,25 +117,26 @@ std::vector<int> ToxAPI::getFriends() {
     std::vector<int> friends;
     std::string response = httpGet("/api/friends");
     if (response.empty()) return friends;
-    
+
     cJSON* root = cJSON_Parse(response.c_str());
     if (!root) return friends;
-    
-    if (cJSON_IsArray(root)) {
-        int count = cJSON_GetArraySize(root);
+
+    cJSON* friendsItem = cJSON_GetObjectItem(root, "friends");
+    if (friendsItem && cJSON_IsArray(friendsItem)) {
+        int count = cJSON_GetArraySize(friendsItem);
         for (int i = 0; i < count; ++i) {
-            cJSON* item = cJSON_GetArrayItem(root, i);
+            cJSON* item = cJSON_GetArrayItem(friendsItem, i);
             if (item) friends.push_back(item->valueint);
         }
     }
-    
+
     cJSON_Delete(root);
     return friends;
 }
 
 bool ToxAPI::getFriendInfo(int friendId, FriendInfo& info) {
-    std::string endpoint = "/api/friend/" + std::to_string(friendId);
-    std::string response = httpGet(endpoint);
+    std::string postData = "friend_id=" + std::to_string(friendId);
+    std::string response = httpPost("/api/friend", postData);
     if (response.empty()) return false;
     
     cJSON* root = cJSON_Parse(response.c_str());
