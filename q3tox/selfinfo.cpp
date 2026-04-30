@@ -199,7 +199,7 @@ void SelfInfoWidget::onShowQRCode() {
     QMessageBox::information(this, "QR Code", _("tox_id_copied") + "\n\nURL: " + url);
 }
 
-void SelfInfoWidget::updateUIStrings() {
+void SelfInfoWidget::retranslateUi() {
     // 更新按钮文字
     if (editBtn) editBtn->setText(_("buttons.edit_info"));
     if (connectBtn) connectBtn->setText(_("buttons.connect_network"));

@@ -16,9 +16,9 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     
     // 语言选择器
     langSelector = new QComboBox(this);
-    langSelector->insertItem("简体中文", 0);
-    langSelector->insertItem("繁體中文", 1);
-    langSelector->insertItem("English", 2);
+    langSelector->insertItem(QString::fromUtf8("简体中文"), 0);
+    langSelector->insertItem(QString::fromUtf8("繁體中文"), 1);
+    langSelector->insertItem(QString::fromUtf8("English"), 2);
     langSelector->setCurrentItem(0);
     connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
     headerLayout->addWidget(langSelector);
@@ -76,16 +76,21 @@ void ChatWidget::onSendClicked() {
     inputEdit->clear();
 }
 
-void ChatWidget::updateUIStrings() {
+void ChatWidget::retranslateUi() {
     // 更新聊天头
-    // 注意：headerText 的更新由 MainWindow::updateUIStrings() 处理
+    // 注意：headerText 的更新由 MainWindow::retranslateUi() 处理
     
     // 更新按钮文字
     if (sendBtn) sendBtn->setText(_("buttons.send"));
-    if (inputEdit && (inputEdit->text() == "输入 Tox ID 添加好友" || 
-                       inputEdit->text() == "Enter Tox ID to add friend" ||
-                       inputEdit->text() == "輸入 Tox ID 添加好友")) {
-        inputEdit->setText(_("placeholders.add_friend"));
+    
+    // 更新输入框 placeholder（如果当前显示的是默认值）
+    if (inputEdit) {
+        QString text = inputEdit->text();
+        if (text == "输入 Tox ID 添加好友" || 
+            text == "Enter Tox ID to add friend" ||
+            text == "輸入 Tox ID 添加好友") {
+            inputEdit->setText(_("placeholders.add_friend"));
+        }
     }
 }
 

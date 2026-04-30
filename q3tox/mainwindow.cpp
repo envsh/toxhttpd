@@ -84,7 +84,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
     connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
             this, SLOT(onLanguageChanged(const QString&)));
-    connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(updateUIStrings()));
+    connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 事件轮询器
     eventPoller = new EventPoller(this);
@@ -303,12 +303,13 @@ void MainWindow::onLanguageChanged(const QString& langCode) {
     Translator::instance().loadLanguage(langCode);
 }
 
-void MainWindow::updateUIStrings() {
+void MainWindow::retranslateUi() {
     setCaption(_("app_title"));
     
     // 更新子控件
-    if (selfInfoWidget) selfInfoWidget->updateUIStrings();
-    if (contactListWidget) contactListWidget->updateUIStrings();
+    if (selfInfoWidget) selfInfoWidget->retranslateUi();
+    if (contactListWidget) contactListWidget->retranslateUi();
+    if (chatWidget) chatWidget->retranslateUi();
     
     if (currentChatId == -1) {
         chatWidget->setHeaderText(_("select_chat_object"));

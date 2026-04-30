@@ -22,7 +22,7 @@ public:
     
     void setContacts(const QPtrList<Contact>& contacts);
     void clear();
-    void updateUIStrings();
+    void retranslateUi();
     
 signals:
     void contactSelected(int id, const QString& type);
@@ -41,6 +41,9 @@ private:
     QString currentFilter;
     int currentTab;
     QLineEdit* addInput;
+    QPushButton* addBtn;        // 添加好友按钮
+    QPushButton* confBtn;       // 创建会议按钮
+    QPushButton* groupBtn;      // 创建群组按钮
     
     // Tab 按钮和过滤器映射
     QPushButton* tabButtons[4];

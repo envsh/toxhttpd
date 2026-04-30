@@ -40,16 +40,16 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     addInput->setText(_("placeholders.add_friend"));
     addLayout->addWidget(addInput, 1);
     
-    QPushButton* addBtn = new QPushButton(_("buttons.add"), this);
+    addBtn = new QPushButton(_("buttons.add"), this);
     addLayout->addWidget(addBtn);
     layout->addLayout(addLayout);
     
     // 创建按钮行
     QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    QPushButton* confBtn = new QPushButton("🎥 " + _("buttons.create_conference"), this);
+    confBtn = new QPushButton(_("buttons.create_conference"), this);
     btnLayout->addWidget(confBtn);
     
-    QPushButton* groupBtn = new QPushButton("👥 " + _("buttons.create_group"), this);
+    groupBtn = new QPushButton(_("buttons.create_group"), this);
     btnLayout->addWidget(groupBtn);
     layout->addLayout(btnLayout);
 }
@@ -201,7 +201,7 @@ void ContactListWidget::updateView() {
     }
 }
 
-void ContactListWidget::updateUIStrings() {
+void ContactListWidget::retranslateUi() {
     // 更新Tab按钮文字
     for (int i = 0; i < 4; ++i) {
         if (tabButtons[i]) {
@@ -218,6 +218,11 @@ void ContactListWidget::updateUIStrings() {
             addInput->setText(_("placeholders.add_friend"));
         }
     }
+    
+    // 更新底部按钮
+    if (addBtn) addBtn->setText(_("buttons.add"));
+    if (confBtn) confBtn->setText(_("buttons.create_conference"));
+    if (groupBtn) groupBtn->setText(_("buttons.create_group"));
     
     // 重新更新视图（刷新联系人列表中的默认文字）
     updateView();

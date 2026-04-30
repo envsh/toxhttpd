@@ -15,7 +15,7 @@ public:
     
     void updateInfo(const QString& name, const QString& statusMsg,
                     const QString& connStatus, const QString& address);
-    void updateUIStrings();
+    void retranslateUi();
     
 private slots:
     void onEditInfo();

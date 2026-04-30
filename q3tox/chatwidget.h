@@ -18,7 +18,7 @@ public:
     void setHeaderText(const QString& text);
     void appendMessage(const QString& message, const QString& type, const QString& sender = QString::null);
     void clearMessages();
-    void updateUIStrings();
+    void retranslateUi();
     
 signals:
     void messageSent(const QString& message);
