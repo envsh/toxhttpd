@@ -87,10 +87,23 @@ function applyLanguage() {
     const sendBtn = document.querySelector('.input-area button');
     if (sendBtn) sendBtn.textContent = t('buttons.send');
     
-    // 更新聊天头部（仅在未选择聊天时）
-    const chatHeader = document.getElementById('chatHeader');
-    if (chatHeader && (currentChatId === null || currentChatId === undefined)) {
-        chatHeader.textContent = t('select_chat_object');
+    // 更新聊天头部
+    const chatHeaderText = document.getElementById('chatHeaderText');
+    if (chatHeaderText) {
+        if (currentChatId === null || currentChatId === undefined) {
+            chatHeaderText.textContent = t('select_chat_object');
+        } else {
+            // 重新生成当前聊天对象的头部文本（语言切换时更新）
+            let headerText = '';
+            if (currentChatType === 'friend') {
+                headerText = t('chat_with_friend', currentChatId);
+            } else if (currentChatType === 'group') {
+                headerText = t('group') + ' ' + currentChatId;
+            } else if (currentChatType === 'conference') {
+                headerText = t('conference_item') + ' ' + currentChatId;
+            }
+            chatHeaderText.textContent = headerText;
+        }
     }
     
     // 更新模态框
@@ -392,7 +405,7 @@ function selectContact(id, type) {
         headerText = t('conference_item') + ' ' + id;
     }
     
-    document.getElementById('chatHeader').textContent = headerText;
+    document.getElementById('chatHeaderText').textContent = headerText;
     document.getElementById('messageArea').innerHTML = '';
     
     // Refresh list to show selection
