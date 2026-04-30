@@ -35,17 +35,17 @@
                 <button class="tab" onclick="showTab('groups')">群组</button>
                 <button class="tab" onclick="showTab('conferences')">会议</button>
             </div>
-            <div class="add-friend-area">
-                <input type="text" id="addFriendInput" placeholder="输入好友公钥 (64/76字符)">
-                <button onclick="addFriend()">添加</button>
-            </div>
-            <div class="add-group-area hidden">
-                <button onclick="createGroup()">创建群组</button>
-            </div>
-            <div class="add-conference-area hidden">
-                <button onclick="createConference()">创建会议</button>
-            </div>
             <div class="list" id="contactList"></div>
+            <div class="sidebar-bottom">
+                <div class="add-friend-bottom">
+                    <input type="text" id="addFriendInputBottom" placeholder="输入好友公钥">
+                    <button onclick="addFriendFromBottom()">添加</button>
+                </div>
+                <div class="create-buttons-row">
+                    <button class="create-btn" onclick="createConference()">🎥 创建会议</button>
+                    <button class="create-btn" onclick="createGroup()">👥 创建群组</button>
+                </div>
+            </div>
         </div>
         <div class="chat-area">
             <div class="chat-header" id="chatHeader">选择聊天对象</div>
