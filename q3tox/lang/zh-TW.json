@@ -1,0 +1,85 @@
+{
+    "app_title": "Tox Chat",
+    "no_contacts": "暫無聯絡人",
+    "chat_with_friend": "與好友 {0} 聊天",
+    "group": "群組",
+    "conference_item": "會議",
+    "friend": "好友",
+    "conference_joined": "已加入會議 {0}",
+    "conference_join_failed": "加入會議失敗",
+    "tabs": {
+        "all": "全部",
+        "friends": "好友",
+        "groups": "群組",
+        "conferences": "會議"
+    },
+    "buttons": {
+        "edit_info": "編輯資訊",
+        "connect_network": "連接網路",
+        "qrcode": "QR碼",
+        "create_conference": "+ 會議",
+        "create_group": "+ 群組",
+        "send": "傳送",
+        "save": "儲存",
+        "cancel": "取消",
+        "close": "關閉",
+        "copy": "複製",
+        "add": "新增"
+    },
+    "placeholders": {
+        "add_friend": "輸入 Tox ID 新增好友"
+    },
+    "modals": {
+        "edit_info_title": "編輯個人資訊",
+        "friend_info_title": "好友資訊",
+        "labels": {
+            "name": "名稱",
+            "status_message": "狀態訊息",
+            "friend_id": "好友 ID",
+            "status": "狀態",
+            "connection": "連線",
+            "public_key": "公鑰"
+        }
+    },
+    "statuses": {
+        "offline": "離線",
+        "tcp": "TCP",
+        "udp": "UDP"
+    },
+    "no_name": "未設定名稱",
+    "no_status": "無狀態訊息",
+    "tox_id_copied": "Tox ID 已複製到剪貼簿",
+    "please_wait": "請等待載入完成",
+    "load_failed": "載入失敗",
+    "load_contacts_failed": "載入聯絡人失敗",
+    "conference": {
+        "invitation_received": "收到會議邀請",
+        "invitation_from": "來自 {0}",
+        "invite_message": "會議邀請",
+        "accept": "同意",
+        "reject": "拒絕",
+        "ignore": "忽略"
+    },
+    "friend_label": "好友 {0}",
+    "select_chat_first": "請先選擇聊天對象",
+    "send_failed": "傳送失敗",
+    "add_friend_prompt": "請輸入有效的公鑰 (64字元) 或地址 (76字元)",
+    "add_friend_success": "新增成功！",
+    "add_friend_failed": "新增失敗",
+    "group_created": "群組建立成功！",
+    "group_create_failed": "建立失敗",
+    "conference_created": "會議建立成功！",
+    "conference_create_failed": "建立失敗",
+    "conference_connected": "已連接會議",
+    "conference_connect_failed": "連接會議失敗",
+    "friend_deleted": "好友已刪除",
+    "delete_failed": "刪除失敗",
+    "save_failed": "儲存失敗",
+    "connecting_network": "正在連接網路...",
+    "connect_failed": "連接失敗",
+    "context_menu": {
+        "view_info": "查看資訊",
+        "delete_friend": "刪除好友"
+    },
+    "select_chat_object": "選擇聊天對象"
+}

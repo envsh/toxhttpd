@@ -22,7 +22,7 @@ public slots:
     void onContactSelected(int id, const QString& type);
     void onMessageSent(const QString& message);
     void onLanguageChanged(const QString& langCode);
-    void updateUIStrings();
+    void retranslateUi();
     void handleEvents(const EventList& events);
     
 private:

@@ -1,0 +1,85 @@
+{
+    "app_title": "Tox Chat",
+    "no_contacts": "No contacts yet",
+    "chat_with_friend": "Chat with friend {0}",
+    "group": "Group",
+    "conference_item": "Conference",
+    "friend": "Friend",
+    "conference_joined": "Joined conference {0}",
+    "conference_join_failed": "Failed to join conference",
+    "tabs": {
+        "all": "All",
+        "friends": "Friends",
+        "groups": "Groups",
+        "conferences": "Conferences"
+    },
+    "buttons": {
+        "edit_info": "Edit Info",
+        "connect_network": "Connect Network",
+        "qrcode": "QR Code",
+        "create_conference": "+ Conference",
+        "create_group": "+ Group",
+        "send": "Send",
+        "save": "Save",
+        "cancel": "Cancel",
+        "close": "Close",
+        "copy": "Copy",
+        "add": "Add"
+    },
+    "placeholders": {
+        "add_friend": "Enter Tox ID to add friend"
+    },
+    "modals": {
+        "edit_info_title": "Edit Personal Info",
+        "friend_info_title": "Friend Info",
+        "labels": {
+            "name": "Name",
+            "status_message": "Status Message",
+            "friend_id": "Friend ID",
+            "status": "Status",
+            "connection": "Connection",
+            "public_key": "Public Key"
+        }
+    },
+    "statuses": {
+        "offline": "Offline",
+        "tcp": "TCP",
+        "udp": "UDP"
+    },
+    "no_name": "Name not set",
+    "no_status": "No status message",
+    "tox_id_copied": "Tox ID copied to clipboard",
+    "please_wait": "Please wait for loading",
+    "load_failed": "Load failed",
+    "load_contacts_failed": "Failed to load contacts",
+    "conference": {
+        "invitation_received": "Conference invitation received",
+        "invitation_from": "From {0}",
+        "invite_message": "Conference invitation",
+        "accept": "Accept",
+        "reject": "Reject",
+        "ignore": "Ignore"
+    },
+    "friend_label": "Friend {0}",
+    "select_chat_first": "Please select chat first",
+    "send_failed": "Send failed",
+    "add_friend_prompt": "Please enter valid public key (64 chars) or address (76 chars)",
+    "add_friend_success": "Friend added successfully!",
+    "add_friend_failed": "Add failed",
+    "group_created": "Group created successfully!",
+    "group_create_failed": "Create failed",
+    "conference_created": "Conference created successfully!",
+    "conference_create_failed": "Create failed",
+    "conference_connected": "Connected to conference",
+    "conference_connect_failed": "Connect conference failed",
+    "friend_deleted": "Friend deleted",
+    "delete_failed": "Delete failed",
+    "save_failed": "Save failed",
+    "connecting_network": "Connecting to network...",
+    "connect_failed": "Connect failed",
+    "context_menu": {
+        "view_info": "View Info",
+        "delete_friend": "Delete Friend"
+    },
+    "select_chat_object": "Select chat object"
+}
