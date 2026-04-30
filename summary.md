@@ -182,3 +182,6 @@ curl -X POST http://localhost:8181/api/conferences
 - [x] Multi-language support (zh-CN, zh-TW, en-US)
 - [x] Web UI with avatar, status badge, language selector
 - [x] Layout optimization (no deformation)
+- [ ] Command flag proxy support
+- [ ] Command flag translate supprt
+- [ ] Web page add group(NGC)
