@@ -50,6 +50,7 @@ function loadContacts(filter = 'all') {
             return Promise.all(promises);
         })
         .then(friendDetails => {
+            console.log('Friend details loaded:', friendDetails);
             contacts.friends = friendDetails;
             // Load groups
             return fetch('/api/groups').then(r => r.json());
@@ -149,8 +150,10 @@ function showTab(tab) {
 
 // Select a contact (friend/group/conference)
 function selectContact(id, type) {
+    console.log('selectContact called: id=' + id + ', type=' + type + ', id type=' + typeof id);
     currentChatId = id;
     currentChatType = type;
+    console.log('After set: currentChatId=' + currentChatId + ', currentChatType=' + currentChatType);
     
     let headerText = '';
     if (type === 'friend') {
@@ -230,8 +233,9 @@ function escapeHtml(text) {
 
 // Send message
 function sendMessage() {
-    if (!currentChatId || !currentChatType) {
-        alert('请先选择聊天对象');
+    console.log('sendMessage called: currentChatId=' + currentChatId + ', type=' + typeof currentChatId + ', currentChatType=' + currentChatType);
+    if (currentChatId === null || currentChatId === undefined || !currentChatType) {
+        alert('请先选择聊天对象. currentChatId=' + currentChatId + ', type=' + typeof currentChatId + ', currentChatType=' + currentChatType);
         return;
     }
     const input = document.getElementById('messageInput');
@@ -254,12 +258,15 @@ function sendMessage() {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: body
-    }).then(() => {
+    }).then(r => {
+        if (!r.ok) {
+            return r.json().then(err => { throw err; });
+        }
         appendMessage(msg, 'self');
         input.value = '';
     }).catch(err => {
         console.error('Send error:', err);
-        alert('发送失败');
+        alert('发送失败: ' + (err.error || JSON.stringify(err)));
     });
 }
 
