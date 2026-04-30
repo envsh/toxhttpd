@@ -19,7 +19,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     QBoxLayout* tabLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     
     for (int i = 0; i < 4; ++i) {
-        QPushButton* tab = new QPushButton(tr(tabNames[i]), this);
+        QPushButton* tab = new QPushButton(_(tabNames[i]), this);
         tab->setToggleButton(true);
         if (i == 0) tab->setOn(true);
         tabButtons[i] = tab;
@@ -37,19 +37,19 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     // 底部添加好友区域
     QBoxLayout* addLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     addInput = new QLineEdit(this);
-    addInput->setText(tr("placeholders.add_friend"));
+    addInput->setText(_("placeholders.add_friend"));
     addLayout->addWidget(addInput, 1);
     
-    QPushButton* addBtn = new QPushButton(tr("buttons.add"), this);
+    QPushButton* addBtn = new QPushButton(_("buttons.add"), this);
     addLayout->addWidget(addBtn);
     layout->addLayout(addLayout);
     
     // 创建按钮行
     QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    QPushButton* confBtn = new QPushButton("🎥 " + tr("buttons.create_conference"), this);
+    QPushButton* confBtn = new QPushButton("🎥 " + _("buttons.create_conference"), this);
     btnLayout->addWidget(confBtn);
     
-    QPushButton* groupBtn = new QPushButton("👥 " + tr("buttons.create_group"), this);
+    QPushButton* groupBtn = new QPushButton("👥 " + _("buttons.create_group"), this);
     btnLayout->addWidget(groupBtn);
     layout->addLayout(btnLayout);
 }
@@ -181,7 +181,7 @@ void ContactListWidget::updateView() {
                        (c->type == "group") ? "👥" : "🎙";
         QString statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
         
-        QString displayName = c->name.isEmpty() ? tr("no_name") : c->name;
+        QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
         if (displayName.length() > 20) {
             displayName = displayName.left(20) + "...";
         }
@@ -195,8 +195,30 @@ void ContactListWidget::updateView() {
     }
     
     if (listBox->count() == 0) {
-        listBox->insertItem(tr("no_contacts"));
+        listBox->insertItem(_("no_contacts"));
     } else if (targetIndex >= 0) {
         listBox->setSelected(targetIndex, TRUE);
     }
+}
+
+void ContactListWidget::updateUIStrings() {
+    // 更新Tab按钮文字
+    for (int i = 0; i < 4; ++i) {
+        if (tabButtons[i]) {
+            tabButtons[i]->setText(_(tabNames[i]));
+        }
+    }
+    
+    // 更新添加好友输入框
+    if (addInput) {
+        QString text = addInput->text();
+        if (text == "输入 Tox ID 添加好友" || 
+            text == "Enter Tox ID to add friend" ||
+            text == "輸入 Tox ID 添加好友") {
+            addInput->setText(_("placeholders.add_friend"));
+        }
+    }
+    
+    // 重新更新视图（刷新联系人列表中的默认文字）
+    updateView();
 }

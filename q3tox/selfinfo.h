@@ -15,6 +15,7 @@ public:
     
     void updateInfo(const QString& name, const QString& statusMsg,
                     const QString& connStatus, const QString& address);
+    void updateUIStrings();
     
 private slots:
     void onEditInfo();
@@ -29,6 +30,9 @@ private:
     QLabel* statusMsgLabel;
     QLabel* addressLabel;
     QPushButton* copyBtn;
+    QPushButton* editBtn;
+    QPushButton* connectBtn;
+    QPushButton* qrBtn;
     
     QString selfAddress;
 };

@@ -11,15 +11,14 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     
     // 聊天头部
     QBoxLayout* headerLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-    headerText = new QLabel(tr("select_chat_object"), this);
+    headerText = new QLabel(_("select_chat_object"), this);
     headerLayout->addWidget(headerText, 1);
     
     // 语言选择器
     langSelector = new QComboBox(this);
-    langSelector->insertItem(tr("tabs.all"), 0);
-    langSelector->insertItem(tr("tabs.friends"), 1);
-    langSelector->insertItem(tr("tabs.groups"), 2);
-    langSelector->insertItem(tr("tabs.conferences"), 3);
+    langSelector->insertItem("简体中文", 0);
+    langSelector->insertItem("繁體中文", 1);
+    langSelector->insertItem("English", 2);
     langSelector->setCurrentItem(0);
     connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
     headerLayout->addWidget(langSelector);
@@ -35,10 +34,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     QBoxLayout* inputLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     
     inputEdit = new QLineEdit(this);
-    inputEdit->setText(tr("placeholders.add_friend"));
+    inputEdit->setText(_("placeholders.add_friend"));
     inputLayout->addWidget(inputEdit, 1);
     
-    sendBtn = new QPushButton(tr("buttons.send"), this);
+    sendBtn = new QPushButton(_("buttons.send"), this);
     connect(sendBtn, SIGNAL(clicked()), this, SLOT(onSendClicked()));
     connect(inputEdit, SIGNAL(returnPressed()), this, SLOT(onSendClicked()));
     inputLayout->addWidget(sendBtn);
@@ -77,10 +76,25 @@ void ChatWidget::onSendClicked() {
     inputEdit->clear();
 }
 
+void ChatWidget::updateUIStrings() {
+    // 更新聊天头
+    // 注意：headerText 的更新由 MainWindow::updateUIStrings() 处理
+    
+    // 更新按钮文字
+    if (sendBtn) sendBtn->setText(_("buttons.send"));
+    if (inputEdit && (inputEdit->text() == "输入 Tox ID 添加好友" || 
+                       inputEdit->text() == "Enter Tox ID to add friend" ||
+                       inputEdit->text() == "輸入 Tox ID 添加好友")) {
+        inputEdit->setText(_("placeholders.add_friend"));
+    }
+}
+
 void ChatWidget::onLanguageChanged(int index) {
     QString langCode;
     if (index == 0) langCode = "zh-CN";
     else if (index == 1) langCode = "zh-TW";
     else if (index == 2) langCode = "en-US";
+    else langCode = "zh-CN"; // 默认
+    qWarning("ChatWidget: language changed to %s", (const char*)langCode.local8Bit());
     emit languageChanged(langCode);
 }
