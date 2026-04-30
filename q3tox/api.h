@@ -38,6 +38,7 @@ public:
     
     // Messages
     bool sendFriendMessage(int friendId, const std::string& message);
+    bool sendConferenceMessage(int conferenceId, const std::string& message);
     
     // Conferences
     std::vector<int> getConferences();
