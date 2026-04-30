@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Tox Chat</title>
+    <title>Tox Chat (Go)</title>
     <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
@@ -14,8 +14,10 @@
                 <button class="action-btn" onclick="bootstrap()">连接网络</button>
             </div>
             <div class="tabs">
-                <button class="tab active" onclick="showTab('friends')">好友</button>
+                <button class="tab active" onclick="showTab('all')">全部</button>
+                <button class="tab" onclick="showTab('friends')">好友</button>
                 <button class="tab" onclick="showTab('groups')">群组</button>
+                <button class="tab" onclick="showTab('conferences')">会议</button>
             </div>
             <div class="add-friend-area">
                 <input type="text" id="addFriendInput" placeholder="输入好友公钥 (64/76字符)">
@@ -24,8 +26,10 @@
             <div class="add-group-area hidden">
                 <button onclick="createGroup()">创建群组</button>
             </div>
-            <div class="list" id="friendList"></div>
-            <div class="list hidden" id="groupList"></div>
+            <div class="add-conference-area hidden">
+                <button onclick="createConference()">创建会议</button>
+            </div>
+            <div class="list" id="contactList"></div>
         </div>
         <div class="chat-area">
             <div class="chat-header" id="chatHeader">选择聊天对象</div>
@@ -52,6 +56,27 @@
             <div class="modal-actions">
                 <button onclick="saveSelfInfo()">保存</button>
                 <button onclick="hideEditSelf()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Friend context menu -->
+    <div id="friendMenu" class="context-menu hidden">
+        <div class="menu-item" data-action="info">查看信息</div>
+        <div class="menu-item danger" data-action="delete">删除好友</div>
+    </div>
+
+    <!-- Friend info modal -->
+    <div id="friendInfoModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>好友信息</h3>
+            <div class="info-row"><label>名称:</label><span id="infoFriendName"></span></div>
+            <div class="info-row"><label>好友ID:</label><span id="infoFriendId"></span></div>
+            <div class="info-row"><label>状态:</label><span id="infoFriendStatus"></span></div>
+            <div class="info-row"><label>连接:</label><span id="infoFriendConn"></span></div>
+            <div class="info-row"><label>公钥:</label><span id="infoFriendPk" class="mono"></span></div>
+            <div class="modal-actions">
+                <button onclick="hideFriendInfo()">关闭</button>
             </div>
         </div>
     </div>
