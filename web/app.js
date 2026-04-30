@@ -190,11 +190,20 @@ function longPollEvents() {
                         }
                     } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
                         // Friend info updated, refresh contacts
-                        loadContacts(currentChatType === 'friend' ? 'all' : 
-                                     currentChatType === 'group' ? 'groups' : 
+                        loadContacts(currentChatType === 'friend' ? 'all' :
+                                     currentChatType === 'group' ? 'groups' :
                                      currentChatType === 'conference' ? 'conferences' : 'all');
                     } else if (event.event_type === 'connection_status') {
                         loadSelfInfo();
+                    } else if (event.event_type === 'conference_invite') {
+                        const data = JSON.parse(event.data);
+                        showConferenceInviteDialog(data);
+                    } else if (event.event_type === 'conference_message') {
+                        const data = JSON.parse(event.data);
+                        // 使用 conference_number（与后端字段名一致）
+                        if (data.conference_number == currentChatId && currentChatType === 'conference') {
+                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number);
+                        }
                     }
                 });
                 // Continue polling immediately if we got events
@@ -229,6 +238,68 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Show conference invite dialog (同意-左, 拒绝-中, 忽略-右)
+function showConferenceInviteDialog(data) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'background:#21262d;padding:20px;border-radius:8px;max-width:400px;width:90%;color:#c9d1d9;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+
+    dialog.innerHTML = `
+        <h3 style="margin-top:0;color:#58a6ff;">会议邀请</h3>
+        <p style="margin:10px 0;">好友 <strong>${data.friend_number}</strong> 邀请你加入会议</p>
+        <div style="text-align:right;margin-top:20px;">
+            <button id="acceptBtn" style="margin-right:10px;padding:8px 16px;background:#238636;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">同意</button>
+            <button id="rejectBtn" style="margin-right:10px;padding:8px 16px;background:#f85149;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">拒绝</button>
+            <button id="ignoreBtn" style="padding:8px 16px;background:#484f58;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">忽略</button>
+        </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // 同意按钮（最左）
+    document.getElementById('acceptBtn').onclick = function() {
+        document.body.removeChild(overlay);
+        fetch('/api/conferences/join', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `friend_number=${data.friend_number}&cookie=${data.cookie}`
+        }).then(r => r.json())
+          .then(data => {
+              alert(`已加入会议 ${data.conference_id}`);
+              loadContacts('conferences');
+          }).catch(err => {
+              alert('加入会议失败: ' + err);
+          });
+    };
+
+    // 拒绝按钮（中间）
+    document.getElementById('rejectBtn').onclick = function() {
+        document.body.removeChild(overlay);
+        fetch('/api/conferences/reject', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `friend_number=${data.friend_number}`
+        }).then(() => {
+            console.log('Conference invite rejected');
+        });
+    };
+
+    // 忽略按钮（最右）
+    document.getElementById('ignoreBtn').onclick = function() {
+        document.body.removeChild(overlay);
+        fetch('/api/conferences/ignore', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `friend_number=${data.friend_number}`
+        }).then(() => {
+            console.log('Conference invite ignored');
+        });
+    };
 }
 
 // Send message

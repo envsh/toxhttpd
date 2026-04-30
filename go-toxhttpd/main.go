@@ -314,9 +314,9 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackConferenceMessage(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
 		data, _ := json.Marshal(map[string]interface{}{
-			"group_number": groupNumber,
-			"peer_number": peerNumber,
-			"message":     message,
+			"conference_number": groupNumber,
+			"peer_number":      peerNumber,
+			"message":          message,
 		})
 		s.eventQueue.Push("conference_message", string(data))
 	}, nil)
@@ -325,9 +325,9 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackConferenceTitle(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, title string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceTitle: group=%d, peer=%d, title=%s", groupNumber, peerNumber, title)
 		data, _ := json.Marshal(map[string]interface{}{
-			"group_number": groupNumber,
-			"peer_number": peerNumber,
-			"title":       title,
+			"conference_number": groupNumber,
+			"peer_number":      peerNumber,
+			"title":            title,
 		})
 		s.eventQueue.Push("conference_title", string(data))
 	}, nil)
@@ -336,9 +336,9 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackConferencePeerName(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, name string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferencePeerName: group=%d, peer=%d, name=%s", groupNumber, peerNumber, name)
 		data, _ := json.Marshal(map[string]interface{}{
-			"group_number": groupNumber,
-			"peer_number": peerNumber,
-			"name":        name,
+			"conference_number": groupNumber,
+			"peer_number":      peerNumber,
+			"name":             name,
 		})
 		s.eventQueue.Push("conference_peer_name", string(data))
 	}, nil)
@@ -347,7 +347,7 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackConferencePeerListChanged(func(this *tox.Tox, groupNumber uint32, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferencePeerListChanged: group=%d", groupNumber)
 		data, _ := json.Marshal(map[string]interface{}{
-			"group_number": groupNumber,
+			"conference_number": groupNumber,
 		})
 		s.eventQueue.Push("conference_peer_list_changed", string(data))
 	}, nil)
@@ -566,6 +566,78 @@ func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(resp)
 }
 
+func (s *Server) handleConferenceJoin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.ParseForm()
+	friendNumberStr := r.FormValue("friend_number")
+	cookie := r.FormValue("cookie")
+
+	var friendNumber uint32
+	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
+
+	if cookie == "" {
+		http.Error(w, `{"error":"missing cookie"}`, http.StatusBadRequest)
+		return
+	}
+
+	confID, err := s.tox.ConferenceJoin(friendNumber, cookie)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TOX] Successfully joined conference %d from friend %d", confID, friendNumber)
+
+	go saveToxData(s.tox, "data/savedata.bin")
+
+	resp := map[string]interface{}{
+		"conference_id": confID,
+		"message":       "Successfully joined conference",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleConferenceReject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.ParseForm()
+	friendNumberStr := r.FormValue("friend_number")
+
+	var friendNumber uint32
+	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
+
+	log.Printf("[TOX] Rejected conference invite from friend %d", friendNumber)
+
+	resp := map[string]interface{}{
+		"message": "Conference invite rejected",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleConferenceIgnore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	log.Printf("[TOX] Ignored conference invite (no action taken)")
+
+	resp := map[string]interface{}{
+		"message": "Conference invite ignored",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -641,6 +713,9 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/groups", loggingMiddleware(s.handleGroups))
 	http.HandleFunc("/api/conferences", loggingMiddleware(s.handleConferences))
 	http.HandleFunc("/api/conference_messages", loggingMiddleware(s.handleConferenceMessages))
+	http.HandleFunc("/api/conferences/join", loggingMiddleware(s.handleConferenceJoin))
+	http.HandleFunc("/api/conferences/reject", loggingMiddleware(s.handleConferenceReject))
+	http.HandleFunc("/api/conferences/ignore", loggingMiddleware(s.handleConferenceIgnore))
 	http.HandleFunc("/api/bootstrap", loggingMiddleware(s.handleBootstrap))
 	http.HandleFunc("/api/events", loggingMiddleware(s.handleEvents))
 	http.HandleFunc("/", loggingMiddleware(s.handleWeb))
