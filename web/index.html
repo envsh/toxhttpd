@@ -8,10 +8,26 @@
 <body>
     <div class="container">
         <div class="sidebar">
-            <div class="self-info" id="selfInfo">加载中...</div>
-            <div class="self-actions">
-                <button class="action-btn" onclick="showEditSelf()">编辑信息</button>
-                <button class="action-btn" onclick="bootstrap()">连接网络</button>
+            <div class="self-info" id="selfInfo">
+                <div class="self-header">
+                    <div class="self-avatar" id="selfAvatar">?</div>
+                    <div class="self-info-content">
+                        <div class="self-name-row">
+                            <div class="self-name" id="selfName">未设置名称</div>
+                            <div class="self-status-badge" id="statusBadge">加载中...</div>
+                        </div>
+                        <div class="self-status-message" id="selfStatusMessage">无状态消息</div>
+                    </div>
+                </div>
+                <div class="self-address-row">
+                    <span class="self-address" id="selfAddress" title="点击复制完整地址">...</span>
+                    <button class="copy-btn" id="copyBtn" onclick="copyAddress()">复制</button>
+                </div>
+                <div class="self-actions">
+                    <button class="action-btn" onclick="showEditSelf()">编辑信息</button>
+                    <button class="action-btn" onclick="bootstrap()">连接网络</button>
+                    <button class="action-btn" onclick="showQRCode()">二维码</button>
+                </div>
             </div>
             <div class="tabs">
                 <button class="tab active" onclick="showTab('all')">全部</button>
