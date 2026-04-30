@@ -29,6 +29,7 @@ signals:
 private slots:
     void onTabClicked();
     void onItemClicked(QListBoxItem* item);
+    void onSelectionChanged();
     
 private:
     void updateView();

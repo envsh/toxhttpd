@@ -152,6 +152,7 @@ void MainWindow::loadContacts() {
 }
 
 void MainWindow::onContactSelected(int id, const QString& type) {
+    qWarning("onContactSelected: id=%d, type=%s", id, type.utf8().data());
     currentChatId = id;
     currentChatType = type;
     
