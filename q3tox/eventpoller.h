@@ -2,12 +2,96 @@
 #define EVENTPOLLER_H
 
 #include <qthread.h>
-#include <qstring.h>
 #include <qobject.h>
+#include <qevent.h>
 #include <vector>
+#include <queue>
+#include <string>
 #include "api.h"
 
 typedef std::vector<Event> EventList;
+
+// 事件类型常量
+const int EventListReadyType = QEvent::User + 100;
+const int ApiRequestEventType = QEvent::User + 101;
+const int ApiResultReadyType = QEvent::User + 102;
+
+// API请求类型
+enum ApiRequestType {
+    ApiLoadAllData,        // 加载所有初始数据（self + contacts）
+    ApiSendFriendMessage,
+    ApiSendConferenceMessage,
+    ApiJoinConference,
+    ApiRejectConference,
+    ApiAddFriend
+};
+
+// 事件轮询结果
+class EventListEvent : public QCustomEvent {
+public:
+    EventListEvent(const EventList& evts) : QCustomEvent(EventListReadyType), events(evts) {}
+    EventList events;
+};
+
+// API请求事件
+class ApiRequestEvent : public QCustomEvent {
+public:
+    ApiRequestEvent(ApiRequestType t) : QCustomEvent(ApiRequestEventType), type(t) {}
+    
+    ApiRequestType type;
+    // 请求参数
+    int id;
+    std::string message;
+    std::string publicKey;
+};
+
+// API结果事件基类
+class ApiResultEvent : public QCustomEvent {
+public:
+    ApiResultEvent(ApiRequestType t) : QCustomEvent(ApiResultReadyType), type(t) {}
+    ApiRequestType type;
+};
+
+// 可跨线程传递的联系人数据
+struct ContactData {
+    int id;
+    std::string name;
+    std::string type;
+    std::string status;
+    
+    ContactData() : id(-1) {}
+};
+
+// 所有数据加载完成事件
+class AllDataLoadedEvent : public ApiResultEvent {
+public:
+    AllDataLoadedEvent() : ApiResultEvent(ApiLoadAllData), success(true) {}
+    
+    bool success;
+    // Self info
+    std::string selfName, selfStatusMsg, selfConnStatus, selfAddress;
+    
+    // Contacts
+    std::vector<ContactData> contacts;
+};
+
+// 消息发送结果事件
+class MessageSentResultEvent : public ApiResultEvent {
+public:
+    MessageSentResultEvent() : ApiResultEvent(ApiSendFriendMessage), success(false) {}
+    bool success;
+    std::string message;  // 用于乐观更新
+    int chatId;
+    std::string chatType;
+};
+
+// 会议操作结果事件
+class ConferenceResultEvent : public ApiResultEvent {
+public:
+    ConferenceResultEvent() : ApiResultEvent(ApiJoinConference), success(false) {}
+    bool success;
+    int conferenceId;
+};
 
 class EventPoller : public QThread {
 public:
@@ -16,16 +100,19 @@ public:
     void stop();
     
     void setLastEventId(uint64_t id);
+    void setReceiver(QObject* recv) { receiver = recv; }
     
-    // 改用普通函数指针回调代替信号槽
-    void setCallback(void (*callback)(const EventList&, void*), void* userData);
+    // API请求接口（主线程调用）
+    void postApiRequest(ApiRequestEvent* req);
     
 private:
+    void processApiRequest(ApiRequestEvent* req);
+    
     bool running;
     uint64_t lastEventId;
     ToxAPI* api;
-    void (*callbackFunc)(const EventList&, void*);
-    void* callbackData;
+    QObject* receiver;
+    std::queue<ApiRequestEvent*> pendingRequests;
 };
 
 #endif // EVENTPOLLER_H
