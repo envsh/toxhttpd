@@ -16,19 +16,16 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
     
-    // 静态回调函数，供EventPoller使用
-    static void onEventsReceivedStatic(const EventList& events, void* userData);
+    void customEvent(QCustomEvent* event);
     
 public slots:
     void onContactSelected(int id, const QString& type);
     void onMessageSent(const QString& message);
     void onLanguageChanged(const QString& langCode);
     void updateUIStrings();
-    void handleEvents(const EventList& events);  // 实际处理事件的成员函数
+    void handleEvents(const EventList& events);
     
 private:
-    void loadSelfInfo();
-    void loadContacts();
     
     QSplitter* splitter;
     SelfInfoWidget* selfInfoWidget;

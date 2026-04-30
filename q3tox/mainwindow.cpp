@@ -10,7 +10,8 @@
 #include <qfile.h>
 #include <qtextstream.h>
 #include <qtextcodec.h>
-#include <cJSON.h>
+#include <qtimer.h>
+#include "cJSON.h"
 #include <stdlib.h>
 #include <qmessagebox.h>
 
@@ -35,14 +36,6 @@ static void saveLanguage(const QString& lang) {
         QTextStream stream(&file);
         stream << lang << "\n";
         file.close();
-    }
-}
-
-// 静态回调函数
-void MainWindow::onEventsReceivedStatic(const EventList& events, void* userData) {
-    MainWindow* self = static_cast<MainWindow*>(userData);
-    if (self) {
-        self->handleEvents(events);
     }
 }
 
@@ -93,12 +86,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     
     // 事件轮询器
     eventPoller = new EventPoller(this);
-    eventPoller->setCallback(MainWindow::onEventsReceivedStatic, this);
+    eventPoller->setReceiver(this);
     eventPoller->start();
     
-    // 初始加载数据
-    loadSelfInfo();
-    loadContacts();
+    // ✅ 异步加载：发送请求事件，不阻塞
+    qWarning("MainWindow: requesting initial data load (async)");
+    ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+    eventPoller->postApiRequest(req);
 }
 
 MainWindow::~MainWindow() {
@@ -108,47 +102,64 @@ MainWindow::~MainWindow() {
     }
 }
 
-void MainWindow::loadSelfInfo() {
-    ToxAPI api;
-    std::string name, statusMsg, connStatus, address;
-    if (api.getSelf(name, statusMsg, connStatus, address)) {
-        selfInfoWidget->updateInfo(QString::fromUtf8(name.c_str()), 
-                                  QString::fromUtf8(statusMsg.c_str()),
-                                  QString::fromUtf8(connStatus.c_str()),
-                                  QString::fromUtf8(address.c_str()));
+void MainWindow::customEvent(QCustomEvent* event) {
+    // 事件轮询结果
+    if (event->type() == EventListReadyType) {
+        EventListEvent* e = static_cast<EventListEvent*>(event);
+        handleEvents(e->events);
+        return;
     }
-}
-
-void MainWindow::loadContacts() {
-    ToxAPI api;
-    QPtrList<Contact> contacts;
     
-    // 加载好友
-    std::vector<int> friends = api.getFriends();
-    for (int id : friends) {
-        FriendInfo info;
-        if (api.getFriendInfo(id, info)) {
-            Contact* c = new Contact;
-            c->id = id;
-            c->name = QString::fromUtf8(info.name.c_str());
-            c->type = "friend";
-            c->status = QString::fromUtf8(info.connection_status.c_str());
-            contacts.append(c);
+    // 所有数据加载完成
+    if (event->type() == ApiResultReadyType) {
+        ApiResultEvent* e = static_cast<ApiResultEvent*>(event);
+        
+        if (e->type == ApiLoadAllData) {
+            AllDataLoadedEvent* evt = static_cast<AllDataLoadedEvent*>(event);
+            
+            // 更新self信息
+            selfInfoWidget->updateInfo(
+                QString::fromUtf8(evt->selfName.c_str()),
+                QString::fromUtf8(evt->selfStatusMsg.c_str()),
+                QString::fromUtf8(evt->selfConnStatus.c_str()),
+                QString::fromUtf8(evt->selfAddress.c_str()));
+            
+            // 转换ContactData为Contact并更新列表
+            QPtrList<Contact> contacts;
+            for (const auto& cd : evt->contacts) {
+                Contact* c = new Contact();
+                c->id = cd.id;
+                c->name = QString::fromUtf8(cd.name.c_str());
+                c->type = QString::fromUtf8(cd.type.c_str());
+                c->status = QString::fromUtf8(cd.status.c_str());
+                contacts.append(c);
+            }
+            contactListWidget->setContacts(contacts);
+            
+            qWarning("MainWindow: initial data load complete");
+            return;
+        }
+        
+        // 消息发送结果
+        if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage) {
+            MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);
+            if (!evt->success) {
+                QMessageBox::warning(this, tr("send_failed"), tr("send_failed"));
+            }
+            return;
+        }
+        
+        // 会议操作结果
+        if (e->type == ApiJoinConference) {
+            ConferenceResultEvent* evt = static_cast<ConferenceResultEvent*>(event);
+            if (evt->success) {
+                // 重新加载联系人
+                ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+                eventPoller->postApiRequest(req);
+            }
+            return;
         }
     }
-    
-    // 加载会议
-    std::vector<int> conferences = api.getConferences();
-    for (int id : conferences) {
-        Contact* c = new Contact;
-        c->id = id;
-        c->name = tr("conference_item") + " " + QString::number(id);
-        c->type = "conference";
-        c->status = "online"; // 会议默认为在线
-        contacts.append(c);
-    }
-    
-    contactListWidget->setContacts(contacts);
 }
 
 void MainWindow::onContactSelected(int id, const QString& type) {
@@ -181,20 +192,16 @@ void MainWindow::onMessageSent(const QString& message) {
         return;
     }
     
-    ToxAPI api;
-    bool success = false;
+    // ✅ 改为异步请求
+    ApiRequestEvent* req = new ApiRequestEvent(
+        currentChatType == "friend" ? ApiSendFriendMessage : ApiSendConferenceMessage
+    );
+    req->id = currentChatId;
+    req->message = std::string(message.utf8());
+    eventPoller->postApiRequest(req);
     
-    if (currentChatType == "friend") {
-        success = api.sendFriendMessage(currentChatId, std::string(message.utf8()));
-    } else if (currentChatType == "conference") {
-        success = api.sendConferenceMessage(currentChatId, std::string(message.utf8()));
-    }
-    
-    if (success) {
-        chatWidget->appendMessage(message, "self");
-    } else {
-        QMessageBox::warning(this, tr("send_failed"), tr("send_failed"));
-    }
+    // 乐观更新：先显示在界面
+    chatWidget->appendMessage(message, "self");
 }
 
 void MainWindow::handleEvents(const EventList& events) {
@@ -212,7 +219,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
                     if (friendId == currentChatId && currentChatType == "friend") {
                         chatWidget->appendMessage(message, "other", 
-                                                 tr("friend_label").arg(QString::number(friendId)));
+                                         tr("friend_label").arg(QString::number(friendId)));
                     }
                 }
                 cJSON_Delete(root);
@@ -229,14 +236,20 @@ void MainWindow::handleEvents(const EventList& events) {
                     InviteDialog dialog(friendNumber, cookie, this);
                     dialog.exec();
                     
-                    ToxAPI api;
                     if (dialog.getResult() == InviteDialog::Accept) {
-                        api.joinConference(friendNumber.toInt(), std::string(cookie.utf8()));
+                        // ✅ 改为异步请求
+                        ApiRequestEvent* req = new ApiRequestEvent(ApiJoinConference);
+                        req->id = friendNumber.toInt();
+                        req->message = std::string(cookie.utf8());
+                        eventPoller->postApiRequest(req);
+                        
                         QMessageBox::information(this, tr("conference_joined"), 
-                                                tr("conference_joined").arg(dialog.getCookie()));
-                        loadContacts();
+                                                        tr("conference_joined").arg(dialog.getCookie()));
                     } else if (dialog.getResult() == InviteDialog::Reject) {
-                        api.rejectConference(friendNumber.toInt());
+                        // ✅ 改为异步请求
+                        ApiRequestEvent* req = new ApiRequestEvent(ApiRejectConference);
+                        req->id = friendNumber.toInt();
+                        eventPoller->postApiRequest(req);
                     }
                 }
                 cJSON_Delete(root);
@@ -272,9 +285,13 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("conference_message: failed to parse JSON: %s", e.data.c_str());
             }
         } else if (e.type == "self_connection_status") {
-            loadSelfInfo();
+            // ✅ 改为异步请求
+            ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+            eventPoller->postApiRequest(req);
         } else if (e.type == "friend_name" || e.type == "friend_status") {
-            loadContacts();
+            // ✅ 异步重新加载（直接发送请求，避免SLOT问题）
+            ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+            eventPoller->postApiRequest(req);
         }
     }
 }
@@ -300,6 +317,4 @@ void MainWindow::updateUIStrings() {
         }
         chatWidget->setHeaderText(headerText);
     }
-    
-    loadContacts();
 }
