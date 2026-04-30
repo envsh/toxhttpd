@@ -203,6 +203,12 @@ bool ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
     return !response.empty();
 }
 
+bool ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
+    std::string postData = "conference_id=" + std::to_string(conferenceId) + "&message=" + message;
+    std::string response = httpPost("/api/conference_messages", postData);
+    return !response.empty();
+}
+
 std::vector<int> ToxAPI::getConferences() {
     std::vector<int> conferences;
     std::string response = httpGet("/api/conferences");

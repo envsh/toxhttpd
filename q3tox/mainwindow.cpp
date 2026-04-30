@@ -152,6 +152,12 @@ void MainWindow::loadContacts() {
 }
 
 void MainWindow::onContactSelected(int id, const QString& type) {
+    // 如果已经是当前选中的聊天对象，不重新加载（避免清空消息）
+    if (id == currentChatId && type == currentChatType) {
+        qWarning("onContactSelected: same contact, ignoring");
+        return;
+    }
+    
     qWarning("onContactSelected: id=%d, type=%s", id, type.utf8().data());
     currentChatId = id;
     currentChatType = type;
@@ -181,7 +187,7 @@ void MainWindow::onMessageSent(const QString& message) {
     if (currentChatType == "friend") {
         success = api.sendFriendMessage(currentChatId, std::string(message.utf8()));
     } else if (currentChatType == "conference") {
-        // TODO: 实现发送会议消息
+        success = api.sendConferenceMessage(currentChatId, std::string(message.utf8()));
     }
     
     if (success) {
@@ -234,6 +240,36 @@ void MainWindow::handleEvents(const EventList& events) {
                     }
                 }
                 cJSON_Delete(root);
+            }
+        } else if (e.type == "conference_message") {
+            qWarning("Processing conference_message event");
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* confNumberItem = cJSON_GetObjectItem(root, "conference_number");
+                cJSON* messageItem = cJSON_GetObjectItem(root, "message");
+                cJSON* peerNumberItem = cJSON_GetObjectItem(root, "peer_number");
+                
+                if (confNumberItem && messageItem) {
+                    int confNumber = confNumberItem->valueint;
+                    QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
+                    int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
+                    
+                    qWarning("confNumber=%d, currentChatId=%d, currentChatType=%s, match=%d", 
+                             confNumber, currentChatId, currentChatType.utf8().data(),
+                             (confNumber == currentChatId && currentChatType == "conference"));
+                    
+                    if (confNumber == currentChatId && currentChatType == "conference") {
+                        QString sender = (peerNumber >= 0) ? 
+                            QString("Peer %1").arg(peerNumber) : tr("conference_item");
+                        qWarning("Appending conference message: %s", message.utf8().data());
+                        chatWidget->appendMessage(message, "other", sender);
+                    }
+                } else {
+                    qWarning("conference_message: missing confNumber or message");
+                }
+                cJSON_Delete(root);
+            } else {
+                qWarning("conference_message: failed to parse JSON: %s", e.data.c_str());
             }
         } else if (e.type == "self_connection_status") {
             loadSelfInfo();
