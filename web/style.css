@@ -160,17 +160,38 @@ body {
 /* 操作按钮区域 */
 .self-actions {
     padding: 8px 12px;
-    border-top: 1px solid #30363d;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.self-actions {
-    padding: 8px 12px;
     border-bottom: 1px solid #30363d;
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* 语言选择器推到最右侧 */
+.lang-selector {
+    margin-left: auto;
+    padding: 6px 10px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.lang-selector:hover {
+    border-color: #00d4aa;
+}
+
+.lang-selector:focus {
+    border-color: #00d4aa;
+}
+
+.lang-selector option {
+    background: #161b22;
+    color: #c9d1d9;
 }
 
 .action-btn {
@@ -218,6 +239,8 @@ body {
     font-size: 13px;
     transition: all 0.2s;
     text-align: center;
+    min-width: 120px;
+    white-space: nowrap;
 }
 
 .create-btn:hover {
@@ -422,6 +445,8 @@ select option {
     cursor: pointer;
     font-size: 13px;
     transition: background 0.2s;
+    min-width: 60px;
+    white-space: nowrap;
 }
 
 .tab:hover {

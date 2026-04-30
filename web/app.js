@@ -11,6 +11,167 @@ let contacts = {
     conferences: []
 };
 
+// 多语言支持
+let currentLang = 'zh-CN'; // 默认简体中文
+let langData = {}; // 语言数据
+
+// 加载语言文件
+async function loadLanguage(lang) {
+    try {
+        const response = await fetch(`/web/lang/${lang}.json`);
+        langData = await response.json();
+        currentLang = lang;
+        // 保存到本地存储
+        try {
+            localStorage.setItem('toxchat_lang', lang);
+        } catch(e) {
+            console.warn('Failed to save language to localStorage:', e);
+        }
+        // 应用语言
+        applyLanguage();
+        console.log(`Language loaded: ${lang}`);
+    } catch (err) {
+        console.error('Failed to load language:', err);
+    }
+}
+
+// 获取翻译文本，支持占位符 {0}, {1} 等
+function t(key, ...args) {
+    const keys = key.split('.');
+    let result = langData;
+    for (const k of keys) {
+        if (result && result[k] !== undefined) {
+            result = result[k];
+        } else {
+            console.warn(`Translation missing: ${key}`);
+            return key; // 返回 key 作为后备
+        }
+    }
+    // 替换占位符
+    if (typeof result === 'string' && args.length > 0) {
+        return result.replace(/\{(\d+)\}/g, (match, index) => {
+            return args[index] !== undefined ? args[index] : match;
+        });
+    }
+    return result;
+}
+
+// 应用语言到页面
+function applyLanguage() {
+    // 更新页面标题
+    document.title = t('app_title');
+    
+    // 更新 Tab 按钮
+    const tabs = document.querySelectorAll('.tab');
+    if (tabs[0]) tabs[0].textContent = t('tabs.all');
+    if (tabs[1]) tabs[1].textContent = t('tabs.friends');
+    if (tabs[2]) tabs[2].textContent = t('tabs.groups');
+    if (tabs[3]) tabs[3].textContent = t('tabs.conferences');
+    
+    // 更新操作按钮
+    const actions = document.querySelectorAll('.self-actions .action-btn');
+    if (actions[0]) actions[0].textContent = t('buttons.edit_info');
+    if (actions[1]) actions[1].textContent = t('buttons.connect_network');
+    if (actions[2]) actions[2].textContent = t('buttons.qrcode');
+    
+    // 更新底部添加好友区域
+    const addInput = document.getElementById('addFriendInputBottom');
+    if (addInput) addInput.placeholder = t('placeholders.add_friend');
+    
+    // 更新创建按钮（底部）
+    const createBtns = document.querySelectorAll('.create-btn');
+    if (createBtns[0]) createBtns[0].textContent = '🎥 ' + t('buttons.create_conference');
+    if (createBtns[1]) createBtns[1].textContent = '👥 ' + t('buttons.create_group');
+    
+    // 更新发送按钮
+    const sendBtn = document.querySelector('.input-area button');
+    if (sendBtn) sendBtn.textContent = t('buttons.send');
+    
+    // 更新聊天头部（仅在未选择聊天时）
+    const chatHeader = document.getElementById('chatHeader');
+    if (chatHeader && (currentChatId === null || currentChatId === undefined)) {
+        chatHeader.textContent = t('select_chat_object');
+    }
+    
+    // 更新模态框
+    updateModalTexts();
+    
+    // 更新右键菜单
+    const menuItems = document.querySelectorAll('#friendMenu .menu-item');
+    if (menuItems[0]) menuItems[0].textContent = t('context_menu.view_info');
+    if (menuItems[1]) menuItems[1].textContent = t('context_menu.delete_friend');
+    
+    console.log('Language applied:', currentLang);
+}
+
+// 更新模态框文本
+function updateModalTexts() {
+    // 编辑信息模态框
+    const editTitle = document.querySelector('#editSelfModal h3');
+    if (editTitle) editTitle.textContent = t('modals.edit_info_title');
+    
+    const editLabels = document.querySelectorAll('#editSelfModal .form-group label');
+    if (editLabels[0]) editLabels[0].textContent = t('modals.labels.name');
+    if (editLabels[1]) editLabels[1].textContent = t('modals.labels.status_message');
+    
+    const editBtns = document.querySelectorAll('#editSelfModal .modal-actions button');
+    if (editBtns[0]) editBtns[0].textContent = t('buttons.save');
+    if (editBtns[1]) editBtns[1].textContent = t('buttons.cancel');
+    
+    // 好友信息模态框
+    const friendTitle = document.querySelector('#friendInfoModal h3');
+    if (friendTitle) friendTitle.textContent = t('modals.friend_info_title');
+    
+    const friendLabels = document.querySelectorAll('#friendInfoModal .info-row label');
+    if (friendLabels[0]) friendLabels[0].textContent = t('modals.labels.name');
+    if (friendLabels[1]) friendLabels[1].textContent = t('modals.labels.friend_id');
+    if (friendLabels[2]) friendLabels[2].textContent = t('modals.labels.status');
+    if (friendLabels[3]) friendLabels[3].textContent = t('modals.labels.connection');
+    if (friendLabels[4]) friendLabels[4].textContent = t('modals.labels.public_key');
+    
+    const friendBtns = document.querySelectorAll('#friendInfoModal .modal-actions button');
+    if (friendBtns[0]) friendBtns[0].textContent = t('buttons.close');
+}
+
+// 初始化语言
+function initLanguage() {
+    // 1. 先尝试从 localStorage 读取
+    try {
+        const savedLang = localStorage.getItem('toxchat_lang');
+        if (savedLang && (savedLang === 'zh-CN' || savedLang === 'zh-TW' || savedLang === 'en-US')) {
+            loadLanguage(savedLang);
+            return;
+        }
+    } catch(e) {
+        console.warn('Failed to read language from localStorage:', e);
+    }
+    
+    // 2. 检测浏览器语言
+    const browserLang = navigator.language || navigator.userLanguage;
+    if (browserLang) {
+        if (browserLang.toLowerCase().startsWith('zh')) {
+            if (browserLang.toLowerCase().includes('tw') || browserLang.toLowerCase().includes('hk')) {
+                loadLanguage('zh-TW'); // 繁体
+            } else {
+                loadLanguage('zh-CN'); // 简体（默认）
+            }
+        } else if (browserLang.toLowerCase().startsWith('en')) {
+            loadLanguage('en-US');
+        } else {
+            loadLanguage('zh-CN'); // 默认简体
+        }
+    } else {
+        loadLanguage('zh-CN'); // 默认简体
+    }
+}
+
+// 切换语言函数（供选择器调用）
+function switchLanguage(lang) {
+    if (lang === 'zh-CN' || lang === 'zh-TW' || lang === 'en-US') {
+        loadLanguage(lang);
+    }
+}
+
 // Load self info
 function loadSelfInfo() {
     fetch('/api/self')
@@ -21,14 +182,14 @@ function loadSelfInfo() {
 
             const connStatus = data.connection_status === 'offline' ? 'offline' :
                                data.connection_status === 'tcp' ? 'tcp' : 'online';
-            const connText = data.connection_status === 'offline' ? '离线' :
-                          data.connection_status === 'tcp' ? 'TCP' : 'UDP';
-
+            const connText = data.connection_status === 'offline' ? t('statuses.offline') :
+                          data.connection_status === 'tcp' ? t('statuses.tcp') : t('statuses.udp');
+            
             // 截断地址显示（前8后8）
-            const shortAddr = data.address.length > 20 ?
+            const shortAddr = data.address.length > 20 ? 
                 data.address.substring(0, 8) + '...' + data.address.substring(data.address.length - 8) :
                 data.address;
-
+            
             // 更新头像（显示名称首字母）
             const avatar = document.getElementById('selfAvatar');
             const initial = (data.name || '?').charAt(0).toUpperCase();
@@ -45,25 +206,25 @@ function loadSelfInfo() {
             const badge = document.getElementById('statusBadge');
             badge.className = 'self-status-badge ' + connStatus;
             badge.textContent = connText;
-
+            
             // 更新名称
-            document.getElementById('selfName').textContent = data.name || '未设置名称';
-            document.getElementById('selfStatusMessage').textContent = data.status_message || '无状态消息';
-
+            document.getElementById('selfName').textContent = data.name || t('no_name');
+            document.getElementById('selfStatusMessage').textContent = data.status_message || t('no_status');
+            
             // 更新地址
             const addrElem = document.getElementById('selfAddress');
             addrElem.textContent = shortAddr;
             addrElem.title = data.address;
             addrElem.onclick = function() {
                 copyToClipboard(data.address);
-                alert('地址已复制到剪贴板');
+                alert(t('tox_id_copied'));
             };
         })
         .catch(err => {
             console.error('loadSelfInfo error:', err);
             const badge = document.getElementById('statusBadge');
             badge.className = 'self-status-badge offline';
-            badge.textContent = '加载失败';
+            badge.textContent = t('load_failed');
             document.getElementById('selfAvatar').textContent = '?';
         });
 }
@@ -72,7 +233,7 @@ function loadSelfInfo() {
 function copyAddress() {
     if (selfAddress) {
         copyToClipboard(selfAddress);
-        alert('Tox ID 已复制到剪贴板');
+        alert(t('tox_id_copied'));
     }
 }
 
@@ -89,7 +250,7 @@ function copyToClipboard(text) {
 // 显示二维码（可选）
 function showQRCode() {
     if (!selfAddress) {
-        alert('请等待加载完成');
+        alert(t('please_wait'));
         return;
     }
     // 简单实现：在新窗口打开二维码生成服务
@@ -135,7 +296,7 @@ function loadContacts(filter = 'all') {
         .catch(err => {
             console.error('loadContacts error:', err);
             document.getElementById('contactList').innerHTML = 
-                '<div style="padding:10px;color:#f85149;">加载联系人失败</div>';
+                '<div style="padding:10px;color:#f85149;">' + t('load_contacts_failed') + '</div>';
         });
 }
 
@@ -174,7 +335,7 @@ function renderContactList(filter) {
                 <div class="list-item ${isSelected ? 'selected' : ''}" onclick="selectContact(${g}, 'group')">
                     <span class="group-dot"></span>
                     <span class="item-emoji">${emoji}</span>
-                    <span class="item-text">群组 ${g}</span>
+                    <span class="item-text">${t('group')} ${g}</span>
                 </div>
             `;
         });
@@ -189,14 +350,14 @@ function renderContactList(filter) {
                 <div class="list-item ${isSelected ? 'selected' : ''}" onclick="selectContact(${c}, 'conference')">
                     <span class="conference-dot"></span>
                     <span class="item-emoji">${emoji}</span>
-                    <span class="item-text">会议 ${c}</span>
+                    <span class="item-text">${t('conference_item')} ${c}</span>
                 </div>
             `;
         });
     }
     
     if (html === '') {
-        list.innerHTML = '<div style="padding:10px;color:#6e7681;">暂无联系人</div>';
+        list.innerHTML = '<div style="padding:10px;color:#6e7681;">' + t('no_contacts') + '</div>';
     } else {
         list.innerHTML = html;
     }
@@ -224,11 +385,11 @@ function selectContact(id, type) {
     
     let headerText = '';
     if (type === 'friend') {
-        headerText = `与好友 ${id} 聊天`;
+        headerText = t('chat_with_friend', id);
     } else if (type === 'group') {
-        headerText = `群组 ${id}`;
+        headerText = t('group') + ' ' + id;
     } else if (type === 'conference') {
-        headerText = `会议 ${id}`;
+        headerText = t('conference_item') + ' ' + id;
     }
     
     document.getElementById('chatHeader').textContent = headerText;
@@ -291,7 +452,7 @@ function appendMessage(text, type, senderId) {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message ' + type;
     if (type === 'other') {
-        msgDiv.innerHTML = `<div class="sender">好友 ${senderId}</div>${escapeHtml(text)}`;
+        msgDiv.innerHTML = `<div class="sender">${t('friend_label', senderId)}</div>${escapeHtml(text)}`;
     } else {
         msgDiv.textContent = text;
     }
@@ -316,12 +477,12 @@ function showConferenceInviteDialog(data) {
     dialog.style.cssText = 'background:#21262d;padding:20px;border-radius:8px;max-width:400px;width:90%;color:#c9d1d9;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
 
     dialog.innerHTML = `
-        <h3 style="margin-top:0;color:#58a6ff;">会议邀请</h3>
-        <p style="margin:10px 0;">好友 <strong>${data.friend_number}</strong> 邀请你加入会议</p>
+        <h3 style="margin-top:0;color:#58a6ff;">${t('conference.invitation_received')}</h3>
+        <p style="margin:10px 0;">${t('conference.invitation_from', data.friend_number)} ${t('conference.invite_message')}</p>
         <div style="text-align:right;margin-top:20px;">
-            <button id="acceptBtn" style="margin-right:10px;padding:8px 16px;background:#238636;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">同意</button>
-            <button id="rejectBtn" style="margin-right:10px;padding:8px 16px;background:#f85149;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">拒绝</button>
-            <button id="ignoreBtn" style="padding:8px 16px;background:#484f58;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">忽略</button>
+            <button id="acceptBtn" style="margin-right:10px;padding:8px 16px;background:#238636;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">${t('conference.accept')}</button>
+            <button id="rejectBtn" style="margin-right:10px;padding:8px 16px;background:#f85149;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">${t('conference.reject')}</button>
+            <button id="ignoreBtn" style="padding:8px 16px;background:#484f58;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">${t('conference.ignore')}</button>
         </div>
     `;
 
@@ -337,10 +498,10 @@ function showConferenceInviteDialog(data) {
             body: `friend_number=${data.friend_number}&cookie=${data.cookie}`
         }).then(r => r.json())
           .then(data => {
-              alert(`已加入会议 ${data.conference_id}`);
+              alert(t('conference_joined', data.conference_id));
               loadContacts('conferences');
           }).catch(err => {
-              alert('加入会议失败: ' + err);
+              alert(t('conference_join_failed') + ': ' + err);
           });
     };
 
@@ -373,7 +534,7 @@ function showConferenceInviteDialog(data) {
 function sendMessage() {
     console.log('sendMessage called: currentChatId=' + currentChatId + ', type=' + typeof currentChatId + ', currentChatType=' + currentChatType);
     if (currentChatId === null || currentChatId === undefined || !currentChatType) {
-        alert('请先选择聊天对象. currentChatId=' + currentChatId + ', type=' + typeof currentChatId + ', currentChatType=' + currentChatType);
+        alert(t('select_chat_first'));
         return;
     }
     const input = document.getElementById('messageInput');
@@ -404,7 +565,7 @@ function sendMessage() {
         input.value = '';
     }).catch(err => {
         console.error('Send error:', err);
-        alert('发送失败: ' + (err.error || JSON.stringify(err)));
+        alert(t('send_failed') + ': ' + (err.error || JSON.stringify(err)));
     });
 }
 
@@ -413,7 +574,7 @@ function addFriend() {
     const input = document.getElementById('addFriendInput');
     const pubkey = input.value.trim();
     if (!pubkey || (pubkey.length !== 64 && pubkey.length !== 76)) {
-        alert('请输入有效的公钥 (64字符) 或地址 (76字符)');
+        alert(t('add_friend_prompt'));
         return;
     }
     fetch('/api/friends', {
@@ -422,11 +583,11 @@ function addFriend() {
         body: `public_key=${encodeURIComponent(pubkey)}`
     }).then(r => r.json())
       .then(data => {
-          alert('添加成功！');
+          alert(t('add_friend_success'));
           input.value = '';
           loadContacts('friends');
       }).catch(err => {
-          alert('添加失败: ' + err);
+          alert(t('add_friend_failed') + ': ' + err);
       });
 }
 
@@ -436,10 +597,10 @@ function createGroup() {
         method: 'POST'
     }).then(r => r.json())
       .then(data => {
-          alert('群组创建成功！');
+          alert(t('group_created'));
           loadContacts('groups');
       }).catch(err => {
-          alert('创建失败: ' + err);
+          alert(t('group_create_failed') + ': ' + err);
       });
 }
 
@@ -449,10 +610,10 @@ function createConference() {
         method: 'POST'
     }).then(r => r.json())
       .then(data => {
-          alert('会议创建成功！');
+          alert(t('conference_created'));
           loadContacts('conferences');
       }).catch(err => {
-          alert('创建失败: ' + err);
+          alert(t('conference_create_failed') + ': ' + err);
       });
 }
 
@@ -509,11 +670,11 @@ function showFriendInfo(friendId) {
         body: `friend_id=${friendId}`
     }).then(r => r.json())
       .then(data => {
-          document.getElementById('infoFriendName').textContent = data.name || '无名';
+          document.getElementById('infoFriendName').textContent = data.name || t('no_name_label');
           document.getElementById('infoFriendId').textContent = data.friend_id;
-          document.getElementById('infoFriendStatus').textContent = data.status || '未知';
-          document.getElementById('infoFriendConn').textContent = data.connection_status || '未知';
-          document.getElementById('infoFriendPk').textContent = data.public_key || '未知';
+          document.getElementById('infoFriendStatus').textContent = data.status || t('unknown');
+          document.getElementById('infoFriendConn').textContent = data.connection_status || t('unknown');
+          document.getElementById('infoFriendPk').textContent = data.public_key || t('unknown');
           
           document.getElementById('friendInfoModal').classList.remove('hidden');
       });
@@ -527,7 +688,7 @@ function hideFriendInfo() {
 function deleteFriend() {
     if (!selectedFriendId) return;
     
-    if (!confirm('确定要删除好友 ' + selectedFriendId + ' 吗？')) {
+    if (!confirm(t('confirm_delete_friend', selectedFriendId))) {
         return;
     }
     
@@ -537,10 +698,10 @@ function deleteFriend() {
         body: `friend_id=${selectedFriendId}`
     }).then(r => r.json())
       .then(data => {
-          alert('好友已删除');
+          alert(t('friend_deleted'));
           loadContacts('friends');
       }).catch(err => {
-          alert('删除失败: ' + err);
+          alert(t('delete_failed') + ': ' + err);
       });
     
     hideFriendMenu();
@@ -591,7 +752,7 @@ function saveSelfInfo() {
             loadSelfInfo();
         })
         .catch(err => {
-            alert('保存失败: ' + err);
+            alert(t('save_failed') + ': ' + err);
         });
 }
 
@@ -600,16 +761,17 @@ function bootstrap() {
     fetch('/api/bootstrap', {
         method: 'POST'
     }).then(() => {
-        alert('正在连接网络...');
+        alert(t('connecting_network'));
         setTimeout(loadSelfInfo, 2000);
     }).catch(err => {
-        alert('连接失败: ' + err);
+        alert(t('connect_failed') + ': ' + err);
     });
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing...');
+    initLanguage();
     loadSelfInfo();
     loadContacts('all');
     longPollEvents();
@@ -649,3 +811,4 @@ window.showFriendInfo = showFriendInfo;
 window.deleteFriend = deleteFriend;
 window.hideFriendInfo = hideFriendInfo;
 window.hideFriendMenu = hideFriendMenu;
+window.switchLanguage = switchLanguage;
