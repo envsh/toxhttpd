@@ -119,9 +119,23 @@ type Server struct {
 }
 
 func NewServer(udpEnabled bool) (*Server, error) {
-	// Create Tox instance
+	// Load saved tox data if exists
+	saveDataPath := "data/savedata.bin"
+	var saveData []byte
+	if data, err := os.ReadFile(saveDataPath); err == nil && len(data) > 100 {
+		saveData = data
+		log.Printf("[TOX] Loaded save data from %s (%d bytes)", saveDataPath, len(data))
+	} else {
+		log.Printf("[TOX] No save data found, creating new identity")
+	}
+
+	// Create Tox instance with options
 	opts := tox.NewToxOptions()
 	opts.Udp_enabled = udpEnabled
+	if saveData != nil {
+		opts.Savedata_type = tox.SAVEDATA_TYPE_TOX_SAVE
+		opts.Savedata_data = saveData
+	}
 	t := tox.NewTox(opts)
 	if t == nil {
 		return nil, fmt.Errorf("failed to create tox instance")
@@ -517,12 +531,14 @@ func (s *Server) Start(port string) error {
 }
 
 func main() {
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
-
 	// Command line flags
 	udpEnabled := flag.Bool("udp", false, "Enable UDP mode (default: TCP only)")
 	port := flag.String("port", "8181", "HTTP server port")
+	debugLevel := flag.String("debug", "info", "Log level: trace, debug, info, warn, error")
 	flag.Parse()
+
+	// Set log level based on -debug flag
+	setLogLevel(*debugLevel)
 
 	server, err := NewServer(*udpEnabled)
 	if err != nil {
@@ -554,9 +570,8 @@ func main() {
 	go func() {
 		<-sig
 		log.Println("Shutting down...")
-		// Save data
-		os.MkdirAll("data", 0700)
-		server.tox.WriteSavedata("data/savedata.bin")
+		// Save Tox data
+		saveToxData(server.tox, "data/savedata.bin")
 		server.tox.Kill()
 		os.Exit(0)
 	}()
@@ -584,6 +599,54 @@ func logToxStatus(t *tox.Tox) {
 	friends := t.SelfGetFriendList()
 	log.Printf("[TOX] Status: name=%s, addr=%s, connection=%s (%d), friends=%d",
 		name, addr[:16]+"...", connStr, connStatus, len(friends))
+}
+
+// saveToxData saves the Tox instance data to file
+func saveToxData(t *tox.Tox, path string) {
+	os.MkdirAll("data", 0700)
+	
+	// Use go-toxcore-c's WriteSavedata method
+	err := t.WriteSavedata(path)
+	if err != nil {
+		log.Printf("[TOX] Failed to save data to %s: %v", path, err)
+	} else {
+		log.Printf("[TOX] Saved data to %s", path)
+	}
+}
+
+// setLogLevel sets the log flags based on the debug level
+func setLogLevel(level string) {
+	// Set Go standard log flags
+	switch level {
+	case "trace", "debug":
+		log.SetFlags(log.Lshortfile | log.LstdFlags)
+	case "info":
+		log.SetFlags(log.LstdFlags)
+	case "warn", "error":
+		log.SetFlags(log.LstdFlags)
+	default:
+		log.SetFlags(log.LstdFlags)
+	}
+	
+	// Set toxcore log level (integer)
+	var toxLevel int
+	switch level {
+	case "trace":
+		toxLevel = tox.LOG_LEVEL_TRACE
+	case "debug":
+		toxLevel = tox.LOG_LEVEL_DEBUG
+	case "info":
+		toxLevel = tox.LOG_LEVEL_INFO
+	case "warn":
+		toxLevel = tox.LOG_LEVEL_WARNING
+	case "error":
+		toxLevel = tox.LOG_LEVEL_ERROR
+	default:
+		toxLevel = tox.LOG_LEVEL_INFO
+	}
+	tox.SetLogLevel(toxLevel)
+	
+	log.Printf("[MAIN] Log level set to: %s (toxcore level: %d)", level, toxLevel)
 }
 
 // addTestData adds some test friends and conferences if none exist
