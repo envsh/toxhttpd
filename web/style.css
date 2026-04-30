@@ -22,48 +22,148 @@ body {
 }
 
 .self-info {
-    padding: 12px;
+    padding: 0;
     border-bottom: 1px solid #30363d;
-    color: #00d4aa;
+    color: #c9d1d9;
     font-size: 13px;
 }
 
-.self-info .name {
-    font-weight: 600;
-    font-size: 15px;
-    margin-bottom: 4px;
+/* 头部区域：头像 + 信息 */
+.self-header {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    gap: 10px;
+    border-bottom: 1px solid #30363d;
 }
 
-.self-info .status-message {
+/* 头像 */
+.self-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #21262d;
+    border: 2px solid #30363d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #00d4aa;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.self-avatar:hover {
+    border-color: #00d4aa;
+    background: #1c3a5f;
+}
+
+/* 信息内容区域 */
+.self-info-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 名称行：名称 + 状态标识 */
+.self-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.self-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 16px;
+    color: #00d4aa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 状态标识（右侧） */
+.self-status-badge {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: all 0.3s;
+}
+
+.self-status-badge.online {
+    background: #1a4731;
+    color: #00d4aa;
+    border: 1px solid #00d4aa;
+}
+
+.self-status-badge.tcp {
+    background: #1a4731;
+    color: #00d4aa;
+    border: 1px solid #00d4aa;
+}
+
+.self-status-badge.offline {
+    background: #482121;
+    color: #f85149;
+    border: 1px solid #f85149;
+}
+
+/* 状态消息 */
+.self-status-message {
     color: #6e7681;
     font-size: 12px;
-    margin-bottom: 4px;
     font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.self-info .address {
+/* 地址行 */
+.self-address-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+    border-top: 1px solid #30363d;
+}
+
+.self-address {
+    flex: 1;
     color: #6e7681;
     font-family: monospace;
     font-size: 11px;
-    word-break: break-all;
-    margin-bottom: 4px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.self-info .status {
-    font-size: 12px;
-    padding: 2px 6px;
+.copy-btn {
+    padding: 3px 8px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #6e7681;
     border-radius: 3px;
-    display: inline-block;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
 }
 
-.self-info .status.online {
-    background: #1a4731;
-    color: #00d4aa;
+.copy-btn:hover {
+    background: #30363d;
+    color: #c9d1d9;
+    border-color: #00d4aa;
 }
 
-.self-info .status.offline {
-    background: #482121;
-    color: #f85149;
+/* 操作按钮区域 */
+.self-actions {
+    padding: 8px 12px;
+    border-top: 1px solid #30363d;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .self-actions {

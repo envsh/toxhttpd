@@ -2,6 +2,7 @@ let currentChatId = null;
 let currentChatType = null; // 'friend', 'group', or 'conference'
 let lastEventId = 0;
 let pollTimeout = null;
+let selfAddress = ''; // 保存完整地址
 
 // Contact list data
 let contacts = {
@@ -16,18 +17,84 @@ function loadSelfInfo() {
         .then(r => r.json())
         .then(data => {
             selfInfo = data;
-            const connClass = data.connection_status === 'offline' ? 'offline' : 'online';
-            document.getElementById('selfInfo').innerHTML = `
-                <div class="name">${data.name || '未设置名称'}</div>
-                <div class="status-message">${data.status_message || '无状态消息'}</div>
-                <div class="address">${data.address}</div>
-                <div class="status ${connClass}">连接: ${data.connection_status}</div>
-            `;
+            selfAddress = data.address;
+
+            const connStatus = data.connection_status === 'offline' ? 'offline' :
+                               data.connection_status === 'tcp' ? 'tcp' : 'online';
+            const connText = data.connection_status === 'offline' ? '离线' :
+                          data.connection_status === 'tcp' ? 'TCP' : 'UDP';
+
+            // 截断地址显示（前8后8）
+            const shortAddr = data.address.length > 20 ?
+                data.address.substring(0, 8) + '...' + data.address.substring(data.address.length - 8) :
+                data.address;
+
+            // 更新头像（显示名称首字母）
+            const avatar = document.getElementById('selfAvatar');
+            const initial = (data.name || '?').charAt(0).toUpperCase();
+            avatar.textContent = initial;
+            if (data.name && data.name !== '') {
+                avatar.style.background = '#1c3a5f';
+                avatar.style.borderColor = '#00d4aa';
+            } else {
+                avatar.style.background = '#21262d';
+                avatar.style.borderColor = '#30363d';
+            }
+
+            // 更新状态标识（名称右侧）
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'self-status-badge ' + connStatus;
+            badge.textContent = connText;
+
+            // 更新名称
+            document.getElementById('selfName').textContent = data.name || '未设置名称';
+            document.getElementById('selfStatusMessage').textContent = data.status_message || '无状态消息';
+
+            // 更新地址
+            const addrElem = document.getElementById('selfAddress');
+            addrElem.textContent = shortAddr;
+            addrElem.title = data.address;
+            addrElem.onclick = function() {
+                copyToClipboard(data.address);
+                alert('地址已复制到剪贴板');
+            };
         })
         .catch(err => {
             console.error('loadSelfInfo error:', err);
-            document.getElementById('selfInfo').innerHTML = '加载失败';
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'self-status-badge offline';
+            badge.textContent = '加载失败';
+            document.getElementById('selfAvatar').textContent = '?';
         });
+}
+
+// 复制完整地址
+function copyAddress() {
+    if (selfAddress) {
+        copyToClipboard(selfAddress);
+        alert('Tox ID 已复制到剪贴板');
+    }
+}
+
+// 复制到剪贴板通用函数
+function copyToClipboard(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+}
+
+// 显示二维码（可选）
+function showQRCode() {
+    if (!selfAddress) {
+        alert('请等待加载完成');
+        return;
+    }
+    // 简单实现：在新窗口打开二维码生成服务
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(selfAddress)}`;
+    window.open(qrUrl, 'qrcode', 'width=250,height=300');
 }
 
 // Load all contacts (friends, groups, conferences) and merge into single list
