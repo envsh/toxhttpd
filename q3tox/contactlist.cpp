@@ -2,11 +2,17 @@
 #include "translator.h"
 #include "compat34.h"
 
+#ifdef QT3_BUILD
+#include <qpopupmenu.h>
+#else
+#include <QMenu>
+#endif
+
 // 静态数组定义
 const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
 const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.groups", "tabs.conferences"};
 
-ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0) {
+ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0), contextItemId(-1), contextItemType("") {
     QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 8, 2);
     qSetMargins(layout, 8, 8, 8, 8);
     
@@ -28,6 +34,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     listWidget = new QListBox(this);
     ((QListBox*)listWidget)->setSelectionMode(QListBox::Single);
     connect(((QListBox*)listWidget), SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
+    ((QListBox*)listWidget)->installEventFilter(this);
 #else
     listWidget = new QListWidget(this);
     ((QListWidget*)listWidget)->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -284,16 +291,106 @@ void ContactListWidget::retranslateUi() {
 }
 
 #ifndef QT3_BUILD
-// Qt4 特有的槽实现（不放在头文件中）
+// Qt4: 右键菜单
 void ContactListWidget::showContextMenu(QPoint pos) {
     QListWidget* lw = (QListWidget*)listWidget;
     QListWidgetItem* item = lw->itemAt(pos);
     if (!item) return;
-    // TODO: 实现右键菜单
+    
+    int id = item->data(Qt::UserRole).toInt();
+    QString type = item->data(Qt::UserRole + 1).toString();
+    QPoint globalPos = lw->mapToGlobal(pos);
+    showContextMenuAt(id, type, globalPos);
 }
 #else
-// Qt3 不实现 showContextMenu（没有 QPoint 参数匹配问题）
+// Qt3: 事件过滤器处理右键
+bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == (QListBox*)listWidget && event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->button() == Qt::RightButton) {
+            QListBox* lb = (QListBox*)listWidget;
+            int index = lb->index(lb->selectedItem());
+            // 查找对应的联系人
+            int count = 0;
+            for (uint i = 0; i < allContacts.count(); ++i) {
+                Contact* c = allContacts.at(i);
+                if (currentFilter != "all") {
+                    if (currentFilter == "friend" && c->type != "friend") continue;
+                    if (currentFilter == "group" && c->type != "group") continue;
+                    if (currentFilter == "conference" && c->type != "conference") continue;
+                }
+                if (count == index) {
+                    contextItemId = c->id;
+                    contextItemType = c->type;
+                    QPoint globalPos = ((QListBox*)listWidget)->mapToGlobal(mouseEvent->pos());
+                    showContextMenuAt(c->id, c->type, globalPos);
+                    return true;
+                }
+                ++count;
+            }
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
 void ContactListWidget::showContextMenu(QPoint) {
-    // Qt3 不需要实现
+    // Qt3 通过 eventFilter 处理，此函数不使用
 }
 #endif
+
+// 共用：显示右键菜单
+void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPoint& globalPos) {
+    contextItemId = id;
+    contextItemType = type;
+    
+#ifdef QT3_BUILD
+    QPopupMenu menu(this);
+#else
+    QMenu menu(this);
+#endif
+    
+    // 查看信息
+#ifdef QT3_BUILD
+    menu.insertItem(_("context_menu.view_info"), 0);
+#else
+    QAction* viewInfoAction = menu.addAction(_("context_menu.view_info"));
+#endif
+    
+    if (type == "friend") {
+        // 好友：删除、邀请进会议
+#ifdef QT3_BUILD
+        menu.insertItem(_("context_menu.delete_friend"), 1);
+        menu.insertSeparator();
+        menu.insertItem(_("invite_to_conference"), 2);
+        int choice = menu.exec(globalPos);
+        if (choice == 0) emit viewInfoRequested(id, type);
+        else if (choice == 1) emit deleteOrLeaveRequested(id, type);
+        else if (choice == 2) emit inviteToConferenceRequested(id);
+#else
+        menu.addSeparator();
+        QAction* deleteAction = menu.addAction(_("context_menu.delete_friend"));
+        QAction* inviteAction = menu.addAction(_("invite_to_conference"));
+        QAction* selected = menu.exec(globalPos);
+        if (selected == viewInfoAction) emit viewInfoRequested(id, type);
+        else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
+        else if (selected == inviteAction) emit inviteToConferenceRequested(id);
+#endif
+    } else if (type == "conference") {
+        // 会议：离开
+#ifdef QT3_BUILD
+        menu.insertItem(_("context_menu.leave_conference"), 1);
+        int choice = menu.exec(globalPos);
+        if (choice == 0) emit viewInfoRequested(id, type);
+        else if (choice == 1) emit deleteOrLeaveRequested(id, type);
+#else
+        menu.addSeparator();
+        QAction* leaveAction = menu.addAction(_("context_menu.leave_conference"));
+        QAction* selected = menu.exec(globalPos);
+        if (selected == viewInfoAction) emit viewInfoRequested(id, type);
+        else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
+#endif
+    } else {
+        // 群组：暂不支持操作
+        menu.exec(globalPos);
+    }
+}

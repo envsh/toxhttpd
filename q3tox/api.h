@@ -43,6 +43,8 @@ public:
     // Conferences
     std::vector<int> getConferences();
     int createConference();
+    bool leaveConference(int confId);
+    bool inviteToConference(int friendId, int confId);
     bool joinConference(int friendNumber, const std::string& cookie);
     bool rejectConference(int friendNumber);
     bool ignoreConference(int friendNumber);

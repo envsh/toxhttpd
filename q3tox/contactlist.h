@@ -27,13 +27,22 @@ public:
     
 signals:
     void contactSelected(int id, const QString& type);
+    void viewInfoRequested(int id, const QString& type);
+    void deleteOrLeaveRequested(int id, const QString& type);
+    void inviteToConferenceRequested(int friendId);
     
 private slots:
     void onTabClicked();
     void onItemClicked();  // Qt3: QListBox selectionChanged -> call this
-                             // Qt4: QListWidget itemClicked -> call this
+                              // Qt4: QListWidget itemClicked -> call this
     void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
     void showContextMenu(QPoint pos); // Qt4: right-click menu
+    
+private:
+#ifdef QT3_BUILD
+    bool eventFilter(QObject* obj, QEvent* event); // Qt3: handle right-click
+#endif
+    void showContextMenuAt(int id, const QString& type, const QPoint& globalPos);
     
 private:
     void updateView_v3();
@@ -44,6 +53,8 @@ private:
     ContactList allContacts;
     QString currentFilter;
     int currentTab;
+    int contextItemId;           // 右键选中的联系人ID
+    QString contextItemType;     // 右键选中的联系人类型
     QLineEdit* addInput;
     QPushButton* addBtn;        // 添加好友按钮
     QPushButton* confBtn;       // 创建会议按钮

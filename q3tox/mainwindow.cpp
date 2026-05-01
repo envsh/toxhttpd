@@ -88,6 +88,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     // 连接信号槽
     connect(contactListWidget, SIGNAL(contactSelected(int, const QString&)), 
             this, SLOT(onContactSelected(int, const QString&)));
+    connect(contactListWidget, SIGNAL(viewInfoRequested(int, const QString&)),
+            this, SLOT(onViewInfoRequested(int, const QString&)));
+    connect(contactListWidget, SIGNAL(deleteOrLeaveRequested(int, const QString&)),
+            this, SLOT(onDeleteOrLeaveRequested(int, const QString&)));
+    connect(contactListWidget, SIGNAL(inviteToConferenceRequested(int)),
+            this, SLOT(onInviteToConferenceRequested(int)));
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
     connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
             this, SLOT(onLanguageChanged(const QString&)));
@@ -333,5 +339,126 @@ void MainWindow::retranslateUi() {
             headerText = _("conference_item") + " " + QString::number(currentChatId);
         }
         chatWidget->setHeaderText(headerText);
+    }
+}
+
+void MainWindow::onViewInfoRequested(int id, const QString& type) {
+    FriendInfoDialog dialog(this);
+    
+    if (type == "friend") {
+        ToxAPI api;
+        FriendInfo info;
+        if (api.getFriendInfo(id, info)) {
+            dialog.setInfo(id, QString::fromUtf8(info.name.c_str()), type,
+                          QString::fromUtf8(info.status.c_str()),
+                          QString::fromUtf8(info.connection_status.c_str()),
+                          QString::fromUtf8(info.public_key.c_str()));
+        } else {
+            dialog.setInfo(id, _("no_name"), type);
+        }
+    } else if (type == "conference") {
+        dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type);
+    }
+    
+    dialog.exec();
+}
+
+void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
+    QString confirmMsg;
+    if (type == "friend") {
+        confirmMsg = _("confirm_delete_friend").arg(QString::number(id));
+    } else if (type == "conference") {
+        confirmMsg = _("confirm_leave_conference").arg(QString::number(id));
+    } else {
+        return;
+    }
+    
+    if (QMessageBox::question(this, _("confirm"), confirmMsg,
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+        ToxAPI api;
+        bool success = false;
+        
+        if (type == "friend") {
+            success = api.deleteFriend(id);
+            if (success) {
+                QMessageBox::information(this, _("friend_deleted"), _("friend_deleted"));
+            }
+        } else if (type == "conference") {
+            success = api.leaveConference(id);
+            if (success) {
+                QMessageBox::information(this, _("conference_leave_success"), _("conference_leave_success"));
+            }
+        }
+        
+        if (success) {
+            // 如果是当前聊天对象，清空聊天区
+            if (id == currentChatId && type == currentChatType) {
+                currentChatId = -1;
+                currentChatType = "";
+                chatWidget->setHeaderText(_("select_chat_object"));
+                chatWidget->clearMessages();
+            }
+            // 重新加载联系人列表
+            ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+            eventPoller->postApiRequest(req);
+        }
+    }
+}
+
+void MainWindow::onInviteToConferenceRequested(int friendId) {
+    // 获取会议列表
+    ToxAPI api;
+    std::vector<int> conferences = api.getConferences();
+    
+    if (conferences.empty()) {
+        QMessageBox::warning(this, _("no_conference"), _("no_conference"));
+        return;
+    }
+    
+    // 创建选择对话框
+    QDialog dialog(this);
+    qSetWindowTitle(&dialog, _("select_conference"));
+    dialog.resize(300, 150);
+    
+    QBoxLayout* layout = qNewBoxLayout(&dialog, QBoxLayout::TopToBottom, 10, 10);
+    
+    QLabel* label = new QLabel(_("select_conference"), &dialog);
+    layout->addWidget(label);
+    
+    QComboBox* confCombo = new QComboBox(&dialog);
+    for (uint i = 0; i < conferences.size(); ++i) {
+#ifdef QT3_BUILD
+        confCombo->insertItem(QString(_("conference_item")) + " " + QString::number(conferences[i]));
+#else
+        confCombo->insertItem(i, QString(_("conference_item")) + " " + QString::number(conferences[i]));
+#endif
+    }
+    layout->addWidget(confCombo);
+    
+    QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    btnLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum));
+    
+    QPushButton* inviteBtn = new QPushButton(_("buttons.add"), &dialog);
+    connect(inviteBtn, SIGNAL(clicked()), &dialog, SLOT(accept()));
+    btnLayout->addWidget(inviteBtn);
+    
+    QPushButton* cancelBtn = new QPushButton(_("buttons.cancel"), &dialog);
+    connect(cancelBtn, SIGNAL(clicked()), &dialog, SLOT(reject()));
+    btnLayout->addWidget(cancelBtn);
+    
+    layout->addLayout(btnLayout);
+    
+    if (dialog.exec() == QDialog::Accepted) {
+#ifdef QT3_BUILD
+        int confId = conferences[confCombo->currentItem()];
+#else
+        int confId = conferences[confCombo->currentIndex()];
+#endif
+        bool success = api.inviteToConference(friendId, confId);
+        if (success) {
+            QMessageBox::information(this, _("invite_success"), _("invite_success"));
+        } else {
+            QMessageBox::warning(this, _("invite_failed"), _("invite_failed"));
+        }
     }
 }

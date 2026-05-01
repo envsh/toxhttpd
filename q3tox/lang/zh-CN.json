@@ -79,8 +79,24 @@
     "connect_failed": "连接失败",
     "context_menu": {
         "view_info": "查看信息",
-        "delete_friend": "删除好友"
+        "delete_friend": "删除好友",
+        "leave_conference": "离开会议"
     },
     "select_chat_object": "选择聊天对象",
-    "theme_dark": "深色主题"
+    "theme_dark": "深色主题",
+    "confirm_delete_friend": "确定删除好友 %1 吗？",
+    "confirm_leave_conference": "确定离开会议 %1 吗？",
+    "invite_to_conference": "邀请进会议",
+    "select_conference": "选择会议",
+    "friend_info_title": "好友信息",
+    "conference_info_title": "会议信息",
+    "conference_leave_success": "已离开会议",
+    "invite_success": "邀请成功",
+    "invite_failed": "邀请失败",
+    "no_conference": "没有可用的会议",
+    "modals": {
+        "labels": {
+            "type": "类型"
+        }
+    }
 }

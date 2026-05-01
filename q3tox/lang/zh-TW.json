@@ -79,8 +79,24 @@
     "connect_failed": "連接失敗",
     "context_menu": {
         "view_info": "查看資訊",
-        "delete_friend": "刪除好友"
+        "delete_friend": "刪除好友",
+        "leave_conference": "離開會議"
     },
     "select_chat_object": "選擇聊天對象",
-    "theme_dark": "深色主題"
+    "theme_dark": "深色主題",
+    "confirm_delete_friend": "確定刪除好友 %1 嗎？",
+    "confirm_leave_conference": "確定離開會議 %1 嗎？",
+    "invite_to_conference": "邀請進會議",
+    "select_conference": "選擇會議",
+    "friend_info_title": "好友資訊",
+    "conference_info_title": "會議資訊",
+    "conference_leave_success": "已離開會議",
+    "invite_success": "邀請成功",
+    "invite_failed": "邀請失敗",
+    "no_conference": "沒有可用的會議",
+    "modals": {
+        "labels": {
+            "type": "類型"
+        }
+    }
 }

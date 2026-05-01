@@ -8,6 +8,7 @@
 #include "eventpoller.h"
 #include "api.h"
 #include "translator.h"
+#include "friendinfodialog.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -23,6 +24,9 @@ public:
     void onLanguageChanged(const QString& langCode);
     void retranslateUi();
     void handleEvents(const EventList& events);
+    void onViewInfoRequested(int id, const QString& type);
+    void onDeleteOrLeaveRequested(int id, const QString& type);
+    void onInviteToConferenceRequested(int friendId);
     
 private:
     

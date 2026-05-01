@@ -79,8 +79,24 @@
     "connect_failed": "Connect failed",
     "context_menu": {
         "view_info": "View Info",
-        "delete_friend": "Delete Friend"
+        "delete_friend": "Delete Friend",
+        "leave_conference": "Leave Conference"
     },
     "select_chat_object": "Select chat object",
-    "theme_dark": "Dark Theme"
+    "theme_dark": "Dark Theme",
+    "confirm_delete_friend": "Delete friend %1?",
+    "confirm_leave_conference": "Leave conference %1?",
+    "invite_to_conference": "Invite to Conference",
+    "select_conference": "Select Conference",
+    "friend_info_title": "Friend Info",
+    "conference_info_title": "Conference Info",
+    "conference_leave_success": "Left conference",
+    "invite_success": "Invited successfully",
+    "invite_failed": "Invite failed",
+    "no_conference": "No conferences available",
+    "modals": {
+        "labels": {
+            "type": "Type"
+        }
+    }
 }
