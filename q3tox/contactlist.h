@@ -10,7 +10,11 @@ struct Contact {
     QString status; // "online", "offline", "tcp"
 };
 
-typedef QPtrList<Contact> ContactList;
+#ifdef QT3_BUILD
+typedef QPtrList<Contact> ContactList; // QPtrList<Contact> stores Contact*
+#else
+typedef QList<Contact*> ContactList; // Qt4: QList<Contact*> to match Qt3's pointer list
+#endif
 
 class ContactListWidget : public QWidget {
     Q_OBJECT
@@ -29,6 +33,7 @@ private slots:
     void onItemClicked();  // Qt3: QListBox selectionChanged -> call this
                              // Qt4: QListWidget itemClicked -> call this
     void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
+    void showContextMenu(QPoint pos); // Qt4: right-click menu
     
 private:
     void updateView_v3();

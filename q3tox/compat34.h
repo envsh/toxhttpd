@@ -166,4 +166,28 @@ typedef QCustomEvent CustomEventBase;
 typedef QEvent CustomEventBase;
 #endif
 
+// QBoxLayout 构造函数兼容
+inline QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border = 0, int autoresize = -1) {
+#ifdef QT3_BUILD
+    return new QBoxLayout(parent, dir, border, autoresize, 0);
+#else
+    QBoxLayout* layout = new QBoxLayout(dir, parent);
+    if (border != 0) layout->setContentsMargins(border, border, border, border);
+    if (autoresize != -1) layout->setSpacing(autoresize);
+    return layout;
+#endif
+}
+
+// QPtrList 兼容 (Qt3 原生，Qt4 用 QList<T*> 模拟)
+#ifndef QT3_BUILD
+#include <QList>
+template<typename T>
+class QPtrList : public QList<T*> {
+public:
+    void append(T* item) { QList<T*>::append(item); }
+    bool isEmpty() const { return QList<T*>::isEmpty(); }
+    int count() const { return QList<T*>::count(); }
+};
+#endif
+
 #endif  // COMPAT34_H

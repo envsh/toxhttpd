@@ -27,7 +27,11 @@ bool Translator::loadLanguage(const QString& langCode) {
     if (len != -1) {
         exePath[len] = '\0';
         QString exeStr(exePath);
+#ifdef QT3_BUILD
         int lastSlash = exeStr.findRev('/');
+#else
+        int lastSlash = exeStr.lastIndexOf('/');
+#endif
         if (lastSlash >= 0) {
             paths.append(exeStr.left(lastSlash + 1) + "lang/" + langCode + ".json");
         }
@@ -50,9 +54,9 @@ bool Translator::loadLanguage(const QString& langCode) {
     
     if (filepath.isEmpty()) {
         qWarning("Language file not found for: %s (tried %d paths)", 
-                 (const char*)langCode.local8Bit(), paths.size());
+                 qToUtf8(langCode).data(), paths.size());
         for (int i = 0; i < (int)paths.size(); ++i) {
-            qWarning("  Path %d: %s", i, (const char*)paths[i].local8Bit());
+            qWarning("  Path %d: %s", i, qToUtf8(paths[i]).data());
         }
         return false;
     }
@@ -60,20 +64,23 @@ bool Translator::loadLanguage(const QString& langCode) {
     QFile file(filepath);
     file.close(); // 确保文件处于关闭状态
     if (!qOpenReadOnly(file)) {
-        qWarning("Cannot open language file: %s", (const char*)filepath.local8Bit());
+        qWarning("Cannot open language file: %s", qToUtf8(filepath).data());
         return false;
     }
     
     QTextStream stream(&file);
     stream.setCodec(QTextCodec::codecForName("UTF-8"));
-    QString jsonStr = stream.read();
+    QString jsonStr;
+    while (!stream.atEnd()) {
+        jsonStr += stream.readLine();
+    }
     file.close(); // 显式关闭文件
-    qWarning("Language file loaded: %s", (const char*)filepath.local8Bit());
+    qWarning("Language file loaded: %s", qToUtf8(filepath).data());
     
     // 解析 JSON
     cJSON* newRoot = cJSON_Parse(qToUtf8(jsonStr).data());
     if (!newRoot) {
-        qWarning("Failed to parse JSON: %s", (const char*)filepath.local8Bit());
+        qWarning("Failed to parse JSON: %s", qToUtf8(filepath).data());
         return false;
     }
     
@@ -83,13 +90,13 @@ bool Translator::loadLanguage(const QString& langCode) {
     m_currentLang = langCode;
     
     emit languageChanged();
-    qWarning("Language loaded: %s", (const char*)langCode.local8Bit());
+    qWarning("Language loaded: %s", qToUtf8(langCode).data());
     return true;
 }
 
 QString Translator::t(const QString& key, const QStringList& args) const {
     if (!m_root) {
-        qWarning("Translator: m_root is nullptr, returning key: %s", (const char*)key.local8Bit());
+        qWarning("Translator: m_root is nullptr, returning key: %s", qToUtf8(key).data());
         return key;
     }
     
@@ -106,13 +113,13 @@ QString Translator::t(const QString& key, const QStringList& args) const {
         current = cJSON_GetObjectItem(current, qToUtf8(parts[i]).data());
         if (!current) {
             qWarning("Translation missing: %s (failed at part %d: %s)", 
-                     (const char*)key.local8Bit(), i, (const char*)parts[i].local8Bit());
+                     qToUtf8(key).data(), i, qToUtf8(parts[i]).data());
             return key;
         }
     }
     
     if (!cJSON_IsString(current)) {
-        qWarning("Translation is not a string: %s", (const char*)key.local8Bit());
+        qWarning("Translation is not a string: %s", qToUtf8(key).data());
         return key;
     }
     

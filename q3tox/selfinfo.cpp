@@ -5,12 +5,11 @@
 #include "compat34.h"
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {
-    QBoxLayout* mainLayout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
-    mainLayout->setSpacing(10);
-    mainLayout->setMargin(12);
+    QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 12, 10);
+    qSetMargins(mainLayout, 12, 12, 12, 12);
     
     // 头部区域：头像 + 信息
-    QBoxLayout* headerLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
+    QBoxLayout* headerLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     
     // 头像
     avatarLabel = new QLabel("?", this);
@@ -22,11 +21,10 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     headerLayout->addWidget(avatarLabel);
     
     // 信息内容
-    QBoxLayout* infoLayout = new QBoxLayout(QBoxLayout::TopToBottom, -1, 0);
-    infoLayout->setSpacing(2);
+    QBoxLayout* infoLayout = qNewBoxLayout(nullptr, QBoxLayout::TopToBottom, 0, 2);
     
     // 名称行：名称 + 状态标识
-    QBoxLayout* nameRowLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
+    QBoxLayout* nameRowLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     nameLabel = new QLabel(_("no_name"), this);
     nameLabel->setFont(QFont("Helvetica", 16, QFont::Bold));
     nameRowLayout->addWidget(nameLabel, 1);
@@ -49,7 +47,7 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     mainLayout->addLayout(headerLayout);
     
     // 地址行
-    QBoxLayout* addrLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
+    QBoxLayout* addrLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     addressLabel = new QLabel("...", this);
     addressLabel->setFont(QFont("Monospace", 11));
     addressLabel->setPalette(QPalette(QColor("#6e7681")));
@@ -62,7 +60,7 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     mainLayout->addLayout(addrLayout);
     
     // 操作按钮
-    QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
+    QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     editBtn = new QPushButton(_("buttons.edit_info"), this);
     connect(editBtn, SIGNAL(clicked()), this, SLOT(onEditInfo()));
     btnLayout->addWidget(editBtn);
@@ -82,7 +80,11 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
                                const QString& connStatus, const QString& address) {
     // 更新头像
     QString displayName = name.isEmpty() ? _("no_name") : name;
+#ifdef QT3_BUILD
     QString initial = displayName.left(1).upper();
+#else
+    QString initial = displayName.left(1).toUpper();
+#endif
     avatarLabel->setText(initial);
     
     if (!name.isEmpty()) {
@@ -127,10 +129,10 @@ void SelfInfoWidget::onEditInfo() {
         QString status = dialog.getStatusMessage();
         
         if (!name.isEmpty()) {
-            api.setSelfName(std::string(name.utf8().data()));
+            api.setSelfName(std::string(qToUtf8(name).data()));
         }
         if (!status.isEmpty()) {
-            api.setSelfStatus(std::string(status.utf8().data()));
+            api.setSelfStatus(std::string(qToUtf8(status).data()));
         }
         
         // 重新加载信息

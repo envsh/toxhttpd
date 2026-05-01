@@ -5,9 +5,9 @@
 #include "ThemeManager.h"
 
 ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
-    QBoxLayout* mainLayout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
+    QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 0, 0);
     mainLayout->setSpacing(0);
-    mainLayout->setMargin(0);
+    qSetMargins(mainLayout, 0, 0, 0, 0);
     
     // 聊天头部
     QBoxLayout* headerLayout = new QBoxLayout(QBoxLayout::LeftToRight);
@@ -16,10 +16,17 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     
     // 语言选择器
     langSelector = new QComboBox(this);
+#ifdef QT3_BUILD
     langSelector->insertItem(QString::fromUtf8("简体中文"), 0);
     langSelector->insertItem(QString::fromUtf8("繁體中文"), 1);
     langSelector->insertItem(QString::fromUtf8("English"), 2);
     langSelector->setCurrentItem(0);
+#else
+    langSelector->insertItem(0, QString::fromUtf8("简体中文"));
+    langSelector->insertItem(1, QString::fromUtf8("繁體中文"));
+    langSelector->insertItem(2, QString::fromUtf8("English"));
+    langSelector->setCurrentIndex(0);
+#endif
     connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
     headerLayout->addWidget(langSelector);
 
@@ -33,6 +40,9 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     // 消息区域
     messageArea = new QTextEdit(this);
     messageArea->setReadOnly(true);
+#ifndef QT3_BUILD
+    messageArea->setAcceptRichText(true);
+#endif
     mainLayout->addWidget(messageArea, 1);
     
     // 输入区域
@@ -108,7 +118,7 @@ void ChatWidget::onLanguageChanged(int index) {
     else if (index == 1) langCode = "zh-TW";
     else if (index == 2) langCode = "en-US";
     else langCode = "zh-CN"; // 默认
-    qWarning("ChatWidget: language changed to %s", (const char*)langCode.local8Bit());
+    qWarning("ChatWidget: language changed to %s", qToUtf8(langCode).data());
     emit languageChanged(langCode);
 }
 

@@ -5,10 +5,10 @@
 InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent) 
     : QDialog(parent), friendNumber(friendNumber), cookie(cookie), result(Ignore) {
     
-    setCaption(_("conference.invitation_received"));
+    qSetWindowTitle(this, _("conference.invitation_received"));
     resize(400, 200);
     
-    QBoxLayout* mainLayout = new QBoxLayout(this, QBoxLayout::TopToBottom, 10, 10, 0);
+    QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 10, 10);
     
     // 标题
     QLabel* titleLabel = new QLabel(_("conference.invitation_received"), this);
@@ -24,20 +24,20 @@ InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, Q
     mainLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Minimum, QSizePolicy::Expanding));
     
     // 按钮行：同意（左）、拒绝（中）、忽略（右）
-    QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight, -1, 0);
+    QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     btnLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum));
     
-    QPushButton* acceptBtn = new QPushButton(_("conference.accept"), this, "acceptBtn");
+    QPushButton* acceptBtn = new QPushButton(_("conference.accept"), this);
     acceptBtn->setFixedSize(80, 35);
     connect(acceptBtn, SIGNAL(clicked()), this, SLOT(onAccept()));
     btnLayout->addWidget(acceptBtn);
     
-    QPushButton* rejectBtn = new QPushButton(_("conference.reject"), this, "rejectBtn");
+    QPushButton* rejectBtn = new QPushButton(_("conference.reject"), this);
     rejectBtn->setFixedSize(80, 35);
     connect(rejectBtn, SIGNAL(clicked()), this, SLOT(onReject()));
     btnLayout->addWidget(rejectBtn);
     
-    QPushButton* ignoreBtn = new QPushButton(_("conference.ignore"), this, "ignoreBtn");
+    QPushButton* ignoreBtn = new QPushButton(_("conference.ignore"), this);
     ignoreBtn->setFixedSize(80, 35);
     connect(ignoreBtn, SIGNAL(clicked()), this, SLOT(onIgnore()));
     btnLayout->addWidget(ignoreBtn);
