@@ -1,7 +1,7 @@
 TEMPLATE = app
 TARGET = q3tox
 QT = core gui
-CONFIG += qt3support
+CONFIG += moc
 
 SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
            chatwidget.cpp contactlist.cpp selfinfo.cpp translator.cpp \
@@ -19,10 +19,10 @@ OBJECTS_DIR = .
 QMAKE_CXXFLAGS += -std=c++11 -O0
 
 # 包含路径
-INCLUDEPATH += /opt/qt338sh/include /opt/qt338sh/include/qt3
+# INCLUDEPATH += /opt/qt338sh/include /opt/qt338sh/include/qt3
 
 # 库路径和链接
-QMAKE_LIBDIR_FLAGS += -L/opt/qt338sh/lib
+# QMAKE_LIBDIR_FLAGS += -L/opt/qt338sh/lib
 LIBS += -lqt-mt -lcurl
 
 # 安装
