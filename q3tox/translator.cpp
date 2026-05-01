@@ -1,9 +1,6 @@
 #include "translator.h"
 #include "cJSON.h"
-#include <qfile.h>
-#include <qtextstream.h>
-#include <qapplication.h>
-#include <qtextcodec.h>
+#include "compat34.h"
 #include <unistd.h>
 
 Translator& Translator::instance() {
@@ -62,7 +59,7 @@ bool Translator::loadLanguage(const QString& langCode) {
     
     QFile file(filepath);
     file.close(); // 确保文件处于关闭状态
-    if (!file.open(IO_ReadOnly)) {
+    if (!qOpenReadOnly(file)) {
         qWarning("Cannot open language file: %s", (const char*)filepath.local8Bit());
         return false;
     }
@@ -74,7 +71,7 @@ bool Translator::loadLanguage(const QString& langCode) {
     qWarning("Language file loaded: %s", (const char*)filepath.local8Bit());
     
     // 解析 JSON
-    cJSON* newRoot = cJSON_Parse(jsonStr.utf8());
+    cJSON* newRoot = cJSON_Parse(qToUtf8(jsonStr).data());
     if (!newRoot) {
         qWarning("Failed to parse JSON: %s", (const char*)filepath.local8Bit());
         return false;
@@ -97,11 +94,16 @@ QString Translator::t(const QString& key, const QStringList& args) const {
     }
     
     // 解析点号分隔的键
-    QStringList parts = QStringList::split('.', key);
+    QStringList parts;
+#ifdef QT3_BUILD
+    parts = QStringList::split('.', key);
+#else
+    parts = key.split('.');
+#endif
     cJSON* current = (cJSON*)m_root;
     
     for (int i = 0; i < (int)parts.size(); ++i) {
-        current = cJSON_GetObjectItem(current, parts[i].utf8());
+        current = cJSON_GetObjectItem(current, qToUtf8(parts[i]).data());
         if (!current) {
             qWarning("Translation missing: %s (failed at part %d: %s)", 
                      (const char*)key.local8Bit(), i, (const char*)parts[i].local8Bit());

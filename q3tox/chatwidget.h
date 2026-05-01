@@ -1,15 +1,7 @@
 #ifndef CHATWIDGET_H
 #define CHATWIDGET_H
 
-#include <qwidget.h>
-#include <qtextedit.h>
-#include <qlineedit.h>
-#include <qpushbt.h>
-#include <qlabel.h>
-#include <qcombobox.h>
-#include <qcheckbox.h>
-#include <qvbox.h>
-#include <qhbox.h>
+#include "compat34.h"
 
 class ChatWidget : public QWidget {
     Q_OBJECT

@@ -1,6 +1,5 @@
 #include "eventpoller.h"
-#include <qapplication.h>
-#include <qmutex.h>
+#include "compat34.h"
 #include <queue>
 
 EventPoller::EventPoller(QObject* parent) : QThread((unsigned int)0), 

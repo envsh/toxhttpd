@@ -1,8 +1,6 @@
 #include "chatwidget.h"
 #include "translator.h"
-#include <qscrollbar.h>
-#include <qmessagebox.h>
-#include <qlayout.h>
+#include "compat34.h"
 
 #include "ThemeManager.h"
 
@@ -76,7 +74,7 @@ void ChatWidget::clearMessages() {
 }
 
 void ChatWidget::onSendClicked() {
-    QString msg = inputEdit->text().stripWhiteSpace();
+    QString msg = qTrim(inputEdit->text());
     if (msg.isEmpty()) return;
     
     emit messageSent(msg);

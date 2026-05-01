@@ -2,12 +2,7 @@
 #include "translator.h"
 #include "editinfodialog.h"
 #include "api.h"
-#include <qlayout.h>
-#include <qclipboard.h>
-#include <qapplication.h>
-#include <qtimer.h>
-#include <qmessagebox.h>
-#include <qtooltip.h>
+#include "compat34.h"
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {
     QBoxLayout* mainLayout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
@@ -120,8 +115,8 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     } else {
         addressLabel->setText(address);
     }
-    // Qt3 没有setToolTip，用QToolTip代替
-    QToolTip::add(addressLabel, address);
+    // 设置工具提示
+    qSetToolTip(addressLabel, address);
 }
 
 void SelfInfoWidget::onEditInfo() {
