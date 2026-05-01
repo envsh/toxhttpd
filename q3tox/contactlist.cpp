@@ -7,12 +7,11 @@ const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "confe
 const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.groups", "tabs.conferences"};
 
 ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0) {
-    QBoxLayout* layout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
-    layout->setSpacing(2);
+    QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 8, 2);
     qSetMargins(layout, 8, 8, 8, 8);
     
     // Tab 标签
-    QBoxLayout* tabLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    QBoxLayout* tabLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     
     for (int i = 0; i < 4; ++i) {
         QPushButton* tab = new QPushButton(_(tabNames[i]), this);
@@ -39,7 +38,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     layout->addWidget((QWidget*)listWidget, 1); // stretch
     
     // 底部添加好友区域
-    QBoxLayout* addLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    QBoxLayout* addLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     addInput = new QLineEdit(this);
     addInput->setText(_("placeholders.add_friend"));
     addLayout->addWidget(addInput, 1);
@@ -49,7 +48,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     layout->addLayout(addLayout);
     
     // 创建按钮行
-    QBoxLayout* btnLayout = new QBoxLayout(QBoxLayout::LeftToRight);
+    QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     confBtn = new QPushButton(_("buttons.create_conference"), this);
     btnLayout->addWidget(confBtn);
     
@@ -61,7 +60,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
 void ContactListWidget::setContacts(const ContactList& contacts) {
     allContacts = contacts;
     updateView_v3();
-#ifdef QT4_BUILD
+#ifndef QT3_BUILD
     updateView_v4();
 #endif
 }
@@ -100,7 +99,7 @@ void ContactListWidget::setTabFilter(int index) {
     }
     
     updateView_v3();
-#ifdef QT4_BUILD
+#ifndef QT3_BUILD
     updateView_v4();
 #endif
 }
@@ -220,18 +219,18 @@ void ContactListWidget::updateView_v4() {
     
     lw->clear();
     for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact c = allContacts.at(i);
+        Contact* c = allContacts.at(i);
         if (currentFilter != "all") {
-            if (currentFilter == "friend" && c.type != "friend") continue;
-            if (currentFilter == "group" && c.type != "group") continue;
-            if (currentFilter == "conference" && c.type != "conference") continue;
+            if (currentFilter == "friend" && c->type != "friend") continue;
+            if (currentFilter == "group" && c->type != "group") continue;
+            if (currentFilter == "conference" && c->type != "conference") continue;
         }
         
-        QString emoji = (c.type == "friend") ? "👤" :
-                       (c.type == "group") ? "👥" : "🎙";
-        QString statusDot = (c.status == "online" || c.status == "tcp") ? "●" : "○";
+        QString emoji = (c->type == "friend") ? "👤" :
+                       (c->type == "group") ? "👥" : "🎙";
+        QString statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
         
-        QString displayName = c.name.isEmpty() ? _("no_name") : c.name;
+        QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
         if (displayName.length() > 20) {
             displayName = displayName.left(20) + "...";
         }
@@ -239,11 +238,11 @@ void ContactListWidget::updateView_v4() {
         QListWidgetItem* item = new QListWidgetItem(
             QString("%1 %2 %3").arg(statusDot, emoji, displayName)
         );
-        item->setData(Qt::UserRole, c.id);
-        item->setData(Qt::UserRole + 1, c.type);
+        item->setData(Qt::UserRole, c->id);
+        item->setData(Qt::UserRole + 1, c->type);
         lw->addItem(item);
         
-        if (c.id == selectedId && c.type == selectedType) {
+        if (c->id == selectedId && c->type == selectedType) {
             item->setSelected(true);
         }
     }
@@ -279,7 +278,7 @@ void ContactListWidget::retranslateUi() {
     
     // 重新更新视图
     updateView_v3();
-#ifdef QT4_BUILD
+#ifndef QT3_BUILD
     updateView_v4();
 #endif
 }
@@ -291,5 +290,10 @@ void ContactListWidget::showContextMenu(QPoint pos) {
     QListWidgetItem* item = lw->itemAt(pos);
     if (!item) return;
     // TODO: 实现右键菜单
+}
+#else
+// Qt3 不实现 showContextMenu（没有 QPoint 参数匹配问题）
+void ContactListWidget::showContextMenu(QPoint) {
+    // Qt3 不需要实现
 }
 #endif

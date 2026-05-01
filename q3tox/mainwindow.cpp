@@ -11,11 +11,11 @@
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
-    QString home = getenv("HOME") ? getenv("HOME") : ".";
+    QString home = qGetHomePath();
     QFile file(home + "/.q3tox_lang");
-    if (file.exists() && file.open(IO_ReadOnly)) {
+    if (qOpenReadOnly(file)) {
         QTextStream stream(&file);
-        QString lang = stream.readLine().stripWhiteSpace();
+        QString lang = qTrim(stream.readLine());
         file.close();
         if (!lang.isEmpty()) return lang;
     }
@@ -24,9 +24,9 @@ static QString loadSavedLanguage() {
 
 // 保存语言设置
 static void saveLanguage(const QString& lang) {
-    QString home = getenv("HOME") ? getenv("HOME") : ".";
+    QString home = qGetHomePath();
     QFile file(home + "/.q3tox_lang");
-    if (file.open(IO_WriteOnly)) {
+    if (qOpenWriteOnly(file)) {
         QTextStream stream(&file);
         stream << lang << "\n";
         file.close();
@@ -38,7 +38,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     qWarning("MainWindow: constructor started");
     
     // 设置窗口
-    setCaption(_("app_title"));
+    qSetWindowTitle(this, _("app_title"));
     setGeometry(100, 100, 1100, 700);
     
     // 设置 UTF-8 编解码器
@@ -49,9 +49,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     
     // ===== 左侧边栏 =====
     QWidget* sidebar = new QWidget(splitter);
-    QBoxLayout* sidebarLayout = new QBoxLayout(sidebar, QBoxLayout::TopToBottom, 0, -1, 0);
+    QBoxLayout* sidebarLayout = qNewBoxLayout(sidebar, QBoxLayout::TopToBottom, 0, 0);
     sidebarLayout->setSpacing(0);
-    sidebarLayout->setMargin(0);
+    qSetMargins(sidebarLayout, 0, 0, 0, 0);
     
     // 个人信息区
     selfInfoWidget = new SelfInfoWidget(sidebar);
@@ -66,9 +66,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     // ===== 右侧聊天区 =====
     chatWidget = new ChatWidget(splitter);
     splitter->addWidget(chatWidget);
-    
-    // 设置分割器比例
-    splitter->setResizeMode(sidebar, QSplitter::KeepSize);
     
     setCentralWidget(splitter);
     
@@ -98,7 +95,7 @@ MainWindow::~MainWindow() {
     }
 }
 
-void MainWindow::customEvent(QCustomEvent* event) {
+void MainWindow::customEvent(CustomEventBase* event) {
     // 事件轮询结果
     if (event->type() == EventListReadyType) {
         EventListEvent* e = static_cast<EventListEvent*>(event);
@@ -121,7 +118,7 @@ void MainWindow::customEvent(QCustomEvent* event) {
                 QString::fromUtf8(evt->selfAddress.c_str()));
             
             // 转换ContactData为Contact并更新列表
-            QPtrList<Contact> contacts;
+            ContactList contacts;
             qWarning("MainWindow: loading %d contacts", (int)evt->contacts.size());
             for (const auto& cd : evt->contacts) {
                 Contact* c = new Contact();
@@ -168,7 +165,7 @@ void MainWindow::onContactSelected(int id, const QString& type) {
         return;
     }
     
-    qWarning("onContactSelected: id=%d, type=%s", id, type.utf8().data());
+    qWarning("onContactSelected: id=%d, type=%s", id, qToUtf8(type).data());
     currentChatId = id;
     currentChatType = type;
     
@@ -196,7 +193,7 @@ void MainWindow::onMessageSent(const QString& message) {
         currentChatType == "friend" ? ApiSendFriendMessage : ApiSendConferenceMessage
     );
     req->id = currentChatId;
-    req->message = std::string(message.utf8());
+    req->message = std::string(qToUtf8(message));
     eventPoller->postApiRequest(req);
     
     // 乐观更新：先显示在界面
@@ -239,7 +236,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         // ✅ 改为异步请求
                         ApiRequestEvent* req = new ApiRequestEvent(ApiJoinConference);
                         req->id = friendNumber.toInt();
-                        req->message = std::string(cookie.utf8());
+                        req->message = std::string(qToUtf8(cookie));
                         eventPoller->postApiRequest(req);
                         
                         QMessageBox::information(this, _("conference_joined"), 
@@ -267,13 +264,13 @@ void MainWindow::handleEvents(const EventList& events) {
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
                     qWarning("confNumber=%d, currentChatId=%d, currentChatType=%s, match=%d", 
-                             confNumber, currentChatId, currentChatType.utf8().data(),
+                             confNumber, currentChatId, qToUtf8(currentChatType).data(),
                              (confNumber == currentChatId && currentChatType == "conference"));
                     
                     if (confNumber == currentChatId && currentChatType == "conference") {
                         QString sender = (peerNumber >= 0) ? 
                             QString("Peer %1").arg(peerNumber) : _("conference_item");
-                        qWarning("Appending conference message: %s", message.utf8().data());
+                        qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", sender);
                     }
                 } else {
@@ -301,7 +298,7 @@ void MainWindow::onLanguageChanged(const QString& langCode) {
 }
 
 void MainWindow::retranslateUi() {
-    setCaption(_("app_title"));
+    qSetWindowTitle(this, _("app_title"));
     
     // 更新子控件
     if (selfInfoWidget) selfInfoWidget->retranslateUi();

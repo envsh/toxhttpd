@@ -15,7 +15,7 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
     
-    void customEvent(QCustomEvent* event);
+    void customEvent(CustomEventBase* event);
     
 public slots:
     void onContactSelected(int id, const QString& type);
