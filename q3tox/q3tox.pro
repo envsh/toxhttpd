@@ -1,6 +1,6 @@
 TEMPLATE = app
 TARGET = q3tox
-QT = core gui
+QT = core gui widgets
 CONFIG += moc
 
 SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \

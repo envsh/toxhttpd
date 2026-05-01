@@ -5,6 +5,7 @@
 // ========== Qt3 头文件 ==========
 #include <qapplication.h>
 #include <qmainwindow.h>
+#include <qpopupmenu.h>
 #include <qwidget.h>
 #include <qpushbt.h>
 #include <qlabel.h>
@@ -30,6 +31,7 @@
 // ========== Qt4 头文件 ==========
 #include <QApplication>
 #include <QMainWindow>
+#include <QMenu>
 #include <QWidget>
 #include <QPushButton>
 #include <QLabel>
