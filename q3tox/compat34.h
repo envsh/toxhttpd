@@ -72,6 +72,42 @@ inline QByteArray qToUtf8(const QString& s) {
 #endif
 }
 
+// 转本地编码
+inline QByteArray qToLocal8Bit(const QString& s) {
+#ifdef QT3_BUILD
+    return s.local8Bit();
+#else
+    return s.toLocal8Bit();
+#endif
+}
+
+// 从后向前查找字符串
+inline int qLastIndexOf(const QString& s, const QString& str) {
+#ifdef QT3_BUILD
+    return s.findRev(str);
+#else
+    return s.lastIndexOf(str);
+#endif
+}
+
+// 转大写
+inline QString qToUpper(const QString& s) {
+#ifdef QT3_BUILD
+    return s.upper();
+#else
+    return s.toUpper();
+#endif
+}
+
+// 分割字符串 (参数顺序: str在前，sep在后，符合Qt4成员函数习惯)
+inline QStringList qSplit(const QString& str, const QString& sep) {
+#ifdef QT3_BUILD
+    return QStringList::split(sep, str);
+#else
+    return str.split(sep);
+#endif
+}
+
 // 窗口标题
 inline void qSetWindowTitle(QWidget* w, const QString& title) {
 #ifdef QT3_BUILD

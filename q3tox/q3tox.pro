@@ -18,13 +18,16 @@ OBJECTS_DIR = .
 # C++11 标准
 QMAKE_CXXFLAGS += -std=c++11 -O0
 
-# Qt 版本检测：Qt3 时定义 QT3_BUILD
-# Qt3 qmake (1.07a) 不支持 contains(QT_VERSION)
-# 通过检测 QT3_BUILD 环境变量来判断
-QT3_BUILD_VAL = $$(QT3_BUILD)
-!equals(QT3_BUILD_VAL, "1") {
+# Qt 版本检测：必须用同一个 .pro 文件
+# 方法：用 system() 调用 qmake -v，检测输出是否包含 "Qt 3" 或 "4."
+# Qt3 qmake (1.07a) 不支持 QT_VERSION 变量
+# Qt4 qmake 支持 QT_VERSION
+# 检测逻辑：如果 QT_VERSION 不为空，则是 Qt4
+!isEmpty(QT_VERSION) {
+    # Qt4: QT_VERSION 不为空（如 "4.8.7"）
     message("Building for Qt4 - QT3_BUILD not defined")
 } else {
+    # Qt3: QT_VERSION 为空
     message("Building for Qt3 - adding QT3_BUILD")
     DEFINES += QT3_BUILD
 }
@@ -35,13 +38,12 @@ QT3_BUILD_VAL = $$(QT3_BUILD)
 # 库路径和链接
 # QMAKE_LIBDIR_FLAGS += -L/opt/qt338sh/lib
 LIBS += -lcurl
-QT3_BUILD_VAL = $$(QT3_BUILD)
-!equals(QT3_BUILD_VAL, "1") {
-    # Qt4: Qt 库由 qmake 自动处理
-    message("Linking with Qt4 libraries")
-} else {
+isEmpty(QT_VERSION) {
     # Qt3: 手动指定库
     LIBS += -lqt-mt
+} else {
+    # Qt4: Qt 库由 qmake 自动处理
+    message("Linking with Qt4 libraries")
 }
 
 # 安装

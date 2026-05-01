@@ -80,11 +80,7 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
                                const QString& connStatus, const QString& address) {
     // 更新头像
     QString displayName = name.isEmpty() ? _("no_name") : name;
-#ifdef QT3_BUILD
-    QString initial = displayName.left(1).upper();
-#else
-    QString initial = displayName.left(1).toUpper();
-#endif
+    QString initial = qToUpper(displayName.left(1));
     avatarLabel->setText(initial);
     
     if (!name.isEmpty()) {
