@@ -17,7 +17,7 @@ public:
     
     void customEvent(CustomEventBase* event);
     
-public slots:
+    public slots:
     void onContactSelected(int id, const QString& type);
     void onMessageSent(const QString& message);
     void onLanguageChanged(const QString& langCode);
@@ -27,6 +27,7 @@ public slots:
 private:
     
     QSplitter* splitter;
+    QWidget* sidebarWidget;  // 左侧边栏容器
     SelfInfoWidget* selfInfoWidget;
     ContactListWidget* contactListWidget;
     ChatWidget* chatWidget;
