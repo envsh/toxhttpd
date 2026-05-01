@@ -1,9 +1,10 @@
 set -x
 
 # for qt3
-QTDIR=/opt/qt338sh
-export QTDIR
-export QT3_BUILD=1
+if [ x"$QTDIR" == x"" ]; then
+    QTDIR=/opt/qt338sh
+    export QTDIR
+fi
 /opt/qt338sh/bin/qmake -makefile
 make
 

@@ -27,11 +27,7 @@ bool Translator::loadLanguage(const QString& langCode) {
     if (len != -1) {
         exePath[len] = '\0';
         QString exeStr(exePath);
-#ifdef QT3_BUILD
-        int lastSlash = exeStr.findRev('/');
-#else
-        int lastSlash = exeStr.lastIndexOf('/');
-#endif
+        int lastSlash = qLastIndexOf(exeStr, "/");
         if (lastSlash >= 0) {
             paths.append(exeStr.left(lastSlash + 1) + "lang/" + langCode + ".json");
         }
@@ -101,12 +97,7 @@ QString Translator::t(const QString& key, const QStringList& args) const {
     }
     
     // 解析点号分隔的键
-    QStringList parts;
-#ifdef QT3_BUILD
-    parts = QStringList::split('.', key);
-#else
-    parts = key.split('.');
-#endif
+    QStringList parts = qSplit(key, ".");
     cJSON* current = (cJSON*)m_root;
     
     for (int i = 0; i < (int)parts.size(); ++i) {

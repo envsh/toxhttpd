@@ -15,12 +15,14 @@
 - 布局不变形：所有文本容器使用 `min-width` + `white-space: nowrap`
 
 ### 前端 (q3tox)
-- 使用 Qt3（头文件路径：`/opt/qt338sh/include`）
+- 使用 Qt3/Qt4 兼容（头文件路径：`/opt/qt338sh/include` for Qt3，`/usr/include/qt4/` for Qt4）
+- **渐进式改造**：同时支持 Qt3/Qt4 编译，优先保证 Qt3 编译通过
 - UI参照 web 端（avatar、status badge、tabs、language selector）
 - 使用 REST API（ToxAPI 类封装）
 - 不要动 `build.sh`
 - 多语言支持：简体中文（默认）、繁体中文、英文
 - 使用 cJSON 解析 JSON，libcurl 进行 HTTP 请求
+- **兼容层文件**：`compat34.h`（统一处理 Qt3/Qt4 API 差异）
 
 ## Progress
 
@@ -42,6 +44,7 @@
 - `selectContact()` 更新：使用 `#chatHeaderText` 而非 `#chatHeader`
 
 ### 前端 (q3tox) - Done
+- **Qt3/Qt4 兼容改造**：创建 `compat34.h` 统一处理 API 差异
 - 创建 q3tox 子项目基础文件结构
 - 实现 `api.h/cpp`（ToxAPI 类，REST API 调用，使用 libcurl）
 - 实现 `translator.h/cpp`（多语言支持，使用 cJSON 解析）
@@ -49,21 +52,23 @@
 - 创建 `invitedialog.h/cpp`（会议邀请对话框，三个按钮：同意/拒绝/忽略）
 - 实现 `mainwindow.h/cpp`（主窗口，左右分割布局）
 - 实现 `selfinfo.h/cpp`（个人信息 widget：avatar、名称、状态、地址）
-- 实现 `contactlist.h/cpp`（联系人列表：tabs 过滤、QListBox 显示）
+- 实现 `contactlist.h/cpp`（联系人列表：tabs 过滤、void* listWidget 成员 + updateView_v3/v4）
 - 实现 `chatwidget.h/cpp`（聊天区域：头部、消息区、输入区、语言选择器）
-- 实现 `eventpoller.h/cpp`（事件轮询器，继承 QThread，使用回调函数）
+- 实现 `eventpoller.h/cpp`（事件轮询器，CustomEventBase 兼容 QCustomEvent/QEvent）
 - 深入研究 Qt3 API 架构：QBoxLayout vs QVBox/QHBox 区别
-- 修复所有 Qt3 兼容性问题：
-  - QBoxLayout 构造函数：`QBoxLayout(QWidget*, Direction, border, spacing, name)`
-  - QLabel/QLineEdit 构造函数：第一个参数必须是 QWidget*
-  - QThread + Q_OBJECT 不兼容：改用回调函数机制
-  - cJSON 函数调用语法：`cJSON_GetObjectItem(root, "key")` 需逗号）
-  - URL 拼接问题：`httpGet`/`httpPost` 内部已拼接，调用者只传相对路径
-  - 内存管理：将 `QArray<Event>` 改为 `std::vector<Event>`
-  - moc 工具：设置 `QTDIR=/opt/qt338sh` 使用正确的 Qt3 moc
-- 项目编译成功，可执行文件 `q3tox` 已生成（2096896 字节）
-- 运行时错误修复：`free(): invalid pointer` 已解决
-- 程序可正常运行并接收事件
+- 修复所有 Qt3/Qt4 兼容性问题：
+  - **QString API**：`qTrim()`、`qToUtf8()`、`qToLocal8Bit()`、`qLastIndexOf()`、`qToUpper()`、`qSplit()`
+  - **布局管理**：`qNewBoxLayout()` 兼容 Qt3/Qt4 不同构造函数
+  - **窗口标题**：`qSetWindowTitle()` 替换 `setCaption()`/`setWindowTitle()`
+  - **按钮状态**：`qSetChecked()`、`qSetCheckable()`
+  - **Tooltip**：`qSetToolTip()`
+  - **文件操作**：`qOpenReadOnly()`、`qOpenWriteOnly()`
+  - **路径处理**：`qGetHomePath()`、`qAppDir()`
+  - **事件基类**：`CustomEventBase`（Qt3=QCustomEvent，Qt4=QEvent）
+  - **容器类**：`QPtrList<T>`（Qt4 用 QList<T*> 模拟）
+- 项目编译成功：
+  - ✅ **Qt3 编译**：`buildqt3.sh` → 生成 q3tox (2.1M)
+  - ✅ **Qt4 编译**：`buildqt4.sh` → 生成 q3tox
 - 修复联系人列表 Tab 过滤问题：
   - 修复 `onTabClicked()` 没有更新 `currentFilter` 的 bug
   - 修复过滤逻辑单复数不匹配（`"friends"` vs `"friend"`）
@@ -102,14 +107,22 @@
 - 语言文件放在 `web/lang/` 目录
 - 聊天头部使用 flex 布局，文本左对齐（`#chatHeaderText`），语言选择器右对齐
 
-### 前端
+### 前端 (Qt3/Qt4 兼容)
+- **兼容层核心**：`compat34.h` 统一处理所有 Qt3/Qt4 API 差异
 - 使用 `QWidget + QBoxLayout` 替代 `QVBox/QHBox`（因为后者没有 `addWidget` 方法）
-- QBoxLayout 正确构造函数：`QBoxLayout(QWidget *parent, Direction, int border=0, int spacing=-1, const char *name=0)`
+- QBoxLayout 正确构造函数：
+  - Qt3: `QBoxLayout(QWidget *parent, Direction, int border=0, int spacing=-1, const char *name=0)`
+  - Qt4: `QBoxLayout(Direction, QWidget *parent=0)`
+  - 兼容方案：`qNewBoxLayout(parent, dir, border, spacing)`
 - QLabel 在 Qt3 中构造函数不同：需要 `QLabel(parent, name)` 或 `QLabel(text, parent, name)`
 - 使用 `std::vector<Event>` 替代 `QArray<Event>`（Qt3 的 QArray 对包含 std::string 的对象支持有问题）
 - 事件轮询使用 `QThread` + libcurl 长轮询，通过回调函数传递事件
 - 翻译文件使用 cJSON 解析，支持点号分隔的键（如 `modals.labels.name`）
 - 语言文件放在 `q3tox/lang/` 目录，通过 `/proc/self/exe` 获取可执行文件路径来定位
+- **编译脚本**：
+  - `buildqt3.sh`：Qt3 编译（设置 `QTDIR=/opt/qt338sh`）
+  - `buildqt4.sh`：Qt4 编译（使用系统 `qmake-qt4`）
+- **项目文件**：`q3tox.pro` 使用 `isEmpty(QT_VERSION)` 检测 Qt 版本（Qt3 qmake 无 QT_VERSION 变量）
 
 ## Next Steps
 
@@ -159,13 +172,14 @@
 - `/opt/golib/pkg/mod/github.com/!tok!tok/go-toxcore-c@v0.2.18-0.20250216202442-0f7463080d5c/group.go`：Conference API实现
 
 ### 前端 (q3tox)
+- `q3tox/compat34.h`：**Qt3/Qt4 兼容层**（QString API、布局、窗口、文件、事件等）
 - `q3tox/api.h/cpp`：REST API 封装，使用 libcurl
 - `q3tox/translator.h/cpp`：多语言支持，使用 cJSON
 - `q3tox/mainwindow.h/cpp`：主窗口，左右分割布局
 - `q3tox/selfinfo.h/cpp`：个人信息 widget
-- `q3tox/contactlist.h/cpp`：联系人列表
+- `q3tox/contactlist.h/cpp`：联系人列表（void* listWidget + updateView_v3/v4）
 - `q3tox/chatwidget.h/cpp`：聊天区域
-- `q3tox/eventpoller.h/cpp`：事件轮询器
+- `q3tox/eventpoller.h/cpp`：事件轮询器（CustomEventBase 兼容）
 - `q3tox/editinfodialog.h/cpp`：编辑个人信息对话框
 - `q3tox/invitedialog.h/cpp`：会议邀请对话框
 - `q3tox/lang/zh-CN.json`：简体中文（默认）
@@ -179,11 +193,12 @@
 - Tox core: `github.com/!Tok!Tok/go-toxcore-c`
 - Event push: Long polling via `/api/events`
 
-### 前端 (C++/Qt3)
-- GUI framework: Qt3 (http://qt.nokia.com)
+### 前端 (C++/Qt3 & Qt4)
+- GUI framework: Qt3 (http://qt.nokia.com) & Qt4 (http://qt-project.org)
 - HTTP client: libcurl
 - JSON parser: cJSON
 - Multi-language: cJSON + custom Translator class
+- **Compat layer**: `compat34.h` 统一处理 QString、布局、事件等 API 差异
 
 ## REST API Endpoints
 
@@ -248,8 +263,13 @@ make
 
 ### 前端 (q3tox)
 ```bash
+# Qt3 编译
 cd /home/gzleo/aprog/toxhttpd/q3tox
-QTDIR=/opt/qt338sh make
+bash buildqt3.sh
+
+# Qt4 编译
+cd /home/gzleo/aprog/toxhttpd/q3tox
+bash buildqt4.sh
 ```
 
 ## Run
@@ -303,6 +323,7 @@ curl -X POST http://localhost:8181/api/conferences
 - [ ] Web page add group(NGC)
 
 ### 前端 (q3tox)
+- [x] **Qt3/Qt4 兼容改造**：`compat34.h` 统一处理 API 差异
 - [x] Qt3 GUI with split layout (sidebar + chat area)
 - [x] Self info widget (avatar, name, status, address)
 - [x] Contact list with tabs (all/friends/conferences) - Tab 过滤已修复
@@ -311,6 +332,8 @@ curl -X POST http://localhost:8181/api/conferences
 - [x] Event polling via QThread + libcurl
 - [x] Conference invite dialog (accept/reject/ignore)
 - [x] Edit self info dialog
+- [x] **Qt3 编译成功**：`buildqt3.sh` → q3tox (2.1M)
+- [x] **Qt4 编译成功**：`buildqt4.sh` → q3tox
 - [x] Successfully loads 4 contacts (2 friends + 2 conferences)
 - [ ] Complete workflow testing (add friend, send message, conference)
 - [ ] Tab filtering verification (All/Friends/Conferences)
