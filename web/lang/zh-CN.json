@@ -77,7 +77,18 @@
     "connect_failed": "连接失败",
     "context_menu": {
         "view_info": "查看信息",
-        "delete_friend": "删除好友"
+        "delete_friend": "删除好友",
+        "leave_conference": "离开会议",
+        "invite_to_conference": "邀请进会议"
     },
+    "confirm_delete_friend": "确定删除好友 {0} 吗？",
+    "confirm_leave_conference": "确定离开会议 {0} 吗？",
+    "conference_leave_success": "已离开会议",
+    "conference_leave_failed": "离开失败",
+    "invite_success": "邀请成功",
+    "invite_failed": "邀请失败",
+    "select_conference": "选择会议",
+    "conference_info_title": "会议信息",
+    "group_info_title": "群组信息",
     "select_chat_object": "选择聊天对象"
 }

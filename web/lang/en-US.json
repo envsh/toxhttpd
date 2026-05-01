@@ -77,7 +77,18 @@
     "connect_failed": "Connect failed",
     "context_menu": {
         "view_info": "View Info",
-        "delete_friend": "Delete Friend"
+        "delete_friend": "Delete Friend",
+        "leave_conference": "Leave Conference",
+        "invite_to_conference": "Invite to Conference"
     },
+    "confirm_delete_friend": "Delete friend {0}?",
+    "confirm_leave_conference": "Leave conference {0}?",
+    "conference_leave_success": "Left conference",
+    "conference_leave_failed": "Leave failed",
+    "invite_success": "Invited successfully",
+    "invite_failed": "Invite failed",
+    "select_conference": "Select Conference",
+    "conference_info_title": "Conference Info",
+    "group_info_title": "Group Info",
     "select_chat_object": "Select chat object"
 }

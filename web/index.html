@@ -86,9 +86,21 @@
     <!-- Friend context menu -->
     <div id="friendMenu" class="context-menu hidden">
         <div class="menu-item" data-action="info">查看信息</div>
+        <div class="menu-item" data-action="invite">邀请进会议</div>
         <div class="menu-item danger" data-action="delete">删除好友</div>
     </div>
 
+    <!-- Conference context menu -->
+    <div id="conferenceMenu" class="context-menu hidden">
+        <div class="menu-item" data-action="info">查看信息</div>
+        <div class="menu-item danger" data-action="leave">离开会议</div>
+    </div>
+
+    <!-- Group context menu -->
+    <div id="groupMenu" class="context-menu hidden">
+        <div class="menu-item" data-action="info">查看信息</div>
+    </div>
+    
     <!-- Friend info modal -->
     <div id="friendInfoModal" class="modal hidden">
         <div class="modal-content">
@@ -104,6 +116,41 @@
         </div>
     </div>
 
+    <!-- Conference info modal -->
+    <div id="conferenceInfoModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="conferenceInfoTitle">会议信息</h3>
+            <div class="info-row"><label>会议ID:</label><span id="infoConferenceId"></span></div>
+            <div class="info-row"><label>类型:</label><span id="infoConferenceType"></span></div>
+            <div class="modal-actions">
+                <button onclick="hideConferenceInfo()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group info modal -->
+    <div id="groupInfoModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="groupInfoTitle">群组信息</h3>
+            <div class="info-row"><label>群组ID:</label><span id="infoGroupId"></span></div>
+            <div class="modal-actions">
+                <button onclick="hideGroupInfo()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Select conference dialog (for invite) -->
+    <div id="selectConferenceModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="selectConferenceTitle">选择会议</h3>
+            <select id="conferenceSelect" style="width: 100%; margin: 10px 0;"></select>
+            <div class="modal-actions">
+                <button onclick="confirmInvite()">邀请</button>
+                <button onclick="hideSelectConference()">取消</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="/web/app.js"></script>
 </body>
 </html>
