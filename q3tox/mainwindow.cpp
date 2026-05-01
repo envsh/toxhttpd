@@ -128,6 +128,7 @@ void MainWindow::customEvent(QCustomEvent* event) {
             
             // 转换ContactData为Contact并更新列表
             QPtrList<Contact> contacts;
+            qWarning("MainWindow: loading %d contacts", (int)evt->contacts.size());
             for (const auto& cd : evt->contacts) {
                 Contact* c = new Contact();
                 c->id = cd.id;
@@ -135,6 +136,8 @@ void MainWindow::customEvent(QCustomEvent* event) {
                 c->type = QString::fromUtf8(cd.type.c_str());
                 c->status = QString::fromUtf8(cd.status.c_str());
                 contacts.append(c);
+                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s'",
+                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str());
             }
             contactListWidget->setContacts(contacts);
             

@@ -57,13 +57,19 @@
   - QBoxLayout 构造函数：`QBoxLayout(QWidget*, Direction, border, spacing, name)`
   - QLabel/QLineEdit 构造函数：第一个参数必须是 QWidget*
   - QThread + Q_OBJECT 不兼容：改用回调函数机制
-  - cJSON 函数调用语法：`cJSON_GetObjectItem(root, "key")`（需逗号）
+  - cJSON 函数调用语法：`cJSON_GetObjectItem(root, "key")` 需逗号）
   - URL 拼接问题：`httpGet`/`httpPost` 内部已拼接，调用者只传相对路径
   - 内存管理：将 `QArray<Event>` 改为 `std::vector<Event>`
   - moc 工具：设置 `QTDIR=/opt/qt338sh` 使用正确的 Qt3 moc
-- 项目编译成功，可执行文件 `q3tox` 已生成（1891920 字节）
+- 项目编译成功，可执行文件 `q3tox` 已生成（2096896 字节）
 - 运行时错误修复：`free(): invalid pointer` 已解决
 - 程序可正常运行并接收事件
+- 修复联系人列表 Tab 过滤问题：
+  - 修复 `onTabClicked()` 没有更新 `currentFilter` 的 bug
+  - 修复过滤逻辑单复数不匹配（`"friends"` vs `"friend"`）
+  - 添加 `tabButtons[]`、`tabFilters[]`、`tabNames[]` 成员变量
+  - 实现 `setTabFilter()` 函数正确切换过滤
+  - 添加调试输出确认联系人加载（成功加载 4 个联系人：2好友+2会议）
 
 ### In Progress
 - 无
@@ -78,8 +84,8 @@
 - Web 页面添加群组(NGC)
 
 ### TODO (前端)
-- 创建多语言 JSON 文件（zh-CN、zh-TW、en-US）
 - 测试完整工作流程（添加好友、发消息、会议）
+- 测试 Tab 过滤功能（All/Friends/Conferences）
 - UI 样式调整（参考 web 端）
 - 头像显示（当前显示名称首字母）
 - 状态标识颜色（online/tcp 绿色，offline 红色）
@@ -115,9 +121,10 @@
 
 ### 前端
 1. 测试完整工作流程（确保 toxhttpd 服务在 `http://localhost:8181` 运行）
-2. 完善 UI 样式（头像、状态标识、颜色等）
-3. 添加更多错误处理
-4. 考虑添加系统托盘图标
+2. 测试 Tab 过滤功能（All/Friends/Conferences）- 代码已修复，待验证
+3. 完善 UI 样式（头像、状态标识、颜色等）
+4. 添加更多错误处理
+5. 考虑添加系统托盘图标
 
 ## Critical Context
 
@@ -298,12 +305,14 @@ curl -X POST http://localhost:8181/api/conferences
 ### 前端 (q3tox)
 - [x] Qt3 GUI with split layout (sidebar + chat area)
 - [x] Self info widget (avatar, name, status, address)
-- [x] Contact list with tabs (all/friends/groups/conferences)
+- [x] Contact list with tabs (all/friends/conferences) - Tab 过滤已修复
 - [x] Chat widget (header, message area, input area)
 - [x] Multi-language support (zh-CN, zh-TW, en-US)
 - [x] Event polling via QThread + libcurl
 - [x] Conference invite dialog (accept/reject/ignore)
 - [x] Edit self info dialog
-- [ ] Complete workflow testing
+- [x] Successfully loads 4 contacts (2 friends + 2 conferences)
+- [ ] Complete workflow testing (add friend, send message, conference)
+- [ ] Tab filtering verification (All/Friends/Conferences)
 - [ ] UI style refinement (avatar, status colors)
 - [ ] System tray icon (optional)
