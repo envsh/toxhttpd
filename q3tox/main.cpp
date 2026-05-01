@@ -1,8 +1,4 @@
-#include <qapplication.h>
-#include <qtextcodec.h>
-#include <qfile.h>
-#include <qtextstream.h>
-#include <qdir.h>
+#include "compat34.h"
 #include "mainwindow.h"
 #include "translator.h"
 
@@ -10,11 +6,12 @@
 
 // 读取保存的语言设置（替代 QSettings）
 static QString loadSavedLanguage() {
-    QFile file(QDir::homeDirPath() + "/.q3tox_lang");
-    if (file.exists() && file.open(IO_ReadOnly)) {
+    QString home = qGetHomePath();
+    QFile file(home + "/.q3tox_lang");
+    if (file.exists() && qOpenReadOnly(file)) {
         QTextStream stream(&file);
         stream.setCodec(QTextCodec::codecForName("UTF-8"));
-        QString lang = stream.readLine().stripWhiteSpace();
+        QString lang = qTrim(stream.readLine());
         file.close();
         if (!lang.isEmpty()) return lang;
     }
@@ -23,8 +20,9 @@ static QString loadSavedLanguage() {
 
 // 保存语言设置
 static void saveLanguage(const QString& lang) {
-    QFile file(QDir::homeDirPath() + "/.q3tox_lang");
-    if (file.open(IO_WriteOnly)) {
+    QString home = qGetHomePath();
+    QFile file(home + "/.q3tox_lang");
+    if (qOpenWriteOnly(file)) {
         QTextStream stream(&file);
         stream.setCodec(QTextCodec::codecForName("UTF-8"));
         stream << lang << "\n";
@@ -49,6 +47,7 @@ int main(int argc, char* argv[]) {
     
     // 创建主窗口
     MainWindow window;
+    qSetWindowTitle(&window, _("app_title"));
     window.show();
     
     return app.exec();
