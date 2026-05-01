@@ -2,12 +2,6 @@
 #include "translator.h"
 #include "compat34.h"
 
-#ifdef QT3_BUILD
-#include <qpopupmenu.h>
-#else
-#include <QMenu>
-#endif
-
 // 静态数组定义
 const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
 const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.groups", "tabs.conferences"};
