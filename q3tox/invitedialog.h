@@ -1,11 +1,7 @@
 #ifndef INVITEDIALOG_H
 #define INVITEDIALOG_H
 
-#include <qdialog.h>
-#include <qvbox.h>
-#include <qhbox.h>
-#include <qlabel.h>
-#include <qpushbt.h>
+#include "compat34.h"
 #include <qstring.h>
 
 class InviteDialog : public QDialog {

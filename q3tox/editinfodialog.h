@@ -1,12 +1,7 @@
 #ifndef EDITINFODIALOG_H
-#define EDITINFODIALOG_H
+#define EDITINFODIALOG_H_
 
-#include <qdialog.h>
-#include <qvbox.h>
-#include <qhbox.h>
-#include <qlabel.h>
-#include <qlineedit.h>
-#include <qpushbt.h>
+#include "compat34.h"
 #include <qstring.h>
 
 class EditInfoDialog : public QDialog {

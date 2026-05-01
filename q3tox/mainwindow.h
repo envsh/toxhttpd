@@ -1,8 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <qmainwindow.h>
-#include <qsplitter.h>
+#include "compat34.h"
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"

@@ -1,5 +1,5 @@
 #include "mainwindow.h"
-#include <qlayout.h>
+#include "compat34.h"
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
@@ -7,13 +7,7 @@
 #include "api.h"
 #include "translator.h"
 #include "invitedialog.h"
-#include <qfile.h>
-#include <qtextstream.h>
-#include <qtextcodec.h>
-#include <qtimer.h>
 #include "cJSON.h"
-#include <stdlib.h>
-#include <qmessagebox.h>
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
