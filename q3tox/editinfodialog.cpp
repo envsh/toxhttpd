@@ -1,7 +1,6 @@
 #include "editinfodialog.h"
 #include "translator.h"
-#include <qlayout.h>
-#include <qapplication.h>
+#include "compat34.h"
 
 EditInfoDialog::EditInfoDialog(QWidget* parent) : QDialog(parent) {
     setCaption(_("modals.edit_info_title"));

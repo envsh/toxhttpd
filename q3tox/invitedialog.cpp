@@ -1,7 +1,6 @@
 #include "invitedialog.h"
 #include "translator.h"
-#include <qlayout.h>
-#include <qapplication.h>
+#include "compat34.h"
 
 InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent) 
     : QDialog(parent), friendNumber(friendNumber), cookie(cookie), result(Ignore) {
