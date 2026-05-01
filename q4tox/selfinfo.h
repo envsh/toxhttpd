@@ -10,7 +10,9 @@ class SelfInfoWidget : public QWidget {
     Q_OBJECT
 public:
     explicit SelfInfoWidget(QWidget* parent = 0);
-    void updateInfo(const QVariantMap& data);
+    void updateInfo(const QString& name, const QString& statusMsg, 
+                   const QString& connStatus, const QString& address);
+    void retranslateUi();
     
 signals:
     void editInfoRequested(const QString& name, const QString& statusMessage);
@@ -34,6 +36,7 @@ private:
     QString fullAddress;
     QString currentName;
     QString currentStatusMessage;
+    QString currentConnStatus;
 };
 
 #endif // SELFINFO_H

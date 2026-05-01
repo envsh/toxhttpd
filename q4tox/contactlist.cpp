@@ -50,7 +50,7 @@ ContactListWidget::ContactListWidget(QWidget* parent)
     QHBoxLayout* addLayout = new QHBoxLayout();
     addFriendEdit = new QLineEdit();
     addFriendEdit->setPlaceholderText(_("input_public_key"));
-    QPushButton* addFriendBtn = new QPushButton(_("add_friend"));
+    addFriendBtn = new QPushButton(_("add_friend"));
     addLayout->addWidget(addFriendEdit, 1);
     addLayout->addWidget(addFriendBtn);
     mainLayout->addLayout(addLayout);
@@ -59,8 +59,8 @@ ContactListWidget::ContactListWidget(QWidget* parent)
     
     // Bottom area: Create buttons (conference left, group right)
     QHBoxLayout* createLayout = new QHBoxLayout();
-    QPushButton* confBtn = new QPushButton(_("create_conference"));
-    QPushButton* groupBtn = new QPushButton(_("create_group"));
+    confBtn = new QPushButton(_("create_conference"));
+    groupBtn = new QPushButton(_("create_group"));
     createLayout->addWidget(confBtn);
     createLayout->addWidget(groupBtn);
     mainLayout->addLayout(createLayout);
@@ -198,4 +198,21 @@ void ContactListWidget::showContextMenu(const QPoint& pos) {
     } else if (selectedAction == deleteAction) {
         emit contactContextMenu(id, type, pos);
     }
+}
+
+void ContactListWidget::retranslateUi() {
+    // Update tab buttons
+    QStringList tabNames;
+    tabNames << _("tabs.all") << _("tabs.friends") << _("tabs.groups") << _("tabs.conferences");
+    for (int i = 0; (i < tabButtons.size()) && (i < tabNames.size()); ++i) {
+        tabButtons[i]->setText(tabNames[i]);
+    }
+    
+    // Update add friend area
+    addFriendEdit->setPlaceholderText(_("input_public_key"));
+    addFriendBtn->setText(_("add_friend"));
+    
+    // Update create buttons
+    confBtn->setText(_("create_conference"));
+    groupBtn->setText(_("create_group"));
 }

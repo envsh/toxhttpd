@@ -2,139 +2,223 @@
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
+#include "eventpoller.h"
 #include "translator.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QStatusBar>
-#include <QFile>
-#include <QTextStream>
-#include <QTextCodec>
-#include <QDir>
-#include <QMessageBox>
+#include <qmessagebox.h>
+#include <qtextcodec.h>
+#include <qtextstream.h>
+#include <qstatusbar.h>
 
-MainWindow::MainWindow(QWidget* parent) 
-    : QMainWindow(parent), currentChatId(-1) {
+// 读取保存的语言设置
+static QString loadSavedLanguage() {
+    QString home = getenv("HOME") ? getenv("HOME") : ".";
+    QFile file(home + "/.q4tox_lang");
+    if (file.exists() && file.open(QIODevice::ReadOnly)) {
+        QTextStream stream(&file);
+        stream.setCodec(QTextCodec::codecForName("UTF-8"));
+        QString lang = stream.readLine().trimmed();
+        file.close();
+        if (!lang.isEmpty()) return lang;
+    }
+    return "zh-CN"; // 默认简体
+}
+
+// 保存语言设置
+static void saveLanguage(const QString& lang) {
+    QString home = getenv("HOME") ? getenv("HOME") : ".";
+    QFile file(home + "/.q4tox_lang");
+    if (file.open(QIODevice::WriteOnly)) {
+        QTextStream stream(&file);
+        stream << lang << "\n";
+        file.close();
+    }
+}
+
+MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), 
+    currentChatId(-1), currentChatType("") {
     
-    // Set window properties
+    // 设置窗口
     setWindowTitle(_("app_title"));
-    setMinimumSize(800, 600);
+    setGeometry(100, 100, 1100, 700);
     
-    // Create central widget and layout
-    QWidget* central = new QWidget(this);
-    setCentralWidget(central);
-    QHBoxLayout* mainLayout = new QHBoxLayout(central);
+    // 设置 UTF-8 编解码器
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     
-    // Create splitter
-    splitter = new QSplitter(Qt::Horizontal, central);
-    mainLayout->addWidget(splitter);
+    // 主分割器（左右布局）
+    splitter = new QSplitter(Qt::Horizontal, this);
     
-    // Create left sidebar
+    // ===== 左侧边栏 =====
     QWidget* sidebar = new QWidget(splitter);
-    QVBoxLayout* sidebarLayout = new QVBoxLayout(sidebar);
-    sidebarLayout->setContentsMargins(0, 0, 0, 0);
+    QBoxLayout* sidebarLayout = new QBoxLayout(QBoxLayout::TopToBottom, sidebar);
+    sidebarLayout->setSpacing(0);
+    sidebarLayout->setMargin(0);
     
+    // 个人信息区
     selfInfoWidget = new SelfInfoWidget(sidebar);
-    contactListWidget = new ContactListWidget(sidebar);
-    
     sidebarLayout->addWidget(selfInfoWidget);
+    
+    // 联系人列表
+    contactListWidget = new ContactListWidget(sidebar);
     sidebarLayout->addWidget(contactListWidget, 1); // stretch
     
-    // Create right chat area
-    chatWidget = new ChatWidget(splitter);
-    
     splitter->addWidget(sidebar);
-    splitter->addWidget(chatWidget);
-    splitter->setStretchFactor(0, 0); // sidebar fixed
-    splitter->setStretchFactor(1, 1); // chat area stretch
     
-    // Create API and event poller
-    api = new ToxAPI(this);
+    // ===== 右侧聊天区 =====
+    chatWidget = new ChatWidget(splitter);
+    splitter->addWidget(chatWidget);
+    
+    setCentralWidget(splitter);
+    
+    // 连接信号槽
+    connect(contactListWidget, SIGNAL(contactSelected(int, const QString&)), 
+            this, SLOT(onContactSelected(int, const QString&)));
+    connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
+    connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
+            this, SLOT(onLanguageChanged(const QString&)));
+    connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
+    
+    // 事件轮询器
     eventPoller = new EventPoller(this);
     eventPoller->setReceiver(this);
-    
-    // Connect signals/slots (Qt4 style)
-    connect(contactListWidget, SIGNAL(contactSelected(int, QString)), 
-            this, SLOT(onContactSelected(int, QString)));
-    connect(contactListWidget, SIGNAL(addFriendRequested(QString)), 
-            this, SLOT(onAddFriendRequested(QString)));
-    connect(contactListWidget, SIGNAL(createConferenceRequested()), 
-            this, SLOT(onCreateConferenceRequested()));
-    connect(contactListWidget, SIGNAL(createGroupRequested()), 
-            this, SLOT(onCreateGroupRequested()));
-    connect(chatWidget, SIGNAL(messageSent(QString)), 
-            this, SLOT(onMessageSent(QString)));
-    connect(chatWidget, SIGNAL(languageChanged(QString)), 
-            this, SLOT(onLanguageChanged(QString)));
-    connect(selfInfoWidget, SIGNAL(editInfoRequested(QString, QString)), 
-            this, SLOT(onEditInfoRequested(QString, QString)));
-    connect(selfInfoWidget, SIGNAL(bootstrapRequested()), 
-            this, SLOT(onBootstrapRequested()));
-    
-    // API signals
-    connect(api, SIGNAL(selfLoaded(QVariantMap)), 
-            this, SLOT(onSelfLoaded(QVariantMap)));
-    connect(api, SIGNAL(friendsLoaded(QList<int>)), 
-            this, SLOT(onFriendsLoaded(QList<int>)));
-    connect(api, SIGNAL(conferencesLoaded(QList<int>)), 
-            this, SLOT(onConferencesLoaded(QList<int>)));
-    connect(api, SIGNAL(eventsReceived(EventList)), 
-            this, SLOT(onEventsReceived(EventList)));
-    connect(api, SIGNAL(messageReceived(int, QString)), 
-            this, SLOT(onMessageReceived(int, QString)));
-    connect(api, SIGNAL(conferenceMessageReceived(int, int, QString)), 
-            this, SLOT(onConferenceMessageReceived(int, int, QString)));
-    connect(api, SIGNAL(conferenceInvited(int, QString)), 
-            this, SLOT(onConferenceInvited(int, QString)));
-    connect(api, SIGNAL(errorOccurred(QString)), 
-            this, SLOT(onErrorOccurred(QString)));
-    
-    // Translator
-    connect(&Translator::instance(), SIGNAL(languageChanged()), 
-            this, SLOT(retranslateUi()));
-    
-    // Start event poller
     eventPoller->start();
     
-    // Load initial data
-    ApiRequest req;
-    req.type = ApiLoadAllData;
+    // 异步加载：发送请求事件，不阻塞
+    ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
     eventPoller->postApiRequest(req);
 }
 
 MainWindow::~MainWindow() {
-    eventPoller->stop();
-    eventPoller->wait();
+    if (eventPoller) {
+        eventPoller->stop();
+        delete eventPoller;
+    }
 }
 
 void MainWindow::customEvent(QEvent* event) {
+    // 事件轮询结果
     if (event->type() == EventListReadyType) {
         EventListEvent* e = static_cast<EventListEvent*>(event);
         handleEvents(e->events);
+        return;
+    }
+    
+    // 所有数据加载完成
+    if (event->type() == ApiResultReadyType) {
+        ApiResultEvent* e = static_cast<ApiResultEvent*>(event);
+        
+        if (e->type == ApiLoadAllData) {
+            AllDataLoadedEvent* evt = static_cast<AllDataLoadedEvent*>(event);
+            
+            // 更新self信息
+            selfInfoWidget->updateInfo(
+                QString::fromUtf8(evt->selfName.c_str()),
+                QString::fromUtf8(evt->selfStatusMsg.c_str()),
+                QString::fromUtf8(evt->selfConnStatus.c_str()),
+                QString::fromUtf8(evt->selfAddress.c_str()));
+            
+            // 转换ContactData为Contact并更新列表
+            QList<Contact> contacts;
+            for (const auto& cd : evt->contacts) {
+                Contact c;
+                c.id = cd.id;
+                c.name = QString::fromUtf8(cd.name.c_str());
+                c.type = QString::fromUtf8(cd.type.c_str());
+                c.status = QString::fromUtf8(cd.status.c_str());
+                contacts.append(c);
+            }
+            contactListWidget->setContacts(contacts);
+            return;
+        }
+        
+        // 消息发送结果
+        if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage) {
+            MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);
+            if (!evt->success) {
+                QMessageBox::warning(this, _("send_failed"), _("send_failed"));
+            }
+            return;
+        }
+        
+        // 会议操作结果
+        if (e->type == ApiJoinConference) {
+            ConferenceResultEvent* evt = static_cast<ConferenceResultEvent*>(event);
+            if (evt->success) {
+                // 重新加载联系人
+                ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+                eventPoller->postApiRequest(req);
+            }
+            return;
+        }
     }
 }
 
 void MainWindow::onContactSelected(int id, const QString& type) {
+    // 如果已经是当前选中的聊天对象，不重新加载
+    if (id == currentChatId && type == currentChatType) {
+        return;
+    }
+    
     currentChatId = id;
     currentChatType = type;
-    chatWidget->setChatInfo(id, type);
+    
+    QString headerText;
+    if (type == "friend") {
+        headerText = _("chat_with_friend").arg(QString::number(id));
+    } else if (type == "group") {
+        headerText = _("group") + " " + QString::number(id);
+    } else if (type == "conference") {
+        headerText = _("conference_item") + " " + QString::number(id);
+    }
+    
+    chatWidget->setHeaderText(headerText);
+    chatWidget->clearMessages();
 }
 
 void MainWindow::onMessageSent(const QString& message) {
-    if (currentChatId == -1) return;
-    
-    ApiRequest req;
-    req.id = currentChatId;
-    req.message = message;
-    
-    if (currentChatType == "friend") {
-        req.type = ApiSendFriendMessage;
-        chatWidget->appendMessage(message, true); // self
-    } else if (currentChatType == "conference") {
-        req.type = ApiSendConferenceMessage;
-        chatWidget->appendMessage(message, true);
+    if (currentChatId == -1 || currentChatType.isEmpty()) {
+        QMessageBox::warning(this, _("select_chat_first"), _("select_chat_first"));
+        return;
     }
     
+    // 改为异步请求
+    ApiRequestEvent* req = new ApiRequestEvent(
+        currentChatType == "friend" ? ApiSendFriendMessage : ApiSendConferenceMessage
+    );
+    req->id = currentChatId;
+    req->message = std::string(message.toUtf8().constData());
     eventPoller->postApiRequest(req);
+    
+    // 乐观更新：先显示在界面
+    chatWidget->appendMessage(message, "self");
+}
+
+void MainWindow::handleEvents(const EventList& events) {
+    for (const auto& e : events) {
+        QString type = QString::fromUtf8(e.type.c_str());
+        
+        if (type == "friend_message") {
+            // 解析 friend_id 和 message
+            // 这里简化处理，实际需要解析 JSON
+            if (currentChatId >= 0 && currentChatType == "friend") {
+                // 暂时显示
+                chatWidget->appendMessage("Friend message", "other");
+            }
+        } else if (type == "conference_invite") {
+            // 显示邀请对话框
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, _("conference.invite_message"), 
+                                          _("conference.invitation_from").arg("..."),
+                                          QMessageBox::Yes | QMessageBox::No | QMessageBox::Ignore);
+            
+            if (reply == QMessageBox::Yes) {
+                ApiRequestEvent* req = new ApiRequestEvent(ApiJoinConference);
+                eventPoller->postApiRequest(req);
+            } else if (reply == QMessageBox::No) {
+                ApiRequestEvent* req = new ApiRequestEvent(ApiRejectConference);
+                eventPoller->postApiRequest(req);
+            }
+        }
+    }
 }
 
 void MainWindow::onLanguageChanged(const QString& langCode) {
@@ -144,103 +228,25 @@ void MainWindow::onLanguageChanged(const QString& langCode) {
 
 void MainWindow::retranslateUi() {
     setWindowTitle(_("app_title"));
-    // TODO: retranslate other widgets
-}
-
-void MainWindow::onSelfLoaded(const QVariantMap& data) {
-    selfData = data;
-    selfInfoWidget->updateInfo(data);
-}
-
-void MainWindow::onFriendInfoLoaded(const FriendInfo& info) {
-    Contact contact;
-    contact.id = info.id;
-    contact.name = info.name;
-    contact.type = "friend";
-    contact.status = info.connectionStatus;
-    contactListWidget->addContact(contact);
-}
-
-void MainWindow::onFriendsLoaded(const QList<int>& friendIds) {
-    // Load each friend's info
-    foreach (int id, friendIds) {
-        loadContactInfo(id, "friend");
-    }
-}
-
-void MainWindow::onConferencesLoaded(const QList<int>& conferenceIds) {
-    foreach (int id, conferenceIds) {
-        loadContactInfo(id, "conference");
-    }
-}
-
-void MainWindow::onEventsReceived(const EventList& events) {
-    handleEvents(events);
-}
-
-void MainWindow::handleEvents(const EventList& events) {
-    foreach (const Event& e, events) {
-        if (e.type == "friend_message") {
-            QVariantMap data = api->parseJsonString(e.data);
-            int friendId = data["friend_id"].toInt();
-            QString message = data["message"].toString();
-            
-            if (currentChatId == friendId && currentChatType == "friend") {
-                chatWidget->appendMessage(message, false);
-            }
-        } else if (e.type == "conference_invite") {
-            QVariantMap data = api->parseJsonString(e.data);
-            int friendNumber = data["friend_number"].toInt();
-            QString cookie = data["cookie"].toString();
-            onConferenceInvited(friendNumber, cookie);
-        } else if (e.type == "conference_message") {
-            QVariantMap data = api->parseJsonString(e.data);
-            int confId = data["conference_number"].toInt();
-            QString message = data["message"].toString();
-            
-            if (currentChatId == confId && currentChatType == "conference") {
-                chatWidget->appendMessage(message, false);
-            }
-        }
-    }
-}
-
-void MainWindow::onMessageReceived(int friendId, const QString& message) {
-    if (currentChatId == friendId) {
-        chatWidget->appendMessage(message, false);
-    }
-}
-
-void MainWindow::onConferenceMessageReceived(int conferenceId, int peerNumber, const QString& message) {
-    if (currentChatId == conferenceId) {
-        chatWidget->appendMessage(message, false);
-    }
-}
-
-void MainWindow::onConferenceInvited(int friendNumber, const QString& cookie) {
-    // Show invite dialog
-    QMessageBox::StandardButton reply;
-    reply = QMessageBox::question(this, _("conference.invite_message"), 
-                                  _("conference.invitation_from").arg(QString::number(friendNumber)),
-                                  QMessageBox::Yes | QMessageBox::No | QMessageBox::Ignore);
     
-    ApiRequest req;
-    req.id = friendNumber;
-    req.data = cookie;
+    // 更新子控件
+    if (selfInfoWidget) selfInfoWidget->retranslateUi();
+    if (contactListWidget) contactListWidget->retranslateUi();
+    if (chatWidget) chatWidget->retranslateUi();
     
-    if (reply == QMessageBox::Yes) {
-        req.type = ApiJoinConference;
-    } else if (reply == QMessageBox::No) {
-        req.type = ApiRejectConference;
+    if (currentChatId == -1) {
+        chatWidget->setHeaderText(_("select_chat_object"));
     } else {
-        return; // Ignore
+        QString headerText;
+        if (currentChatType == "friend") {
+            headerText = _("chat_with_friend").arg(QString::number(currentChatId));
+        } else if (currentChatType == "group") {
+            headerText = _("group") + " " + QString::number(currentChatId);
+        } else if (currentChatType == "conference") {
+            headerText = _("conference_item") + " " + QString::number(currentChatId);
+        }
+        chatWidget->setHeaderText(headerText);
     }
-    
-    eventPoller->postApiRequest(req);
-}
-
-void MainWindow::onErrorOccurred(const QString& error) {
-    statusBar()->showMessage(error, 5000);
 }
 
 void MainWindow::onContactContextMenu(int id, const QString& type, const QPoint& pos) {
@@ -262,62 +268,19 @@ void MainWindow::onContactContextMenu(int id, const QString& type, const QPoint&
 void MainWindow::onDeleteFriend() {
     if (currentChatId == -1 || currentChatType != "friend") return;
     
-    ApiRequest req;
-    req.type = ApiDeleteFriend;
-    req.id = currentChatId;
+    ApiRequestEvent* req = new ApiRequestEvent(ApiDeleteFriend);
+    req->id = currentChatId;
     eventPoller->postApiRequest(req);
     
     statusBar()->showMessage(_("deleting_friend"), 3000);
 }
 
-void MainWindow::loadContactInfo(int id, const QString& type) {
-    if (type == "friend") {
-        api->getFriendInfo(id);
-    } else if (type == "conference") {
-        // For conference, we might need different API
-        // For now, just add to contact list with basic info
-        Contact contact;
-        contact.id = id;
-        contact.name = QString("Conference %1").arg(id);
-        contact.type = type;
-        contact.status = "online";
-        contactListWidget->addContact(contact);
-    }
-}
-
-void MainWindow::saveLanguage(const QString& lang) {
-    QFile file(QDir::homePath() + "/.q4tox_lang");
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QTextStream stream(&file);
-        stream.setCodec(QTextCodec::codecForName("UTF-8"));
-        stream << lang << "\n";
-        file.close();
-    }
-}
-
-QString MainWindow::loadSavedLanguage() {
-    QFile file(QDir::homePath() + "/.q4tox_lang");
-    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream stream(&file);
-        stream.setCodec(QTextCodec::codecForName("UTF-8"));
-        QString lang = stream.readLine().trimmed();
-        file.close();
-        if (!lang.isEmpty()) return lang;
-    }
-    return "zh-CN";
-}
-
 void MainWindow::onEditInfoRequested(const QString& name, const QString& statusMessage) {
-    if (!name.isEmpty()) {
-        api->setSelfName(name);
-    }
-    if (!statusMessage.isEmpty()) {
-        api->setSelfStatus(statusMessage);
-    }
+    // TODO: 通过 eventpoller 发送请求
 }
 
 void MainWindow::onBootstrapRequested() {
-    api->bootstrap();
+    // TODO: 通过 eventpoller 发送请求
     statusBar()->showMessage(_("connecting"), 3000);
 }
 
@@ -327,25 +290,22 @@ void MainWindow::onAddFriendRequested(const QString& publicKey) {
         return;
     }
     
-    ApiRequest req;
-    req.type = ApiAddFriend;
-    req.message = publicKey;
+    ApiRequestEvent* req = new ApiRequestEvent(ApiAddFriend);
+    req->publicKey = std::string(publicKey.toUtf8().constData());
     eventPoller->postApiRequest(req);
     
     statusBar()->showMessage(_("adding_friend"), 3000);
 }
 
 void MainWindow::onCreateConferenceRequested() {
-    ApiRequest req;
-    req.type = ApiCreateConference;
+    ApiRequestEvent* req = new ApiRequestEvent(ApiCreateConference);
     eventPoller->postApiRequest(req);
     
     statusBar()->showMessage(_("creating_conference"), 3000);
 }
 
 void MainWindow::onCreateGroupRequested() {
-    ApiRequest req;
-    req.type = ApiCreateGroup;
+    ApiRequestEvent* req = new ApiRequestEvent(ApiCreateGroup);
     eventPoller->postApiRequest(req);
     
     statusBar()->showMessage(_("creating_group"), 3000);

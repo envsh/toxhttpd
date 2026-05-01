@@ -4,7 +4,6 @@
 #include <QMainWindow>
 #include <QSplitter>
 #include <QListWidgetItem>
-#include "api.h"
 #include "eventpoller.h"
 
 class SelfInfoWidget;
@@ -31,17 +30,6 @@ private slots:
     void onContactContextMenu(int id, const QString& type, const QPoint& pos);
     void onDeleteFriend();
     
-    // API slots
-    void onSelfLoaded(const QVariantMap& data);
-    void onFriendsLoaded(const QList<int>& friendIds);
-    void onFriendInfoLoaded(const FriendInfo& info);
-    void onConferencesLoaded(const QList<int>& conferenceIds);
-    void onEventsReceived(const EventList& events);
-    void onMessageReceived(int friendId, const QString& message);
-    void onConferenceMessageReceived(int conferenceId, int peerNumber, const QString& message);
-    void onConferenceInvited(int friendNumber, const QString& cookie);
-    void onErrorOccurred(const QString& error);
-    
     // Info save
     void onEditInfoRequested(const QString& name, const QString& statusMessage);
     void onBootstrapRequested();
@@ -52,22 +40,17 @@ private slots:
     void onCreateGroupRequested();
     
 private:
-    void handleEvents(const EventList& events);
-    void loadContactInfo(int id, const QString& type);
-    void saveLanguage(const QString& lang);
-    QString loadSavedLanguage();
+    void handleEvents(const std::vector<Event>& events);
     
     QSplitter* splitter;
     SelfInfoWidget* selfInfoWidget;
     ContactListWidget* contactListWidget;
     ChatWidget* chatWidget;
     EventPoller* eventPoller;
-    ToxAPI* api;
     
     // Current chat state
     int currentChatId;
     QString currentChatType;
-    QVariantMap selfData;
 };
 
 #endif // MAINWINDOW_H
