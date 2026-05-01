@@ -1,11 +1,11 @@
 {
     "app_title": "Tox Chat",
     "no_contacts": "No contacts yet",
-    "chat_with_friend": "Chat with friend {0}",
+    "chat_with_friend": "Chat with friend %1",
     "group": "Group",
     "conference_item": "Conference",
     "friend": "Friend",
-    "conference_joined": "Joined conference {0}",
+    "conference_joined": "Joined conference %1",
     "conference_join_failed": "Failed to join conference",
     "tabs": {
         "all": "All",
@@ -54,13 +54,13 @@
     "load_contacts_failed": "Failed to load contacts",
     "conference": {
         "invitation_received": "Conference invitation received",
-        "invitation_from": "From {0}",
+        "invitation_from": "From %1",
         "invite_message": "Conference invitation",
         "accept": "Accept",
         "reject": "Reject",
         "ignore": "Ignore"
     },
-    "friend_label": "Friend {0}",
+    "friend_label": "Friend %1",
     "select_chat_first": "Please select chat first",
     "send_failed": "Send failed",
     "add_friend_prompt": "Please enter valid public key (64 chars) or address (76 chars)",

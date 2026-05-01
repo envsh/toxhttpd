@@ -1,11 +1,11 @@
 {
     "app_title": "Tox Chat",
     "no_contacts": "暫無聯絡人",
-    "chat_with_friend": "與好友 {0} 聊天",
+    "chat_with_friend": "與好友 %1 聊天",
     "group": "群組",
     "conference_item": "會議",
     "friend": "好友",
-    "conference_joined": "已加入會議 {0}",
+    "conference_joined": "已加入會議 %1",
     "conference_join_failed": "加入會議失敗",
     "tabs": {
         "all": "全部",
@@ -54,13 +54,13 @@
     "load_contacts_failed": "載入聯絡人失敗",
     "conference": {
         "invitation_received": "收到會議邀請",
-        "invitation_from": "來自 {0}",
+        "invitation_from": "來自 %1",
         "invite_message": "會議邀請",
         "accept": "同意",
         "reject": "拒絕",
         "ignore": "忽略"
     },
-    "friend_label": "好友 {0}",
+    "friend_label": "好友 %1",
     "select_chat_first": "請先選擇聊天對象",
     "send_failed": "傳送失敗",
     "add_friend_prompt": "請輸入有效的公鑰 (64字元) 或地址 (76字元)",
