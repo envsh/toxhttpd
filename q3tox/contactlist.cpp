@@ -1,10 +1,6 @@
 #include "contactlist.h"
 #include "translator.h"
-#include <qmessagebox.h>
-#include <qlayout.h>
-#include <qpushbt.h>
-#include <qlineedit.h>
-#include <qlistbox.h>
+#include "compat34.h"
 
 // 静态数组定义
 const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
@@ -13,26 +9,34 @@ const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.
 ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0) {
     QBoxLayout* layout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
     layout->setSpacing(2);
-    layout->setMargin(8);
+    qSetMargins(layout, 8, 8, 8, 8);
     
     // Tab 标签
     QBoxLayout* tabLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     
     for (int i = 0; i < 4; ++i) {
         QPushButton* tab = new QPushButton(_(tabNames[i]), this);
-        tab->setToggleButton(true);
-        if (i == 0) tab->setOn(true);
+        qSetCheckable(tab, true);
+        if (i == 0) qSetChecked(tab, true);
         tabButtons[i] = tab;
         connect(tab, SIGNAL(clicked()), this, SLOT(onTabClicked()));
         tabLayout->addWidget(tab);
     }
     layout->addLayout(tabLayout);
     
-    // 联系人列表 - 使用 QListBox 而不是 QListView
-    listBox = new QListBox(this);
-    listBox->setSelectionMode(QListBox::Single);
-    connect(listBox, SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
-    layout->addWidget(listBox, 1); // stretch
+    // 联系人列表
+#ifdef QT3_BUILD
+    listWidget = new QListBox(this);
+    ((QListBox*)listWidget)->setSelectionMode(QListBox::Single);
+    connect(((QListBox*)listWidget), SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
+#else
+    listWidget = new QListWidget(this);
+    ((QListWidget*)listWidget)->setSelectionMode(QAbstractItemView::SingleSelection);
+    connect(((QListWidget*)listWidget), SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(onItemClicked()));
+    ((QListWidget*)listWidget)->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(((QListWidget*)listWidget), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showContextMenu(QPoint)));
+#endif
+    layout->addWidget((QWidget*)listWidget, 1); // stretch
     
     // 底部添加好友区域
     QBoxLayout* addLayout = new QBoxLayout(QBoxLayout::LeftToRight);
@@ -54,14 +58,21 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     layout->addLayout(btnLayout);
 }
 
-void ContactListWidget::setContacts(const QPtrList<Contact>& contacts) {
+void ContactListWidget::setContacts(const ContactList& contacts) {
     allContacts = contacts;
-    updateView();
+    updateView_v3();
+#ifdef QT4_BUILD
+    updateView_v4();
+#endif
 }
 
 void ContactListWidget::clear() {
     allContacts.clear();
-    listBox->clear();
+#ifdef QT3_BUILD
+    ((QListBox*)listWidget)->clear();
+#else
+    ((QListWidget*)listWidget)->clear();
+#endif
 }
 
 void ContactListWidget::onTabClicked() {
@@ -85,68 +96,62 @@ void ContactListWidget::setTabFilter(int index) {
     
     // 更新按钮状态
     for (int i = 0; i < 4; ++i) {
-        tabButtons[i]->setOn(i == index);
+        qSetChecked(tabButtons[i], i == index);
     }
     
-    updateView();
-}
-
-void ContactListWidget::onItemClicked(QListBoxItem* item) {
-    int index = listBox->index(item);
-    int count = 0;
-    for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact* c = allContacts.at(i);
-        
-        // 使用相同的过滤逻辑（单数形式）
-        if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") continue;
-            if (currentFilter == "group" && c->type != "group") continue;
-            if (currentFilter == "conference" && c->type != "conference") continue;
-        }
-        
-        if (count == index) {
-            emit contactSelected(c->id, c->type);
-            return;
-        }
-        ++count;
-    }
+    updateView_v3();
+#ifdef QT4_BUILD
+    updateView_v4();
+#endif
 }
 
 void ContactListWidget::onSelectionChanged() {
-    qWarning("onSelectionChanged called");
-    QListBoxItem* item = listBox->selectedItem();
-    if (!item) {
-        qWarning("onSelectionChanged: no item selected");
-        return;
-    }
-    
-    int index = listBox->index(item);
+#ifdef QT3_BUILD
+    QListBox* lb = (QListBox*)listWidget;
+    QListBoxItem* item = lb->selectedItem();
+    if (!item) return;
+    int index = lb->index(item);
     int count = 0;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
-        
         if (currentFilter != "all") {
             if (currentFilter == "friend" && c->type != "friend") continue;
             if (currentFilter == "group" && c->type != "group") continue;
             if (currentFilter == "conference" && c->type != "conference") continue;
         }
-        
         if (count == index) {
-            qWarning("Emitting contactSelected: id=%d, type=%s", c->id, c->type.utf8().data());
             emit contactSelected(c->id, c->type);
             return;
         }
         ++count;
     }
+#endif
 }
 
-void ContactListWidget::updateView() {
+void ContactListWidget::onItemClicked() {
+#ifdef QT3_BUILD
+    // Qt3: onSelectionChanged handles it
+#else
+    // Qt4: get current item
+    QListWidget* lw = (QListWidget*)listWidget;
+    QListWidgetItem* item = lw->currentItem();
+    if (!item) return;
+    int id = item->data(Qt::UserRole).toInt();
+    QString type = item->data(Qt::UserRole + 1).toString();
+    emit contactSelected(id, type);
+#endif
+}
+
+void ContactListWidget::updateView_v3() {
+#ifdef QT3_BUILD
+    QListBox* lb = (QListBox*)listWidget;
+    
     // 保存当前选中的联系人信息
     int selectedId = -1;
     QString selectedType;
-    QListBoxItem* selItem = listBox->selectedItem();
+    QListBoxItem* selItem = lb->selectedItem();
     if (selItem) {
-        int index = listBox->index(selItem);
+        int index = lb->index(selItem);
         int count = 0;
         for (uint i = 0; i < allContacts.count(); ++i) {
             Contact* c = allContacts.at(i);
@@ -164,13 +169,12 @@ void ContactListWidget::updateView() {
         }
     }
     
-    listBox->clear();
+    lb->clear();
     
     int newIndex = 0;
     int targetIndex = -1;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
-        
         if (currentFilter != "all") {
             if (currentFilter == "friend" && c->type != "friend") continue;
             if (currentFilter == "group" && c->type != "group") continue;
@@ -186,7 +190,7 @@ void ContactListWidget::updateView() {
             displayName = displayName.left(20) + "...";
         }
         
-        listBox->insertItem(QString("%1 %2 %3").arg(statusDot, emoji, displayName));
+        lb->insertItem(QString("%1 %2 %3").arg(statusDot, emoji, displayName));
         
         if (c->id == selectedId && c->type == selectedType) {
             targetIndex = newIndex;
@@ -194,11 +198,60 @@ void ContactListWidget::updateView() {
         ++newIndex;
     }
     
-    if (listBox->count() == 0) {
-        listBox->insertItem(_("no_contacts"));
+    if (lb->count() == 0) {
+        lb->insertItem(_("no_contacts"));
     } else if (targetIndex >= 0) {
-        listBox->setSelected(targetIndex, TRUE);
+        lb->setSelected(targetIndex, TRUE);
     }
+#endif
+}
+
+void ContactListWidget::updateView_v4() {
+#ifndef QT3_BUILD
+    QListWidget* lw = (QListWidget*)listWidget;
+    
+    int selectedId = -1;
+    QString selectedType;
+    QListWidgetItem* selItem = lw->currentItem();
+    if (selItem) {
+        selectedId = selItem->data(Qt::UserRole).toInt();
+        selectedType = selItem->data(Qt::UserRole + 1).toString();
+    }
+    
+    lw->clear();
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact c = allContacts.at(i);
+        if (currentFilter != "all") {
+            if (currentFilter == "friend" && c.type != "friend") continue;
+            if (currentFilter == "group" && c.type != "group") continue;
+            if (currentFilter == "conference" && c.type != "conference") continue;
+        }
+        
+        QString emoji = (c.type == "friend") ? "👤" :
+                       (c.type == "group") ? "👥" : "🎙";
+        QString statusDot = (c.status == "online" || c.status == "tcp") ? "●" : "○";
+        
+        QString displayName = c.name.isEmpty() ? _("no_name") : c.name;
+        if (displayName.length() > 20) {
+            displayName = displayName.left(20) + "...";
+        }
+        
+        QListWidgetItem* item = new QListWidgetItem(
+            QString("%1 %2 %3").arg(statusDot, emoji, displayName)
+        );
+        item->setData(Qt::UserRole, c.id);
+        item->setData(Qt::UserRole + 1, c.type);
+        lw->addItem(item);
+        
+        if (c.id == selectedId && c.type == selectedType) {
+            item->setSelected(true);
+        }
+    }
+    
+    if (lw->count() == 0) {
+        lw->addItem(new QListWidgetItem(_("no_contacts")));
+    }
+#endif
 }
 
 void ContactListWidget::retranslateUi() {
@@ -212,7 +265,7 @@ void ContactListWidget::retranslateUi() {
     // 更新添加好友输入框
     if (addInput) {
         QString text = addInput->text();
-        if (text == "输入 Tox ID 添加好友" || 
+        if (text == "输入 Tox ID 添加好友" ||
             text == "Enter Tox ID to add friend" ||
             text == "輸入 Tox ID 添加好友") {
             addInput->setText(_("placeholders.add_friend"));
@@ -224,6 +277,19 @@ void ContactListWidget::retranslateUi() {
     if (confBtn) confBtn->setText(_("buttons.create_conference"));
     if (groupBtn) groupBtn->setText(_("buttons.create_group"));
     
-    // 重新更新视图（刷新联系人列表中的默认文字）
-    updateView();
+    // 重新更新视图
+    updateView_v3();
+#ifdef QT4_BUILD
+    updateView_v4();
+#endif
 }
+
+#ifndef QT3_BUILD
+// Qt4 特有的槽实现（不放在头文件中）
+void ContactListWidget::showContextMenu(QPoint pos) {
+    QListWidget* lw = (QListWidget*)listWidget;
+    QListWidgetItem* item = lw->itemAt(pos);
+    if (!item) return;
+    // TODO: 实现右键菜单
+}
+#endif

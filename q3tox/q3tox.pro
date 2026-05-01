@@ -15,7 +15,7 @@ HEADERS = mainwindow.h api.h eventpoller.h \
 MOC_DIR = .
 OBJECTS_DIR = .
 
-# C++11 标准
+# C++11 标准 + 默认定义 QT3_BUILD（Qt3 项目）
 QMAKE_CXXFLAGS += -std=c++11 -O0 -DQT3_BUILD
 
 # 包含路径

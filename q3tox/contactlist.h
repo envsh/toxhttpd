@@ -1,12 +1,7 @@
 #ifndef CONTACTLIST_H
 #define CONTACTLIST_H
 
-#include <qwidget.h>
-#include <qlistbox.h>
-#include <qpushbt.h>
-#include <qlayout.h>
-#include <qstring.h>
-#include <qlineedit.h>
+#include "compat34.h"
 
 struct Contact {
     int id;
@@ -15,12 +10,14 @@ struct Contact {
     QString status; // "online", "offline", "tcp"
 };
 
+typedef QPtrList<Contact> ContactList;
+
 class ContactListWidget : public QWidget {
     Q_OBJECT
 public:
     explicit ContactListWidget(QWidget* parent = 0);
     
-    void setContacts(const QPtrList<Contact>& contacts);
+    void setContacts(const ContactList& contacts);
     void clear();
     void retranslateUi();
     
@@ -29,15 +26,17 @@ signals:
     
 private slots:
     void onTabClicked();
-    void onItemClicked(QListBoxItem* item);
-    void onSelectionChanged();
+    void onItemClicked();  // Qt3: QListBox selectionChanged -> call this
+                             // Qt4: QListWidget itemClicked -> call this
+    void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
     
 private:
-    void updateView();
+    void updateView_v3();
+    void updateView_v4();
     void setTabFilter(int index);
     
-    QListBox* listBox;
-    QPtrList<Contact> allContacts;
+    void* listWidget;  // QListBox* (Qt3) or QListWidget* (Qt4)
+    ContactList allContacts;
     QString currentFilter;
     int currentTab;
     QLineEdit* addInput;

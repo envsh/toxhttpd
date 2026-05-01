@@ -1,11 +1,7 @@
 #ifndef SELFINFO_H
 #define SELFINFO_H
 
-#include <qwidget.h>
-#include <qlabel.h>
-#include <qpushbt.h>
-#include <qvbox.h>
-#include <qhbox.h>
+#include "compat34.h"
 #include <qstring.h>
 
 class SelfInfoWidget : public QWidget {

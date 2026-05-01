@@ -1,9 +1,7 @@
 #ifndef EVENTPOLLER_H
 #define EVENTPOLLER_H
 
-#include <qthread.h>
-#include <qobject.h>
-#include <qevent.h>
+#include "compat34.h"
 #include <vector>
 #include <queue>
 #include <string>
@@ -27,17 +25,24 @@ enum ApiRequestType {
 };
 
 // 事件轮询结果
-class EventListEvent : public QCustomEvent {
+class EventListEvent : public CustomEventBase {
 public:
+#ifdef QT3_BUILD
     EventListEvent(const EventList& evts) : QCustomEvent(EventListReadyType), events(evts) {}
+#else
+    EventListEvent(const EventList& evts) : QEvent((QEvent::Type)EventListReadyType), events(evts) {}
+#endif
     EventList events;
 };
 
 // API请求事件
-class ApiRequestEvent : public QCustomEvent {
+class ApiRequestEvent : public CustomEventBase {
 public:
+#ifdef QT3_BUILD
     ApiRequestEvent(ApiRequestType t) : QCustomEvent(ApiRequestEventType), type(t) {}
-    
+#else
+    ApiRequestEvent(ApiRequestType t) : QEvent((QEvent::Type)ApiRequestEventType), type(t) {}
+#endif
     ApiRequestType type;
     // 请求参数
     int id;
@@ -46,9 +51,13 @@ public:
 };
 
 // API结果事件基类
-class ApiResultEvent : public QCustomEvent {
+class ApiResultEvent : public CustomEventBase {
 public:
+#ifdef QT3_BUILD
     ApiResultEvent(ApiRequestType t) : QCustomEvent(ApiResultReadyType), type(t) {}
+#else
+    ApiResultEvent(ApiRequestType t) : QEvent((QEvent::Type)ApiResultReadyType), type(t) {}
+#endif
     ApiRequestType type;
 };
 
@@ -65,8 +74,11 @@ struct ContactData {
 // 所有数据加载完成事件
 class AllDataLoadedEvent : public ApiResultEvent {
 public:
+#ifdef QT3_BUILD
     AllDataLoadedEvent() : ApiResultEvent(ApiLoadAllData), success(true) {}
-    
+#else
+    AllDataLoadedEvent() : ApiResultEvent(ApiLoadAllData), success(true) {}
+#endif
     bool success;
     // Self info
     std::string selfName, selfStatusMsg, selfConnStatus, selfAddress;
@@ -78,7 +90,11 @@ public:
 // 消息发送结果事件
 class MessageSentResultEvent : public ApiResultEvent {
 public:
+#ifdef QT3_BUILD
     MessageSentResultEvent() : ApiResultEvent(ApiSendFriendMessage), success(false) {}
+#else
+    MessageSentResultEvent() : ApiResultEvent(ApiSendFriendMessage), success(false) {}
+#endif
     bool success;
     std::string message;  // 用于乐观更新
     int chatId;
@@ -88,7 +104,11 @@ public:
 // 会议操作结果事件
 class ConferenceResultEvent : public ApiResultEvent {
 public:
+#ifdef QT3_BUILD
     ConferenceResultEvent() : ApiResultEvent(ApiJoinConference), success(false) {}
+#else
+    ConferenceResultEvent() : ApiResultEvent(ApiJoinConference), success(false) {}
+#endif
     bool success;
     int conferenceId;
 };
