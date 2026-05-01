@@ -81,5 +81,6 @@
         "view_info": "查看資訊",
         "delete_friend": "刪除好友"
     },
-    "select_chat_object": "選擇聊天對象"
+    "select_chat_object": "選擇聊天對象",
+    "theme_dark": "深色主題"
 }

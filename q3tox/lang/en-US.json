@@ -81,5 +81,6 @@
         "view_info": "View Info",
         "delete_friend": "Delete Friend"
     },
-    "select_chat_object": "Select chat object"
+    "select_chat_object": "Select chat object",
+    "theme_dark": "Dark Theme"
 }
