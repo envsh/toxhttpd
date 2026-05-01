@@ -62,10 +62,26 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     sidebarLayout->addWidget(contactListWidget, 1); // stretch
     
     splitter->addWidget(sidebar);
+    sidebarWidget = sidebar;  // 保存 sidebar 指针
     
     // ===== 右侧聊天区 =====
     chatWidget = new ChatWidget(splitter);
     splitter->addWidget(chatWidget);
+    
+    // 设置 splitter 比例：左 1/3 (367px)，右 2/3 (733px)
+    // 窗口固定 1100px，所以直接算像素值
+    int leftWidth = 367;   // 1100 / 3 ≈ 367
+    int rightWidth = 733;  // 1100 - 367 = 733
+    
+#ifdef QT3_BUILD
+    QValueList<int> sizes;
+    sizes << leftWidth << rightWidth;
+    splitter->setSizes(sizes);
+#else
+    QList<int> sizes;
+    sizes << leftWidth << rightWidth;
+    splitter->setSizes(sizes);
+#endif
     
     setCentralWidget(splitter);
     
