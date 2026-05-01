@@ -9,7 +9,7 @@ SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
 
 HEADERS = mainwindow.h api.h eventpoller.h \
            chatwidget.h contactlist.h selfinfo.h translator.h \
-           editinfodialog.h invitedialog.h ThemeManager.h
+           editinfodialog.h invitedialog.h ThemeManager.h compat34.h
 
 # moc 处理
 MOC_DIR = .
