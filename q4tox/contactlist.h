@@ -25,6 +25,7 @@ public slots:
     void updateContact(const Contact& contact);
     void clearContacts();
     void setFilter(const QString& filter); // "all", "friends", "groups", "conferences"
+    void retranslateUi();
     
 signals:
     void contactSelected(int id, const QString& type);
@@ -43,6 +44,9 @@ private slots:
 private:
     QListWidget* listWidget;
     QLineEdit* addFriendEdit;
+    QPushButton* addFriendBtn;
+    QPushButton* confBtn;
+    QPushButton* groupBtn;
     QList<Contact> allContacts;
     QString currentFilter;
     QList<QPushButton*> tabButtons;

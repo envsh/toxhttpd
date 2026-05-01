@@ -1,112 +1,126 @@
 #include "eventpoller.h"
-#include <QCoreApplication>
-#include <QDebug>
+#include <qapplication.h>
+#include <qmutex.h>
+#include <queue>
 
-EventPoller::EventPoller(QObject* parent) 
-    : QThread(parent), api(0), receiver(0), running(false), lastEventId(0) {
+EventPoller::EventPoller(QObject* parent) : QThread((unsigned int)0), 
+    running(false), lastEventId(0), receiver(nullptr) {
+    api = new ToxAPI();
 }
 
-EventPoller::~EventPoller() {
-    stop();
-    wait();
-    // api is deleted in run() thread
+void EventPoller::run() {
+    running = true;
+    while (running) {
+        // 处理待处理的API请求
+        while (!pendingRequests.empty()) {
+            ApiRequestEvent* req = pendingRequests.front();
+            pendingRequests.pop();
+            processApiRequest(req);
+            delete req;
+        }
+        
+        // 事件轮询
+        std::vector<Event> events = api->pollEvents(lastEventId);
+        
+        if (!events.empty()) {
+            if (receiver) {
+                EventListEvent* event = new EventListEvent(events);
+                QApplication::postEvent(receiver, event);
+            }
+            // 更新lastEventId
+            for (const auto& e : events) {
+                if (e.id > lastEventId) {
+                    lastEventId = e.id;
+                }
+            }
+        } else {
+            // 无事件：等待2秒后重试
+            QThread::sleep(2);
+        }
+    }
 }
 
 void EventPoller::stop() {
     running = false;
+    wait();
 }
 
-void EventPoller::postApiRequest(const ApiRequest& req) {
-    QMutexLocker locker(&mutex);
-    pendingRequests.enqueue(req);
+void EventPoller::setLastEventId(uint64_t id) {
+    lastEventId = id;
 }
 
-void EventPoller::run() {
-    // Create API in this thread
-    api = new ToxAPI();
-    connect(api, SIGNAL(eventsReceived(EventList)), 
-            this, SLOT(onEventsReceived(EventList)));
-    
-    running = true;
-    lastEventId = 0;
-    
-    while (running) {
-        // Process pending API requests
-        mutex.lock();
-        while (!pendingRequests.isEmpty()) {
-            ApiRequest req = pendingRequests.dequeue();
-            mutex.unlock();
-            processApiRequest(req);
-            mutex.lock();
-        }
-        mutex.unlock();
-        
-        // Poll for events
-        if (api) {
-            api->pollEvents(lastEventId);
-        }
-        
-        // In real implementation, eventsReceived will update lastEventId
-        // For now, sleep and continue polling
-        if (running) {
-            QThread::sleep(2);
-        }
-    }
-    
-    // Cleanup API in this thread
-    delete api;
-    api = 0;
+void EventPoller::postApiRequest(ApiRequestEvent* req) {
+    pendingRequests.push(req);
 }
 
-void EventPoller::processApiRequest(const ApiRequest& req) {
-    if (!api) return;
+void EventPoller::processApiRequest(ApiRequestEvent* req) {
+    if (!req || !receiver) return;
     
-    switch (req.type) {
-        case ApiLoadAllData:
-            api->getSelf();
-            api->getFriends();
-            api->getConferences();
+    switch (req->type) {
+        case ApiLoadAllData: {
+            AllDataLoadedEvent* result = new AllDataLoadedEvent();
+            
+            // 1. 加载self info
+            result->success = api->getSelf(result->selfName, 
+                                            result->selfStatusMsg,
+                                            result->selfConnStatus,
+                                            result->selfAddress);
+            
+            // 2. 加载好友列表和详情
+            std::vector<int> friends = api->getFriends();
+            for (int id : friends) {
+                FriendInfo info;
+                if (api->getFriendInfo(id, info)) {
+                    ContactData cd;
+                    cd.id = id;
+                    cd.name = info.name;
+                    cd.type = "friend";
+                    cd.status = info.connection_status;
+                    result->contacts.push_back(cd);
+                }
+            }
+            
+            // 3. 加载会议列表
+            std::vector<int> conferences = api->getConferences();
+            for (int id : conferences) {
+                ContactData cd;
+                cd.id = id;
+                cd.name = "conference_item " + std::to_string(id);
+                cd.type = "conference";
+                cd.status = "online";
+                result->contacts.push_back(cd);
+            }
+            
+            // 一次性发送所有结果
+            QApplication::postEvent(receiver, result);
             break;
-        case ApiSendFriendMessage:
-            api->sendFriendMessage(req.id, req.message);
-            break;
-        case ApiSendConferenceMessage:
-            api->sendConferenceMessage(req.id, req.message);
-            break;
-        case ApiJoinConference:
-            api->joinConference(req.id, req.data);
-            break;
-        case ApiRejectConference:
-            api->rejectConference(req.id);
-            break;
-        case ApiAddFriend:
-            api->addFriend(req.message);
-            break;
-        case ApiDeleteFriend:
-            api->deleteFriend(req.id);
-            break;
-        case ApiCreateConference:
-            api->createConference();
-            break;
-        case ApiCreateGroup:
-            api->createGroup();
-            break;
-    }
-}
-
-void EventPoller::onEventsReceived(const EventList& events) {
-    if (events.isEmpty()) return;
-    
-    // Update lastEventId
-    foreach (const Event& e, events) {
-        if (e.id > lastEventId) {
-            lastEventId = e.id;
         }
-    }
-    
-    // Post event to receiver in main thread
-    if (receiver) {
-        EventListEvent* event = new EventListEvent(events);
-        QCoreApplication::postEvent(receiver, event);
+        case ApiSendFriendMessage: {
+            MessageSentResultEvent* result = new MessageSentResultEvent();
+            result->chatId = req->id;
+            result->chatType = "friend";
+            result->success = api->sendFriendMessage(req->id, req->message);
+            result->message = req->message;
+            QApplication::postEvent(receiver, result);
+            break;
+        }
+        case ApiSendConferenceMessage: {
+            MessageSentResultEvent* result = new MessageSentResultEvent();
+            result->chatId = req->id;
+            result->chatType = "conference";
+            result->success = api->sendConferenceMessage(req->id, req->message);
+            result->message = req->message;
+            QApplication::postEvent(receiver, result);
+            break;
+        }
+        case ApiJoinConference: {
+            ConferenceResultEvent* result = new ConferenceResultEvent();
+            // 需要从请求中获取friendNumber和cookie
+            // 简化：假设req中有这些字段
+            result->success = api->joinConference(req->id, req->message);
+            QApplication::postEvent(receiver, result);
+            break;
+        }
+        // ... 处理其他请求类型
     }
 }

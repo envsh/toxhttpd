@@ -6,31 +6,37 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QComboBox>
+#include <QLabel>
 
 class ChatWidget : public QWidget {
     Q_OBJECT
 public:
     explicit ChatWidget(QWidget* parent = 0);
-    void setChatInfo(int id, const QString& type); // "friend", "conference", "group"
-    void appendMessage(const QString& message, bool isSelf);
+    void setHeaderText(const QString& text);
+    void clearMessages();
+    void appendMessage(const QString& message, const QString& sender);
+    void retranslateUi();
     
 signals:
     void messageSent(const QString& message);
     void languageChanged(const QString& langCode);
+    void darkModeToggled(bool dark);
     
 private slots:
     void onSendClicked();
     void onLanguageChanged(int index);
+    void onDarkModeClicked();
     
 private:
     QTextEdit* messageArea;
     QLineEdit* inputEdit;
     QPushButton* sendBtn;
     QComboBox* langSelector;
+    QPushButton* darkModeBtn;
+    QLabel* headerText;
     
     int chatId;
     QString chatType;
-    QString chatName;
 };
 
 #endif // CHATWIDGET_H

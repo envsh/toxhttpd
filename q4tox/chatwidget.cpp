@@ -1,19 +1,28 @@
 #include "chatwidget.h"
 #include "translator.h"
+#include "ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QScrollBar>
 #include <QLabel>
 
 ChatWidget::ChatWidget(QWidget* parent) 
-    : QWidget(parent), chatId(-1) {
+    : QWidget(parent), chatId(-1), chatType("") {
     
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     
-    // Header with chat info and language selector
+    // Header with chat info, dark mode button, and language selector
     QHBoxLayout* headerLayout = new QHBoxLayout();
-    QLabel* headerText = new QLabel(_("select_chat_object"));
+    headerText = new QLabel(_("select_chat_object"));
     headerText->setObjectName("chatHeaderText");
+    
+    // Dark mode toggle button
+    darkModeBtn = new QPushButton("🌙", this);
+    darkModeBtn->setToolTip(_("dark_mode"));
+    darkModeBtn->setCheckable(true);
+    darkModeBtn->setChecked(true); // Default: dark mode
+    darkModeBtn->setFixedSize(30, 30);
+    connect(darkModeBtn, SIGNAL(clicked()), this, SLOT(onDarkModeClicked()));
     
     langSelector = new QComboBox();
     langSelector->addItem("简体中文", "zh-CN");
@@ -22,6 +31,7 @@ ChatWidget::ChatWidget(QWidget* parent)
     langSelector->setCurrentIndex(0); // Default: zh-CN
     
     headerLayout->addWidget(headerText, 1);
+    headerLayout->addWidget(darkModeBtn);
     headerLayout->addWidget(langSelector);
     mainLayout->addLayout(headerLayout);
     
@@ -49,26 +59,19 @@ ChatWidget::ChatWidget(QWidget* parent)
     connect(langSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(onLanguageChanged(int)));
 }
 
-void ChatWidget::setChatInfo(int id, const QString& type) {
-    chatId = id;
-    chatType = type;
-    
-    // Update header text
-    QLabel* headerText = findChild<QLabel*>("chatHeaderText");
+void ChatWidget::setHeaderText(const QString& text) {
     if (headerText) {
-        if (type == "friend") {
-            headerText->setText(_("chat_with_friend").arg(QString::number(id)));
-        } else if (type == "conference") {
-            headerText->setText(_("chat_with_conference").arg(QString::number(id)));
-        } else {
-            headerText->setText(_("select_chat_object"));
-        }
+        headerText->setText(text);
     }
 }
 
-void ChatWidget::appendMessage(const QString& message, bool isSelf) {
-    QString color = isSelf ? "#00d4aa" : "#58a6ff";
-    QString align = isSelf ? "right" : "left";
+void ChatWidget::clearMessages() {
+    messageArea->clear();
+}
+
+void ChatWidget::appendMessage(const QString& message, const QString& sender) {
+    QString color = (sender == "self") ? "#00d4aa" : "#58a6ff";
+    QString align = (sender == "self") ? "right" : "left";
     
     // Escape HTML characters manually for Qt4
     QString escaped = message;
@@ -77,11 +80,13 @@ void ChatWidget::appendMessage(const QString& message, bool isSelf) {
     escaped.replace(">", "&gt;");
     escaped.replace("\"", "&quot;");
     
+    QString senderLabel = (sender == "self") ? _("you") : sender;
     QString html = QString("<div style='text-align: %1; margin: 5px;'>"
+                         "<span style='color: #888; font-size: 12px;'>%4</span><br>"
                          "<span style='background-color: %2; padding: 5px 10px; "
                          "border-radius: 10px; display: inline-block; max-width: 70%;'>"
                          "%3</span></div>")
-                   .arg(align).arg(color).arg(escaped);
+                   .arg(align).arg(color).arg(escaped).arg(senderLabel);
     
     messageArea->append(html);
     
@@ -101,4 +106,20 @@ void ChatWidget::onSendClicked() {
 void ChatWidget::onLanguageChanged(int index) {
     QString langCode = langSelector->itemData(index).toString();
     emit languageChanged(langCode);
+}
+
+void ChatWidget::onDarkModeClicked() {
+    bool dark = darkModeBtn->isChecked();
+    ThemeManager::applyTheme(dark);
+    darkModeBtn->setText(dark ? "🌙" : "☀️");
+    emit darkModeToggled(dark);
+}
+
+void ChatWidget::retranslateUi() {
+    if (chatId == -1) {
+        if (headerText) headerText->setText(_("select_chat_object"));
+    }
+    if (inputEdit) inputEdit->setPlaceholderText(_("input_placeholder"));
+    if (sendBtn) sendBtn->setText(_("buttons.send"));
+    if (darkModeBtn) darkModeBtn->setToolTip(_("dark_mode"));
 }

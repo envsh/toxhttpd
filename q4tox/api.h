@@ -1,120 +1,60 @@
 #ifndef API_H
 #define API_H
 
-#include <QObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QMap>
-#include <QString>
-#include <QVariantMap>
-
-// Forward declaration for cJSON
-struct cJSON;
+#include <string>
+#include <vector>
+#include <map>
+#include <cstdint>
 
 struct FriendInfo {
     int id;
-    QString name;
-    QString statusMessage;
-    QString status;
-    QString connectionStatus;
-    QString publicKey;
+    std::string name;
+    std::string status_message;
+    std::string status;
+    std::string connection_status;
+    std::string public_key;
 };
 
 struct Event {
-    quint64 id;
-    QString type;
-    QString data; // JSON string
+    uint64_t id;
+    std::string type;
+    std::string data;
 };
 
-typedef QList<Event> EventList;
-
-class ToxAPI : public QObject {
-    Q_OBJECT
+class ToxAPI {
 public:
-    explicit ToxAPI(QObject* parent = 0, const QString& baseUrl = "http://localhost:8181");
+    ToxAPI(const std::string& baseUrl = "http://localhost:8181");
     
-    // Self info
-    void getSelf();
-    void setSelfName(const QString& name);
-    void setSelfStatus(const QString& statusMessage);
-    
-    // Friends
-    void getFriends();
-    void getFriendInfo(int friendId);
-    void addFriend(const QString& publicKey);
-    void deleteFriend(int friendId);
-    
-    // Messages
-    void sendFriendMessage(int friendId, const QString& message);
-    
-    // Conferences
-    void getConferences();
-    void createConference();
-    void joinConference(int friendNumber, const QString& cookie);
-    void rejectConference(int friendNumber);
-    void ignoreConference(int friendNumber);
-    void sendConferenceMessage(int conferenceId, const QString& message);
-    
-    // Groups (if supported)
-    void getGroups();
-    void createGroup();
-    void sendGroupMessage(int groupId, const QString& message);
-    
-    // Events
-    void pollEvents(quint64 after = 0);
-    
-    // Bootstrap
-    void bootstrap();
-
-signals:
     // Self
-    void selfLoaded(const QVariantMap& data);
-    void selfUpdated();
+    bool getSelf(std::string& name, std::string& statusMsg, std::string& connStatus, std::string& address);
+    bool setSelfName(const std::string& name);
+    bool setSelfStatus(const std::string& status);
     
     // Friends
-    void friendsLoaded(const QList<int>& friendIds);
-    void friendInfoLoaded(const FriendInfo& info);
-    void friendAdded(int friendId);
-    void friendDeleted(int friendId);
+    std::vector<int> getFriends();
+    bool getFriendInfo(int friendId, FriendInfo& info);
+    int addFriend(const std::string& publicKey);
+    bool deleteFriend(int friendId);
     
     // Messages
-    void messageSent(bool success);
-    void messageReceived(int friendId, const QString& message);
+    bool sendFriendMessage(int friendId, const std::string& message);
+    bool sendConferenceMessage(int conferenceId, const std::string& message);
     
     // Conferences
-    void conferencesLoaded(const QList<int>& conferenceIds);
-    void conferenceCreated(int conferenceId);
-    void conferenceJoined(int conferenceId);
-    void conferenceMessageReceived(int conferenceId, int peerNumber, const QString& message);
-    void conferenceInvited(int friendNumber, const QString& cookie);
+    std::vector<int> getConferences();
+    int createConference();
+    bool joinConference(int friendNumber, const std::string& cookie);
+    bool rejectConference(int friendNumber);
+    bool ignoreConference(int friendNumber);
     
-    // Groups
-    void groupsLoaded(const QList<int>& groupIds);
+    // Events (long polling, 30s timeout)
+    std::vector<Event> pollEvents(uint64_t after);
     
-    // Events
-    void eventsReceived(const EventList& events);
-    
-    // Error
-    void errorOccurred(const QString& error);
-
-public slots:
-    // Parse JSON helper (used by other classes)
-    QVariantMap parseJsonString(const QString& jsonStr);
-
-private slots:
-    void onReplyFinished();
-
 private:
-    QNetworkAccessManager* manager;
-    QString baseUrl;
+    std::string baseUrl;
     
-    // Parse JSON response using cJSON
-    QVariantMap parseJsonResponse(const QByteArray& data);
-    EventList parseEvents(const QByteArray& data);
-    
-    // Make HTTP request
-    void get(const QString& endpoint, const QString& callbackName);
-    void post(const QString& endpoint, const QString& postData, const QString& callbackName);
+    std::string httpGet(const std::string& endpoint);
+    std::string httpPost(const std::string& endpoint, const std::string& postData);
 };
 
 #endif // API_H

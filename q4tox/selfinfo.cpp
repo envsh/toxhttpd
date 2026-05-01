@@ -66,10 +66,12 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent) {
     connect(copyBtn, SIGNAL(clicked()), this, SLOT(onCopyAddress()));
 }
 
-void SelfInfoWidget::updateInfo(const QVariantMap& data) {
-    currentName = data["name"].toString();
-    currentStatusMessage = data["status_message"].toString();
-    fullAddress = data["address"].toString();
+void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg, 
+                                const QString& connStatus, const QString& address) {
+    currentName = name;
+    currentStatusMessage = statusMsg;
+    currentConnStatus = connStatus;
+    fullAddress = address;
     
     // Update avatar (show first letter of name)
     QString firstLetter = currentName.isEmpty() ? "?" : QString(currentName[0].toUpper());
@@ -82,8 +84,7 @@ void SelfInfoWidget::updateInfo(const QVariantMap& data) {
     statusMessageLabel->setText(currentStatusMessage.isEmpty() ? _("no_status") : currentStatusMessage);
     
     // Update status badge
-    QString connStatus = data["connection_status"].toString();
-    if (connStatus == "online" || connStatus == "tcp") {
+    if (currentConnStatus == "online" || currentConnStatus == "tcp") {
         statusBadge->setText(_("online"));
         statusBadge->setStyleSheet("background-color: #4caf50; color: white; padding: 2px 8px; border-radius: 10px;");
     } else {
@@ -96,6 +97,22 @@ void SelfInfoWidget::updateInfo(const QVariantMap& data) {
         QString shortAddr = fullAddress.left(8) + "..." + fullAddress.right(8);
         addressLabel->setText(shortAddr);
         addressLabel->setToolTip(fullAddress);
+    }
+}
+
+void SelfInfoWidget::retranslateUi() {
+    nameLabel->setText(currentName.isEmpty() ? _("not_set") : currentName);
+    statusMessageLabel->setText(currentStatusMessage.isEmpty() ? _("no_status") : currentStatusMessage);
+    addressLabel->setToolTip(_("click_to_copy"));
+    copyBtn->setText(_("copy"));
+    editBtn->setText(_("edit_info"));
+    bootstrapBtn->setText(_("connect_network"));
+    
+    // Update status badge text
+    if (currentConnStatus == "online" || currentConnStatus == "tcp") {
+        statusBadge->setText(_("online"));
+    } else {
+        statusBadge->setText(_("offline"));
     }
 }
 
