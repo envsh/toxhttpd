@@ -197,6 +197,18 @@ bool ToxAPI::deleteFriend(int friendId) {
     return !response.empty();
 }
 
+bool ToxAPI::leaveConference(int confId) {
+    std::string postData = "conference_id=" + std::to_string(confId);
+    std::string response = httpPost("/api/conference_delete", postData);
+    return !response.empty();
+}
+
+bool ToxAPI::inviteToConference(int friendId, int confId) {
+    std::string postData = "friend_id=" + std::to_string(friendId) + "&conference_id=" + std::to_string(confId);
+    std::string response = httpPost("/api/conference_invite", postData);
+    return !response.empty();
+}
+
 bool ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
     std::string postData = "friend_id=" + std::to_string(friendId) + "&message=" + message;
     std::string response = httpPost("/api/messages", postData);

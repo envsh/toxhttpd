@@ -75,6 +75,27 @@
   - 添加 `tabButtons[]`、`tabFilters[]`、`tabNames[]` 成员变量
   - 实现 `setTabFilter()` 函数正确切换过滤
   - 添加调试输出确认联系人加载（成功加载 4 个联系人：2好友+2会议）
+- **修复 Bug**：聊天头部不更新问题（翻译文件 `{0}` → `%1`，Qt 的 `QString::arg()` 格式）
+- **右键菜单功能**：
+  - 创建 `friendinfodialog.h/cpp`（查看好友/会议信息对话框）
+  - 修改 `contactlist.h/cpp`：
+    - 添加右键菜单信号：`viewInfoRequested`、`deleteOrLeaveRequested`、`inviteToConferenceRequested`
+    - Qt3：使用 `eventFilter` + `QPopupMenu` 实现右键菜单
+    - Qt4：使用 `customContextMenuRequested` + `QMenu` 实现右键菜单
+    - 支持好友菜单：查看信息、删除好友、邀请进会议
+    - 支持会议菜单：查看信息、离开会议
+  - 修改 `mainwindow.h/cpp`：
+    - 添加槽函数处理右键菜单动作
+    - `onViewInfoRequested()`：显示好友/会议信息对话框
+    - `onDeleteOrLeaveRequested()`：确认后删除好友/离开会议，成功后重新加载联系人
+    - `onInviteToConferenceRequested()`：弹出会议选择对话框，邀请好友进会议
+  - 修改 `api.h/cpp`：
+    - 添加 `leaveConference(int confId)` - 离开会议（POST `/api/conference_delete`）
+    - 添加 `inviteToConference(int friendId, int confId)` - 邀请进会议（POST `/api/conference_invite`）
+  - 更新翻译文件 `lang/*.json`：
+    - 添加右键菜单翻译：`view_info`、`delete_friend`、`leave_conference`
+    - 添加确认对话框翻译：`confirm_delete_friend`、`confirm_leave_conference`
+    - 添加其他翻译：`invite_to_conference`、`select_conference`、`friend_info_title` 等
 
 ### In Progress
 - 无
@@ -173,15 +194,16 @@
 
 ### 前端 (q3tox)
 - `q3tox/compat34.h`：**Qt3/Qt4 兼容层**（QString API、布局、窗口、文件、事件等）
-- `q3tox/api.h/cpp`：REST API 封装，使用 libcurl
+- `q3tox/api.h/cpp`：REST API 封装，使用 libcurl（含 `leaveConference()`、`inviteToConference()`）
 - `q3tox/translator.h/cpp`：多语言支持，使用 cJSON
-- `q3tox/mainwindow.h/cpp`：主窗口，左右分割布局
+- `q3tox/mainwindow.h/cpp`：主窗口，左右分割布局（处理右键菜单动作）
 - `q3tox/selfinfo.h/cpp`：个人信息 widget
-- `q3tox/contactlist.h/cpp`：联系人列表（void* listWidget + updateView_v3/v4）
+- `q3tox/contactlist.h/cpp`：联系人列表（void* listWidget + updateView_v3/v4，右键菜单）
 - `q3tox/chatwidget.h/cpp`：聊天区域
 - `q3tox/eventpoller.h/cpp`：事件轮询器（CustomEventBase 兼容）
 - `q3tox/editinfodialog.h/cpp`：编辑个人信息对话框
 - `q3tox/invitedialog.h/cpp`：会议邀请对话框
+- `q3tox/friendinfodialog.h/cpp`：查看好友/会议信息对话框（新增）
 - `q3tox/lang/zh-CN.json`：简体中文（默认）
 - `q3tox/lang/zh-TW.json`：繁体中文
 - `q3tox/lang/en-US.json`：英文
@@ -236,6 +258,8 @@
 | POST | `/api/conferences/join` | `friend_number`, `cookie` | Accept conference invite |
 | POST | `/api/conferences/reject` | `friend_number` | Reject conference invite |
 | POST | `/api/conferences/ignore` | `friend_number` | Ignore conference invite |
+| POST | `/api/conference_invite` | `friend_id`, `conference_id` | Invite friend to conference |
+| POST | `/api/conference_delete` | `conference_id` | Leave conference |
 
 ### Bootstrap
 | Method | Endpoint | Parameters | Description |
@@ -335,6 +359,13 @@ curl -X POST http://localhost:8181/api/conferences
 - [x] **Qt3 编译成功**：`buildqt3.sh` → q3tox (2.1M)
 - [x] **Qt4 编译成功**：`buildqt4.sh` → q3tox
 - [x] Successfully loads 4 contacts (2 friends + 2 conferences)
+- [x] **右键菜单功能**：
+  - [x] 查看信息对话框 (`friendinfodialog.h/cpp`)
+  - [x] 好友：查看信息、删除好友、邀请进会议
+  - [x] 会议：查看信息、离开会议
+  - [x] Qt3 右键菜单（`QPopupMenu` + `eventFilter`）
+  - [x] Qt4 右键菜单（`QMenu` + `customContextMenuRequested`）
+- [x] **Bug 修复**：聊天头部不更新（翻译文件 `{0}` → `%1`）
 - [ ] Complete workflow testing (add friend, send message, conference)
 - [ ] Tab filtering verification (All/Friends/Conferences)
 - [ ] UI style refinement (avatar, status colors)

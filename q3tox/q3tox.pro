@@ -5,11 +5,13 @@ CONFIG += moc
 
 SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
            chatwidget.cpp contactlist.cpp selfinfo.cpp translator.cpp \
-           cJSON.c editinfodialog.cpp invitedialog.cpp ThemeManager.cpp
+           cJSON.c editinfodialog.cpp invitedialog.cpp ThemeManager.cpp \
+           friendinfodialog.cpp
 
 HEADERS = mainwindow.h api.h eventpoller.h \
            chatwidget.h contactlist.h selfinfo.h translator.h \
-           editinfodialog.h invitedialog.h ThemeManager.h compat34.h
+           editinfodialog.h invitedialog.h ThemeManager.h compat34.h \
+           friendinfodialog.h
 
 # moc 处理
 MOC_DIR = .
