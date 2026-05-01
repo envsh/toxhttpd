@@ -7,6 +7,7 @@
 #include <qpushbt.h>
 #include <qlabel.h>
 #include <qcombobox.h>
+#include <qcheckbox.h>
 #include <qvbox.h>
 #include <qhbox.h>
 
@@ -27,10 +28,12 @@ signals:
 private slots:
     void onSendClicked();
     void onLanguageChanged(int index);
+    void onThemeToggled(bool checked);
 
 private:
     QLabel* headerText;
     QComboBox* langSelector;
+    QCheckBox* themeCheckBox;
     QTextEdit* messageArea;
     QLineEdit* inputEdit;
     QPushButton* sendBtn;

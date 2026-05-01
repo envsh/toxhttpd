@@ -6,6 +6,8 @@
 #include "mainwindow.h"
 #include "translator.h"
 
+#include "ThemeManager.h"
+
 // 读取保存的语言设置（替代 QSettings）
 static QString loadSavedLanguage() {
     QFile file(QDir::homeDirPath() + "/.q3tox_lang");
@@ -36,6 +38,8 @@ int main(int argc, char* argv[]) {
     // 设置 UTF-8 编解码器
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     QTextCodec::setCodecForTr(QTextCodec::codecForName("UTF-8"));
+    
+    ThemeManager::applyTheme(true);
     
     // 读取保存的语言设置
     QString savedLang = loadSavedLanguage();

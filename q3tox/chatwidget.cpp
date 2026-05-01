@@ -4,6 +4,8 @@
 #include <qmessagebox.h>
 #include <qlayout.h>
 
+#include "ThemeManager.h"
+
 ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     QBoxLayout* mainLayout = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, -1, 0);
     mainLayout->setSpacing(0);
@@ -22,6 +24,11 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     langSelector->setCurrentItem(0);
     connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
     headerLayout->addWidget(langSelector);
+
+    // 主题切换复选框
+    themeCheckBox = new QCheckBox(_("theme_dark"), this);
+    connect(themeCheckBox, SIGNAL(toggled(bool)), this, SLOT(onThemeToggled(bool)));
+    headerLayout->addWidget(themeCheckBox);
     
     mainLayout->addLayout(headerLayout);
     
@@ -83,6 +90,9 @@ void ChatWidget::retranslateUi() {
     // 更新按钮文字
     if (sendBtn) sendBtn->setText(_("buttons.send"));
     
+    // 更新主题复选框文本
+    if (themeCheckBox) themeCheckBox->setText(_("theme_dark"));
+    
     // 更新输入框 placeholder（如果当前显示的是默认值）
     if (inputEdit) {
         QString text = inputEdit->text();
@@ -102,4 +112,10 @@ void ChatWidget::onLanguageChanged(int index) {
     else langCode = "zh-CN"; // 默认
     qWarning("ChatWidget: language changed to %s", (const char*)langCode.local8Bit());
     emit languageChanged(langCode);
+}
+
+void ChatWidget::onThemeToggled(bool checked) {
+    // TODO: 实现主题切换逻辑
+    qWarning("Theme toggled: %d", checked);
+    ThemeManager::applyTheme(checked);
 }
