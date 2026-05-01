@@ -110,9 +110,17 @@ function applyLanguage() {
     updateModalTexts();
     
     // 更新右键菜单
-    const menuItems = document.querySelectorAll('#friendMenu .menu-item');
-    if (menuItems[0]) menuItems[0].textContent = t('context_menu.view_info');
-    if (menuItems[1]) menuItems[1].textContent = t('context_menu.delete_friend');
+    const friendMenuItems = document.querySelectorAll('#friendMenu .menu-item');
+    if (friendMenuItems[0]) friendMenuItems[0].textContent = t('context_menu.view_info');
+    if (friendMenuItems[1]) friendMenuItems[1].textContent = t('context_menu.invite_to_conference');
+    if (friendMenuItems[2]) friendMenuItems[2].textContent = t('context_menu.delete_friend');
+
+    const conferenceMenuItems = document.querySelectorAll('#conferenceMenu .menu-item');
+    if (conferenceMenuItems[0]) conferenceMenuItems[0].textContent = t('context_menu.view_info');
+    if (conferenceMenuItems[1]) conferenceMenuItems[1].textContent = t('context_menu.leave_conference');
+
+    const groupMenuItems = document.querySelectorAll('#groupMenu .menu-item');
+    if (groupMenuItems[0]) groupMenuItems[0].textContent = t('context_menu.view_info');
     
     console.log('Language applied:', currentLang);
 }
@@ -134,6 +142,18 @@ function updateModalTexts() {
     // 好友信息模态框
     const friendTitle = document.querySelector('#friendInfoModal h3');
     if (friendTitle) friendTitle.textContent = t('modals.friend_info_title');
+    
+    // 会议信息模态框
+    const conferenceTitle = document.getElementById('conferenceInfoTitle');
+    if (conferenceTitle) conferenceTitle.textContent = t('conference_info_title');
+    
+    // 群组信息模态框
+    const groupTitle = document.getElementById('groupInfoTitle');
+    if (groupTitle) groupTitle.textContent = t('group_info_title');
+    
+    // 选择会议对话框
+    const selectTitle = document.getElementById('selectConferenceTitle');
+    if (selectTitle) selectTitle.textContent = t('select_conference');
     
     const friendLabels = document.querySelectorAll('#friendInfoModal .info-row label');
     if (friendLabels[0]) friendLabels[0].textContent = t('modals.labels.name');
@@ -345,7 +365,7 @@ function renderContactList(filter) {
             const isSelected = g == currentChatId && currentChatType === 'group';
             const emoji = '👥';
             html += `
-                <div class="list-item ${isSelected ? 'selected' : ''}" onclick="selectContact(${g}, 'group')">
+                <div class="list-item ${isSelected ? 'selected' : ''}" data-group-id="${g}" onclick="selectContact(${g}, 'group')">
                     <span class="group-dot"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${t('group')} ${g}</span>
@@ -360,7 +380,7 @@ function renderContactList(filter) {
             const isSelected = c == currentChatId && currentChatType === 'conference';
             const emoji = '🎙';
             html += `
-                <div class="list-item ${isSelected ? 'selected' : ''}" onclick="selectContact(${c}, 'conference')">
+                <div class="list-item ${isSelected ? 'selected' : ''}" data-conference-id="${c}" onclick="selectContact(${c}, 'conference')">
                     <span class="conference-dot"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${t('conference_item')} ${c}</span>
@@ -630,46 +650,99 @@ function createConference() {
       });
 }
 
-// Friend context menu
+// Context menu variables
 let selectedFriendId = null;
+let selectedConferenceId = null;
+let selectedGroupId = null;
+let inviteFriendId = null;
 
-// Use event delegation for friend list context menu
+// Use event delegation for contact list context menu
 document.addEventListener('DOMContentLoaded', () => {
     const contactList = document.getElementById('contactList');
     if (contactList) {
         contactList.addEventListener('contextmenu', (event) => {
             const item = event.target.closest('.list-item');
-            if (item && item.dataset.friendId) {
-                event.preventDefault();
+            if (!item) return;
+            
+            event.preventDefault();
+            
+            // Determine type and show appropriate menu
+            if (item.dataset.friendId) {
                 selectedFriendId = item.dataset.friendId;
-                const menu = document.getElementById('friendMenu');
-                menu.style.display = 'block';
-                menu.style.left = event.pageX + 'px';
-                menu.style.top = event.pageY + 'px';
-                
-                // Hide menu when clicking elsewhere
-                setTimeout(() => {
-                    document.addEventListener('click', hideFriendMenu, { once: true });
-                }, 0);
+                showContextMenu('friendMenu', event.pageX, event.pageY);
+            } else if (item.dataset.conferenceId) {
+                selectedConferenceId = item.dataset.conferenceId;
+                showContextMenu('conferenceMenu', event.pageX, event.pageY);
+            } else if (item.dataset.groupId) {
+                selectedGroupId = item.dataset.groupId;
+                showContextMenu('groupMenu', event.pageX, event.pageY);
             }
         });
     }
 
-    // Handle menu item clicks
-    const menu = document.getElementById('friendMenu');
-    if (menu) {
-        menu.addEventListener('click', (event) => {
+    // Handle friend menu item clicks
+    const friendMenu = document.getElementById('friendMenu');
+    if (friendMenu) {
+        friendMenu.addEventListener('click', (event) => {
             const action = event.target.getAttribute('data-action');
             if (action === 'info') {
                 window.showFriendInfo(selectedFriendId);
+            } else if (action === 'invite') {
+                window.inviteToConference(selectedFriendId);
             } else if (action === 'delete') {
                 window.deleteFriend();
             }
         });
     }
 
-    hideFriendMenu();
+    // Handle conference menu item clicks
+    const conferenceMenu = document.getElementById('conferenceMenu');
+    if (conferenceMenu) {
+        conferenceMenu.addEventListener('click', (event) => {
+            const action = event.target.getAttribute('data-action');
+            if (action === 'info') {
+                window.showConferenceInfo(selectedConferenceId);
+            } else if (action === 'leave') {
+                window.leaveConference();
+            }
+        });
+    }
+
+    // Handle group menu item clicks
+    const groupMenu = document.getElementById('groupMenu');
+    if (groupMenu) {
+        groupMenu.addEventListener('click', (event) => {
+            const action = event.target.getAttribute('data-action');
+            if (action === 'info') {
+                window.showGroupInfo(selectedGroupId);
+            }
+        });
+    }
+
+    hideAllContextMenus();
 });
+
+function showContextMenu(menuId, pageX, pageY) {
+    hideAllContextMenus();
+    const menu = document.getElementById(menuId);
+    if (menu) {
+        menu.style.display = 'block';
+        menu.style.left = pageX + 'px';
+        menu.style.top = pageY + 'px';
+        
+        // Hide menu when clicking elsewhere
+        setTimeout(() => {
+            document.addEventListener('click', hideAllContextMenus, { once: true });
+        }, 0);
+    }
+}
+
+function hideAllContextMenus() {
+    ['friendMenu', 'conferenceMenu', 'groupMenu'].forEach(id => {
+        const menu = document.getElementById(id);
+        if (menu) menu.style.display = 'none';
+    });
+}
 
 function hideFriendMenu() {
     const menu = document.getElementById('friendMenu');
@@ -717,7 +790,95 @@ function deleteFriend() {
           alert(t('delete_failed') + ': ' + err);
       });
     
-    hideFriendMenu();
+    hideAllContextMenus();
+}
+
+// Conference functions
+function showConferenceInfo(conferenceId) {
+    document.getElementById('infoConferenceId').textContent = conferenceId;
+    document.getElementById('infoConferenceType').textContent = 'Tox Conference';
+    document.getElementById('conferenceInfoModal').classList.remove('hidden');
+    hideAllContextMenus();
+}
+
+function hideConferenceInfo() {
+    document.getElementById('conferenceInfoModal').classList.add('hidden');
+}
+
+function leaveConference() {
+    if (!selectedConferenceId) return;
+    
+    if (!confirm(t('confirm_leave_conference', selectedConferenceId))) {
+        return;
+    }
+    
+    fetch('/api/conference_delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `conference_id=${selectedConferenceId}`
+    }).then(r => r.json())
+      .then(data => {
+          alert(t('conference_leave_success'));
+          loadContacts('conferences');
+      }).catch(err => {
+          alert(t('conference_leave_failed') + ': ' + err);
+      });
+    
+    hideAllContextMenus();
+}
+
+// Group functions
+function showGroupInfo(groupId) {
+    document.getElementById('infoGroupId').textContent = groupId;
+    document.getElementById('groupInfoModal').classList.remove('hidden');
+    hideAllContextMenus();
+}
+
+function hideGroupInfo() {
+    document.getElementById('groupInfoModal').classList.add('hidden');
+}
+
+// Invite functions
+function inviteToConference(friendId) {
+    inviteFriendId = friendId;
+    
+    fetch('/api/conferences')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('conferenceSelect');
+            select.innerHTML = '';
+            data.conferences.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c;
+                option.textContent = t('conference_item') + ' ' + c;
+                select.appendChild(option);
+            });
+            document.getElementById('selectConferenceModal').classList.remove('hidden');
+        })
+        .catch(err => {
+            alert(t('load_failed') + ': ' + err);
+        });
+    
+    hideAllContextMenus();
+}
+
+function confirmInvite() {
+    const confId = document.getElementById('conferenceSelect').value;
+    fetch('/api/conference_invite', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `friend_id=${inviteFriendId}&conference_id=${confId}`
+    }).then(r => r.json())
+      .then(data => {
+          alert(t('invite_success'));
+          hideSelectConference();
+      }).catch(err => {
+          alert(t('invite_failed') + ': ' + err);
+      });
+}
+
+function hideSelectConference() {
+    document.getElementById('selectConferenceModal').classList.add('hidden');
 }
 
 // Show edit self modal
@@ -804,8 +965,11 @@ document.getElementById('messageInput').addEventListener('keypress', e => {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         hideFriendInfo();
-        hideFriendMenu();
+        hideAllContextMenus();
         hideEditSelf();
+        hideConferenceInfo();
+        hideGroupInfo();
+        hideSelectConference();
     }
 });
 
@@ -823,5 +987,12 @@ window.bootstrap = bootstrap;
 window.showFriendInfo = showFriendInfo;
 window.deleteFriend = deleteFriend;
 window.hideFriendInfo = hideFriendInfo;
-window.hideFriendMenu = hideFriendMenu;
+window.leaveConference = leaveConference;
+window.showConferenceInfo = showConferenceInfo;
+window.hideConferenceInfo = hideConferenceInfo;
+window.showGroupInfo = showGroupInfo;
+window.hideGroupInfo = hideGroupInfo;
+window.inviteToConference = inviteToConference;
+window.confirmInvite = confirmInvite;
+window.hideSelectConference = hideSelectConference;
 window.switchLanguage = switchLanguage;
