@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Install backend dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libtoxcore-dev libopus-dev libsodium-dev libcurl4-openssl-dev
+      - name: Pre‑build custom commands (reserved)
+        run: |
+          echo "=== Backend custom commands placeholder ==="
+          # =====================================================
+          # 在此处取消注释并添加你需要执行的预编译命令
+          # 例如: go mod download, export CGO_CFLAGS, ./prepare.sh
+          # =====================================================
+      - name: Build backend
+        run: cd go-toxhttpd && go build -v ./...
+      - name: Verify backend binary
+        run: test -f go-toxhttpd/toxhttpd-go
+
+  build-q3tox-qt4:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt4 and dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y qt4-default libqt4-dev qt4-qmake libcurl4-openssl-dev libcjson-dev
+      - name: Pre‑build custom commands (reserved)
+        run: |
+          echo "=== q3tox custom commands placeholder ==="
+          # =====================================================
+          # 在此处取消注释并添加你需要执行的预编译命令
+          # 例如: export QTDIR, ./prepare_qt4.sh
+          # =====================================================
+      - name: Build q3tox with Qt4
+        run: |
+          cd q3tox
+          qmake -makefile
+          make -j$(nproc)
+      - name: Verify executable
+        run: test -f q3tox/q3tox
+      - name: Basic functional test
+        run: |
+          cd q3tox
+          if ./q3tox --help 2>&1 | grep -qiE "usage|help|version"; then
+            echo "q3tox --help succeeded"
+          else
+            timeout 2s ./q3tox 2>&1 || test $? -eq 124
+            echo "q3tox started and terminated (expected for GUI app)"
+          fi
