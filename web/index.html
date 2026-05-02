@@ -99,6 +99,7 @@
     <!-- Group context menu -->
     <div id="groupMenu" class="context-menu hidden">
         <div class="menu-item" data-action="info">查看信息</div>
+        <div class="menu-item danger" data-action="leave">离开群组</div>
     </div>
     
     <!-- Friend info modal -->
@@ -147,6 +148,38 @@
             <div class="modal-actions">
                 <button onclick="confirmInvite()">邀请</button>
                 <button onclick="hideSelectConference()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group creation modal -->
+    <div id="groupModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="groupModalTitle">创建群组</h3>
+            <div class="modal-body">
+                <div class="form-inline">
+                    <label for="groupNameInput" id="labelGroupName">群组名称：</label>
+                    <input type="text" id="groupNameInput" placeholder="输入群组名称">
+                </div>
+                <div class="form-inline">
+                    <label for="groupCreatorNameInput" id="labelCreatorName">创建者昵称：</label>
+                    <input type="text" id="groupCreatorNameInput" placeholder="输入你的昵称">
+                </div>
+                <div class="form-inline">
+                    <label for="groupPasswordInput" id="labelGroupPassword">密码（可选）：</label>
+                    <input type="password" id="groupPasswordInput" placeholder="留空则不设密码">
+                </div>
+                <div class="form-inline">
+                    <label for="groupPrivacySelect" id="labelPrivacy">隐私状态：</label>
+                    <select id="groupPrivacySelect">
+                        <option value="public">公开</option>
+                        <option value="private">私密</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button onclick="confirmCreateGroup()" id="btnConfirmGroup">确认</button>
+                <button onclick="closeGroupModal()" id="btnCancelGroup">取消</button>
             </div>
         </div>
     </div>

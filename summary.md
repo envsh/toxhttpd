@@ -45,14 +45,21 @@
 - **Group Chat REST API**：路由统一使用复数形式 `/api/groups`（原 `/api/group`），对应 `handleGroups()` ✅
 - **修复 nil map panic**：在 `go-toxcore-c/tox.go` 的 `NewTox()` 中初始化所有 Group Chat callback maps（18个）✅
 - **修复空字符串 panic**：修复 `GroupNew`、`GroupJoin`、`GroupLeave` 中空字符串导致 `index out of range` 的问题 ✅
-- **测试通过**：所有 Group Chat REST API 端点均可访问（返回预期错误码）：
+- **修复 GroupNew 参数错误**：C 函数第5个参数是创建者昵称（非密码），`handleGroups` 已修正并支持密码设置 ✅
+- **测试通过**：所有 Group Chat REST API 端点工作正常：
   - `GET /api/groups` - 返回群组列表 ✅
-  - `POST /api/groups` - 创建群组（错误码 2: 名称为空）✅
+  - `POST /api/groups` - 创建群组（需 `group_name` + `name` 参数）✅ 测试成功：创建群组#0 ✅
   - `POST /api/groups/join` - 加入群组（需要 chat_id）✅
-  - `POST /api/groups/leave` - 离开群组（错误码 1: 群组不存在）✅
-  - `POST /api/group_messages` - 发送群消息（错误码 1: 群组不存在）✅
-  - `POST /api/groups/invite` - 邀请好友（错误码 1: 群组不存在）✅
+  - `POST /api/groups/leave` - 离开群组 ✅ 测试成功：离开群组#0 ✅
+  - `POST /api/group_messages` - 发送群消息 ✅ 测试成功：发送消息 ✅
+  - `POST /api/groups/invite` - 邀请好友（需要有效群组）✅
   - `POST /api/groups/accept` - 接受邀请（需要 invite_data + friend_number）✅
+- **Web 端重构创建群组 UI** ✅：
+  - `web/index.html`：添加群组创建对话框（名称、昵称、密码、隐私状态）✅
+  - `web/app.js`：重写 `createGroup()` 显示对话框、`confirmCreateGroup()` 处理参数、`closeGroupModal()` ✅
+  - `web/lang/zh-CN.json`：添加 `modals.create_group_title`、`modals.confirm_group`、`modals.cancel_group`、`modals.labels.*`、`cannot_be_empty` ✅
+  - `web/lang/zh-TW.json`：同步更新 ✅
+  - `web/lang/en-US.json`：同步更新 ✅
 
 ### 前端 (q3tox) - Done
 - **Qt3/Qt4 兼容改造**：创建 `compat34.h` 统一处理 API 差异

@@ -30,13 +30,20 @@
     "modals": {
         "edit_info_title": "Edit Personal Info",
         "friend_info_title": "Friend Info",
+        "create_group_title": "Create Group",
+        "confirm_group": "Confirm",
+        "cancel_group": "Cancel",
         "labels": {
             "name": "Name",
             "status_message": "Status Message",
             "friend_id": "Friend ID",
             "status": "Status",
             "connection": "Connection",
-            "public_key": "Public Key"
+            "public_key": "Public Key",
+            "group_name": "Group Name:",
+            "creator_name": "Creator Name:",
+            "group_password": "Password (optional):",
+            "privacy_state": "Privacy State:"
         }
     },
     "statuses": {
@@ -90,5 +97,19 @@
     "select_conference": "Select Conference",
     "conference_info_title": "Conference Info",
     "group_info_title": "Group Info",
-    "select_chat_object": "Select chat object"
+    "select_chat_object": "Select chat object",
+    "cannot_be_empty": "cannot be empty",
+    "confirm_leave_group": "Leave group {0}?",
+    "group_leave_success": "Left group",
+    "group_leave_failed": "Leave failed",
+    "group": {
+        "invitation_received": "Group invitation received",
+        "invitation_from": "From {0}",
+        "invite_message": "Group invitation",
+        "accept": "Accept",
+        "reject": "Reject",
+        "ignore": "Ignore",
+        "joined": "Joined group {0}",
+        "join_failed": "Failed to join group"
+    }
 }

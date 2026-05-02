@@ -30,13 +30,20 @@
     "modals": {
         "edit_info_title": "編輯個人資訊",
         "friend_info_title": "好友資訊",
+        "create_group_title": "建立群組",
+        "confirm_group": "確認",
+        "cancel_group": "取消",
         "labels": {
             "name": "名稱",
             "status_message": "狀態訊息",
             "friend_id": "好友 ID",
             "status": "狀態",
             "connection": "連線",
-            "public_key": "公鑰"
+            "public_key": "公鑰",
+            "group_name": "群組名稱：",
+            "creator_name": "建立者暱稱：",
+            "group_password": "密碼（選填）：",
+            "privacy_state": "隱私狀態："
         }
     },
     "statuses": {
@@ -90,5 +97,19 @@
     "select_conference": "選擇會議",
     "conference_info_title": "會議資訊",
     "group_info_title": "群組資訊",
-    "select_chat_object": "選擇聊天對象"
+    "select_chat_object": "選擇聊天對象",
+    "cannot_be_empty": "不能為空",
+    "confirm_leave_group": "確定離開群組 {0} 嗎？",
+    "group_leave_success": "已離開群組",
+    "group_leave_failed": "離開失敗",
+    "group": {
+        "invitation_received": "收到群組邀請",
+        "invitation_from": "來自 {0}",
+        "invite_message": "群組邀請",
+        "accept": "同意",
+        "reject": "拒絕",
+        "ignore": "忽略",
+        "joined": "已加入群組 {0}",
+        "join_failed": "加入群組失敗"
+    }
 }
