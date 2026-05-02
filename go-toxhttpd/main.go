@@ -352,6 +352,46 @@ func setupCallbacks(s *Server) {
 		s.eventQueue.Push("conference_peer_list_changed", string(data))
 	}, nil)
 
+	// Group Chat callbacks (stubs)
+	// 1. CallbackGroupChatInvite - 邀请回调
+	s.tox.CallbackGroupChatInvite(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		friendNumber uint32, data string, userData interface{}) {
+		log.Printf("[GroupInvite] group=%d, friend=%d, data=%s",
+			groupNumber, friendNumber, data)
+		// TODO: 处理邀请事件，可能触发 Web 前端通知
+	}, nil)
+
+	// 2. CallbackGroupPeerJoin - Peer 加入回调
+	s.tox.CallbackGroupPeerJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, userData interface{}) {
+		log.Printf("[GroupPeerJoin] group=%d, peer=%d",
+			groupNumber, peerNumber)
+		// TODO: 更新在线用户列表
+	}, nil)
+
+	// 3. CallbackGroupPeerExit - Peer 退出回调
+	s.tox.CallbackGroupPeerExit(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, exitType tox.GroupExitType, name string, userData interface{}) {
+		log.Printf("[GroupPeerExit] group=%d, peer=%d, type=%s, name=%s",
+			groupNumber, peerNumber, tox.GroupExitTypeToString(exitType), name)
+		// TODO: 更新在线用户列表
+	}, nil)
+
+	// 4. CallbackGroupPeerStatus - Peer 状态变化回调
+	s.tox.CallbackGroupPeerStatus(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, status int, userData interface{}) {
+		log.Printf("[GroupPeerStatus] group=%d, peer=%d, status=%d",
+			groupNumber, peerNumber, status)
+		// TODO: 更新前端状态显示
+	}, nil)
+
+	// 5. CallbackGroupSelfJoin - 自己加入群组回调
+	s.tox.CallbackGroupSelfJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		userData interface{}) {
+		log.Printf("[GroupSelfJoin] group=%d", groupNumber)
+		// TODO: 初始化群组相关状态
+	}, nil)
+
 	log.Println("[TOX] All callbacks registered")
 }
 
@@ -498,17 +538,51 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == http.MethodGet {
-		// Return group list (different from conferences)
-		// For now return empty
+		// 获取所有群组列表（使用新 Group API）
+		groups := s.tox.GroupGetNumberGroups()
 		resp := map[string]interface{}{
-			"groups": []uint32{},
+			"groups": groups,
 		}
 		json.NewEncoder(w).Encode(resp)
 	} else if r.Method == http.MethodPost {
-		// Using conference as group
-		// Note: go-toxcore-c uses ConferenceNew()
+		r.ParseForm()
+
+		privacyStateStr := r.FormValue("privacy_state")
+		groupName := r.FormValue("group_name")
+		name := r.FormValue("name") // 创建者昵称（C 函数第5个参数）
+		password := r.FormValue("password")
+
+		if groupName == "" {
+			http.Error(w, `{"error":"missing group_name"}`, http.StatusBadRequest)
+			return
+		}
+
+		var privacyState tox.GroupPrivacyState
+		if privacyStateStr == "private" {
+			privacyState = tox.GroupPrivacyState(tox.GROUP_PRIVACY_STATE_PRIVATE)
+		} else {
+			privacyState = tox.GroupPrivacyState(tox.GROUP_PRIVACY_STATE_PUBLIC)
+		}
+
+		// C 函数第5个参数是创建者昵称（name），不是密码
+		groupNumber, err := s.tox.GroupNew(privacyState, groupName, name)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+			return
+		}
+
+		// 如果提供了密码，在创建后设置
+		if password != "" {
+			err = s.tox.GroupSetPassword(groupNumber, password)
+			if err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"set password failed: %s"}`, err), http.StatusBadRequest)
+				return
+			}
+		}
+
 		resp := map[string]interface{}{
-			"group_id": 0,
+			"group_number": uint32(groupNumber),
+			"message": "group created",
 		}
 		json.NewEncoder(w).Encode(resp)
 	}
@@ -537,6 +611,44 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(resp)
 	}
+}
+
+func (s *Server) handleGroupSendMessage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	r.ParseForm()
+
+	groupNumberStr := r.FormValue("group_number")
+	messageTypeStr := r.FormValue("message_type")
+	message := r.FormValue("message")
+
+	if groupNumberStr == "" || message == "" {
+		http.Error(w, `{"error":"missing required parameters"}`, http.StatusBadRequest)
+		return
+	}
+
+	var groupNumber tox.GroupNumber
+	fmt.Sscanf(groupNumberStr, "%d", &groupNumber)
+
+	messageType := tox.MESSAGE_TYPE_NORMAL
+	if messageTypeStr == "action" {
+		messageType = tox.MESSAGE_TYPE_ACTION
+	}
+
+	msgId, err := s.tox.GroupSendMessage(groupNumber, messageType, message)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"message_id": uint64(msgId),
+		"message":   "message sent",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request) {
@@ -638,6 +750,36 @@ func (s *Server) handleConferenceIgnore(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(resp)
 }
 
+func (s *Server) handleGroupJoin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	r.ParseForm()
+
+	chatId := r.FormValue("chat_id")
+	name := r.FormValue("name")
+	password := r.FormValue("password")
+
+	if chatId == "" {
+		http.Error(w, `{"error":"missing chat_id"}`, http.StatusBadRequest)
+		return
+	}
+
+	groupNumber, err := s.tox.GroupJoin(chatId, name, password)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"group_number": uint32(groupNumber),
+		"message":      "group joined",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -650,6 +792,104 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 
 	resp := map[string]interface{}{
 		"message": "bootstrap initiated to 3 nodes",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleGroupLeave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	r.ParseForm()
+
+	groupNumberStr := r.FormValue("group_number")
+	partMessage := r.FormValue("part_message")
+
+	if groupNumberStr == "" {
+		http.Error(w, `{"error":"missing group_number"}`, http.StatusBadRequest)
+		return
+	}
+
+	var groupNumber tox.GroupNumber
+	fmt.Sscanf(groupNumberStr, "%d", &groupNumber)
+
+	err := s.tox.GroupLeave(groupNumber, partMessage)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"message": "group left",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+	}
+
+func (s *Server) handleGroupInvite(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	r.ParseForm()
+
+	groupNumberStr := r.FormValue("group_number")
+	friendNumberStr := r.FormValue("friend_number")
+
+	if groupNumberStr == "" || friendNumberStr == "" {
+		http.Error(w, `{"error":"missing required parameters"}`, http.StatusBadRequest)
+		return
+	}
+
+	var groupNumber tox.GroupNumber
+	var friendNumber uint32
+	fmt.Sscanf(groupNumberStr, "%d", &groupNumber)
+	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
+
+	err := s.tox.GroupInviteFriend(groupNumber, friendNumber)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"message": "invite sent",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+	}
+
+func (s *Server) handleGroupAccept(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	r.ParseForm()
+
+	inviteData := r.FormValue("invite_data")
+	friendNumberStr := r.FormValue("friend_number")
+	name := r.FormValue("name")
+	password := r.FormValue("password")
+
+	if inviteData == "" || friendNumberStr == "" {
+		http.Error(w, `{"error":"missing required parameters"}`, http.StatusBadRequest)
+		return
+	}
+
+	var friendNumber uint32
+	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
+
+	groupNumber, err := s.tox.GroupInviteAccept(inviteData, friendNumber, name, password)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"group_number": uint32(groupNumber),
+		"message":      "invite accepted",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -719,6 +959,13 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/bootstrap", loggingMiddleware(s.handleBootstrap))
 	http.HandleFunc("/api/events", loggingMiddleware(s.handleEvents))
 	http.HandleFunc("/", loggingMiddleware(s.handleWeb))
+
+	// Group Chat API 路由 (复数形式 /api/groups)
+	http.HandleFunc("/api/groups/join", loggingMiddleware(s.handleGroupJoin))
+	http.HandleFunc("/api/groups/leave", loggingMiddleware(s.handleGroupLeave))
+	http.HandleFunc("/api/group_messages", loggingMiddleware(s.handleGroupSendMessage))
+	http.HandleFunc("/api/groups/invite", loggingMiddleware(s.handleGroupInvite))
+	http.HandleFunc("/api/groups/accept", loggingMiddleware(s.handleGroupAccept))
 
 	log.Printf("Server starting on :%s", port)
 	return http.ListenAndServe(":"+port, nil)
