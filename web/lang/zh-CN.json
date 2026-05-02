@@ -87,7 +87,8 @@
         "view_info": "查看信息",
         "delete_friend": "删除好友",
         "leave_conference": "离开会议",
-        "invite_to_conference": "邀请进会议"
+        "invite_to_conference": "邀请进会议",
+        "invite_to_group": "邀请进群组"
     },
     "confirm_delete_friend": "确定删除好友 {0} 吗？",
     "confirm_leave_conference": "确定离开会议 {0} 吗？",

@@ -90,7 +90,8 @@
     <!-- Friend context menu -->
     <div id="friendMenu" class="context-menu hidden">
         <div class="menu-item" data-action="info">查看信息</div>
-        <div class="menu-item" data-action="invite">邀请进会议</div>
+        <div class="menu-item" data-action="invite_conference">邀请进会议</div>
+        <div class="menu-item" data-action="invite_group">邀请进群组</div>
         <div class="menu-item danger" data-action="delete">删除好友</div>
     </div>
 
@@ -150,7 +151,7 @@
             <h3 id="selectConferenceTitle">选择会议</h3>
             <select id="conferenceSelect" style="width: 100%; margin: 10px 0;"></select>
             <div class="modal-actions">
-                <button onclick="confirmInvite()">邀请</button>
+                <button onclick="confirmConferenceInvite()">邀请</button>
                 <button onclick="hideSelectConference()">取消</button>
             </div>
         </div>
