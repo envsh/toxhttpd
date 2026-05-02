@@ -42,6 +42,17 @@
 - 语言选择器从左侧边栏移至聊天头部（`#chatHeader`）最右侧
 - `applyLanguage()` 更新逻辑：根据聊天状态动态更新 `#chatHeaderText`
 - `selectContact()` 更新：使用 `#chatHeaderText` 而非 `#chatHeader`
+- **Group Chat REST API**：路由统一使用复数形式 `/api/groups`（原 `/api/group`），对应 `handleGroups()` ✅
+- **修复 nil map panic**：在 `go-toxcore-c/tox.go` 的 `NewTox()` 中初始化所有 Group Chat callback maps（18个）✅
+- **修复空字符串 panic**：修复 `GroupNew`、`GroupJoin`、`GroupLeave` 中空字符串导致 `index out of range` 的问题 ✅
+- **测试通过**：所有 Group Chat REST API 端点均可访问（返回预期错误码）：
+  - `GET /api/groups` - 返回群组列表 ✅
+  - `POST /api/groups` - 创建群组（错误码 2: 名称为空）✅
+  - `POST /api/groups/join` - 加入群组（需要 chat_id）✅
+  - `POST /api/groups/leave` - 离开群组（错误码 1: 群组不存在）✅
+  - `POST /api/group_messages` - 发送群消息（错误码 1: 群组不存在）✅
+  - `POST /api/groups/invite` - 邀请好友（错误码 1: 群组不存在）✅
+  - `POST /api/groups/accept` - 接受邀请（需要 invite_data + friend_number）✅
 
 ### 前端 (q3tox) - Done
 - **Qt3/Qt4 兼容改造**：创建 `compat34.h` 统一处理 API 差异
@@ -241,7 +252,7 @@
 | Method | Endpoint | Parameters | Description |
 |--------|----------|------------|-------------|
 | POST | `/api/messages` | `friend_id`, `message` | Send message to friend |
-| POST | `/api/group_messages` | `group_id`, `message` | Send message to group |
+| POST | `/api/group_messages` | `group_number`, `message` | Send message to group |
 | POST | `/api/conference_messages` | `conference_id`, `message` | Send message to conference |
 
 ### Groups
