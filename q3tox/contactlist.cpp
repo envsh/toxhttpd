@@ -351,23 +351,27 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPo
 #endif
     
     if (type == "friend") {
-        // 好友：删除、邀请进会议
+        // 好友：删除、邀请进会议、邀请进群组
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.delete_friend"), 1);
         menu.insertSeparator();
-        menu.insertItem(_("invite_to_conference"), 2);
+        menu.insertItem(_("context_menu.invite_to_conference"), 2);
+        menu.insertItem(_("context_menu.invite_to_group"), 3);
         int choice = menu.exec(globalPos);
         if (choice == 0) emit viewInfoRequested(id, type);
         else if (choice == 1) emit deleteOrLeaveRequested(id, type);
         else if (choice == 2) emit inviteToConferenceRequested(id);
+        else if (choice == 3) emit inviteToGroupRequested(id);
 #else
         menu.addSeparator();
         QAction* deleteAction = menu.addAction(_("context_menu.delete_friend"));
-        QAction* inviteAction = menu.addAction(_("invite_to_conference"));
+        QAction* inviteConfAction = menu.addAction(_("context_menu.invite_to_conference"));
+        QAction* inviteGroupAction = menu.addAction(_("context_menu.invite_to_group"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) emit viewInfoRequested(id, type);
         else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
-        else if (selected == inviteAction) emit inviteToConferenceRequested(id);
+        else if (selected == inviteConfAction) emit inviteToConferenceRequested(id);
+        else if (selected == inviteGroupAction) emit inviteToGroupRequested(id);
 #endif
     } else if (type == "conference") {
         // 会议：离开

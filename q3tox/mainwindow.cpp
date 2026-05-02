@@ -6,7 +6,8 @@
 #include "eventpoller.h"
 #include "api.h"
 #include "translator.h"
-#include "invitedialog.h"
+#include "conferenceinvitedialog.h"
+#include "groupinvitedialog.h"
 #include "cJSON.h"
 
 // 读取保存的语言设置
@@ -251,10 +252,10 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString friendNumber = QString::number(friendNumberItem->valueint);
                     QString cookie = QString::fromUtf8(cJSON_GetStringValue(cookieItem));
                     
-                    InviteDialog dialog(friendNumber, cookie, this);
-                    dialog.exec();
-                    
-                    if (dialog.getResult() == InviteDialog::Accept) {
+                    ConferenceInviteDialog dialog(friendNumber, cookie, this);
+                     dialog.exec();
+                     
+                     if (dialog.getResult() == ConferenceInviteDialog::Accept) {
                         // ✅ 改为异步请求
                         ApiRequestEvent* req = new ApiRequestEvent(ApiJoinConference);
                         req->id = friendNumber.toInt();
@@ -263,7 +264,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         
                         QMessageBox::information(this, _("conference_joined"), 
                                                         _("conference_joined").arg(dialog.getCookie()));
-                    } else if (dialog.getResult() == InviteDialog::Reject) {
+                    } else if (dialog.getResult() == ConferenceInviteDialog::Reject) {
                         // ✅ 改为异步请求
                         ApiRequestEvent* req = new ApiRequestEvent(ApiRejectConference);
                         req->id = friendNumber.toInt();
@@ -306,6 +307,39 @@ void MainWindow::handleEvents(const EventList& events) {
             // ✅ 改为异步请求
             ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
             eventPoller->postApiRequest(req);
+        } else if (e.type == "group_invite") {
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* friendNumberItem = cJSON_GetObjectItem(root, "friend_number");
+                cJSON* chatIdItem = cJSON_GetObjectItem(root, "chat_id");
+                if (friendNumberItem && chatIdItem) {
+                    int friendNumber = friendNumberItem->valueint;
+                    QString chatId = QString::fromUtf8(cJSON_GetStringValue(chatIdItem));
+                    onGroupInviteReceived(friendNumber, chatId);
+                }
+                cJSON_Delete(root);
+            }
+        } else if (e.type == "group_message") {
+            qWarning("Processing group_message event");
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* groupNumberItem = cJSON_GetObjectItem(root, "group_number");
+                cJSON* messageItem = cJSON_GetObjectItem(root, "message");
+                cJSON* peerNumberItem = cJSON_GetObjectItem(root, "peer_number");
+                
+                if (groupNumberItem && messageItem) {
+                    int groupNumber = groupNumberItem->valueint;
+                    QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
+                    int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
+                    
+                    if (groupNumber == currentChatId && currentChatType == "group") {
+                        QString sender = (peerNumber >= 0) ? 
+                            QString("Peer %1").arg(peerNumber) : _("group_item");
+                        chatWidget->appendMessage(message, "other", sender);
+                    }
+                }
+                cJSON_Delete(root);
+            }
         } else if (e.type == "friend_name" || e.type == "friend_status") {
             // ✅ 异步重新加载（直接发送请求，避免SLOT问题）
             ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
@@ -459,6 +493,88 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
             QMessageBox::information(this, _("invite_success"), _("invite_success"));
         } else {
             QMessageBox::warning(this, _("invite_failed"), _("invite_failed"));
+        }
+    }
+}
+
+void MainWindow::onInviteToGroupRequested(int friendId) {
+    // 获取群组列表
+    ToxAPI api;
+    std::vector<int> groups = api.getGroups();
+    
+    if (groups.empty()) {
+        QMessageBox::warning(this, _("no_group"), _("no_group"));
+        return;
+    }
+    
+    // 创建选择对话框
+    QDialog dialog(this);
+    qSetWindowTitle(&dialog, _("select_group"));
+    dialog.resize(300, 150);
+    
+    QBoxLayout* layout = qNewBoxLayout(&dialog, QBoxLayout::TopToBottom, 10, 10);
+    
+    QLabel* label = new QLabel(_("select_group"), &dialog);
+    layout->addWidget(label);
+    
+    QComboBox* groupCombo = new QComboBox(&dialog);
+    for (uint i = 0; i < groups.size(); ++i) {
+#ifdef QT3_BUILD
+        groupCombo->insertItem(QString(_("group_item")) + " " + QString::number(groups[i]));
+#else
+        groupCombo->insertItem(i, QString(_("group_item")) + " " + QString::number(groups[i]));
+#endif
+    }
+    layout->addWidget(groupCombo);
+    
+    QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    btnLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum));
+    
+    QPushButton* inviteBtn = new QPushButton(_("buttons.add"), &dialog);
+    connect(inviteBtn, SIGNAL(clicked()), &dialog, SLOT(accept()));
+    btnLayout->addWidget(inviteBtn);
+    
+    QPushButton* cancelBtn = new QPushButton(_("buttons.cancel"), &dialog);
+    connect(cancelBtn, SIGNAL(clicked()), &dialog, SLOT(reject()));
+    btnLayout->addWidget(cancelBtn);
+    
+    layout->addLayout(btnLayout);
+    
+    if (dialog.exec() == QDialog::Accepted) {
+#ifdef QT3_BUILD
+        int groupId = groups[groupCombo->currentItem()];
+#else
+        int groupId = groups[groupCombo->currentIndex()];
+#endif
+        bool success = api.inviteToGroup(friendId, groupId);
+        if (success) {
+            QMessageBox::information(this, _("invite_success"), _("invite_success"));
+        } else {
+            QMessageBox::warning(this, _("invite_failed"), _("invite_failed"));
+        }
+    }
+}
+
+void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) {
+    GroupInviteDialog dialog(QString::number(friendNumber), chatId, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        if (dialog.getResult() == GroupInviteDialog::Accept) {
+            // 接受群组邀请
+            ToxAPI api;
+            bool success = api.joinGroup(friendNumber, qToUtf8(chatId).data(), 
+                                         "", qToUtf8(dialog.getPassword()).data());
+            if (success) {
+                QMessageBox::information(this, _("group_joined"), 
+                                        _("group_joined").arg(chatId));
+                // 重新加载联系人
+                ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
+                eventPoller->postApiRequest(req);
+            } else {
+                QMessageBox::warning(this, _("group_join_failed"), _("group_join_failed"));
+            }
+        } else if (dialog.getResult() == GroupInviteDialog::Reject) {
+            // 拒绝群组邀请（直接忽略，无后端API）
+            QMessageBox::information(this, _("group_rejected"), _("group_rejected"));
         }
     }
 }

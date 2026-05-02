@@ -1,13 +1,13 @@
-#ifndef INVITEDIALOG_H
-#define INVITEDIALOG_H
+#ifndef CONFERENCEINVITEDIALOG_H
+#define CONFERENCEINVITEDIALOG_H
 
 #include "compat34.h"
 #include <qstring.h>
 
-class InviteDialog : public QDialog {
+class ConferenceInviteDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit InviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent = nullptr);
+    explicit ConferenceInviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent = nullptr);
     
     enum Result {
         Accept,
@@ -30,4 +30,4 @@ private:
     Result result;
 };
 
-#endif // INVITEDIALOG_H
+#endif // CONFERENCEINVITEDIALOG_H

@@ -309,3 +309,72 @@ std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
     cJSON_Delete(root);
     return events;
 }
+
+// ===== Groups (NGC) =====
+
+std::vector<int> ToxAPI::getGroups() {
+    std::vector<int> groups;
+    std::string response = httpGet("/api/groups");
+    if (response.empty()) return groups;
+    
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return groups;
+    
+    cJSON* groupsItem = cJSON_GetObjectItem(root, "groups");
+    if (groupsItem && cJSON_IsArray(groupsItem)) {
+        int count = cJSON_GetArraySize(groupsItem);
+        for (int i = 0; i < count; ++i) {
+            cJSON* item = cJSON_GetArrayItem(groupsItem, i);
+            if (item) groups.push_back(item->valueint);
+        }
+    }
+    
+    cJSON_Delete(root);
+    return groups;
+}
+
+int ToxAPI::createGroup(const std::string& groupName, const std::string& creatorName, 
+                       const std::string& password, bool isPrivate) {
+    std::string postData = "group_name=" + groupName + "&name=" + creatorName;
+    if (!password.empty()) {
+        postData += "&password=" + password;
+    }
+    postData += "&privacy=" + std::string(isPrivate ? "private" : "public");
+    
+    std::string response = httpPost("/api/groups", postData);
+    if (response.empty()) return -1;
+    
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return -1;
+    
+    cJSON* idItem = cJSON_GetObjectItem(root, "group_id");
+    int id = idItem ? idItem->valueint : -1;
+    
+    cJSON_Delete(root);
+    return id;
+}
+
+bool ToxAPI::leaveGroup(int groupId) {
+    std::string postData = "group_id=" + std::to_string(groupId);
+    std::string response = httpPost("/api/groups/leave", postData);
+    return !response.empty();
+}
+
+bool ToxAPI::inviteToGroup(int friendId, int groupId) {
+    std::string postData = "friend_id=" + std::to_string(friendId) + "&group_id=" + std::to_string(groupId);
+    std::string response = httpPost("/api/groups/invite", postData);
+    return !response.empty();
+}
+
+bool ToxAPI::joinGroup(int friendNumber, const std::string& chatId, 
+                       const std::string& name, const std::string& password) {
+    std::string postData = "friend_number=" + std::to_string(friendNumber) + "&chat_id=" + chatId;
+    if (!name.empty()) {
+        postData += "&name=" + name;
+    }
+    if (!password.empty()) {
+        postData += "&password=" + password;
+    }
+    std::string response = httpPost("/api/groups/join", postData);
+    return !response.empty();
+}

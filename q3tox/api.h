@@ -49,6 +49,15 @@ public:
     bool rejectConference(int friendNumber);
     bool ignoreConference(int friendNumber);
     
+    // Groups (NGC)
+    std::vector<int> getGroups();
+    int createGroup(const std::string& groupName, const std::string& creatorName, 
+                   const std::string& password = "", bool isPrivate = false);
+    bool leaveGroup(int groupId);
+    bool inviteToGroup(int friendId, int groupId);
+    bool joinGroup(int friendNumber, const std::string& chatId, 
+                  const std::string& name = "", const std::string& password = "");
+    
     // Events (long polling, 30s timeout)
     std::vector<Event> pollEvents(uint64_t after);
     

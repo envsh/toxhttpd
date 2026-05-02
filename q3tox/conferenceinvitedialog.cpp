@@ -1,8 +1,8 @@
-#include "invitedialog.h"
+#include "conferenceinvitedialog.h"
 #include "translator.h"
 #include "compat34.h"
 
-InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent) 
+ConferenceInviteDialog::ConferenceInviteDialog(const QString& friendNumber, const QString& cookie, QWidget* parent) 
     : QDialog(parent), friendNumber(friendNumber), cookie(cookie), result(Ignore) {
     
     qSetWindowTitle(this, _("conference.invitation_received"));
@@ -17,7 +17,7 @@ InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, Q
     mainLayout->addWidget(titleLabel);
     
     // 邀请信息
-    QString infoText = _("conference.invitation_from").arg(friendNumber) + " " + _("conference.invite_message");
+    QString infoText = _("conference.invitation_from").arg(friendNumber) + "\n" + _("conference.invite_message");
     QLabel* infoLabel = new QLabel(infoText, this);
     mainLayout->addWidget(infoLabel);
     
@@ -45,17 +45,17 @@ InviteDialog::InviteDialog(const QString& friendNumber, const QString& cookie, Q
     mainLayout->addLayout(btnLayout);
 }
 
-void InviteDialog::onAccept() {
+void ConferenceInviteDialog::onAccept() {
     result = Accept;
     accept();
 }
 
-void InviteDialog::onReject() {
+void ConferenceInviteDialog::onReject() {
     result = Reject;
     accept();
 }
 
-void InviteDialog::onIgnore() {
+void ConferenceInviteDialog::onIgnore() {
     result = Ignore;
     accept();
 }

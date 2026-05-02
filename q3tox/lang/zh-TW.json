@@ -80,14 +80,29 @@
     "context_menu": {
         "view_info": "查看資訊",
         "delete_friend": "刪除好友",
-        "leave_conference": "離開會議"
+        "leave_conference": "離開會議",
+        "invite_to_conference": "邀請進會議",
+        "invite_to_group": "邀請進群組"
     },
     "select_chat_object": "選擇聊天對象",
     "theme_dark": "深色主題",
     "confirm_delete_friend": "確定刪除好友 %1 嗎？",
     "confirm_leave_conference": "確定離開會議 %1 嗎？",
     "invite_to_conference": "邀請進會議",
+    "invite_to_group": "邀請進群組",
     "select_conference": "選擇會議",
+    "select_group": "選擇群組",
+    "group": {
+        "invitation_received": "收到群組邀請",
+        "invitation_from": "來自好友 %1 的群組邀請",
+        "invite_chat_id": "chat_id",
+        "accept": "接受",
+        "reject": "拒絕",
+        "password_optional": "密碼（可選）：",
+        "joined": "已加入群組 %1",
+        "join_failed": "加入群組失敗",
+        "rejected": "已拒絕群組邀請"
+    },
     "friend_info_title": "好友資訊",
     "conference_info_title": "會議資訊",
     "conference_leave_success": "已離開會議",

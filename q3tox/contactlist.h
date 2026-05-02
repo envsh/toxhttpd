@@ -25,11 +25,12 @@ public:
     void clear();
     void retranslateUi();
     
-signals:
+    signals:
     void contactSelected(int id, const QString& type);
     void viewInfoRequested(int id, const QString& type);
     void deleteOrLeaveRequested(int id, const QString& type);
     void inviteToConferenceRequested(int friendId);
+    void inviteToGroupRequested(int friendId);
     
 private slots:
     void onTabClicked();
