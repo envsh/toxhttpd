@@ -323,6 +323,17 @@ func setupCallbacks(s *Server) {
 		s.eventQueue.Push("conference_message", string(data))
 	}, nil)
 
+	// Group message callback (NGC)
+	s.tox.CallbackGroupMessage(func(this *tox.Tox, groupNumber int, peerNumber int, message string, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] GroupMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": groupNumber,
+			"peer_number": peerNumber,
+			"message":     message,
+		})
+		s.eventQueue.Push("group_message", string(data))
+	}, nil)
+
 	// Conference title callback
 	s.tox.CallbackConferenceTitle(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, title string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceTitle: group=%d, peer=%d, title=%s", groupNumber, peerNumber, title)
@@ -360,7 +371,13 @@ func setupCallbacks(s *Server) {
 		friendNumber uint32, data string, userData interface{}) {
 		log.Printf("[GroupInvite] group=%d, friend=%d, data=%s",
 			groupNumber, friendNumber, data)
-		// TODO: 处理邀请事件，可能触发 Web 前端通知
+		// 推送群组邀请事件到前端
+		eventData, _ := json.Marshal(map[string]interface{}{
+			"friend_number": friendNumber,
+			"group_number": groupNumber,
+			"chat_id":      data, // 64字符十六进制chat_id
+		})
+		s.eventQueue.Push("group_invite", string(eventData))
 	}, nil)
 
 	// 2. CallbackGroupPeerJoin - Peer 加入回调
@@ -391,7 +408,48 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackGroupSelfJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		userData interface{}) {
 		log.Printf("[GroupSelfJoin] group=%d", groupNumber)
-		// TODO: 初始化群组相关状态
+		// 推送自己加入群组事件
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": groupNumber,
+		})
+		s.eventQueue.Push("group_self_join", string(data))
+	}, nil)
+
+	// 6. CallbackGroupPeerJoin - Peer 加入回调
+	s.tox.CallbackGroupPeerJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, userData interface{}) {
+		log.Printf("[GroupPeerJoin] group=%d, peer=%d", int(groupNumber), int(peerNumber))
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": int(groupNumber),
+			"peer_number": int(peerNumber),
+		})
+		s.eventQueue.Push("group_peer_join", string(data))
+	}, nil)
+
+	// 7. CallbackGroupPeerExit - Peer 退出回调
+	s.tox.CallbackGroupPeerExit(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, exitType tox.GroupExitType, name string, userData interface{}) {
+		log.Printf("[GroupPeerExit] group=%d, peer=%d, type=%s, name=%s",
+			int(groupNumber), int(peerNumber), tox.GroupExitTypeToString(exitType), name)
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": int(groupNumber),
+			"peer_number": int(peerNumber),
+			"exit_type":   tox.GroupExitTypeToString(exitType),
+			"name":        name,
+		})
+		s.eventQueue.Push("group_peer_exit", string(data))
+	}, nil)
+
+	// 8. CallbackGroupPeerStatus - Peer 状态变化回调
+	s.tox.CallbackGroupPeerStatus(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, status int, userData interface{}) {
+		log.Printf("[GroupPeerStatus] group=%d, peer=%d, status=%d", int(groupNumber), int(peerNumber), status)
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": int(groupNumber),
+			"peer_number": int(peerNumber),
+			"status":      status,
+		})
+		s.eventQueue.Push("group_peer_status", string(data))
 	}, nil)
 
 	log.Println("[TOX] All callbacks registered")

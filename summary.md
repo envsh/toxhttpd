@@ -116,16 +116,21 @@
     - 添加其他翻译：`invite_to_conference`、`select_conference`、`friend_info_title` 等
 
 ### In Progress
-- 无
+- ✅ 区分会议和群组邀请功能（q3tox）：
+  - 重命名 `InviteDialog` → `ConferenceInviteDialog`
+  - 新增 `GroupInviteDialog`（接受/拒绝，支持密码输入）
+  - 后端推送 `group_invite`、`group_message`、`group_peer_join`、`group_peer_exit`、`group_peer_status`、`group_self_join` 事件
+  - q3tox API 新增群组方法：`getGroups()`、`createGroup()`、`leaveGroup()`、`inviteToGroup()`、`joinGroup()`
+  - 右键菜单：好友支持"邀请进会议"和"邀请进群组"
+  - 翻译文件更新：添加群组相关翻译键
 
 ### TODO (后端)
 - 测试：验证中/繁/英切换 + 布局不变形
 - 测试会议功能：创建、加入、消息显示
 - 测试语言切换后 localStorage 持久化
-- 修复 `web/app.js` 中 `applyLanguage()` 的变量名错误（`tabs` vs `tabs`）
+- 测试群组功能：创建、加入、消息显示、邀请
 - 命令标志代理支持
 - 命令标志翻译支持
-- Web 页面添加群组(NGC)
 
 ### TODO (前端)
 - 测试完整工作流程（添加好友、发消息、会议）

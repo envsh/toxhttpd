@@ -27,6 +27,8 @@ public:
     void onViewInfoRequested(int id, const QString& type);
     void onDeleteOrLeaveRequested(int id, const QString& type);
     void onInviteToConferenceRequested(int friendId);
+    void onInviteToGroupRequested(int friendId);
+    void onGroupInviteReceived(int friendNumber, const QString& chatId);
     
 private:
     
