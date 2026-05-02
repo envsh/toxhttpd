@@ -208,20 +208,20 @@
 - `web/lang/zh-CN.json`：简体中文（默认）
 - `web/lang/zh-TW.json`：繁体中文
 - `web/lang/en-US.json`：英文
-- `/opt/golib/pkg/mod/github.com/!tok!tok/go-toxcore-c@v0.2.18-0.20250216202442-0f7463080d5c/group.go`：Conference API实现
+- `go-toxhttpd/go-toxcore-c/group.go`：Conference API实现（外部依赖路径已省略）
 
 ### 前端 (q3tox)
 - `q3tox/compat34.h`：**Qt3/Qt4 兼容层**（QString API、布局、窗口、文件、事件等）
-- `q3tox/api.h/cpp`：REST API 封装，使用 libcurl（含 `leaveConference()`、`inviteToConference()`）
-- `q3tox/translator.h/cpp`：多语言支持，使用 cJSON
-- `q3tox/mainwindow.h/cpp`：主窗口，左右分割布局（处理右键菜单动作）
-- `q3tox/selfinfo.h/cpp`：个人信息 widget
-- `q3tox/contactlist.h/cpp`：联系人列表（void* listWidget + updateView_v3/v4，右键菜单）
-- `q3tox/chatwidget.h/cpp`：聊天区域
-- `q3tox/eventpoller.h/cpp`：事件轮询器（CustomEventBase 兼容）
-- `q3tox/editinfodialog.h/cpp`：编辑个人信息对话框
-- `q3tox/invitedialog.h/cpp`：会议邀请对话框
-- `q3tox/friendinfodialog.h/cpp`：查看好友/会议信息对话框（新增）
+- `q3tox/api.h` / `q3tox/api.cpp`：REST API 封装，使用 libcurl（含 `leaveConference()`、`inviteToConference()`）
+- `q3tox/translator.h` / `q3tox/translator.cpp`：多语言支持，使用 cJSON
+- `q3tox/mainwindow.h` / `q3tox/mainwindow.cpp`：主窗口，左右分割布局（处理右键菜单动作）
+- `q3tox/selfinfo.h` / `q3tox/selfinfo.cpp`：个人信息 widget
+- `q3tox/contactlist.h` / `q3tox/contactlist.cpp`：联系人列表（void* listWidget + updateView_v3/v4，右键菜单）
+- `q3tox/chatwidget.h` / `q3tox/chatwidget.cpp`：聊天区域
+- `q3tox/eventpoller.h` / `q3tox/eventpoller.cpp`：事件轮询器（CustomEventBase 兼容）
+- `q3tox/editinfodialog.h` / `q3tox/editinfodialog.cpp`：编辑个人信息对话框
+- `q3tox/invitedialog.h` / `q3tox/invitedialog.cpp`：会议邀请对话框
+- `q3tox/friendinfodialog.h` / `q3tox/friendinfodialog.cpp`：查看好友/会议信息对话框（新增）
 - `q3tox/lang/zh-CN.json`：简体中文（默认）
 - `q3tox/lang/zh-TW.json`：繁体中文
 - `q3tox/lang/en-US.json`：英文
@@ -299,18 +299,18 @@
 
 ### 后端
 ```bash
-cd /home/gzleo/aprog/toxhttpd
+cd <项目根目录>
 make
 ```
 
 ### 前端 (q3tox)
 ```bash
 # Qt3 编译
-cd /home/gzleo/aprog/toxhttpd/q3tox
+cd <项目根目录>/q3tox
 bash buildqt3.sh
 
 # Qt4 编译
-cd /home/gzleo/aprog/toxhttpd/q3tox
+cd <项目根目录>/q3tox
 bash buildqt4.sh
 ```
 
@@ -318,13 +318,13 @@ bash buildqt4.sh
 
 ### 后端
 ```bash
-cd /home/gzleo/aprog/toxhttpd
+cd <项目根目录>
 ./toxhttpd 8181
 ```
 
 ### 前端
 ```bash
-cd /home/gzleo/aprog/toxhttpd/q3tox
+cd <项目根目录>/q3tox
 ./q3tox
 ```
 

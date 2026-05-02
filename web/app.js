@@ -113,7 +113,8 @@ function applyLanguage() {
     const friendMenuItems = document.querySelectorAll('#friendMenu .menu-item');
     if (friendMenuItems[0]) friendMenuItems[0].textContent = t('context_menu.view_info');
     if (friendMenuItems[1]) friendMenuItems[1].textContent = t('context_menu.invite_to_conference');
-    if (friendMenuItems[2]) friendMenuItems[2].textContent = t('context_menu.delete_friend');
+    if (friendMenuItems[2]) friendMenuItems[2].textContent = t('context_menu.invite_to_group');
+    if (friendMenuItems[3]) friendMenuItems[3].textContent = t('context_menu.delete_friend');
 
     const conferenceMenuItems = document.querySelectorAll('#conferenceMenu .menu-item');
     if (conferenceMenuItems[0]) conferenceMenuItems[0].textContent = t('context_menu.view_info');
@@ -406,9 +407,12 @@ function showTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     event.target.classList.add('active');
 
-    document.getElementById('add-friend-area').classList.toggle('hidden', tab !== 'friends' && tab !== 'all');
-    document.getElementById('add-group-area').classList.toggle('hidden', tab !== 'groups');
-    document.getElementById('add-conference-area').classList.toggle('hidden', tab !== 'conferences');
+    // 控制底部区域显示
+    const friendBottom = document.querySelector('.add-friend-bottom');
+    const groupBottom = document.querySelector('.join-group-bottom');
+    
+    if (friendBottom) friendBottom.style.display = (tab === 'friends' || tab === 'all') ? 'flex' : 'none';
+    if (groupBottom) groupBottom.style.display = (tab === 'groups' || tab === 'all') ? 'flex' : 'none';
 
     loadContacts(tab);
 }
@@ -884,8 +888,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const action = event.target.getAttribute('data-action');
             if (action === 'info') {
                 window.showFriendInfo(selectedFriendId);
-            } else if (action === 'invite') {
+            } else if (action === 'invite_conference') {
                 window.inviteToConference(selectedFriendId);
+            } else if (action === 'invite_group') {
+                window.inviteToGroup(selectedFriendId);
             } else if (action === 'delete') {
                 window.deleteFriend();
             }
@@ -1061,7 +1067,7 @@ function inviteToConference(friendId) {
     hideAllContextMenus();
 }
 
-function confirmInvite() {
+function confirmConferenceInvite() {
     const confId = document.getElementById('conferenceSelect').value;
     fetch('/api/conference_invite', {
         method: 'POST',
@@ -1069,8 +1075,31 @@ function confirmInvite() {
         body: `friend_id=${inviteFriendId}&conference_id=${confId}`
     }).then(r => r.json())
       .then(data => {
-          alert(t('invite_success'));
-          hideSelectConference();
+          if (data.error) {
+              alert(t('invite_failed') + ': ' + data.error);
+          } else {
+              alert(t('invite_success'));
+              hideSelectConference();
+          }
+      }).catch(err => {
+          alert(t('invite_failed') + ': ' + err);
+      });
+}
+
+function confirmGroupInvite() {
+    const groupId = document.getElementById('groupSelect').value;
+    fetch('/api/groups/invite', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `friend_id=${inviteFriendId}&group_id=${groupId}`
+    }).then(r => r.json())
+      .then(data => {
+          if (data.error) {
+              alert(t('invite_failed') + ': ' + data.error);
+          } else {
+              alert(t('invite_success'));
+              hideSelectGroup();
+          }
       }).catch(err => {
           alert(t('invite_failed') + ': ' + err);
       });
@@ -1078,6 +1107,46 @@ function confirmInvite() {
 
 function hideSelectConference() {
     document.getElementById('selectConferenceModal').classList.add('hidden');
+}
+
+// Invite friend to group
+function inviteToGroup(friendId) {
+    // 获取群组列表
+    fetch('/api/groups')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.groups || data.groups.length === 0) {
+                alert(t('no_group') || '没有可用的群组');
+                return;
+            }
+            
+            // 创建选择对话框
+            const select = document.createElement('select');
+            data.groups.forEach(g => {
+                const option = document.createElement('option');
+                option.value = g;
+                option.textContent = t('group') + ' ' + g;
+                select.appendChild(option);
+            });
+            
+            const groupId = prompt('选择群组 ID:', data.groups[0]);
+            if (groupId) {
+                fetch('/api/groups/invite', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `friend_id=${friendId}&group_id=${groupId}`
+                }).then(() => {
+                    alert(t('invite_success') || '邀请成功');
+                }).catch(err => {
+                    alert(t('invite_failed') + ': ' + err);
+                });
+            }
+        })
+        .catch(err => {
+            alert(t('load_failed') + ': ' + err);
+        });
+    
+    hideAllContextMenus();
 }
 
 // Show edit self modal
@@ -1192,7 +1261,9 @@ window.hideConferenceInfo = hideConferenceInfo;
 window.showGroupInfo = showGroupInfo;
 window.hideGroupInfo = hideGroupInfo;
 window.inviteToConference = inviteToConference;
-window.confirmInvite = confirmInvite;
+window.confirmConferenceInvite = confirmConferenceInvite;
+window.confirmGroupInvite = confirmGroupInvite;
 window.hideSelectConference = hideSelectConference;
 window.switchLanguage = switchLanguage;
 window.joinGroupFromBottom = joinGroupFromBottom;
+window.inviteToGroup = inviteToGroup;
