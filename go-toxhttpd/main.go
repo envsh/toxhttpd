@@ -539,7 +539,12 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		// 获取所有群组列表（使用新 Group API）
-		groups := s.tox.GroupGetNumberGroups()
+		// GroupGetNumberGroups() 返回数量，需要生成 ID 数组 [0, 1, ..., n-1]
+		numGroups := s.tox.GroupGetNumberGroups()
+		groups := make([]uint32, 0, numGroups)
+		for i := uint32(0); i < numGroups; i++ {
+			groups = append(groups, i)
+		}
 		resp := map[string]interface{}{
 			"groups": groups,
 		}

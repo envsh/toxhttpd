@@ -30,13 +30,20 @@
     "modals": {
         "edit_info_title": "编辑个人信息",
         "friend_info_title": "好友信息",
+        "create_group_title": "创建群组",
+        "confirm_group": "确认",
+        "cancel_group": "取消",
         "labels": {
             "name": "名称",
             "status_message": "状态消息",
             "friend_id": "好友 ID",
             "status": "状态",
             "connection": "连接",
-            "public_key": "公钥"
+            "public_key": "公钥",
+            "group_name": "群组名称：",
+            "creator_name": "创建者昵称：",
+            "group_password": "密码（可选）：",
+            "privacy_state": "隐私状态："
         }
     },
     "statuses": {
@@ -90,5 +97,19 @@
     "select_conference": "选择会议",
     "conference_info_title": "会议信息",
     "group_info_title": "群组信息",
-    "select_chat_object": "选择聊天对象"
+    "select_chat_object": "选择聊天对象",
+    "cannot_be_empty": "不能为空",
+    "confirm_leave_group": "确定离开群组 {0} 吗？",
+    "group_leave_success": "已离开群组",
+    "group_leave_failed": "离开失败",
+    "group": {
+        "invitation_received": "收到群组邀请",
+        "invitation_from": "来自 {0}",
+        "invite_message": "群组邀请",
+        "accept": "同意",
+        "reject": "拒绝",
+        "ignore": "忽略",
+        "joined": "已加入群组 {0}",
+        "join_failed": "加入群组失败"
+    }
 }

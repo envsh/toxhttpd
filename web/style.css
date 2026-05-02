@@ -349,6 +349,38 @@ body {
     font-size: 12px;
 }
 
+.form-inline {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.form-inline label {
+    color: #6e7681;
+    font-size: 12px;
+    white-space: nowrap;
+    min-width: 110px;
+}
+
+.form-inline input,
+.form-inline select {
+    flex: 1;
+    padding: 8px 12px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.form-inline input:focus,
+.form-inline select:focus {
+    border-color: #00d4aa;
+}
+
 .form-group input {
     width: 100%;
     padding: 8px 12px;

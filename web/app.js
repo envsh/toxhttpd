@@ -328,8 +328,12 @@ function loadContacts(filter = 'all') {
         })
         .catch(err => {
             console.error('loadContacts error:', err);
+            let errorMsg = t('load_contacts_failed');
+            if (err && err.message) {
+                errorMsg += ': ' + err.message;
+            }
             document.getElementById('contactList').innerHTML = 
-                '<div style="padding:10px;color:#f85149;">' + t('load_contacts_failed') + '</div>';
+                '<div style="padding:10px;color:#f85149;">' + errorMsg + '</div>';
         });
 }
 
@@ -465,6 +469,14 @@ function longPollEvents() {
                         if (data.conference_number == currentChatId && currentChatType === 'conference') {
                             appendMessage(data.message, 'other', 'Peer ' + data.peer_number);
                         }
+                    } else if (event.event_type === 'group_invite') {
+                        const data = JSON.parse(event.data);
+                        showGroupInviteDialog(data);
+                    } else if (event.event_type === 'group_message') {
+                        const data = JSON.parse(event.data);
+                        if (data.group_number == currentChatId && currentChatType === 'group') {
+                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number);
+                        }
                     }
                 });
                 // Continue polling immediately if we got events
@@ -563,6 +575,72 @@ function showConferenceInviteDialog(data) {
     };
 }
 
+// Show group invite dialog (同意-左, 拒绝-中, 忽略-右)
+function showGroupInviteDialog(data) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'background:#21262d;padding:20px;border-radius:8px;max-width:400px;width:90%;color:#c9d1d9;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+
+    dialog.innerHTML = `
+        <h3 style="margin-top:0;color:#58a6ff;">${t('group.invitation_received')}</h3>
+        <p style="margin:10px 0;">${t('group.invitation_from', data.friend_number)} ${t('group.invite_message')}</p>
+        <div style="text-align:right;margin-top:20px;">
+            <button id="groupAcceptBtn" style="margin-right:10px;padding:8px 16px;background:#238636;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">${t('group.accept')}</button>
+            <button id="groupRejectBtn" style="margin-right:10px;padding:8px 16px;background:#f85149;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">${t('group.reject')}</button>
+            <button id="groupIgnoreBtn" style="padding:8px 16px;background:#484f58;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">${t('group.ignore')}</button>
+        </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // 同意按钮（最左）
+    document.getElementById('groupAcceptBtn').onclick = function() {
+        document.body.removeChild(overlay);
+        fetch('/api/groups/accept', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `invite_data=${data.invite_data}&friend_number=${data.friend_number}&name=${encodeURIComponent(data.name || '')}`
+        }).then(r => r.json())
+          .then(data => {
+              if (data.error) {
+                  alert(t('group.join_failed') + ': ' + data.error);
+              } else {
+                  alert(t('group.joined', data.group_number));
+                  loadContacts('groups');
+              }
+          }).catch(err => {
+              alert(t('group.join_failed') + ': ' + err);
+          });
+    };
+
+    // 拒绝按钮（中间）
+    document.getElementById('groupRejectBtn').onclick = function() {
+        document.body.removeChild(overlay);
+        fetch('/api/groups/reject', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `friend_number=${data.friend_number}`
+        }).then(() => {
+            console.log('Group invite rejected');
+        });
+    };
+
+    // 忽略按钮（最右）
+    document.getElementById('groupIgnoreBtn').onclick = function() {
+        document.body.removeChild(overlay);
+        fetch('/api/groups/ignore', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `friend_number=${data.friend_number}`
+        }).then(() => {
+            console.log('Group invite ignored');
+        });
+    };
+}
+
 // Send message
 function sendMessage() {
     console.log('sendMessage called: currentChatId=' + currentChatId + ', type=' + typeof currentChatId + ', currentChatType=' + currentChatType);
@@ -626,12 +704,53 @@ function addFriend() {
 
 // Create group
 function createGroup() {
+    // Show group creation modal
+    document.getElementById('groupModal').classList.remove('hidden');
+    document.getElementById('groupNameInput').value = '';
+    document.getElementById('groupCreatorNameInput').value = '';
+    document.getElementById('groupPasswordInput').value = '';
+    document.getElementById('groupPrivacySelect').value = 'public';
+    document.getElementById('groupNameInput').focus();
+}
+
+function closeGroupModal() {
+    document.getElementById('groupModal').classList.add('hidden');
+}
+
+function confirmCreateGroup() {
+    const groupName = document.getElementById('groupNameInput').value.trim();
+    const creatorName = document.getElementById('groupCreatorNameInput').value.trim();
+    const password = document.getElementById('groupPasswordInput').value;
+    const privacyState = document.getElementById('groupPrivacySelect').value;
+    
+    if (!groupName) {
+        alert(t('modals.labels.group_name') + ' ' + t('cannot_be_empty'));
+        return;
+    }
+    if (!creatorName) {
+        alert(t('modals.labels.creator_name') + ' ' + t('cannot_be_empty'));
+        return;
+    }
+    
+    const params = new URLSearchParams();
+    params.append('group_name', groupName);
+    params.append('name', creatorName);
+    if (password) params.append('password', password);
+    if (privacyState === 'private') params.append('privacy_state', 'private');
+    
     fetch('/api/groups', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
     }).then(r => r.json())
       .then(data => {
-          alert(t('group_created'));
-          loadContacts('groups');
+          if (data.error) {
+              alert(t('group_create_failed') + ': ' + data.error);
+          } else {
+              alert(t('group_created') + ' (Group #' + data.group_number + ')');
+              closeGroupModal();
+              loadContacts('groups');
+          }
       }).catch(err => {
           alert(t('group_create_failed') + ': ' + err);
       });
@@ -647,6 +766,35 @@ function createConference() {
           loadContacts('conferences');
       }).catch(err => {
           alert(t('conference_create_failed') + ': ' + err);
+      });
+}
+
+// Leave group
+function leaveGroup() {
+    if (!selectedGroupId) return;
+    if (!confirm(t('confirm_leave_group', selectedGroupId))) {
+        return;
+    }
+    fetch('/api/groups/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `group_number=${selectedGroupId}`
+    }).then(r => r.json())
+      .then(data => {
+          if (data.error) {
+              alert(t('group_leave_failed') + ': ' + data.error);
+          } else {
+              alert(t('group_leave_success'));
+              if (currentChatId == selectedGroupId && currentChatType === 'group') {
+                  currentChatId = null;
+                  currentChatType = null;
+                  document.getElementById('chatHeaderText').textContent = t('select_chat_object');
+                  document.getElementById('messageArea').innerHTML = '';
+              }
+              loadContacts('groups');
+          }
+      }).catch(err => {
+          alert(t('group_leave_failed') + ': ' + err);
       });
 }
 
@@ -715,6 +863,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const action = event.target.getAttribute('data-action');
             if (action === 'info') {
                 window.showGroupInfo(selectedGroupId);
+            } else if (action === 'leave') {
+                window.leaveGroup();
             }
         });
     }
