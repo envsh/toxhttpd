@@ -27,6 +27,7 @@
     "placeholders": {
         "add_friend": "Enter Tox ID to add friend"
     },
+    "please_enter_chat_id": "Please enter group chat_id",
     "modals": {
         "edit_info_title": "Edit Personal Info",
         "friend_info_title": "Friend Info",

@@ -38,12 +38,16 @@
             <div class="list" id="contactList"></div>
             <div class="sidebar-bottom">
                 <div class="add-friend-bottom">
-                    <input type="text" id="addFriendInputBottom" placeholder="输入好友公钥">
+                    <input type="text" id="addFriendInputBottom" placeholder="好友公钥">
                     <button onclick="addFriendFromBottom()">添加</button>
                 </div>
+                <div class="join-group-bottom">
+                    <input type="text" id="joinGroupInputBottom" placeholder="群组ID">
+                    <button onclick="joinGroupFromBottom()">加入</button>
+                </div>
                 <div class="create-buttons-row">
-                    <button class="create-btn" onclick="createConference()">🎥 创建会议</button>
-                    <button class="create-btn" onclick="createGroup()">👥 创建群组</button>
+                    <button class="create-btn" onclick="createConference()">🎥 会议</button>
+                    <button class="create-btn" onclick="createGroup()">👥 群组</button>
                 </div>
             </div>
         </div>

@@ -702,6 +702,55 @@ function addFriend() {
       });
 }
 
+// Add friend from bottom input
+function addFriendFromBottom() {
+    const input = document.getElementById('addFriendInputBottom');
+    const pubkey = input.value.trim();
+    if (!pubkey || (pubkey.length !== 64 && pubkey.length !== 76)) {
+        alert(t('add_friend_prompt'));
+        return;
+    }
+    fetch('/api/friends', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `public_key=${encodeURIComponent(pubkey)}`
+    }).then(r => r.json())
+      .then(data => {
+          alert(t('add_friend_success'));
+          input.value = '';
+          loadContacts('friends');
+      }).catch(err => {
+          alert(t('add_friend_failed') + ': ' + err);
+      });
+}
+
+// Join group from bottom input
+function joinGroupFromBottom() {
+    const chatId = document.getElementById('joinGroupInputBottom').value.trim();
+
+    if (!chatId) {
+        alert(t('please_enter_chat_id') || '请输入群组 chat_id');
+        return;
+    }
+
+    fetch('/api/groups/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `chat_id=${encodeURIComponent(chatId)}`
+    }).then(r => r.json())
+      .then(data => {
+          if (data.error) {
+              alert(t('group.join_failed') + ': ' + data.error);
+          } else {
+              alert(t('group.joined') + ' (Group #' + data.group_number + ')');
+              document.getElementById('joinGroupInputBottom').value = '';
+              loadContacts('groups');
+          }
+      }).catch(err => {
+          alert(t('group.join_failed') + ': ' + err);
+      });
+}
+
 // Create group
 function createGroup() {
     // Show group creation modal
@@ -1146,3 +1195,4 @@ window.inviteToConference = inviteToConference;
 window.confirmInvite = confirmInvite;
 window.hideSelectConference = hideSelectConference;
 window.switchLanguage = switchLanguage;
+window.joinGroupFromBottom = joinGroupFromBottom;
