@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -771,9 +773,48 @@ func (s *Server) handleGroupJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 如果 name 为空，自动填充
+	if name == "" {
+		// 尝试使用自己的昵称
+		name = s.tox.SelfGetName()
+
+		// 如果昵称也为空，使用 "nonamed" + pubkey前5个字符
+		if name == "" {
+			pubkey := s.tox.SelfGetPublicKey() // 返回64字符hex大写
+			if len(pubkey) >= 5 {
+				name = "nonamed" + pubkey[:5]
+			} else {
+				name = "nonamed"
+			}
+		}
+		log.Printf("[GroupJoin] name auto-filled: %s", name)
+	}
+
+	// 验证 chat_id 长度
+	if len(chatId) != 64 {
+		http.Error(w, fmt.Sprintf(`{"error":"invalid chat_id length: expected 64, got %d"}`, len(chatId)), http.StatusBadRequest)
+		return
+	}
+
+	// 验证是否为有效的十六进制字符串
+	if !regexp.MustCompile(`^[0-9a-fA-F]{64}$`).MatchString(chatId) {
+		http.Error(w, `{"error":"invalid chat_id format: must be 64 hex characters (0-9, A-F)"}`, http.StatusBadRequest)
+		return
+	}
+
 	groupNumber, err := s.tox.GroupJoin(chatId, name, password)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		errStr := err.Error()
+		// 提供更友好的错误信息
+		if strings.Contains(errStr, "chat id invalid") || strings.Contains(errStr, "3") {
+			http.Error(w, `{"error":"无效的群组ID：群组不存在、已过期或需要密码"}`, http.StatusBadRequest)
+		} else if strings.Contains(errStr, "bad password") {
+			http.Error(w, `{"error":"密码错误"}`, http.StatusBadRequest)
+		} else if strings.Contains(errStr, "failed to decrypt") {
+			http.Error(w, `{"error":"群组ID解密失败，可能已损坏"}`, http.StatusBadRequest)
+		} else {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, errStr), http.StatusBadRequest)
+		}
 		return
 	}
 

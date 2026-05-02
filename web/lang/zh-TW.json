@@ -27,6 +27,7 @@
     "placeholders": {
         "add_friend": "輸入 Tox ID 新增好友"
     },
+    "please_enter_chat_id": "請輸入群組 chat_id",
     "modals": {
         "edit_info_title": "編輯個人資訊",
         "friend_info_title": "好友資訊",
