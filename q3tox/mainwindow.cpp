@@ -93,6 +93,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
             this, SLOT(onViewInfoRequested(int, const QString&)));
     connect(contactListWidget, SIGNAL(deleteOrLeaveRequested(int, const QString&)),
             this, SLOT(onDeleteOrLeaveRequested(int, const QString&)));
+    connect(contactListWidget, SIGNAL(viewMembersRequested(int, const QString&)),
+            this, SLOT(onViewMembersRequested(int, const QString&)));
     connect(contactListWidget, SIGNAL(inviteToConferenceRequested(int)),
             this, SLOT(onInviteToConferenceRequested(int)));
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
@@ -392,8 +394,31 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         }
     } else if (type == "conference") {
         dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type);
+    } else if (type == "group") {
+        dialog.setInfo(id, _("group_item") + " " + QString::number(id), type);
     }
     
+    dialog.exec();
+}
+
+void MainWindow::onViewMembersRequested(int id, const QString& type) {
+    ToxAPI api;
+    std::vector<PeerInfo> members;
+    QString title;
+    
+    if (type == "conference") {
+        members = api.getConferenceMembers(id);
+        title = _("member_list.title.conference").arg(QString::number(id));
+    } else if (type == "group") {
+        members = api.getGroupMembers(id);
+        title = _("member_list.title.group").arg(QString::number(id));
+    } else {
+        return;
+    }
+    
+    MemberListDialog dialog(this);
+    dialog.setDialogTitle(title);
+    dialog.setMembers(members);
     dialog.exec();
 }
 

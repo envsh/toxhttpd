@@ -385,22 +385,36 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPo
         else if (selected == inviteGroupAction) emit inviteToGroupRequested(id);
 #endif
     } else if (type == "conference") {
-        // 会议：离开
+        // 会议：离开、查看成员
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.leave_conference"), 1);
+        menu.insertItem(_("context_menu.view_members"), 2);
         int choice = menu.exec(globalPos);
         if (choice == 0) emit viewInfoRequested(id, type);
         else if (choice == 1) emit deleteOrLeaveRequested(id, type);
+        else if (choice == 2) emit viewMembersRequested(id, type);
 #else
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_conference"));
+        QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) emit viewInfoRequested(id, type);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
+        else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
 #endif
-    } else {
-        // 群组：暂不支持操作
-        menu.exec(globalPos);
+    } else if (type == "group") {
+        // 群组：查看成员
+#ifdef QT3_BUILD
+        menu.insertItem(_("context_menu.view_members"), 1);
+        int choice = menu.exec(globalPos);
+        if (choice == 0) emit viewInfoRequested(id, type);
+        else if (choice == 1) emit viewMembersRequested(id, type);
+#else
+        QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
+        QAction* selected = menu.exec(globalPos);
+        if (selected == viewInfoAction) emit viewInfoRequested(id, type);
+        else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
+#endif
     }
 }
 

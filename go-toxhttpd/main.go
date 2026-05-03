@@ -1147,6 +1147,10 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/groups/invite", loggingMiddleware(s.handleGroupInvite))
 	http.HandleFunc("/api/groups/accept", loggingMiddleware(s.handleGroupAccept))
 
+	// 成员列表 API 路由
+	http.HandleFunc("/api/conference/members", loggingMiddleware(s.handleConferenceMembers))
+	http.HandleFunc("/api/group/members", loggingMiddleware(s.handleGroupMembers))
+
 	log.Printf("Server starting on :%s", port)
 	return http.ListenAndServe(":"+port, nil)
 }
@@ -1281,6 +1285,84 @@ func addTestData(s *Server) {
 	addr := s.tox.SelfGetAddress()
 	log.Printf("Tox ID: %s", addr)
 	log.Println("Server ready with saved tox identity")
+}
+
+// handleConferenceMembers returns the list of peers in a conference
+func (s *Server) handleConferenceMembers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	confIDStr := r.URL.Query().Get("conference_id")
+	if confIDStr == "" {
+		http.Error(w, `{"error":"missing conference_id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var confID uint32
+	fmt.Sscanf(confIDStr, "%d", &confID)
+
+	// Get peer list using ConferenceGetPeers (returns map[peerNumber]pubkey)
+	peers := s.tox.ConferenceGetPeers(confID)
+
+	// Build member list with names
+	members := make([]map[string]interface{}, 0, len(peers))
+	for peerNumber := range peers {
+		name, err := s.tox.ConferencePeerGetName(confID, peerNumber)
+		if err != nil {
+			name = fmt.Sprintf("Peer %d", peerNumber)
+		}
+		members = append(members, map[string]interface{}{
+			"peer_number": int(peerNumber),
+			"name":        name,
+		})
+	}
+
+	resp := map[string]interface{}{
+		"conference_id": int(confID),
+		"members":       members,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleGroupMembers returns the list of peers in a group (NGC)
+func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	groupNumberStr := r.URL.Query().Get("group_number")
+	if groupNumberStr == "" {
+		http.Error(w, `{"error":"missing group_number"}`, http.StatusBadRequest)
+		return
+	}
+
+	var groupNumber tox.GroupNumber
+	fmt.Sscanf(groupNumberStr, "%d", &groupNumber)
+
+	// Iterate peer numbers 0-255 (reasonable upper limit for group size)
+	members := make([]map[string]interface{}, 0)
+	for peerNumber := 0; peerNumber < 256; peerNumber++ {
+		name, err := s.tox.GroupPeerGetName(groupNumber, tox.GroupPeerNumber(peerNumber))
+		if err != nil {
+			// Peer doesn't exist, stop iterating
+			break
+		}
+		members = append(members, map[string]interface{}{
+			"peer_number": peerNumber,
+			"name":        name,
+		})
+	}
+
+	resp := map[string]interface{}{
+		"group_number": int(groupNumber),
+		"members":      members,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {

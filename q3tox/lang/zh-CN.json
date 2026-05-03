@@ -84,7 +84,13 @@
         "delete_friend": "删除好友",
         "leave_conference": "离开会议",
         "invite_to_conference": "邀请进会议",
-        "invite_to_group": "邀请进群组"
+        "invite_to_group": "邀请进群组",
+        "view_members": "查看成员"
+    },
+    "member_list": {
+        "title": "成员列表",
+        "title.conference": "会议成员 - {0}",
+        "title.group": "群组成员 - {0}"
     },
     "select_chat_object": "选择聊天对象",
     "please_enter_chat_id": "请输入群组chat_id",

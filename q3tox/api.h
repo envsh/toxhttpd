@@ -21,6 +21,11 @@ struct Event {
     std::string data;
 };
 
+struct PeerInfo {
+    int peerNumber;
+    std::string name;
+};
+
 class ToxAPI {
 public:
     ToxAPI(const std::string& baseUrl = "http://localhost:8181");
@@ -60,6 +65,10 @@ public:
     
     // Events (long polling, 30s timeout)
     std::vector<Event> pollEvents(uint64_t after);
+    
+    // Member lists
+    std::vector<PeerInfo> getConferenceMembers(int confId);
+    std::vector<PeerInfo> getGroupMembers(int groupId);
     
 private:
     std::string baseUrl;

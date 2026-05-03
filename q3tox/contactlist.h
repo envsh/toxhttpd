@@ -32,6 +32,7 @@ public:
     void deleteOrLeaveRequested(int id, const QString& type);
     void inviteToConferenceRequested(int friendId);
     void inviteToGroupRequested(int friendId);
+    void viewMembersRequested(int id, const QString& type);
     
 private slots:
     void onTabClicked();

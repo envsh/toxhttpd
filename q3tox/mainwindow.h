@@ -9,6 +9,7 @@
 #include "api.h"
 #include "translator.h"
 #include "friendinfodialog.h"
+#include "memberlistdialog.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,6 +30,7 @@ public:
     void onInviteToConferenceRequested(int friendId);
     void onInviteToGroupRequested(int friendId);
     void onGroupInviteReceived(int friendNumber, const QString& chatId);
+    void onViewMembersRequested(int id, const QString& type);
     
 private:
     

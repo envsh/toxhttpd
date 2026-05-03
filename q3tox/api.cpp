@@ -386,3 +386,73 @@ bool ToxAPI::joinGroup(int friendNumber, const std::string& chatId,
     std::string response = httpPost("/api/groups/join", postData);
     return !response.empty();
 }
+
+std::vector<PeerInfo> ToxAPI::getConferenceMembers(int confId) {
+    std::vector<PeerInfo> members;
+    std::string endpoint = "/api/conference/members?conference_id=" + std::to_string(confId);
+    std::string response = httpGet(endpoint);
+    if (response.empty()) return members;
+    
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return members;
+    
+    cJSON* membersItem = cJSON_GetObjectItem(root, "members");
+    if (membersItem && cJSON_IsArray(membersItem)) {
+        int count = cJSON_GetArraySize(membersItem);
+        for (int i = 0; i < count; ++i) {
+            cJSON* memberItem = cJSON_GetArrayItem(membersItem, i);
+            if (!memberItem) continue;
+            
+            PeerInfo info;
+            cJSON* peerNumberItem = cJSON_GetObjectItem(memberItem, "peer_number");
+            info.peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
+            
+            cJSON* nameItem = cJSON_GetObjectItem(memberItem, "name");
+            if (nameItem && cJSON_IsString(nameItem)) {
+                info.name = std::string(cJSON_GetStringValue(nameItem));
+            } else {
+                info.name = "Unknown";
+            }
+            
+            members.push_back(info);
+        }
+    }
+    
+    cJSON_Delete(root);
+    return members;
+}
+
+std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
+    std::vector<PeerInfo> members;
+    std::string endpoint = "/api/group/members?group_number=" + std::to_string(groupId);
+    std::string response = httpGet(endpoint);
+    if (response.empty()) return members;
+    
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return members;
+    
+    cJSON* membersItem = cJSON_GetObjectItem(root, "members");
+    if (membersItem && cJSON_IsArray(membersItem)) {
+        int count = cJSON_GetArraySize(membersItem);
+        for (int i = 0; i < count; ++i) {
+            cJSON* memberItem = cJSON_GetArrayItem(membersItem, i);
+            if (!memberItem) continue;
+            
+            PeerInfo info;
+            cJSON* peerNumberItem = cJSON_GetObjectItem(memberItem, "peer_number");
+            info.peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
+            
+            cJSON* nameItem = cJSON_GetObjectItem(memberItem, "name");
+            if (nameItem && cJSON_IsString(nameItem)) {
+                info.name = std::string(cJSON_GetStringValue(nameItem));
+            } else {
+                info.name = "Unknown";
+            }
+            
+            members.push_back(info);
+        }
+    }
+    
+    cJSON_Delete(root);
+    return members;
+}
