@@ -24,10 +24,12 @@
         "cancel": "取消",
         "close": "关闭",
         "copy": "复制",
-        "add": "添加"
+        "add": "添加",
+        "join_group": "加入"
     },
     "placeholders": {
-        "add_friend": "输入 Tox ID 添加好友"
+        "add_friend": "输入 Tox ID 添加好友",
+        "join_group": "群组chat_id"
     },
     "modals": {
         "edit_info_title": "编辑个人信息",
@@ -85,6 +87,7 @@
         "invite_to_group": "邀请进群组"
     },
     "select_chat_object": "选择聊天对象",
+    "please_enter_chat_id": "请输入群组chat_id",
     "theme_dark": "深色主题",
     "confirm_delete_friend": "确定删除好友 %1 吗？",
     "confirm_leave_conference": "确定离开会议 %1 吗？",
@@ -99,7 +102,7 @@
         "accept": "接受",
         "reject": "拒绝",
         "password_optional": "密码（可选）：",
-        "joined": "已加入群组 %1",
+        "joined": "已加入群组 {0}",
         "join_failed": "加入群组失败",
         "rejected": "已拒绝群组邀请"
     },

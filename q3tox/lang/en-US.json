@@ -24,10 +24,12 @@
         "cancel": "Cancel",
         "close": "Close",
         "copy": "Copy",
-        "add": "Add"
+        "add": "Add",
+        "join_group": "Join"
     },
     "placeholders": {
-        "add_friend": "Enter Tox ID to add friend"
+        "add_friend": "Enter Tox ID to add friend",
+        "join_group": "Group chat_id"
     },
     "modals": {
         "edit_info_title": "Edit Personal Info",
@@ -85,6 +87,7 @@
         "invite_to_group": "Invite to Group"
     },
     "select_chat_object": "Select chat object",
+    "please_enter_chat_id": "Please enter group chat_id",
     "theme_dark": "Dark Theme",
     "confirm_delete_friend": "Delete friend %1?",
     "confirm_leave_conference": "Leave conference %1?",
@@ -99,7 +102,7 @@
         "accept": "Accept",
         "reject": "Reject",
         "password_optional": "Password (optional):",
-        "joined": "Joined group %1",
+        "joined": "Joined group {0}",
         "join_failed": "Failed to join group",
         "rejected": "Group invitation rejected"
     },

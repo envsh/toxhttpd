@@ -1,6 +1,8 @@
 #include "contactlist.h"
 #include "translator.h"
 #include "compat34.h"
+#include "api.h"
+#include "placeholderlineedit.h"
 
 // 静态数组定义
 const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
@@ -40,15 +42,24 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     
     // 底部添加好友区域
     QBoxLayout* addLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
-    addInput = new QLineEdit(this);
-    addInput->setText(_("placeholders.add_friend"));
+    addInput = new PlaceholderLineEdit(_("placeholders.add_friend"), this);
     addLayout->addWidget(addInput, 1);
     
     addBtn = new QPushButton(_("buttons.add"), this);
     addLayout->addWidget(addBtn);
     layout->addLayout(addLayout);
     
-    // 创建按钮行
+    // 加入群组区域（第2行，参照 web 端 index.html:44-47）
+    QBoxLayout* joinGroupLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    joinGroupInput = new PlaceholderLineEdit(_("placeholders.join_group"), this);
+    joinGroupLayout->addWidget(joinGroupInput, 1);
+
+    joinGroupBtn = new QPushButton(_("buttons.join_group"), this);
+    connect(joinGroupBtn, SIGNAL(clicked()), this, SLOT(onJoinGroupClicked()));
+    joinGroupLayout->addWidget(joinGroupBtn);
+    layout->addLayout(joinGroupLayout);
+    
+    // 创建按钮行（第3行）
     QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     confBtn = new QPushButton(_("buttons.create_conference"), this);
     btnLayout->addWidget(confBtn);
@@ -390,5 +401,25 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPo
     } else {
         // 群组：暂不支持操作
         menu.exec(globalPos);
+    }
+}
+
+void ContactListWidget::onJoinGroupClicked() {
+    QString chatId = qTrim(joinGroupInput->text());
+    if (chatId.isEmpty()) {
+        QMessageBox::warning(this, _("warning"), _("please_enter_chat_id"));
+        return;
+    }
+
+    ToxAPI api;
+    bool success = api.joinGroup(-1, qToUtf8(chatId).data(), "", "");
+
+    if (success) {
+        QMessageBox::information(this, _("group.joined"),
+                                  _A("group.joined", QStringList() << chatId));
+        joinGroupInput->clear();
+    } else {
+        QMessageBox::warning(this, _("group.join_failed"),
+                             _("group.join_failed"));
     }
 }

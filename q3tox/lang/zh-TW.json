@@ -24,10 +24,12 @@
         "cancel": "取消",
         "close": "關閉",
         "copy": "複製",
-        "add": "新增"
+        "add": "新增",
+        "join_group": "加入"
     },
     "placeholders": {
-        "add_friend": "輸入 Tox ID 新增好友"
+        "add_friend": "輸入 Tox ID 新增好友",
+        "join_group": "群組chat_id"
     },
     "modals": {
         "edit_info_title": "編輯個人資訊",
@@ -85,6 +87,7 @@
         "invite_to_group": "邀請進群組"
     },
     "select_chat_object": "選擇聊天對象",
+    "please_enter_chat_id": "請輸入群組chat_id",
     "theme_dark": "深色主題",
     "confirm_delete_friend": "確定刪除好友 %1 嗎？",
     "confirm_leave_conference": "確定離開會議 %1 嗎？",
@@ -99,7 +102,7 @@
         "accept": "接受",
         "reject": "拒絕",
         "password_optional": "密碼（可選）：",
-        "joined": "已加入群組 %1",
+        "joined": "已加入群組 {0}",
         "join_failed": "加入群組失敗",
         "rejected": "已拒絕群組邀請"
     },

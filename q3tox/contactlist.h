@@ -2,6 +2,7 @@
 #define CONTACTLIST_H
 
 #include "compat34.h"
+#include "placeholderlineedit.h"
 
 struct Contact {
     int id;
@@ -35,9 +36,10 @@ public:
 private slots:
     void onTabClicked();
     void onItemClicked();  // Qt3: QListBox selectionChanged -> call this
-                              // Qt4: QListWidget itemClicked -> call this
+                               // Qt4: QListWidget itemClicked -> call this
     void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
     void showContextMenu(QPoint pos); // Qt4: right-click menu
+    void onJoinGroupClicked();
     
 private:
 #ifdef QT3_BUILD
@@ -56,10 +58,12 @@ private:
     int currentTab;
     int contextItemId;           // 右键选中的联系人ID
     QString contextItemType;     // 右键选中的联系人类型
-    QLineEdit* addInput;
+     PlaceholderLineEdit* addInput;
     QPushButton* addBtn;        // 添加好友按钮
     QPushButton* confBtn;       // 创建会议按钮
     QPushButton* groupBtn;      // 创建群组按钮
+    PlaceholderLineEdit* joinGroupInput;  // 加入群组输入框
+    QPushButton* joinGroupBtn;  // 加入群组按钮
     
     // Tab 按钮和过滤器映射
     QPushButton* tabButtons[4];
