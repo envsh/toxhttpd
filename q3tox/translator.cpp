@@ -80,6 +80,9 @@ bool Translator::loadLanguage(const QString& langCode) {
         return false;
     }
     
+    // 调试：打印加载信息
+    qWarning("DEBUG loadLanguage: file=%s, newRoot=%p", qToUtf8(filepath).data(), newRoot);
+    
     // 替换旧数据
     if (m_root) cJSON_Delete((cJSON*)m_root);
     m_root = newRoot;
@@ -100,11 +103,30 @@ QString Translator::t(const QString& key, const QStringList& args) const {
     QStringList parts = qSplit(key, ".");
     cJSON* current = (cJSON*)m_root;
     
+    // 调试输出
+    qWarning("DEBUG t: key=%s, parts.size=%d, m_root=%p", qToUtf8(key).data(), parts.size(), m_root);
+    
     for (int i = 0; i < (int)parts.size(); ++i) {
+        qWarning("DEBUG t: i=%d, part=%s, current=%p, type=%d", i, qToUtf8(parts[i]).data(), current, ((cJSON*)current)->type);
         current = cJSON_GetObjectItem(current, qToUtf8(parts[i]).data());
+        qWarning("DEBUG t: after cJSON_GetObjectItem, current=%p, type=%d", current, current ? ((cJSON*)current)->type : -1);
         if (!current) {
             qWarning("Translation missing: %s (failed at part %d: %s)", 
                      qToUtf8(key).data(), i, qToUtf8(parts[i]).data());
+            // 调试：打印父对象的所有键
+            if (i > 0) {
+                cJSON* parent = (cJSON*)m_root;
+                for (int j = 0; j < i; ++j) {
+                    parent = cJSON_GetObjectItem(parent, qToUtf8(parts[j]).data());
+                }
+                if (parent) {
+                    qWarning("DEBUG t: parent object keys:");
+                    // cJSON 没有直接遍历对象键的 API，但我们可以打印整个对象
+                    char* parentStr = cJSON_Print(parent);
+                    qWarning("DEBUG t: parent=%s", parentStr);
+                    free(parentStr);
+                }
+            }
             return key;
         }
     }

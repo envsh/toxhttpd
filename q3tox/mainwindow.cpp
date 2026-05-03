@@ -570,13 +570,13 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
             bool success = api.joinGroup(friendNumber, qToUtf8(chatId).data(), 
                                          "", qToUtf8(dialog.getPassword()).data());
             if (success) {
-                QMessageBox::information(this, _("group_joined"), 
-                                        _("group_joined").arg(chatId));
+                QMessageBox::information(this, _("group.joined"),
+                                        _A("group.joined", QStringList() << chatId));
                 // 重新加载联系人
                 ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
                 eventPoller->postApiRequest(req);
             } else {
-                QMessageBox::warning(this, _("group_join_failed"), _("group_join_failed"));
+                QMessageBox::warning(this, _("group.join_failed"), _("group.join_failed"));
             }
         } else if (dialog.getResult() == GroupInviteDialog::Reject) {
             // 拒绝群组邀请（直接忽略，无后端API）

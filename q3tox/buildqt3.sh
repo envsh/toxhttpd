@@ -6,6 +6,9 @@ if [ x"$QTDIR" == x"" ]; then
     export QTDIR
 fi
 /opt/qt338sh/bin/qmake -makefile
+if [ x"$1" == x"c" ]; then
+	make clean
+fi
 make
 
 # qmake-qt4 && make

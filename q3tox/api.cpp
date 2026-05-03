@@ -1,8 +1,8 @@
 #include "api.h"
+#include "apilog.h"
 #include "cJSON.h"
 #include <curl/curl.h>
 #include <sstream>
-#include <iostream>
 
 // cURL 回调函数
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -27,8 +27,12 @@ std::string ToxAPI::httpGet(const std::string& endpoint) {
         
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
-            std::cerr << "cURL GET error: " << curl_easy_strerror(res) << std::endl;
+            ALOG_ERROR("cURL GET error:", curl_easy_strerror(res));
             response.clear();
+        } else {
+            long httpCode = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+            ALOG_INFO("HTTP GET response, code:", httpCode, "body length:", response.length());
         }
         curl_easy_cleanup(curl);
     }
@@ -50,8 +54,12 @@ std::string ToxAPI::httpPost(const std::string& endpoint, const std::string& pos
         
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
-            std::cerr << "cURL POST error: " << curl_easy_strerror(res) << std::endl;
+            ALOG_ERROR("cURL POST error:", curl_easy_strerror(res));
             response.clear();
+        } else {
+            long httpCode = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+            ALOG_INFO("HTTP POST response, code:", httpCode, "body length:", response.length());
         }
         curl_easy_cleanup(curl);
     }
