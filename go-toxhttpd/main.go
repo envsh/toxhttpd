@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -109,6 +111,53 @@ func (q *EventQueue) PopAfter(after uint64) []Event {
 		}
 	}
 	return result
+}
+
+// RequestParams provides a unified way to access request parameters
+// regardless of content type (JSON or form-urlencoded)
+type RequestParams struct {
+	formValues url.Values
+	jsonData   map[string]interface{}
+	isJSON     bool
+}
+
+// getRequestParams parses request parameters based on Content-Type header
+func getRequestParams(r *http.Request) (*RequestParams, error) {
+	params := &RequestParams{}
+	contentType := r.Header.Get("Content-Type")
+
+	if strings.Contains(contentType, "application/json") {
+		params.isJSON = true
+		params.jsonData = make(map[string]interface{})
+		if err := json.NewDecoder(r.Body).Decode(&params.jsonData); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON: %v", err)
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			return nil, fmt.Errorf("failed to parse form: %v", err)
+		}
+		params.formValues = r.Form
+	}
+	return params, nil
+}
+
+// Get returns the value for the given key
+func (p *RequestParams) Get(key string) string {
+	if p.isJSON {
+		val, ok := p.jsonData[key]
+		if !ok {
+			return ""
+		}
+		switch v := val.(type) {
+		case string:
+			return v
+		case float64:
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			return fmt.Sprintf("%v", v)
+		}
+	}
+	return p.formValues.Get(key)
 }
 
 // Server holds the server state
@@ -467,9 +516,13 @@ func (s *Server) handleFriends(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(resp)
 
 	} else if r.Method == http.MethodPost {
-		r.ParseForm()
-		pubkeyStr := r.FormValue("public_key")
-		message := r.FormValue("message")
+		params, err := getRequestParams(r)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+			return
+		}
+		pubkeyStr := params.Get("public_key")
+		message := params.Get("message")
 		if pubkeyStr == "" {
 			http.Error(w, `{"error":"missing public_key"}`, http.StatusBadRequest)
 			return
@@ -492,12 +545,16 @@ func (s *Server) handleFriends(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(resp)
 
 	} else if r.Method == http.MethodDelete {
-		r.ParseForm()
-		friendIDStr := r.FormValue("friend_id")
+		params, err := getRequestParams(r)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+			return
+		}
+		friendIDStr := params.Get("friend_id")
 		var friendID uint32
 		fmt.Sscanf(friendIDStr, "%d", &friendID)
 
-		_, err := s.tox.FriendDelete(friendID)
+		_, err = s.tox.FriendDelete(friendID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 			return
@@ -516,8 +573,12 @@ func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.ParseForm()
-	friendIDStr := r.FormValue("friend_id")
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	friendIDStr := params.Get("friend_id")
 	var friendID uint32
 	fmt.Sscanf(friendIDStr, "%d", &friendID)
 
@@ -549,9 +610,13 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.ParseForm()
-	friendIDStr := r.FormValue("friend_id")
-	message := r.FormValue("message")
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	friendIDStr := params.Get("friend_id")
+	message := params.Get("message")
 
 	var friendID uint32
 	fmt.Sscanf(friendIDStr, "%d", &friendID)
@@ -585,12 +650,16 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(resp)
 	} else if r.Method == http.MethodPost {
-		r.ParseForm()
+		params, err := getRequestParams(r)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+			return
+		}
 
-		privacyStateStr := r.FormValue("privacy_state")
-		groupName := r.FormValue("group_name")
-		name := r.FormValue("name") // 创建者昵称（C 函数第5个参数）
-		password := r.FormValue("password")
+		privacyStateStr := params.Get("privacy_state")
+		groupName := params.Get("group_name")
+		name := params.Get("name") // 创建者昵称（C 函数第5个参数）
+		password := params.Get("password")
 
 		if groupName == "" {
 			http.Error(w, `{"error":"missing group_name"}`, http.StatusBadRequest)
@@ -658,11 +727,15 @@ func (s *Server) handleGroupSendMessage(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	r.ParseForm()
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
 
-	groupNumberStr := r.FormValue("group_number")
-	messageTypeStr := r.FormValue("message_type")
-	message := r.FormValue("message")
+	groupNumberStr := params.Get("group_number")
+	messageTypeStr := params.Get("message_type")
+	message := params.Get("message")
 
 	if groupNumberStr == "" || message == "" {
 		http.Error(w, `{"error":"missing required parameters"}`, http.StatusBadRequest)
@@ -697,14 +770,18 @@ func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	r.ParseForm()
-	confIDStr := r.FormValue("conference_id")
-	message := r.FormValue("message")
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	confIDStr := params.Get("conference_id")
+	message := params.Get("message")
 
 	var confID uint32
 	fmt.Sscanf(confIDStr, "%d", &confID)
 
-	_, err := s.tox.ConferenceSendMessage(confID, tox.MESSAGE_TYPE_NORMAL, message)
+	_, err = s.tox.ConferenceSendMessage(confID, tox.MESSAGE_TYPE_NORMAL, message)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 		return
@@ -724,9 +801,13 @@ func (s *Server) handleConferenceJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.ParseForm()
-	friendNumberStr := r.FormValue("friend_number")
-	cookie := r.FormValue("cookie")
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	friendNumberStr := params.Get("friend_number")
+	cookie := params.Get("cookie")
 
 	var friendNumber uint32
 	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
@@ -760,8 +841,12 @@ func (s *Server) handleConferenceReject(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	r.ParseForm()
-	friendNumberStr := r.FormValue("friend_number")
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	friendNumberStr := params.Get("friend_number")
 
 	var friendNumber uint32
 	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
@@ -795,11 +880,15 @@ func (s *Server) handleGroupJoin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	r.ParseForm()
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
 
-	chatId := r.FormValue("chat_id")
-	name := r.FormValue("name")
-	password := r.FormValue("password")
+	chatId := params.Get("chat_id")
+	name := params.Get("name")
+	password := params.Get("password")
 
 	if chatId == "" {
 		http.Error(w, `{"error":"missing chat_id"}`, http.StatusBadRequest)
@@ -881,10 +970,14 @@ func (s *Server) handleGroupLeave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	r.ParseForm()
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
 
-	groupNumberStr := r.FormValue("group_number")
-	partMessage := r.FormValue("part_message")
+	groupNumberStr := params.Get("group_number")
+	partMessage := params.Get("part_message")
 
 	if groupNumberStr == "" {
 		http.Error(w, `{"error":"missing group_number"}`, http.StatusBadRequest)
@@ -894,7 +987,7 @@ func (s *Server) handleGroupLeave(w http.ResponseWriter, r *http.Request) {
 	var groupNumber tox.GroupNumber
 	fmt.Sscanf(groupNumberStr, "%d", &groupNumber)
 
-	err := s.tox.GroupLeave(groupNumber, partMessage)
+	err = s.tox.GroupLeave(groupNumber, partMessage)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 		return
@@ -912,10 +1005,14 @@ func (s *Server) handleGroupInvite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	r.ParseForm()
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
 
-	groupNumberStr := r.FormValue("group_number")
-	friendNumberStr := r.FormValue("friend_number")
+	groupNumberStr := params.Get("group_number")
+	friendNumberStr := params.Get("friend_number")
 
 	if groupNumberStr == "" || friendNumberStr == "" {
 		http.Error(w, `{"error":"missing required parameters"}`, http.StatusBadRequest)
@@ -927,7 +1024,7 @@ func (s *Server) handleGroupInvite(w http.ResponseWriter, r *http.Request) {
 	fmt.Sscanf(groupNumberStr, "%d", &groupNumber)
 	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
 
-	err := s.tox.GroupInviteFriend(groupNumber, friendNumber)
+	err = s.tox.GroupInviteFriend(groupNumber, friendNumber)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 		return
@@ -945,12 +1042,16 @@ func (s *Server) handleGroupAccept(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	r.ParseForm()
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
 
-	inviteData := r.FormValue("invite_data")
-	friendNumberStr := r.FormValue("friend_number")
-	name := r.FormValue("name")
-	password := r.FormValue("password")
+	inviteData := params.Get("invite_data")
+	friendNumberStr := params.Get("friend_number")
+	name := params.Get("name")
+	password := params.Get("password")
 
 	if inviteData == "" || friendNumberStr == "" {
 		http.Error(w, `{"error":"missing required parameters"}`, http.StatusBadRequest)
@@ -1188,12 +1289,16 @@ func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.ParseForm()
-	friendIDStr := r.FormValue("friend_id")
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	friendIDStr := params.Get("friend_id")
 	var friendID uint32
 	fmt.Sscanf(friendIDStr, "%d", &friendID)
 
-	_, err := s.tox.FriendDelete(friendID)
+	_, err = s.tox.FriendDelete(friendID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 		return
