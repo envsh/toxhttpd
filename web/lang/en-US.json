@@ -85,10 +85,16 @@
     "connect_failed": "Connect failed",
     "context_menu": {
         "view_info": "View Info",
+        "view_members": "View Members",
         "delete_friend": "Delete Friend",
         "leave_conference": "Leave Conference",
         "invite_to_conference": "Invite to Conference",
         "invite_to_group": "Invite to Group"
+    },
+    "member_list": {
+        "title": "Member List",
+        "title.conference": "Conference Members - {0}",
+        "title.group": "Group Members - {0}"
     },
     "confirm_delete_friend": "Delete friend {0}?",
     "confirm_leave_conference": "Leave conference {0}?",

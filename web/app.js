@@ -118,10 +118,13 @@ function applyLanguage() {
 
     const conferenceMenuItems = document.querySelectorAll('#conferenceMenu .menu-item');
     if (conferenceMenuItems[0]) conferenceMenuItems[0].textContent = t('context_menu.view_info');
-    if (conferenceMenuItems[1]) conferenceMenuItems[1].textContent = t('context_menu.leave_conference');
-
+    if (conferenceMenuItems[1]) conferenceMenuItems[1].textContent = t('context_menu.view_members');
+    if (conferenceMenuItems[2]) conferenceMenuItems[2].textContent = t('context_menu.leave_conference');
+    
     const groupMenuItems = document.querySelectorAll('#groupMenu .menu-item');
     if (groupMenuItems[0]) groupMenuItems[0].textContent = t('context_menu.view_info');
+    if (groupMenuItems[1]) groupMenuItems[1].textContent = t('context_menu.view_members');
+    if (groupMenuItems[2]) groupMenuItems[2].textContent = t('context_menu.leave_conference');
     
     console.log('Language applied:', currentLang);
 }
@@ -905,6 +908,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const action = event.target.getAttribute('data-action');
             if (action === 'info') {
                 window.showConferenceInfo(selectedConferenceId);
+            } else if (action === 'members') {
+                window.showConferenceMembers(selectedConferenceId);
             } else if (action === 'leave') {
                 window.leaveConference();
             }
@@ -918,6 +923,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const action = event.target.getAttribute('data-action');
             if (action === 'info') {
                 window.showGroupInfo(selectedGroupId);
+            } else if (action === 'members') {
+                window.showGroupMembers(selectedGroupId);
             } else if (action === 'leave') {
                 window.leaveGroup();
             }
@@ -1041,6 +1048,75 @@ function showGroupInfo(groupId) {
 
 function hideGroupInfo() {
     document.getElementById('groupInfoModal').classList.add('hidden');
+}
+
+// Member list functions
+async function fetchConferenceMembers(conferenceId) {
+    try {
+        const resp = await fetch(`/api/conference/members?conference_id=${conferenceId}`);
+        const data = await resp.json();
+        return data.members || [];
+    } catch (err) {
+        console.error('Failed to fetch conference members:', err);
+        return [];
+    }
+}
+
+async function fetchGroupMembers(groupId) {
+    try {
+        const resp = await fetch(`/api/group/members?group_number=${groupId}`);
+        const data = await resp.json();
+        return data.members || [];
+    } catch (err) {
+        console.error('Failed to fetch group members:', err);
+        return [];
+    }
+}
+
+async function showConferenceMembers(conferenceId) {
+    const members = await fetchConferenceMembers(conferenceId);
+    const title = t('member_list.title.conference').replace('{0}', conferenceId);
+    document.getElementById('memberListTitle').textContent = title;
+    
+    let html = '';
+    if (members.length === 0) {
+        html = '<div style="text-align: center; color: #8b949e;">暂无成员</div>';
+    } else {
+        members.forEach(m => {
+            html += `<div style="padding: 8px; border-bottom: 1px solid #30363d;">
+                        <span style="color: #00d4aa;">Peer ${m.peer_number}</span>: 
+                        <span style="color: #c9d1d9;">${m.name}</span>
+                      </div>`;
+        });
+    }
+    
+    document.getElementById('memberListContent').innerHTML = html;
+    document.getElementById('memberListModal').classList.remove('hidden');
+}
+
+async function showGroupMembers(groupId) {
+    const members = await fetchGroupMembers(groupId);
+    const title = t('member_list.title.group').replace('{0}', groupId);
+    document.getElementById('memberListTitle').textContent = title;
+    
+    let html = '';
+    if (members.length === 0) {
+        html = '<div style="text-align: center; color: #8b949e;">暂无成员</div>';
+    } else {
+        members.forEach(m => {
+            html += `<div style="padding: 8px; border-bottom: 1px solid #30363d;">
+                        <span style="color: #00d4aa;">Peer ${m.peer_number}</span>: 
+                        <span style="color: #c9d1d9;">${m.name}</span>
+                      </div>`;
+        });
+    }
+    
+    document.getElementById('memberListContent').innerHTML = html;
+    document.getElementById('memberListModal').classList.remove('hidden');
+}
+
+function hideMemberList() {
+    document.getElementById('memberListModal').classList.add('hidden');
 }
 
 // Invite functions
@@ -1238,6 +1314,7 @@ document.addEventListener('keydown', (e) => {
         hideConferenceInfo();
         hideGroupInfo();
         hideSelectConference();
+        hideMemberList();
     }
 });
 
@@ -1267,3 +1344,6 @@ window.hideSelectConference = hideSelectConference;
 window.switchLanguage = switchLanguage;
 window.joinGroupFromBottom = joinGroupFromBottom;
 window.inviteToGroup = inviteToGroup;
+window.showConferenceMembers = showConferenceMembers;
+window.showGroupMembers = showGroupMembers;
+window.hideMemberList = hideMemberList;
