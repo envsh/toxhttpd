@@ -407,8 +407,14 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
         return;
     }
     
+#ifdef QT3_BUILD
+    int result = QMessageBox::question(this, _("confirm"), confirmMsg,
+                                       QMessageBox::Yes, QMessageBox::No);
+    if (result == 0) {
+#else
     if (QMessageBox::question(this, _("confirm"), confirmMsg,
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+#endif
         ToxAPI api;
         bool success = false;
         
