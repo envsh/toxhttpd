@@ -19,13 +19,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y libtoxcore-dev libopus-dev libsodium-dev libcurl4-openssl-dev
-      - name: Pre‑build custom commands (reserved)
-        run: |
-          echo "=== Backend custom commands placeholder ==="
-          # =====================================================
-          # 在此处取消注释并添加你需要执行的预编译命令
-          # 例如: go mod download, export CGO_CFLAGS, ./prepare.sh
-          # =====================================================
+      - name: Pre-build custom commands
+        run: ./scripts/ci_prebuild_go.sh
       - name: Build backend
         run: cd go-toxhttpd && go build -v ./...
       - name: Verify backend binary
@@ -33,19 +28,15 @@ jobs:
 
   build-q3tox-qt4:
     runs-on: ubuntu-22.04
+    container: ubuntu:20.04
     steps:
       - uses: actions/checkout@v4
       - name: Install Qt4 and dependencies
         run: |
-          sudo apt update
-          sudo apt install -y qt4-default libqt4-dev qt4-qmake libcurl4-openssl-dev libcjson-dev
-      - name: Pre‑build custom commands (reserved)
-        run: |
-          echo "=== q3tox custom commands placeholder ==="
-          # =====================================================
-          # 在此处取消注释并添加你需要执行的预编译命令
-          # 例如: export QTDIR, ./prepare_qt4.sh
-          # =====================================================
+          apt update
+          apt install -y qt4-default libqt4-dev qt4-qmake libcurl4-openssl-dev libcjson-dev
+      - name: Pre-build custom commands
+        run: ./scripts/ci_prebuild_qt.sh
       - name: Build q3tox with Qt4
         run: |
           cd q3tox
