@@ -398,7 +398,7 @@ function renderContactList(filter) {
             const emoji = '👥';
             html += `
                 <div class="list-item ${isSelected ? 'selected' : ''}" data-group-id="${groupId}" onclick="selectContact(${groupId}, 'group')">
-                    <span class="group-dot"></span>
+                    <span class="${g.is_connected ? 'online-dot' : 'offline-dot'}"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${groupName}</span>
                 </div>
@@ -421,7 +421,7 @@ function renderContactList(filter) {
             const emoji = '🎙';
             html += `
                 <div class="list-item ${isSelected ? 'selected' : ''}" data-conference-id="${confId}" onclick="selectContact(${confId}, 'conference')">
-                    <span class="conference-dot"></span>
+                    <span class="${c.is_connected ? 'online-dot' : 'offline-dot'}"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${confName}</span>
                 </div>

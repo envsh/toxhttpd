@@ -166,6 +166,7 @@ type Server struct {
 	eventQueue           *EventQueue
 	selfConnectionStatus string
 	friendStatuses       map[uint32]string
+	conferenceConnected map[uint32]bool  // 新增：会议连接状态
 	mu                   sync.RWMutex
 }
 
@@ -477,6 +478,21 @@ func setupCallbacks(s *Server) {
 		s.eventQueue.Push("group_peer_status", string(data))
 	}, nil)
 
+	// 6. CallbackConferenceConnected - 会议连接状态回调
+	s.tox.CallbackConferenceConnected(func(this *tox.Tox, groupNumber uint32, userData interface{}) {
+		log.Printf("[ConferenceConnected] group=%d", groupNumber)
+		// 更新会议连接状态map
+		s.mu.Lock()
+		s.conferenceConnected[groupNumber] = true
+		s.mu.Unlock()
+		// 推送连接状态事件到前端
+		data, _ := json.Marshal(map[string]interface{}{
+			"conference_number": groupNumber,
+			"is_connected":     true,
+		})
+		s.eventQueue.Push("conference_connected", string(data))
+	}, nil)
+
 	log.Println("[TOX] All callbacks registered")
 }
 
@@ -649,6 +665,7 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 				"group_number": gn,
 				"group_name":   "",
 				"chat_id":      "",
+				"is_connected": false, // 新增
 			}
 			// 获取群组名称
 			if name, err := s.tox.GroupGetName(gn); err == nil {
@@ -657,6 +674,10 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 			// 获取群组 chat_id (public key)
 			if chatId, err := s.tox.GroupGetChatId(gn); err == nil {
 				group["chat_id"] = chatId
+			}
+			// 获取群组连接状态
+			if connected, err := s.tox.GroupIsConnected(gn); err == nil {
+				group["is_connected"] = connected
 			}
 			groups = append(groups, group)
 		}
@@ -718,13 +739,14 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// Use ConferenceGetChatlist() from group.go to get all conferences
 		confIDs := s.tox.ConferenceGetChatlist()
-		// Build conference objects with names and chat_id
+		// Build conference objects with names, chat_id, and connected state
 		conferences := make([]map[string]interface{}, 0, len(confIDs))
 		for _, confID := range confIDs {
 			conf := map[string]interface{}{
 				"conference_number": confID,
 				"conference_name":   "",
 				"chat_id":           "",
+				"is_connected":      false,
 			}
 			// Try to get conference title
 			if title, err := s.tox.ConferenceGetTitle(confID); err == nil {
@@ -734,6 +756,12 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 			if chatId, err := s.tox.ConferenceGetIdentifier(confID); err == nil {
 				conf["chat_id"] = chatId
 			}
+			// Get connected state from map
+			s.mu.RLock()
+			if connected, ok := s.conferenceConnected[confID]; ok {
+				conf["is_connected"] = connected
+			}
+			s.mu.RUnlock()
 			conferences = append(conferences, conf)
 		}
 		resp := map[string]interface{}{

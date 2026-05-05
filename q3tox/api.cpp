@@ -365,6 +365,14 @@ std::vector<GroupInfo> ToxAPI::getGroups() {
                 info.chat_id = std::string(cJSON_GetStringValue(chatIdItem));
             }
             
+            // 解析 is_connected 字段
+            cJSON* connectedItem = cJSON_GetObjectItem(item, "is_connected");
+            if (connectedItem) {
+                info.is_connected = (connectedItem->valueint == 1);
+            } else {
+                info.is_connected = false;
+            }
+            
             groups.push_back(info);
         }
     }

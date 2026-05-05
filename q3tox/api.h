@@ -30,12 +30,14 @@ struct GroupInfo {
     int group_number;
     std::string group_name;
     std::string chat_id;
+    bool is_connected; // 新增：群组连接状态
 };
 
 struct ConferenceInfo {
     int conference_number;
     std::string conference_name;
     std::string chat_id;
+    bool is_connected; // 新增：会议连接状态
 };
 
 class ToxAPI {

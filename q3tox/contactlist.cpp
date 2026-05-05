@@ -194,7 +194,13 @@ void ContactListWidget::updateView_v3() {
         
         QString emoji = (c->type == "friend") ? "👤" :
                        (c->type == "group") ? "👥" : "🎙";
-        QString statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
+        // 群组使用真实连接状态，好友使用原有逻辑，会议保持硬编码
+        QString statusDot;
+        if (c->type == "group") {
+            statusDot = c->is_connected ? "●" : "○";
+        } else {
+            statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
+        }
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
         // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）

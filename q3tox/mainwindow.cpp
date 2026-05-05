@@ -152,9 +152,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 c->type = QString::fromUtf8(cd.type.c_str());
                 c->status = QString::fromUtf8(cd.status.c_str());
                 c->chat_id = QString::fromUtf8(cd.chat_id.c_str());  // 传递chat_id
+                c->is_connected = cd.is_connected;  // 新增：传递连接状态
                 contacts.append(c);
-                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s'",
-                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chat_id.c_str());
+                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%d",
+                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chat_id.c_str(), cd.is_connected);
             }
             contactListWidget->setContacts(contacts);
             

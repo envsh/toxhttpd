@@ -67,9 +67,10 @@ struct ContactData {
     std::string name;
     std::string type;
     std::string status;
-    std::string chat_id;  // 新增：public key
+    std::string chat_id;  // public key
+    bool is_connected;     // 群组/会议连接状态
     
-    ContactData() : id(-1) {}
+    ContactData() : id(-1), is_connected(false) {}
 };
 
 // 所有数据加载完成事件

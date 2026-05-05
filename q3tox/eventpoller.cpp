@@ -85,6 +85,7 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
                 ContactData cd;
                 cd.id = grp.group_number;
                 cd.chat_id = grp.chat_id;  // 传递chat_id
+                cd.is_connected = grp.is_connected;  // 新增：群组连接状态
                 // 使用群组名称，为空时使用降级策略
                 if (!grp.group_name.empty()) {
                     cd.name = grp.group_name;
@@ -97,7 +98,8 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
                     cd.name = displayName;
                 }
                 cd.type = "group";
-                cd.status = "online";
+                // 根据真实连接状态设置 status
+                cd.status = cd.is_connected ? "online" : "offline";
                 result->contacts.push_back(cd);
             }
             
@@ -107,6 +109,7 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
                 ContactData cd;
                 cd.id = conf.conference_number;
                 cd.chat_id = conf.chat_id;  // 传递chat_id
+                cd.is_connected = conf.is_connected;  // 新增：会议连接状态
                 // 使用会议名称，为空时使用降级策略
                 if (!conf.conference_name.empty()) {
                     cd.name = conf.conference_name;
@@ -119,7 +122,8 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
                     cd.name = displayName;
                 }
                 cd.type = "conference";
-                cd.status = "online";
+                // 会议使用真实连接状态
+                cd.status = cd.is_connected ? "online" : "offline";
                 result->contacts.push_back(cd);
             }
             

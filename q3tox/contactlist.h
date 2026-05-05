@@ -10,6 +10,7 @@ struct Contact {
     QString type; // "friend", "group", "conference"
     QString status; // "online", "offline", "tcp"
     QString chat_id; // public key
+    bool is_connected; // 群组/会议连接状态
 };
 
 #ifdef QT3_BUILD
