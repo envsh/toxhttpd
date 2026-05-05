@@ -45,6 +45,7 @@
     },
     "statuses": {
         "offline": "离线",
+        "online": "在线",
         "tcp": "TCP",
         "udp": "UDP"
     },

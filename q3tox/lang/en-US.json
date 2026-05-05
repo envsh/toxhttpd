@@ -45,6 +45,7 @@
     },
     "statuses": {
         "offline": "Offline",
+        "online": "Online",
         "tcp": "TCP",
         "udp": "UDP"
     },

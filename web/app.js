@@ -366,7 +366,10 @@ function renderContactList(filter) {
     if (filter === 'all' || filter === 'friends') {
         contacts.friends.forEach(f => {
             const isSelected = f.friend_id == currentChatId && currentChatType === 'friend';
-            const dotClass = f.connection_status === 'offline' ? 'offline-dot' : 'online-dot';
+            const dotClass = (f.connection_status && 
+                             f.connection_status !== 'offline' && 
+                             f.connection_status !== 'unknown') 
+                             ? 'online-dot' : 'offline-dot';
             const emoji = '👤';
             // Show name, or public key first 7 chars if name empty
             let displayName = f.name;
@@ -1085,8 +1088,12 @@ function deleteFriend() {
 
 // Conference functions
 function showConferenceInfo(conferenceId) {
+    // 从contacts.conferences中找到对应的会议数据
+    const conf = contacts.conferences ? contacts.conferences.find(c => c.conference_number == conferenceId) : null;
     document.getElementById('infoConferenceId').textContent = conferenceId;
     document.getElementById('infoConferenceType').textContent = 'Tox Conference';
+    document.getElementById('infoConferenceConn').textContent = conf ? 
+        (conf.is_connected ? '在线' : '离线') : 'N/A';
     document.getElementById('conferenceInfoModal').classList.remove('hidden');
     hideAllContextMenus();
 }
@@ -1119,7 +1126,12 @@ function leaveConference() {
 
 // Group functions
 function showGroupInfo(groupId) {
+    // 从contacts.groups中找到对应的群组数据
+    const group = contacts.groups ? contacts.groups.find(g => g.group_number == groupId) : null;
     document.getElementById('infoGroupId').textContent = groupId;
+    document.getElementById('infoGroupName').textContent = group ? (group.group_name || 'N/A') : 'N/A';
+    document.getElementById('infoGroupConn').textContent = group ? 
+        (group.is_connected ? '在线' : '离线') : 'N/A';
     document.getElementById('groupInfoModal').classList.remove('hidden');
     hideAllContextMenus();
 }

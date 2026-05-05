@@ -3,10 +3,18 @@
 #include "compat34.h"
 
 FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
-    qSetWindowTitle(this, _("friend_info_title"));
+    qSetWindowTitle(this, _("modals.friend_info_title"));
     resize(400, 250);
     
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 10, 10);
+    
+    // 标题
+    titleLabel = new QLabel(this);
+    QFont titleFont = titleLabel->font();
+    titleFont.setBold(true);
+    titleFont.setPointSize(titleFont.pointSize() + 2);
+    titleLabel->setFont(titleFont);
+    mainLayout->addWidget(titleLabel);
     
     // ID
     QBoxLayout* idLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
@@ -53,6 +61,15 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     connLayout->addWidget(connLabel, 1);
     mainLayout->addLayout(connLayout);
     
+    // 连接状态（在线/离线）
+    QBoxLayout* connectedLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    QLabel* connectedTitle = new QLabel(_("modals.labels.type"), this);  // 复用 type 标签显示"连接状态"
+    connectedTitle->setFixedWidth(80);
+    connectedLayout->addWidget(connectedTitle);
+    connectedLabel = new QLabel(this);
+    connectedLayout->addWidget(connectedLabel, 1);
+    mainLayout->addLayout(connectedLayout);
+    
     // 公钥
     QBoxLayout* pkLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     QLabel* pkTitle = new QLabel(_("modals.labels.public_key"), this);
@@ -79,15 +96,28 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
 }
 
 void FriendInfoDialog::setInfo(int id, const QString& name, const QString& type,
-                                const QString& status, const QString& connection,
-                                const QString& publicKey) {
+                                 const QString& status, const QString& connection,
+                                 bool isConnected, const QString& publicKey) {
     idLabel->setText(QString::number(id));
     nameLabel->setText(name.isEmpty() ? _("no_name") : name);
     typeLabel->setText(type == "friend" ? _("friend") : 
                       type == "conference" ? _("conference_item") : _("group"));
     statusLabel->setText(status.isEmpty() ? _("no_status") : status);
     connLabel->setText(connection.isEmpty() ? _("statuses.offline") : connection);
+    
+    // 设置连接状态（在线/离线）
+    if (type == "friend") {
+        connectedLabel->setText(connection.isEmpty() ? _("statuses.offline") : connection);
+    } else {
+        connectedLabel->setText(isConnected ? _("statuses.online") : _("statuses.offline"));
+    }
+    
     pkLabel->setText(publicKey.isEmpty() ? _("no_status") : publicKey);
+}
+
+void FriendInfoDialog::setTitle(const QString& title) {
+    titleLabel->setText(title);
+    qSetWindowTitle(this, title);
 }
 
 void FriendInfoDialog::onClose() {

@@ -31,6 +31,8 @@
     "modals": {
         "edit_info_title": "Edit Personal Info",
         "friend_info_title": "Friend Info",
+        "conference_info_title": "Conference Info",
+        "group_info_title": "Group Info",
         "create_group_title": "Create Group",
         "confirm_group": "Confirm",
         "cancel_group": "Cancel",
@@ -40,6 +42,7 @@
             "friend_id": "Friend ID",
             "status": "Status",
             "connection": "Connection",
+            "type": "Type",
             "public_key": "Public Key",
             "group_name": "Group Name:",
             "creator_name": "Creator Name:",
@@ -49,6 +52,7 @@
     },
     "statuses": {
         "offline": "Offline",
+        "online": "Online",
         "tcp": "TCP",
         "udp": "UDP"
     },

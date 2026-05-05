@@ -154,8 +154,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 c->chat_id = QString::fromUtf8(cd.chat_id.c_str());  // 传递chat_id
                 c->is_connected = cd.is_connected;  // 新增：传递连接状态
                 contacts.append(c);
-                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%d",
-                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chat_id.c_str(), cd.is_connected);
+                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%s",
+                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chat_id.c_str(), 
+                          cd.is_connected ? "true" : "false");
             }
             contactListWidget->setContacts(contacts);
             
@@ -390,14 +391,49 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
             dialog.setInfo(id, QString::fromUtf8(info.name.c_str()), type,
                           QString::fromUtf8(info.status.c_str()),
                           QString::fromUtf8(info.connection_status.c_str()),
+                          false,
                           QString::fromUtf8(info.public_key.c_str()));
         } else {
             dialog.setInfo(id, _("no_name"), type);
         }
     } else if (type == "conference") {
-        dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type);
+        // 设置正确的标题
+        dialog.setTitle(_("modals.conference_info_title"));
+        
+        // 获取会议连接状态和chat_id (public key)
+        ToxAPI api;
+        std::vector<ConferenceInfo> conferences = api.getConferences();
+        bool isConnected = false;
+        QString chatId = "";
+        for (const auto& c : conferences) {
+            if (c.conference_number == (uint32_t)id) {
+                isConnected = c.is_connected;
+                chatId = QString::fromUtf8(c.chat_id.c_str());
+                break;
+            }
+        }
+        
+        dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type,
+                       "", "", isConnected, chatId);
     } else if (type == "group") {
-        dialog.setInfo(id, _("group_item") + " " + QString::number(id), type);
+        // 设置正确的标题
+        dialog.setTitle(_("modals.group_info_title"));
+        
+        // 获取群组连接状态和chat_id (public key)
+        ToxAPI api;
+        std::vector<GroupInfo> groups = api.getGroups();
+        bool isConnected = false;
+        QString chatId = "";
+        for (const auto& g : groups) {
+            if (g.group_number == (uint32_t)id) {
+                isConnected = g.is_connected;
+                chatId = QString::fromUtf8(g.chat_id.c_str());
+                break;
+            }
+        }
+        
+        dialog.setInfo(id, _("group_item") + " " + QString::number(id), type,
+                       "", "", isConnected, chatId);
     }
     
     dialog.exec();

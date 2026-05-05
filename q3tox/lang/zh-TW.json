@@ -45,6 +45,7 @@
     },
     "statuses": {
         "offline": "離線",
+        "online": "在線",
         "tcp": "TCP",
         "udp": "UDP"
     },

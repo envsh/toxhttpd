@@ -8,6 +8,22 @@
 const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
 const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.groups", "tabs.conferences"};
 
+// Emoji 和状态点常量
+#if QT_VERSION >= 0x050000
+const char* EMOJI_FRIEND = "👤";
+const char* EMOJI_GROUP = "👥";
+const char* EMOJI_CONFERENCE = "🎙";
+const char* STATUS_ONLINE = "●";
+const char* STATUS_OFFLINE = "○";
+#else
+// qt3/qt4 not support emoji
+const char* EMOJI_FRIEND = "F";
+const char* EMOJI_GROUP = "G";
+const char* EMOJI_CONFERENCE = "C";
+const char* STATUS_ONLINE = "O";
+const char* STATUS_OFFLINE = "N";
+#endif
+
 ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0), contextItemId(-1), contextItemType("") {
     QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 8, 2);
     qSetMargins(layout, 8, 8, 8, 8);
@@ -192,14 +208,14 @@ void ContactListWidget::updateView_v3() {
             if (currentFilter == "conference" && c->type != "conference") continue;
         }
         
-        QString emoji = (c->type == "friend") ? "👤" :
-                       (c->type == "group") ? "👥" : "🎙";
+        QString emoji = (c->type == "friend") ? EMOJI_FRIEND :
+                       (c->type == "group") ? EMOJI_GROUP : EMOJI_CONFERENCE;
         // 群组使用真实连接状态，好友使用原有逻辑，会议保持硬编码
         QString statusDot;
         if (c->type == "group") {
-            statusDot = c->is_connected ? "●" : "○";
+            statusDot = c->is_connected ? STATUS_ONLINE : STATUS_OFFLINE;
         } else {
-            statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
+            statusDot = (c->status == "online" || c->status == "tcp") ? STATUS_ONLINE : STATUS_OFFLINE;
         }
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
@@ -246,9 +262,9 @@ void ContactListWidget::updateView_v4() {
             if (currentFilter == "conference" && c->type != "conference") continue;
         }
         
-        QString emoji = (c->type == "friend") ? "👤" :
-                       (c->type == "group") ? "👥" : "🎙";
-        QString statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
+        QString emoji = (c->type == "friend") ? EMOJI_FRIEND :
+                       (c->type == "group") ? EMOJI_GROUP : EMOJI_CONFERENCE;
+        QString statusDot = (c->status == "online" || c->status == "tcp") ? STATUS_ONLINE : STATUS_OFFLINE;
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
         // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）

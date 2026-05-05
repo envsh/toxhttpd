@@ -12,17 +12,21 @@ public:
     void setInfo(int id, const QString& name, const QString& type,
                  const QString& status = QString(),
                  const QString& connection = QString(),
+                 bool isConnected = false,
                  const QString& publicKey = QString());
+    void setTitle(const QString& title);
 
 private slots:
     void onClose();
 
 private:
+    QLabel* titleLabel;
     QLabel* idLabel;
     QLabel* nameLabel;
     QLabel* typeLabel;
     QLabel* statusLabel;
     QLabel* connLabel;
+    QLabel* connectedLabel;
     QLabel* pkLabel;
 };
 

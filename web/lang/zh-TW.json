@@ -31,6 +31,8 @@
     "modals": {
         "edit_info_title": "編輯個人資訊",
         "friend_info_title": "好友資訊",
+        "conference_info_title": "會議資訊",
+        "group_info_title": "群組資訊",
         "create_group_title": "建立群組",
         "confirm_group": "確認",
         "cancel_group": "取消",
@@ -40,6 +42,7 @@
             "friend_id": "好友 ID",
             "status": "狀態",
             "connection": "連線",
+            "type": "類型",
             "public_key": "公鑰",
             "group_name": "群組名稱：",
             "creator_name": "建立者暱稱：",
@@ -49,6 +52,7 @@
     },
     "statuses": {
         "offline": "離線",
+        "online": "在線",
         "tcp": "TCP",
         "udp": "UDP"
     },
