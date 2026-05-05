@@ -151,9 +151,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 c->name = QString::fromUtf8(cd.name.c_str());
                 c->type = QString::fromUtf8(cd.type.c_str());
                 c->status = QString::fromUtf8(cd.status.c_str());
+                c->chat_id = QString::fromUtf8(cd.chat_id.c_str());  // 传递chat_id
                 contacts.append(c);
-                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s'",
-                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str());
+                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s'",
+                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chat_id.c_str());
             }
             contactListWidget->setContacts(contacts);
             
@@ -473,7 +474,7 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
 void MainWindow::onInviteToConferenceRequested(int friendId) {
     // 获取会议列表
     ToxAPI api;
-    std::vector<int> conferences = api.getConferences();
+    std::vector<ConferenceInfo> conferences = api.getConferences();
     
     if (conferences.empty()) {
         QMessageBox::warning(this, _("no_conference"), _("no_conference"));
@@ -491,11 +492,21 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
     layout->addWidget(label);
     
     QComboBox* confCombo = new QComboBox(&dialog);
+    // Qt3: 用单独的数组存储ID
+    std::vector<int> confIds;
     for (uint i = 0; i < conferences.size(); ++i) {
+        const auto& conf = conferences[i];
+        QString displayName;
+        if (!conf.conference_name.empty()) {
+            displayName = QString::fromUtf8(conf.conference_name.c_str());
+        } else {
+            displayName = QString(_("conference_item")) + " " + QString::number(conf.conference_number);
+        }
 #ifdef QT3_BUILD
-        confCombo->insertItem(QString(_("conference_item")) + " " + QString::number(conferences[i]));
+        confCombo->insertItem(displayName);
+        confIds.push_back(conf.conference_number);
 #else
-        confCombo->insertItem(i, QString(_("conference_item")) + " " + QString::number(conferences[i]));
+        confCombo->addItem(displayName, QVariant(conf.conference_number));
 #endif
     }
     layout->addWidget(confCombo);
@@ -514,11 +525,19 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
     layout->addLayout(btnLayout);
     
     if (dialog.exec() == QDialog::Accepted) {
+        int confId = -1;
 #ifdef QT3_BUILD
-        int confId = conferences[confCombo->currentItem()];
+        // Qt3: 从单独的ID数组获取
+        int idx = confCombo->currentItem();
+        if (idx >= 0 && idx < (int)confIds.size()) {
+            confId = confIds[idx];
+        }
 #else
-        int confId = conferences[confCombo->currentIndex()];
+        // Qt4: 从 QVariant 获取存储的ID
+        QVariant data = confCombo->itemData(confCombo->currentIndex());
+        confId = data.toInt();
 #endif
+        if (confId == -1) return;
         bool success = api.inviteToConference(friendId, confId);
         if (success) {
             QMessageBox::information(this, _("invite_success"), _("invite_success"));
@@ -531,7 +550,7 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
 void MainWindow::onInviteToGroupRequested(int friendId) {
     // 获取群组列表
     ToxAPI api;
-    std::vector<int> groups = api.getGroups();
+    std::vector<GroupInfo> groups = api.getGroups();
     
     if (groups.empty()) {
         QMessageBox::warning(this, _("no_group"), _("no_group"));
@@ -549,11 +568,21 @@ void MainWindow::onInviteToGroupRequested(int friendId) {
     layout->addWidget(label);
     
     QComboBox* groupCombo = new QComboBox(&dialog);
+    // Qt3: 用单独的数组存储ID
+    std::vector<int> groupIds;
     for (uint i = 0; i < groups.size(); ++i) {
+        const auto& grp = groups[i];
+        QString displayName;
+        if (!grp.group_name.empty()) {
+            displayName = QString::fromUtf8(grp.group_name.c_str());
+        } else {
+            displayName = QString(_("group_item")) + " " + QString::number(grp.group_number);
+        }
 #ifdef QT3_BUILD
-        groupCombo->insertItem(QString(_("group_item")) + " " + QString::number(groups[i]));
+        groupCombo->insertItem(displayName);
+        groupIds.push_back(grp.group_number);
 #else
-        groupCombo->insertItem(i, QString(_("group_item")) + " " + QString::number(groups[i]));
+        groupCombo->addItem(displayName, QVariant(grp.group_number));
 #endif
     }
     layout->addWidget(groupCombo);
@@ -572,10 +601,17 @@ void MainWindow::onInviteToGroupRequested(int friendId) {
     layout->addLayout(btnLayout);
     
     if (dialog.exec() == QDialog::Accepted) {
+        int groupId = -1;
 #ifdef QT3_BUILD
-        int groupId = groups[groupCombo->currentItem()];
+        // Qt3: 从单独的ID数组获取
+        int idx = groupCombo->currentItem();
+        if (idx >= 0 && idx < (int)groupIds.size()) {
+            groupId = groupIds[idx];
+        }
 #else
-        int groupId = groups[groupCombo->currentIndex()];
+        // Qt4: 从 QVariant 获取存储的ID
+        QVariant data = groupCombo->itemData(groupCombo->currentIndex());
+        groupId = data.toInt();
 #endif
         bool success = api.inviteToGroup(friendId, groupId);
         if (success) {

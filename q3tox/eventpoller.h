@@ -67,6 +67,7 @@ struct ContactData {
     std::string name;
     std::string type;
     std::string status;
+    std::string chat_id;  // 新增：public key
     
     ContactData() : id(-1) {}
 };

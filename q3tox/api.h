@@ -26,6 +26,18 @@ struct PeerInfo {
     std::string name;
 };
 
+struct GroupInfo {
+    int group_number;
+    std::string group_name;
+    std::string chat_id;
+};
+
+struct ConferenceInfo {
+    int conference_number;
+    std::string conference_name;
+    std::string chat_id;
+};
+
 class ToxAPI {
 public:
     ToxAPI(const std::string& baseUrl = "http://localhost:8181");
@@ -46,7 +58,7 @@ public:
     bool sendConferenceMessage(int conferenceId, const std::string& message);
     
     // Conferences
-    std::vector<int> getConferences();
+    std::vector<ConferenceInfo> getConferences();
     int createConference();
     bool leaveConference(int confId);
     bool inviteToConference(int friendId, int confId);
@@ -55,7 +67,7 @@ public:
     bool ignoreConference(int friendNumber);
     
     // Groups (NGC)
-    std::vector<int> getGroups();
+    std::vector<GroupInfo> getGroups();
     int createGroup(const std::string& groupName, const std::string& creatorName, 
                    const std::string& password = "", bool isPrivate = false);
     bool leaveGroup(int groupId);

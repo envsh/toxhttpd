@@ -9,6 +9,7 @@ struct Contact {
     QString name;
     QString type; // "friend", "group", "conference"
     QString status; // "online", "offline", "tcp"
+    QString chat_id; // public key
 };
 
 #ifdef QT3_BUILD

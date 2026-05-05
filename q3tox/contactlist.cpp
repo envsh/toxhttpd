@@ -197,11 +197,13 @@ void ContactListWidget::updateView_v3() {
         QString statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
+        // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）
         if (displayName.length() > 20) {
             displayName = displayName.left(20) + "...";
         }
         
-        lb->insertItem(QString("%1 %2 %3").arg(statusDot, emoji, displayName));
+        // emoji和名字之间加空格（web端使用CSS margin-right，这里用字符串空格）
+        lb->insertItem(QString("%1 %2  %3").arg(statusDot, emoji, displayName));
         
         if (c->id == selectedId && c->type == selectedType) {
             targetIndex = newIndex;
@@ -243,12 +245,14 @@ void ContactListWidget::updateView_v4() {
         QString statusDot = (c->status == "online" || c->status == "tcp") ? "●" : "○";
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
+        // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）
         if (displayName.length() > 20) {
             displayName = displayName.left(20) + "...";
         }
         
+        // emoji和名字之间加空格
         QListWidgetItem* item = new QListWidgetItem(
-            QString("%1 %2 %3").arg(statusDot, emoji, displayName)
+            QString("%1 %2  %3").arg(statusDot, emoji, displayName)
         );
         item->setData(Qt::UserRole, c->id);
         item->setData(Qt::UserRole + 1, c->type);

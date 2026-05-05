@@ -79,12 +79,45 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
                 }
             }
             
-            // 3. 加载会议列表
-            std::vector<int> conferences = api->getConferences();
-            for (int id : conferences) {
+            // 3. 加载群组列表（使用新的API返回结构）
+            std::vector<GroupInfo> groups = api->getGroups();
+            for (const auto& grp : groups) {
                 ContactData cd;
-                cd.id = id;
-                cd.name = "conference_item " + std::to_string(id);
+                cd.id = grp.group_number;
+                cd.chat_id = grp.chat_id;  // 传递chat_id
+                // 使用群组名称，为空时使用降级策略
+                if (!grp.group_name.empty()) {
+                    cd.name = grp.group_name;
+                } else {
+                    // 名称为空：显示 "number - chat_id前7位"
+                    std::string displayName = std::to_string(grp.group_number);
+                    if (!grp.chat_id.empty()) {
+                        displayName += " - " + grp.chat_id.substr(0, 7);
+                    }
+                    cd.name = displayName;
+                }
+                cd.type = "group";
+                cd.status = "online";
+                result->contacts.push_back(cd);
+            }
+            
+            // 4. 加载会议列表（使用新的API返回结构）
+            std::vector<ConferenceInfo> conferences = api->getConferences();
+            for (const auto& conf : conferences) {
+                ContactData cd;
+                cd.id = conf.conference_number;
+                cd.chat_id = conf.chat_id;  // 传递chat_id
+                // 使用会议名称，为空时使用降级策略
+                if (!conf.conference_name.empty()) {
+                    cd.name = conf.conference_name;
+                } else {
+                    // 名称为空：显示 "number - chat_id前7位"
+                    std::string displayName = std::to_string(conf.conference_number);
+                    if (!conf.chat_id.empty()) {
+                        displayName += " - " + conf.chat_id.substr(0, 7);
+                    }
+                    cd.name = displayName;
+                }
                 cd.type = "conference";
                 cd.status = "online";
                 result->contacts.push_back(cd);

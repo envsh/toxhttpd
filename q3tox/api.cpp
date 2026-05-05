@@ -229,8 +229,8 @@ bool ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message)
     return !response.empty();
 }
 
-std::vector<int> ToxAPI::getConferences() {
-    std::vector<int> conferences;
+std::vector<ConferenceInfo> ToxAPI::getConferences() {
+    std::vector<ConferenceInfo> conferences;
     std::string response = httpGet("/api/conferences");
     if (response.empty()) return conferences;
     
@@ -242,7 +242,23 @@ std::vector<int> ToxAPI::getConferences() {
         int count = cJSON_GetArraySize(conferencesItem);
         for (int i = 0; i < count; ++i) {
             cJSON* item = cJSON_GetArrayItem(conferencesItem, i);
-            if (item) conferences.push_back(item->valueint);
+            if (!item) continue;
+            
+            ConferenceInfo info;
+            cJSON* numItem = cJSON_GetObjectItem(item, "conference_number");
+            if (numItem) info.conference_number = numItem->valueint;
+            
+            cJSON* nameItem = cJSON_GetObjectItem(item, "conference_name");
+            if (nameItem && cJSON_IsString(nameItem)) {
+                info.conference_name = std::string(cJSON_GetStringValue(nameItem));
+            }
+            
+            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chat_id");
+            if (chatIdItem && cJSON_IsString(chatIdItem)) {
+                info.chat_id = std::string(cJSON_GetStringValue(chatIdItem));
+            }
+            
+            conferences.push_back(info);
         }
     }
     
@@ -320,8 +336,8 @@ std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
 
 // ===== Groups (NGC) =====
 
-std::vector<int> ToxAPI::getGroups() {
-    std::vector<int> groups;
+std::vector<GroupInfo> ToxAPI::getGroups() {
+    std::vector<GroupInfo> groups;
     std::string response = httpGet("/api/groups");
     if (response.empty()) return groups;
     
@@ -333,7 +349,23 @@ std::vector<int> ToxAPI::getGroups() {
         int count = cJSON_GetArraySize(groupsItem);
         for (int i = 0; i < count; ++i) {
             cJSON* item = cJSON_GetArrayItem(groupsItem, i);
-            if (item) groups.push_back(item->valueint);
+            if (!item) continue;
+            
+            GroupInfo info;
+            cJSON* numItem = cJSON_GetObjectItem(item, "group_number");
+            if (numItem) info.group_number = numItem->valueint;
+            
+            cJSON* nameItem = cJSON_GetObjectItem(item, "group_name");
+            if (nameItem && cJSON_IsString(nameItem)) {
+                info.group_name = std::string(cJSON_GetStringValue(nameItem));
+            }
+            
+            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chat_id");
+            if (chatIdItem && cJSON_IsString(chatIdItem)) {
+                info.chat_id = std::string(cJSON_GetStringValue(chatIdItem));
+            }
+            
+            groups.push_back(info);
         }
     }
     
