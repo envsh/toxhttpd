@@ -572,6 +572,11 @@ select option {
     height: 8px;
     background: #484f58;
     border-radius: 50%;
+     margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.item-emoji {
     margin-right: 8px;
     flex-shrink: 0;
 }

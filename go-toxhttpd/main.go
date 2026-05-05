@@ -640,11 +640,25 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		// 获取所有群组列表（使用新 Group API）
-		// GroupGetNumberGroups() 返回数量，需要生成 ID 数组 [0, 1, ..., n-1]
 		numGroups := s.tox.GroupGetNumberGroups()
-		groups := make([]uint32, 0, numGroups)
+		// 构建包含 group_number, group_name, chat_id 的对象数组
+		groups := make([]map[string]interface{}, 0, numGroups)
 		for i := uint32(0); i < numGroups; i++ {
-			groups = append(groups, i)
+			gn := tox.GroupNumber(i) // 类型转换
+			group := map[string]interface{}{
+				"group_number": gn,
+				"group_name":   "",
+				"chat_id":      "",
+			}
+			// 获取群组名称
+			if name, err := s.tox.GroupGetName(gn); err == nil {
+				group["group_name"] = name
+			}
+			// 获取群组 chat_id (public key)
+			if chatId, err := s.tox.GroupGetChatId(gn); err == nil {
+				group["chat_id"] = chatId
+			}
+			groups = append(groups, group)
 		}
 		resp := map[string]interface{}{
 			"groups": groups,
@@ -703,7 +717,25 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		// Use ConferenceGetChatlist() from group.go to get all conferences
-		conferences := s.tox.ConferenceGetChatlist()
+		confIDs := s.tox.ConferenceGetChatlist()
+		// Build conference objects with names and chat_id
+		conferences := make([]map[string]interface{}, 0, len(confIDs))
+		for _, confID := range confIDs {
+			conf := map[string]interface{}{
+				"conference_number": confID,
+				"conference_name":   "",
+				"chat_id":           "",
+			}
+			// Try to get conference title
+			if title, err := s.tox.ConferenceGetTitle(confID); err == nil {
+				conf["conference_name"] = title
+			}
+			// Get conference identifier (public key)
+			if chatId, err := s.tox.ConferenceGetIdentifier(confID); err == nil {
+				conf["chat_id"] = chatId
+			}
+			conferences = append(conferences, conf)
+		}
 		resp := map[string]interface{}{
 			"conferences": conferences,
 		}

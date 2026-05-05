@@ -386,13 +386,21 @@ function renderContactList(filter) {
     // Add groups
     if (filter === 'all' || filter === 'groups') {
         contacts.groups.forEach(g => {
-            const isSelected = g == currentChatId && currentChatType === 'group';
+            // g is object: {group_number, group_name, chat_id, ...}
+            const groupId = g.group_number;
+            // 名称为空时：显示 "number - chat_id前7位"
+            let groupName = g.group_name;
+            if (!groupName) {
+                const shortId = (g.chat_id || '').substring(0, 7);
+                groupName = shortId ? `${groupId} - ${shortId}` : `${t('group')} ${groupId}`;
+            }
+            const isSelected = groupId == currentChatId && currentChatType === 'group';
             const emoji = '👥';
             html += `
-                <div class="list-item ${isSelected ? 'selected' : ''}" data-group-id="${g}" onclick="selectContact(${g}, 'group')">
+                <div class="list-item ${isSelected ? 'selected' : ''}" data-group-id="${groupId}" onclick="selectContact(${groupId}, 'group')">
                     <span class="group-dot"></span>
                     <span class="item-emoji">${emoji}</span>
-                    <span class="item-text">${t('group')} ${g}</span>
+                    <span class="item-text">${groupName}</span>
                 </div>
             `;
         });
@@ -401,13 +409,21 @@ function renderContactList(filter) {
     // Add conferences
     if (filter === 'all' || filter === 'conferences') {
         contacts.conferences.forEach(c => {
-            const isSelected = c == currentChatId && currentChatType === 'conference';
+            // c is object: {conference_number, conference_name, chat_id, ...}
+            const confId = c.conference_number;
+            // 名称为空时：显示 "number - chat_id前7位"
+            let confName = c.conference_name;
+            if (!confName) {
+                const shortId = (c.chat_id || '').substring(0, 7);
+                confName = shortId ? `${confId} - ${shortId}` : `${t('conference_item')} ${confId}`;
+            }
+            const isSelected = confId == currentChatId && currentChatType === 'conference';
             const emoji = '🎙';
             html += `
-                <div class="list-item ${isSelected ? 'selected' : ''}" data-conference-id="${c}" onclick="selectContact(${c}, 'conference')">
+                <div class="list-item ${isSelected ? 'selected' : ''}" data-conference-id="${confId}" onclick="selectContact(${confId}, 'conference')">
                     <span class="conference-dot"></span>
                     <span class="item-emoji">${emoji}</span>
-                    <span class="item-text">${t('conference_item')} ${c}</span>
+                    <span class="item-text">${confName}</span>
                 </div>
             `;
         });
