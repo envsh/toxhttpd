@@ -11,6 +11,16 @@ let contacts = {
     conferences: []
 };
 
+// 使用 getter/setter 监控 currentFilter 的变化
+let _currentFilter = 'all';
+Object.defineProperty(window, 'currentFilter', {
+    get: function() { return _currentFilter; },
+    set: function(newVal) {
+        console.trace('currentFilter CHANGED from', _currentFilter, 'to', newVal);
+        _currentFilter = newVal;
+    }
+});
+
 // 多语言支持
 let currentLang = 'zh-CN'; // 默认简体中文
 let langData = {}; // 语言数据
@@ -343,8 +353,14 @@ function loadContacts(filter = 'all') {
 
 // Render merged contact list with emoji indicators
 function renderContactList(filter) {
+    console.log('renderContactList: filter=' + filter + ', currentFilter=' + currentFilter + ', currentChatId=' + currentChatId + ', currentChatType=' + currentChatType);
     const list = document.getElementById('contactList');
     let html = '';
+    
+    // 防御性检查：确保数组存在
+    if (!Array.isArray(contacts.friends)) contacts.friends = [];
+    if (!Array.isArray(contacts.groups)) contacts.groups = [];
+    if (!Array.isArray(contacts.conferences)) contacts.conferences = [];
     
     // Add friends
     if (filter === 'all' || filter === 'friends') {
@@ -406,7 +422,12 @@ function renderContactList(filter) {
 
 // Tab switching
 function showTab(tab) {
-    currentChatType = tab;
+    console.trace('showTab TRACE');
+    console.log('showTab called: tab=' + tab + ', old currentFilter=' + currentFilter);
+    // 注意：不要设置 currentChatType = tab，因为 tab 是复数形式（groups/conferences）
+    // 而 currentChatType 应该是单数形式（group/conference）
+    currentFilter = tab;
+    console.log('showTab after set: currentFilter=' + currentFilter);
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     event.target.classList.add('active');
 
@@ -421,11 +442,27 @@ function showTab(tab) {
 }
 
 // Select a contact (friend/group/conference)
+let lastSelectTime = 0;
 function selectContact(id, type) {
-    console.log('selectContact called: id=' + id + ', type=' + type + ', id type=' + typeof id);
+    const now = Date.now();
+    if (now - lastSelectTime < 300) {
+        console.warn('selectContact: ignoring rapid re-call (possible event loop)');
+        return;
+    }
+    lastSelectTime = now;
+    
+    console.trace('selectContact TRACE');
+    console.log('selectContact called: id=' + id + ', type=' + type + ', id type=' + typeof id + ', currentFilter=' + currentFilter);
+    
+    // 防御：如果 type 是复数形式，修正为单数
+    if (type === 'groups' || type === 'conferences') {
+        console.error('selectContact: invalid type=' + type + ', correcting to singular');
+        type = type.endsWith('s') ? type.slice(0, -1) : type;
+    }
+    
     currentChatId = id;
     currentChatType = type;
-    console.log('After set: currentChatId=' + currentChatId + ', currentChatType=' + currentChatType);
+    console.log('After set: currentChatId=' + currentChatId + ', currentChatType=' + currentChatType + ', currentFilter=' + currentFilter);
     
     let headerText = '';
     if (type === 'friend') {
@@ -439,10 +476,37 @@ function selectContact(id, type) {
     document.getElementById('chatHeaderText').textContent = headerText;
     document.getElementById('messageArea').innerHTML = '';
     
-    // Refresh list to show selection
-    renderContactList(currentChatType === 'friend' ? 'all' : 
-                     currentChatType === 'group' ? 'groups' : 
-                     currentChatType === 'conference' ? 'conferences' : 'all');
+    // 只更新选中状态，不重新渲染整个列表
+    updateSelection(id, type);
+}
+
+// 只更新选中状态，不重新渲染整个列表
+function updateSelection(id, type) {
+    console.log('updateSelection: id=' + id + ', type=' + type + ', currentFilter=' + currentFilter);
+    
+    // 移除所有选中状态
+    document.querySelectorAll('.list-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    
+    // 给当前选中的条目添加选中状态
+    let selector = '';
+    if (type === 'friend') {
+        selector = `.list-item[data-friend-id="${id}"]`;
+    } else if (type === 'group') {
+        selector = `.list-item[data-group-id="${id}"]`;
+    } else if (type === 'conference') {
+        selector = `.list-item[data-conference-id="${id}"]`;
+    }
+    
+    if (selector) {
+        const selectedItem = document.querySelector(selector);
+        if (selectedItem) {
+            selectedItem.classList.add('selected');
+        } else {
+            console.warn('updateSelection: item not found with selector=' + selector);
+        }
+    }
 }
 
 // Long polling for events
@@ -461,10 +525,8 @@ function longPollEvents() {
                             appendMessage(data.message, 'other', data.friend_id);
                         }
                     } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
-                        // Friend info updated, refresh contacts
-                        loadContacts(currentChatType === 'friend' ? 'all' :
-                                     currentChatType === 'group' ? 'groups' :
-                                     currentChatType === 'conference' ? 'conferences' : 'all');
+                        // Friend info updated, refresh contacts with current filter
+                        loadContacts(currentFilter);
                     } else if (event.event_type === 'connection_status') {
                         loadSelfInfo();
                     } else if (event.event_type === 'conference_invite') {
