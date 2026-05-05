@@ -134,7 +134,7 @@ function applyLanguage() {
     const groupMenuItems = document.querySelectorAll('#groupMenu .menu-item');
     if (groupMenuItems[0]) groupMenuItems[0].textContent = t('context_menu.view_info');
     if (groupMenuItems[1]) groupMenuItems[1].textContent = t('context_menu.view_members');
-    if (groupMenuItems[2]) groupMenuItems[2].textContent = t('context_menu.leave_conference');
+    if (groupMenuItems[2]) groupMenuItems[2].textContent = t('context_menu.leave_group');
     
     console.log('Language applied:', currentLang);
 }

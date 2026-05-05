@@ -85,8 +85,10 @@
     "connect_failed": "連接失敗",
     "context_menu": {
         "view_info": "查看資訊",
+        "view_members": "查看成員",
         "delete_friend": "刪除好友",
         "leave_conference": "離開會議",
+        "leave_group": "離開群組",
         "invite_to_conference": "邀請進會議",
         "invite_to_group": "邀請進群組"
     },

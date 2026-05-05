@@ -88,6 +88,7 @@
         "view_members": "查看成员",
         "delete_friend": "删除好友",
         "leave_conference": "离开会议",
+        "leave_group": "离开群组",
         "invite_to_conference": "邀请进会议",
         "invite_to_group": "邀请进群组"
     },
