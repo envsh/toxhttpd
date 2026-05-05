@@ -183,6 +183,7 @@ func NewServer(udpEnabled bool) (*Server, error) {
 	// Create Tox instance with options
 	opts := tox.NewToxOptions()
 	opts.Udp_enabled = udpEnabled
+	opts.GroupsPersistence = true
 	if saveData != nil {
 		opts.Savedata_type = tox.SAVEDATA_TYPE_TOX_SAVE
 		opts.Savedata_data = saveData
