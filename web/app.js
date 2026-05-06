@@ -665,6 +665,7 @@ function showConferenceInviteDialog(data) {
 
 // Show group invite dialog (同意-左, 拒绝-中, 忽略-右)
 function showGroupInviteDialog(data) {
+    console.log('Group invite data:', data); // Debug log
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
 
@@ -687,10 +688,16 @@ function showGroupInviteDialog(data) {
     // 同意按钮（最左）
     document.getElementById('groupAcceptBtn').onclick = function() {
         document.body.removeChild(overlay);
+        const inviteData = data.chat_id || data.invite_data || data.cookie || '';
+        if (!inviteData) {
+            alert('Invalid invite: missing chat_id. Please check console for details.');
+            console.error('Missing invite data:', data);
+            return;
+        }
         fetch('/api/groups/accept', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `invite_data=${data.invite_data}&friend_number=${data.friend_number}&name=${encodeURIComponent(data.name || '')}`
+            body: `invite_data=${encodeURIComponent(inviteData)}&friend_number=${data.friend_number}&name=${encodeURIComponent(data.name || '')}`
         }).then(r => r.json())
           .then(data => {
               if (data.error) {

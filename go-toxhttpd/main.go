@@ -100,6 +100,20 @@ func (q *EventQueue) Push(eventType string, data string) uint64 {
 	return event.ID
 }
 
+// DeleteEvent removes an event from the queue by ID
+func (q *EventQueue) DeleteEvent(id uint64) {
+    q.mu.Lock()
+    defer q.mu.Unlock()
+    
+    newEvents := make([]Event, 0, len(q.events))
+    for _, e := range q.events {
+        if e.ID != id {
+            newEvents = append(newEvents, e)
+        }
+    }
+    q.events = newEvents
+}
+
 func (q *EventQueue) PopAfter(after uint64) []Event {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -421,13 +435,18 @@ func setupCallbacks(s *Server) {
 		friendNumber uint32, data string, userData interface{}) {
 		log.Printf("[GroupInvite] group=%d, friend=%d, data=%s",
 			groupNumber, friendNumber, data)
+		// 检查 invite data 是否有效
+		if data == "" {
+			log.Printf("[GroupInvite] WARNING: empty invite data from friend %d, skipping event", friendNumber)
+			return
+		}
 		// 推送群组邀请事件到前端
 		eventData, _ := json.Marshal(map[string]interface{}{
 			"friend_number": friendNumber,
-			"group_number": groupNumber,
-			"chat_id":      data, // 64字符十六进制chat_id
+			"chat_id":      data, // 64字符十六进制chat_id (cookie)
 		})
 		s.eventQueue.Push("group_invite", string(eventData))
+		log.Printf("[GroupInvite] Pushed event: friend=%d, chat_id=%s", friendNumber, data)
 	}, nil)
 	
 	// 2. CallbackGroupSelfJoin - 自己加入群组回调
@@ -1119,6 +1138,9 @@ func (s *Server) handleGroupAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 确保 name 不为空（Tox Core 要求 name_length > 0）
+	name = s.getDefaultName(name)
+
 	var friendNumber uint32
 	fmt.Sscanf(friendNumberStr, "%d", &friendNumber)
 
@@ -1452,4 +1474,22 @@ func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// getDefaultName returns a default name for group join.
+// If input name is not empty, returns it directly.
+// Otherwise uses self name if available, otherwise "nonamed." + first 7 chars of public key.
+func (s *Server) getDefaultName(name string) string {
+	if name != "" {
+		return name
+	}
+	selfName := s.tox.SelfGetName()
+	if selfName != "" {
+		return selfName
+	}
+	pubkey := s.tox.SelfGetPublicKey()
+	if len(pubkey) >= 7 {
+		return "nonamed." + pubkey[:7]
+	}
+	return "nonamed"
 }
