@@ -1,6 +1,7 @@
 let currentChatId = null;
 let currentChatType = null; // 'friend', 'group', or 'conference'
 let lastEventId = 0;
+let currentEventId = 0; // For deleting events after processing
 let pollTimeout = null;
 let selfAddress = ''; // 保存完整地址
 
@@ -559,6 +560,7 @@ function longPollEvents() {
                         }
                     } else if (event.event_type === 'group_invite') {
                         const data = JSON.parse(event.data);
+                        currentEventId = event.id; // Save event ID for deletion
                         showGroupInviteDialog(data);
                     } else if (event.event_type === 'group_message') {
                         const data = JSON.parse(event.data);
@@ -688,6 +690,10 @@ function showGroupInviteDialog(data) {
     // 同意按钮（最左）
     document.getElementById('groupAcceptBtn').onclick = function() {
         document.body.removeChild(overlay);
+        // Delete the event
+        if (currentEventId > 0) {
+            fetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
+        }
         const inviteData = data.chat_id || data.invite_data || data.cookie || '';
         if (!inviteData) {
             alert('Invalid invite: missing chat_id. Please check console for details.');
@@ -714,6 +720,10 @@ function showGroupInviteDialog(data) {
     // 拒绝按钮（中间）
     document.getElementById('groupRejectBtn').onclick = function() {
         document.body.removeChild(overlay);
+        // Delete the event
+        if (currentEventId > 0) {
+            fetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
+        }
         fetch('/api/groups/reject', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -726,6 +736,10 @@ function showGroupInviteDialog(data) {
     // 忽略按钮（最右）
     document.getElementById('groupIgnoreBtn').onclick = function() {
         document.body.removeChild(overlay);
+        // Delete the event
+        if (currentEventId > 0) {
+            fetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
+        }
         fetch('/api/groups/ignore', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -753,7 +767,7 @@ function sendMessage() {
         body = `friend_id=${currentChatId}&message=${encodeURIComponent(msg)}`;
     } else if (currentChatType === 'group') {
         url = '/api/group_messages';
-        body = `group_id=${currentChatId}&message=${encodeURIComponent(msg)}`;
+        body = `group_number=${currentChatId}&message=${encodeURIComponent(msg)}`;
     } else if (currentChatType === 'conference') {
         url = '/api/conference_messages';
         body = `conference_id=${currentChatId}&message=${encodeURIComponent(msg)}`;

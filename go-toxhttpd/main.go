@@ -1159,6 +1159,21 @@ func (s *Server) handleGroupAccept(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodDelete {
+		// Delete event by ID
+		eventIDStr := r.URL.Query().Get("id")
+		var eventID uint64
+		fmt.Sscanf(eventIDStr, "%d", &eventID)
+		if eventID > 0 {
+			s.eventQueue.DeleteEvent(eventID)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"message": "event deleted"})
+			return
+		}
+		http.Error(w, `{"error":"invalid event id"}`, http.StatusBadRequest)
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return

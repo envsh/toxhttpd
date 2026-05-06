@@ -229,6 +229,12 @@ bool ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message)
     return !response.empty();
 }
 
+bool ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
+    std::string postData = "group_number=" + std::to_string(groupId) + "&message=" + message;
+    std::string response = httpPost("/api/group_messages", postData);
+    return !response.empty();
+}
+
 std::vector<ConferenceInfo> ToxAPI::getConferences() {
     std::vector<ConferenceInfo> conferences;
     std::string response = httpGet("/api/conferences");

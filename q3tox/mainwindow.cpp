@@ -217,9 +217,19 @@ void MainWindow::onMessageSent(const QString& message) {
     }
     
     // ✅ 改为异步请求
-    ApiRequestEvent* req = new ApiRequestEvent(
-        currentChatType == "friend" ? ApiSendFriendMessage : ApiSendConferenceMessage
-    );
+    ApiRequestType reqType;
+    if (currentChatType == "friend") {
+        reqType = ApiSendFriendMessage;
+    } else if (currentChatType == "group") {
+        reqType = ApiSendGroupMessage;
+    } else if (currentChatType == "conference") {
+        reqType = ApiSendConferenceMessage;
+    } else {
+        qWarning("Unknown chat type: %s", qToUtf8(currentChatType).data());
+        return;
+    }
+    
+    ApiRequestEvent* req = new ApiRequestEvent(reqType);
     req->id = currentChatId;
     req->message = std::string(qToUtf8(message));
     eventPoller->postApiRequest(req);

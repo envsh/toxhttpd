@@ -104,7 +104,8 @@
         "accept": "接受",
         "reject": "拒絕",
         "password_optional": "密碼（可選）：",
-        "joined": "已加入群組 {0}",
+        "joined": "已加入群組 %1",
+        "group.joined": "已加入群組 %1",
         "join_failed": "加入群組失敗",
         "rejected": "已拒絕群組邀請"
     },

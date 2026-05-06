@@ -104,7 +104,8 @@
         "accept": "Accept",
         "reject": "Reject",
         "password_optional": "Password (optional):",
-        "joined": "Joined group {0}",
+        "joined": "Joined group %1",
+        "group.joined": "Joined group %1",
         "join_failed": "Failed to join group",
         "rejected": "Group invitation rejected"
     },

@@ -149,6 +149,15 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
             QApplication::postEvent(receiver, result);
             break;
         }
+        case ApiSendGroupMessage: {
+            MessageSentResultEvent* result = new MessageSentResultEvent();
+            result->chatId = req->id;
+            result->chatType = "group";
+            result->success = api->sendGroupMessage(req->id, req->message);
+            result->message = req->message;
+            QApplication::postEvent(receiver, result);
+            break;
+        }
         case ApiJoinConference: {
             ConferenceResultEvent* result = new ConferenceResultEvent();
             // 需要从请求中获取friendNumber和cookie

@@ -91,8 +91,8 @@
     },
     "member_list": {
         "title": "成员列表",
-        "title.conference": "会议成员 - {0}",
-        "title.group": "群组成员 - {0}"
+        "title.conference": "会议成员 - %1",
+        "title.group": "群组成员 - %1"
     },
     "select_chat_object": "选择聊天对象",
     "please_enter_chat_id": "请输入群组chat_id",
@@ -110,7 +110,8 @@
         "accept": "接受",
         "reject": "拒绝",
         "password_optional": "密码（可选）：",
-        "joined": "已加入群组 {0}",
+        "joined": "已加入群组 %1",
+        "group.joined": "已加入群组 %1",
         "join_failed": "加入群组失败",
         "rejected": "已拒绝群组邀请"
     },

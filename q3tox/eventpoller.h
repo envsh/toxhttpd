@@ -19,6 +19,7 @@ enum ApiRequestType {
     ApiLoadAllData,        // 加载所有初始数据（self + contacts）
     ApiSendFriendMessage,
     ApiSendConferenceMessage,
+    ApiSendGroupMessage,    // 新增：发送群组消息
     ApiJoinConference,
     ApiRejectConference,
     ApiAddFriend
