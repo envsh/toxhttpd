@@ -389,12 +389,12 @@ func setupCallbacks(s *Server) {
 	}, nil)
 
 	// Group message callback (NGC)
-	s.tox.CallbackGroupMessage(func(this *tox.Tox, groupNumber int, peerNumber int, message string, userData interface{}) {
+	s.tox.CallbackGroupMessage(func(this *tox.Tox, groupNumber tox.GroupNumber, peerNumber tox.GroupPeerNumber, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] GroupMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": groupNumber,
 			"peer_number": peerNumber,
-			"message":     message,
+			"message":      message,
 		})
 		s.eventQueue.Push("group_message", string(data))
 	}, nil)
@@ -430,8 +430,8 @@ func setupCallbacks(s *Server) {
 		s.eventQueue.Push("conference_peer_list_changed", string(data))
 	}, nil)
 	
-	// 1. CallbackGroupChatInvite - 邀请回调
-	s.tox.CallbackGroupChatInvite(func(this *tox.Tox, groupNumber tox.GroupNumber,
+	// 1. CallbackGroupInvite - 邀请回调
+	s.tox.CallbackGroupInvite(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		friendNumber uint32, data string, userData interface{}) {
 		log.Printf("[GroupInvite] group=%d, friend=%d, data=%s",
 			groupNumber, friendNumber, data)
