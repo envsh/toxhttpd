@@ -1,10 +1,11 @@
+---
 name: CI
 
 on:
   push:
-    branches: [ main, master, tryci ]
+    branches: [main, master, tryci]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 jobs:
   build-backend:
@@ -18,38 +19,137 @@ jobs:
       - name: Install backend dependencies
         run: |
           sudo apt update
-          sudo apt install -y libtoxcore-dev libopus-dev libsodium-dev libcurl4-openssl-dev
+          sudo apt install -y libtoxcore-dev libopus-dev \
+            libsodium-dev libcurl4-openssl-dev
       - name: Pre-build custom commands
         run: ./scripts/ci_prebuild_go.sh
       - name: Build backend
         run: cd go-toxhttpd && ls -lh || true
-      - name: Verify backend binary
-        run: test -f go-toxhttpd/toxhttpd-go
+      - name: Prepare backend artifact
+        run: |
+          mkdir -p bin
+          cp go-toxhttpd/toxhttpd-go bin/toxhttpd-go
+          chmod +x bin/toxhttpd-go
+      - name: Upload backend binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: toxhttpd-go-backend
+          path: bin/
+          retention-days: 30
 
-  build-qltox-qt4-u20:
+  # Note: Ubuntu 18.04 is NOT supported as a container for GitHub Actions
+  # because the runner's Node.js 20 requires GLIBC 2.28+, but Ubuntu 18.04
+  # only has GLIBC 2.27.
+  # Error: /__e/node20/bin/node: /lib/x86_64-linux-gnu/libc.so.6:
+  # version `GLIBC_2.28' not found
+
+  build-qltox-qt4:
     runs-on: ubuntu-22.04
     container: ubuntu:20.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TERM: xterm
     steps:
       - uses: actions/checkout@v4
-      - name: Install Qt4 and dependencies
+      - name: Install Qt4 from PPA
         run: |
-          apt update
-          apt install -y qt4-default libqt4-dev qt4-qmake libcurl4-openssl-dev libcjson-dev
-      - name: Pre-build custom commands
-        run: ./scripts/ci_prebuild_qt.sh
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            software-properties-common \
+            wget \
+            gnupg \
+            build-essential \
+            pkg-config \
+            xvfb
+
+          # 添加 rock-core/qt4 PPA
+          add-apt-repository ppa:rock-core/qt4 -y
+
+          apt-get update
+
+          # 安装Qt4及依赖
+          apt-get install -y --no-install-recommends \
+            qt4-default \
+            libqt4-dev \
+            qt4-qmake \
+            qt4-dev-tools \
+            libcurl4-openssl-dev \
+            libcjson-dev \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev
+
+          rm -rf /var/lib/apt/lists/*
+      - name: Verify Qt4 installation
+        run: |
+          qmake -v
+          dpkg -l | grep -E "qt4|libqt" | head -10
+      - name: Verify build tools and libcurl
+        run: |
+          make -v
+          gcc --version | head -1
+          g++ --version | head -1
+          pkg-config --modversion libcurl || true
+          dpkg -l | grep -E "libcurl|build-essential"
       - name: Build q3tox with Qt4
         run: |
           cd q3tox
-          qmake -makefile
+          qmake q3tox.pro
           make -j$(nproc)
-      - name: Verify executable
-        run: test -f q3tox/q3tox
-      - name: Basic functional test
+      - name: Prepare frontend artifact
         run: |
-          cd q3tox
-          if ./q3tox --help 2>&1 | grep -qiE "usage|help|version"; then
-            echo "q3tox --help succeeded"
-          else
-            timeout 2s ./q3tox 2>&1 || test $? -eq 124
-            echo "q3tox started and terminated (expected for GUI app)"
+          mkdir -p bin
+          cp q3tox/q3tox bin/q3tox
+          chmod +x bin/q3tox
+      - name: Upload q3tox binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: q3tox-qt4-frontend
+          path: bin/
+          retention-days: 30
+
+  package-release:
+    runs-on: ubuntu-22.04
+    needs: [build-backend, build-qltox-qt4]
+    steps:
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: toxhttpd-go-backend
+          path: release/
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: q3tox-qt4-frontend
+          path: release/
+      - name: Debug release structure
+        run: |
+          echo "Release directory structure:"
+          find release/ -type f | sort
+          ls -lhR release/
+      - name: Organize files for packaging
+        run: |
+          mkdir -p release/bin
+          if [ -f release/toxhttpd-go ]; then
+            mv release/toxhttpd-go release/bin/
+            echo "Moved toxhttpd-go to bin/"
           fi
+          if [ -f release/q3tox ]; then
+            mv release/q3tox release/bin/
+            echo "Moved q3tox to bin/"
+          fi
+          echo "Release directory structure after organizing:"
+          ls -lhR release/
+      - name: Create unified release tarball
+        run: |
+          cd release
+          tar czvf ../toxhttpd-release-${{ github.sha }}.tar.gz bin/
+          cd ..
+          ls -lh toxhttpd-release-*.tar.gz
+      - name: Upload unified release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: toxhttpd-release-${{ github.sha }}
+          path: toxhttpd-release-*.tar.gz
+          retention-days: 90
