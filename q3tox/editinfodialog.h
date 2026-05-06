@@ -7,7 +7,9 @@
 class EditInfoDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit EditInfoDialog(QWidget* parent = nullptr);
+    explicit EditInfoDialog(const QString& initialName = "", 
+                           const QString& initialStatus = "", 
+                           QWidget* parent = nullptr);
     
     QString getName() const;
     QString getStatusMessage() const;

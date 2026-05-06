@@ -46,6 +46,8 @@ public:
     
     // Self
     bool getSelf(std::string& name, std::string& statusMsg, std::string& connStatus, std::string& address);
+    bool setSelfInfo(const std::string& name, const std::string& status_message);
+    // Keep old functions for compatibility (call setSelfInfo internally)
     bool setSelfName(const std::string& name);
     bool setSelfStatus(const std::string& status);
     

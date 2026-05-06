@@ -120,16 +120,32 @@ bool ToxAPI::getSelf(std::string& name, std::string& statusMsg, std::string& con
     return true;
 }
 
-bool ToxAPI::setSelfName(const std::string& name) {
-    std::string postData = "name=" + name;
-    std::string response = httpPost("/api/self/name", postData);
+bool ToxAPI::setSelfInfo(const std::string& name, const std::string& status_message) {
+    std::string postData;
+    bool hasParams = false;
+    
+    if (!name.empty()) {
+        postData += "name=" + urlEncode(name);
+        hasParams = true;
+    }
+    if (!status_message.empty()) {
+        if (hasParams) postData += "&";
+        postData += "status_message=" + urlEncode(status_message);
+        hasParams = true;
+    }
+    
+    if (!hasParams) return true; // No params, return directly
+    
+    std::string response = httpPost("/api/self", postData);
     return !response.empty();
 }
 
+bool ToxAPI::setSelfName(const std::string& name) {
+    return setSelfInfo(name, "");
+}
+
 bool ToxAPI::setSelfStatus(const std::string& status) {
-    std::string postData = "status_message=" + status;
-    std::string response = httpPost("/api/self/status", postData);
-    return !response.empty();
+    return setSelfInfo("", status);
 }
 
 std::vector<int> ToxAPI::getFriends() {

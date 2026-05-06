@@ -1355,27 +1355,21 @@ function saveSelfInfo() {
     const name = document.getElementById('editName').value.trim();
     const status = document.getElementById('editStatus').value.trim();
     
-    const promises = [];
+    // 合并为一次 POST 请求
+    const params = new URLSearchParams();
     if (name) {
-        promises.push(
-            fetch('/api/self/name', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: `name=${encodeURIComponent(name)}`
-            })
-        );
+        params.append('name', name);
     }
     if (status) {
-        promises.push(
-            fetch('/api/self/status', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: `status_message=${encodeURIComponent(status)}`
-            })
-        );
+        params.append('status_message', status);
     }
     
-    Promise.all(promises)
+    if (name || status) {
+        fetch('/api/self', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: params.toString()
+        })
         .then(() => {
             hideEditSelf();
             loadSelfInfo();
@@ -1383,6 +1377,10 @@ function saveSelfInfo() {
         .catch(err => {
             alert(t('save_failed') + ': ' + err);
         });
+    } else {
+        hideEditSelf();
+        loadSelfInfo();
+    }
 }
 
 // Bootstrap

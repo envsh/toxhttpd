@@ -516,6 +516,54 @@ func setupCallbacks(s *Server) {
 }
 
 func (s *Server) handleSelf(w http.ResponseWriter, r *http.Request) {
+	// Handle POST requests (modify self info)
+	if r.Method == http.MethodPost {
+		params, err := getRequestParams(r)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+			return
+		}
+
+		// Update name
+		if newName := params.Get("name"); newName != "" {
+			if err := s.tox.SelfSetName(newName); err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"failed to set name: %s"}`, err), http.StatusBadRequest)
+				return
+			}
+			log.Printf("[TOX] Self name updated: %s", newName)
+		}
+
+		// Update status message
+		if newStatus := params.Get("status_message"); newStatus != "" {
+			if _, err := s.tox.SelfSetStatusMessage(newStatus); err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"failed to set status: %s"}`, err), http.StatusBadRequest)
+				return
+			}
+			log.Printf("[TOX] Self status message updated: %s", newStatus)
+		}
+
+		// Return updated info
+		addr := s.tox.SelfGetAddress()
+		name := s.tox.SelfGetName()
+		status, _ := s.tox.SelfGetStatusMessage()
+
+		s.mu.RLock()
+		connStatus := s.selfConnectionStatus
+		s.mu.RUnlock()
+
+		resp := map[string]interface{}{
+			"message":           "updated",
+			"address":           addr,
+			"name":              name,
+			"status_message":    status,
+			"connection_status": connStatus,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// Handle GET requests (query self info)
 	if r.Method != http.MethodGet {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return

@@ -118,26 +118,41 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
 }
 
 void SelfInfoWidget::onEditInfo() {
-    EditInfoDialog dialog(this);
+    // 从现有控件读取当前值
+    QString currentName = nameLabel->text();
+    QString currentStatus = statusMsgLabel->text();
+    
+    // 如果是默认值，传递空字符串（让对话框显示为空）
+    if (currentName == _("no_name") || currentName == "未设置名称") {
+        currentName = "";
+    }
+    if (currentStatus == _("no_status") || currentStatus == "无状态消息") {
+        currentStatus = "";
+    }
+    
+    EditInfoDialog dialog(currentName, currentStatus, this);
     if (dialog.exec() == QDialog::Accepted) {
         ToxAPI api;
         QString name = dialog.getName();
         QString status = dialog.getStatusMessage();
         
-        if (!name.isEmpty()) {
-            api.setSelfName(std::string(qToUtf8(name).data()));
-        }
-        if (!status.isEmpty()) {
-            api.setSelfStatus(std::string(qToUtf8(status).data()));
-        }
+        // 合并为一次调用
+        bool success = api.setSelfInfo(
+            std::string(qToUtf8(name).data()),
+            std::string(qToUtf8(status).data())
+        );
         
-        // 重新加载信息
-        std::string name2, statusMsg, connStatus, address;
-        if (api.getSelf(name2, statusMsg, connStatus, address)) {
-            updateInfo(QString::fromUtf8(name2.c_str()), 
-                      QString::fromUtf8(statusMsg.c_str()), 
-                      QString::fromUtf8(connStatus.c_str()),
-                      QString::fromUtf8(address.c_str()));
+        if (success) {
+            // 重新加载信息
+            std::string name2, statusMsg, connStatus, address;
+            if (api.getSelf(name2, statusMsg, connStatus, address)) {
+                updateInfo(QString::fromUtf8(name2.c_str()), 
+                          QString::fromUtf8(statusMsg.c_str()), 
+                          QString::fromUtf8(connStatus.c_str()),
+                          QString::fromUtf8(address.c_str()));
+            }
+        } else {
+            QMessageBox::warning(this, _("save_failed"), _("save_failed"));
         }
     }
 }

@@ -29,7 +29,7 @@ private:
     QPushButton* editBtn;
     QPushButton* connectBtn;
     QPushButton* qrBtn;
-    
+
     QString selfAddress;
 };
 

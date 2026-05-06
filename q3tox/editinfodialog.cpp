@@ -2,7 +2,9 @@
 #include "translator.h"
 #include "compat34.h"
 
-EditInfoDialog::EditInfoDialog(QWidget* parent) : QDialog(parent) {
+EditInfoDialog::EditInfoDialog(const QString& initialName, 
+                                   const QString& initialStatus, 
+                                   QWidget* parent) : QDialog(parent) {
     qSetWindowTitle(this, _("modals.edit_info_title"));
     resize(400, 200);
     
@@ -14,6 +16,7 @@ EditInfoDialog::EditInfoDialog(QWidget* parent) : QDialog(parent) {
     nameLabel->setFixedWidth(80);
     nameLayout->addWidget(nameLabel);
     nameEdit = new QLineEdit(this);
+    nameEdit->setText(initialName);  // 设置初始值
     nameLayout->addWidget(nameEdit, 1);
     mainLayout->addLayout(nameLayout);
     
@@ -23,6 +26,7 @@ EditInfoDialog::EditInfoDialog(QWidget* parent) : QDialog(parent) {
     statusLabel->setFixedWidth(80);
     statusLayout->addWidget(statusLabel);
     statusEdit = new QLineEdit(this);
+    statusEdit->setText(initialStatus);  // 设置初始值
     statusLayout->addWidget(statusEdit, 1);
     mainLayout->addLayout(statusLayout);
     
