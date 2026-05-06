@@ -66,6 +66,17 @@ std::string ToxAPI::httpPost(const std::string& endpoint, const std::string& pos
     return response;
 }
 
+// URL encode string using curl_easy_escape
+std::string ToxAPI::urlEncode(const std::string& str) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return str;
+    char* encoded = curl_easy_escape(curl, str.c_str(), (int)str.length());
+    std::string result = encoded ? encoded : str;
+    if (encoded) curl_free(encoded);
+    curl_easy_cleanup(curl);
+    return result;
+}
+
 ToxAPI::ToxAPI(const std::string& baseUrl) : baseUrl(baseUrl) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
 }
@@ -218,19 +229,19 @@ bool ToxAPI::inviteToConference(int friendId, int confId) {
 }
 
 bool ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
-    std::string postData = "friend_id=" + std::to_string(friendId) + "&message=" + message;
+    std::string postData = "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message);
     std::string response = httpPost("/api/messages", postData);
     return !response.empty();
 }
 
 bool ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
-    std::string postData = "conference_id=" + std::to_string(conferenceId) + "&message=" + message;
+    std::string postData = "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message);
     std::string response = httpPost("/api/conference_messages", postData);
     return !response.empty();
 }
 
 bool ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
-    std::string postData = "group_number=" + std::to_string(groupId) + "&message=" + message;
+    std::string postData = "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message);
     std::string response = httpPost("/api/group_messages", postData);
     return !response.empty();
 }

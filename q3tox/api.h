@@ -87,7 +87,8 @@ public:
     
 private:
     std::string baseUrl;
-    
+
+    std::string urlEncode(const std::string& str);
     std::string httpGet(const std::string& endpoint);
     std::string httpPost(const std::string& endpoint, const std::string& postData);
 };
