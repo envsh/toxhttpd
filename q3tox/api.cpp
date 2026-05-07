@@ -359,6 +359,10 @@ std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
             const char* dataStr = dataItem ? cJSON_GetStringValue(dataItem) : "";
             event.data = dataStr ? dataStr : "";
             
+            cJSON* timestampItem = cJSON_GetObjectItem(item, "timestamp");
+            const char* timestampStr = timestampItem ? cJSON_GetStringValue(timestampItem) : "";
+            event.timestamp = timestampStr ? timestampStr : "";
+            
             events.push_back(event);
         }
     }

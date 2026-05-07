@@ -1,6 +1,12 @@
 #include "mainwindow.h"
 #include "compat34.h"
-//#include <QDateTime>
+
+// 获取当前时间字符串 (hh:mm:ss)
+static QString getCurrentTime() {
+    QTime now = QTime::currentTime();
+    return now.toString("hh:mm:ss");
+}
+
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
@@ -245,7 +251,7 @@ void MainWindow::onMessageSent(const QString& message) {
     eventPoller->postApiRequest(req);
     
     // 乐观更新：先显示在界面
-    chatWidget->appendMessage(message, "self");
+    chatWidget->appendMessage(message, "self", "Me", getCurrentTime());
 }
 
 void MainWindow::handleEvents(const EventList& events) {
@@ -263,7 +269,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
                     if (friendId == currentChatId && currentChatType == "friend") {
                         chatWidget->appendMessage(message, "other", 
-                                         _("friend_label").arg(QString::number(friendId)));
+                                         _("friend_label").arg(QString::number(friendId)), getCurrentTime());
                     }
                 }
                 cJSON_Delete(root);
@@ -316,10 +322,9 @@ void MainWindow::handleEvents(const EventList& events) {
                              (confNumber == currentChatId && currentChatType == "conference"));
                     
                     if (confNumber == currentChatId && currentChatType == "conference") {
-                        QString sender = (peerNumber >= 0) ? 
-                            QString("Peer %1").arg(peerNumber) : _("conference_item");
+                    QString sender = QString("Peer %1").arg(peerNumber);
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
-                        chatWidget->appendMessage(message, "other", sender);
+                        chatWidget->appendMessage(message, "other", sender, getCurrentTime());
                     }
                 } else {
                     qWarning("conference_message: missing confNumber or message");
@@ -360,7 +365,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     if (groupNumber == currentChatId && currentChatType == "group") {
                         QString sender = (peerNumber >= 0) ? 
                             QString("Peer %1").arg(peerNumber) : _("group_item");
-                        chatWidget->appendMessage(message, "other", sender);
+                        chatWidget->appendMessage(message, "other", sender, getCurrentTime());
                     }
                 }
                 cJSON_Delete(root);
@@ -731,11 +736,11 @@ void MainWindow::loadMessageHistory() {
                         senderLabel = QString::fromUtf8(it->second.c_str());
                         avatarText = qToUpper(senderLabel.left(1));  // 昵称首字母
                     } else {
-                        senderLabel = QString("Peer %1").arg(msg.sender_number);
-                        avatarText = "?";  // 未知
+                        senderLabel = QString("Friend %1").arg(currentChatId);
+                        avatarText = "F";
                     }
                 } else {
-                    // 群组/会议消息
+                    // 群组/会议消息：直接显示后端返回的 peer number
                     senderLabel = QString("Peer %1").arg(msg.sender_number);
                     avatarText = "P";  // Peer 的首字母
                 }

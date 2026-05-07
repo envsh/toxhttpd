@@ -26,6 +26,7 @@
 #include <qcheckbox.h>
 #include <qclipboard.h>
 #include <qfileinfo.h>
+#include <qdatetime.h>
 #include <unistd.h>
 #else
 // ========== Qt4 头文件 ==========
@@ -235,24 +236,9 @@ inline QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int
 #endif
 }
 
-// 时间字符串解析：从 "yyyy-MM-dd hh:mm:ss" 提取 "hh:mm"
-inline QString qFormatTime(const QString& createdAt) {
-#ifdef QT3_BUILD
-    // Qt3: 手动解析，split 后取时间部分
-    QStringList parts = QStringList::split(" ", createdAt);
-    if (parts.count() >= 2) {
-        return parts[1].left(5);  // 取 "hh:mm"
-    }
-    return QString();
-#else
-    // Qt4: 使用 QDateTime
-    QDateTime dt = QDateTime::fromString(createdAt, "yyyy-MM-dd hh:mm:ss");
-    if (dt.isValid()) {
-        return dt.toString("hh:mm");
-    }
-    return QString();
-#endif
-}
+// 时间函数声明
+QString qFormatTime(const QString& createdAt);
+QString qFormatISO8601(const QString& iso8601Str);
 
 // QPtrList 兼容 (Qt3 原生，Qt4 用 QList<T*> 模拟)
 #ifndef QT3_BUILD

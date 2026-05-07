@@ -19,6 +19,7 @@ struct Event {
     uint64_t id;
     std::string type;
     std::string data;
+    std::string timestamp;  // ISO8601 format from server
 };
 
 struct PeerInfo {
