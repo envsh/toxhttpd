@@ -335,16 +335,15 @@ func setupCallbacks(s *Server) {
 	// Friend message callback
 	s.tox.CallbackFriendMessage(func(this *tox.Tox, friendNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendMessage: friend=%d, message=%s", friendNumber, message)
+		friendPubKey, _ := s.tox.FriendGetPublicKey(friendNumber)
 		data, _ := json.Marshal(map[string]interface{}{
-			"friend_id": friendNumber,
 			"message":   message,
+			"sender":    friendPubKey,
+			"direction": "received",
 		})
 		s.eventQueue.Push("friend_message", string(data))
 		// Persist to SQLite with friend pubkey as chanid
-		friendPubKey, err := s.tox.FriendGetPublicKey(friendNumber)
-		if err == nil {
-			s.persistEventToSQLite(friendPubKey, string(data))
-		}
+		s.persistEventToSQLite(friendPubKey, string(data))
 	}, nil)
 
 	// Friend connection status callback
@@ -458,15 +457,17 @@ func setupCallbacks(s *Server) {
 	// Conference message callback
 	s.tox.CallbackConferenceMessage(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
+		chatId, _ := s.tox.ConferenceGetIdentifier(groupNumber)
+		// Get peer pubkey
+		peerPubKey, _ := s.tox.ConferencePeerGetPublicKey(groupNumber, peerNumber)
 		data, _ := json.Marshal(map[string]interface{}{
-			"conference_number": groupNumber,
-			"peer_number":      peerNumber,
-			"message":          message,
+			"message":   message,
+			"sender":    peerPubKey,
+			"direction": "received",
 		})
 		s.eventQueue.Push("conference_message", string(data))
 		// Persist to SQLite with conference identifier as chanid
-		chatId, err := s.tox.ConferenceGetIdentifier(groupNumber)
-		if err == nil {
+		if chatId != "" {
 			s.persistEventToSQLite(chatId, string(data))
 		}
 	}, nil)
@@ -474,15 +475,17 @@ func setupCallbacks(s *Server) {
 	// Group message callback (NGC)
 	s.tox.CallbackGroupMessage(func(this *tox.Tox, groupNumber tox.GroupNumber, peerNumber tox.GroupPeerNumber, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] GroupMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
+		chatId, _ := s.tox.GroupGetChatId(groupNumber)
+		// Get peer pubkey
+		peerPubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, peerNumber)
 		data, _ := json.Marshal(map[string]interface{}{
-			"group_number": groupNumber,
-			"peer_number": peerNumber,
-			"message":      message,
+			"message":   message,
+			"sender":    peerPubKey,
+			"direction": "received",
 		})
 		s.eventQueue.Push("group_message", string(data))
 		// Persist to SQLite with group chat_id as chanid
-		chatId, err := s.tox.GroupGetChatId(groupNumber)
-		if err == nil {
+		if chatId != "" {
 			s.persistEventToSQLite(chatId, string(data))
 		}
 	}, nil)
@@ -799,6 +802,16 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Persist outgoing friend message to SQLite with sender pubkey
+	friendPubKey, _ := s.tox.FriendGetPublicKey(friendID)
+	selfPubKey := s.tox.SelfGetPublicKey()
+	data, _ := json.Marshal(map[string]interface{}{
+		"message":   message,
+		"sender":    selfPubKey,
+		"direction": "sent",
+	})
+	s.persistEventToSQLite(friendPubKey, string(data))
+
 	resp := map[string]interface{}{
 		"message_id": msgID,
 	}
@@ -972,6 +985,18 @@ func (s *Server) handleGroupSendMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Persist outgoing group message to SQLite with sender pubkey
+	chatId, _ := s.tox.GroupGetChatId(groupNumber)
+	selfPubKey := s.tox.SelfGetPublicKey()
+	data, _ := json.Marshal(map[string]interface{}{
+		"message":   message,
+		"sender":    selfPubKey,
+		"direction": "sent",
+	})
+	if chatId != "" {
+		s.persistEventToSQLite(chatId, string(data))
+	}
+
 	resp := map[string]interface{}{
 		"message_id": uint64(msgId),
 		"message":   "message sent",
@@ -1001,6 +1026,18 @@ func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 		return
+	}
+
+	// Persist outgoing conference message to SQLite with sender pubkey
+	chatId, _ := s.tox.ConferenceGetIdentifier(confID)
+	selfPubKey := s.tox.SelfGetPublicKey()
+	data, _ := json.Marshal(map[string]interface{}{
+		"message":   message,
+		"sender":    selfPubKey,
+		"direction": "sent",
+	})
+	if chatId != "" {
+		s.persistEventToSQLite(chatId, string(data))
 	}
 
 	resp := map[string]interface{}{
