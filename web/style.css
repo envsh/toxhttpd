@@ -727,19 +727,26 @@ select option {
     color: #c9d1d9;
 }
 
-/* 自己消息：头像在右侧 */
+/* 自己消息：整体靠右，头像在右 */
 .message.self {
-    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
+/* 自己消息头像在右侧 */
+.message.self .avatar-col {
+    order: 2;
+    margin-left: 8px;
+}
+
+/* 自己消息内容在左侧 */
+.message.self .content-col {
+    order: 1;
+    text-align: right;
 }
 
 /* 自己消息头部右对齐（时间+昵称） */
 .message.self .message-header {
     justify-content: flex-end;
-}
-
-/* 自己消息内容右对齐 */
-.message.self .content-col {
-    text-align: right;
 }
 
 /* 自己消息气泡靠右 */
