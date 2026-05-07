@@ -2,7 +2,7 @@ module github.com/anomalyco/toxhttpd-go
 
 go 1.21
 
-replace github.com/TokTok/go-toxcore-c => ./go-toxcore-c
+// replace github.com/TokTok/go-toxcore-c => ./go-toxcore-c
 
 require (
 	github.com/TokTok/go-toxcore-c v0.2.18-0.20250216202442-0f7463080d5c // indirect

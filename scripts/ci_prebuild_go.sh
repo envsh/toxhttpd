@@ -20,9 +20,11 @@ export CGO_CFLAGS="-I$PROJDIR/toxlibs/include"
 export CGO_LDFLAGS="-L$PROJDIR/toxlibs/lib"
 export PKG_CONFIG_PATH=$PROJDIR/toxlibs/lib/pkgconfig
 
+cd go-toxhttpd && ln -sv go.work.impl go.work
 # cd go-toxhttpd && go build -v ./...
-cd go-toxhttpd && go build -v
+go build -v
 
 pwd && ls -lh && ldd toxhttpd-go
 
+# it should be in $PROJDIR/go-toxhttpd/
 exit 0
