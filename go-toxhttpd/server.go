@@ -53,6 +53,28 @@ var bootstrapNodes = []BootstrapNode{
 		PublicKey:  "E20ABCF38CDBFFD7D04B29C956B33F7B27A3BB7AF0618101617B036E4AEA402D",
 		Maintainer: "2mf (C version)",
 	},
+	{
+      IPv4: "144.217.167.73",
+      IPv6: "-",
+      Port: 33445,
+      PublicKey: "7E5668E0EE09E19F320AD47902419331FFEE147BB3606769CFBE921A2A2FD34C",
+      Maintainer: "velusip",
+    },
+    {
+      IPv4: "tox.abilinski.com",
+      IPv6: "-",
+      Port: 33445,
+      PublicKey: "10C00EB250C3233E343E2AEBA07115A5C28920E9C8D29492F6D00B29049EDC7E",
+      Maintainer: "AnthonyBilinski",
+    },
+    {
+      IPv4: "86.107.187.54",
+      IPv6: "-",
+      Port: 33445,
+      PublicKey: "2C0F90965134C7BEFAFE72B077A19221628D7045BB51C1165A2C75CDB2B32634",
+      Maintainer: "Boca",
+    },	
+	
 }
 
 // bootstrapAll bootstraps the Tox instance to all nodes (UDP + TCP relay)
