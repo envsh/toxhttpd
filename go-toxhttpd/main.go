@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	tox "github.com/TokTok/go-toxcore-c"
 )
 
@@ -127,6 +130,68 @@ func (q *EventQueue) PopAfter(after uint64) []Event {
 	return result
 }
 
+// initMsgHistDB initializes the SQLite database for message history
+func initMsgHistDB(dbPath string) (*sql.DB, error) {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0700); err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, err
+	}
+	// Create events table: no event_type column, chanid max 128 chars
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS events (
+			rowid      INTEGER PRIMARY KEY AUTOINCREMENT,
+			chanid     TEXT(128) NOT NULL,
+			data       TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+	// Create required chanid index
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_events_chanid ON events(chanid)`)
+	if err != nil {
+		return nil, err
+	}
+	// Set rowid start to 10000 by initializing sqlite_sequence
+	// sqlite_sequence is auto-created by SQLite on first AUTOINCREMENT use
+	// We insert a dummy row to trigger its creation, then set seq to 9999
+	_, err = db.Exec(`INSERT INTO events(chanid, data) VALUES('__init__', '{}')`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	// Get the dummy row's rowid, then delete it
+	var dummyRowid int
+	err = db.QueryRow(`SELECT rowid FROM events WHERE chanid = '__init__'`).Scan(&dummyRowid)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	_, err = db.Exec(`DELETE FROM events WHERE chanid = '__init__'`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	// Now sqlite_sequence should exist, set events seq to 9999
+	_, err = db.Exec(`INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES('events', 9999)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// persistEventToSQLite stores event copy to SQLite (only for friend/group/conference messages)
+func (s *Server) persistEventToSQLite(chanid string, data string) {
+	if _, err := s.db.Exec("INSERT INTO events(chanid, data) VALUES(?, ?)", chanid, data); err != nil {
+		log.Printf("Failed to persist event to SQLite: %v", err)
+	}
+}
+
 // RequestParams provides a unified way to access request parameters
 // regardless of content type (JSON or form-urlencoded)
 type RequestParams struct {
@@ -177,10 +242,11 @@ func (p *RequestParams) Get(key string) string {
 // Server holds the server state
 type Server struct {
 	tox                  *tox.Tox
+	db                   *sql.DB  // SQLite connection for event copy only
 	eventQueue           *EventQueue
 	selfConnectionStatus string
 	friendStatuses       map[uint32]string
-	conferenceConnected map[uint32]bool  // 新增：会议连接状态
+	conferenceConnected  map[uint32]bool  // 新增：会议连接状态
 	mu                   sync.RWMutex
 }
 
@@ -208,8 +274,15 @@ func NewServer(udpEnabled bool) (*Server, error) {
 		return nil, fmt.Errorf("failed to create tox instance")
 	}
 
+	// Initialize SQLite database for message history
+	db, err := initMsgHistDB("data/msghist.db")
+	if err != nil {
+		return nil, fmt.Errorf("failed to init msghist db: %w", err)
+	}
+
 	server := &Server{
 		tox:                  t,
+		db:                   db,
 		eventQueue:           NewEventQueue(),
 		selfConnectionStatus: "offline",
 		friendStatuses:       make(map[uint32]string),
@@ -267,6 +340,11 @@ func setupCallbacks(s *Server) {
 			"message":   message,
 		})
 		s.eventQueue.Push("friend_message", string(data))
+		// Persist to SQLite with friend pubkey as chanid
+		friendPubKey, err := s.tox.FriendGetPublicKey(friendNumber)
+		if err == nil {
+			s.persistEventToSQLite(friendPubKey, string(data))
+		}
 	}, nil)
 
 	// Friend connection status callback
@@ -386,6 +464,11 @@ func setupCallbacks(s *Server) {
 			"message":          message,
 		})
 		s.eventQueue.Push("conference_message", string(data))
+		// Persist to SQLite with conference identifier as chanid
+		chatId, err := s.tox.ConferenceGetIdentifier(groupNumber)
+		if err == nil {
+			s.persistEventToSQLite(chatId, string(data))
+		}
 	}, nil)
 
 	// Group message callback (NGC)
@@ -397,6 +480,11 @@ func setupCallbacks(s *Server) {
 			"message":      message,
 		})
 		s.eventQueue.Push("group_message", string(data))
+		// Persist to SQLite with group chat_id as chanid
+		chatId, err := s.tox.GroupGetChatId(groupNumber)
+		if err == nil {
+			s.persistEventToSQLite(chatId, string(data))
+		}
 	}, nil)
 
 	// Conference title callback
