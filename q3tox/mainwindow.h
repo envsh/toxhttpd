@@ -31,8 +31,10 @@ public:
     void onInviteToGroupRequested(int friendId);
     void onGroupInviteReceived(int friendNumber, const QString& chatId);
     void onViewMembersRequested(int id, const QString& type);
+    void loadMessageHistory();
     
 private:
+    std::string selfPubkey;  // 自己的公钥（地址前64字符）
     
     QSplitter* splitter;
     QWidget* sidebarWidget;  // 左侧边栏容器

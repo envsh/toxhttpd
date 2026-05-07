@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include <qstring.h>
 #include <vector>
+// #include <qobject.h>  // Qt3 需要 Q_OBJECT 宏
 #include "api.h"  // for PeerInfo
 
 class MemberListDialog : public QDialog {

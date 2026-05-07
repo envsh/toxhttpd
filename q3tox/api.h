@@ -40,6 +40,15 @@ struct ConferenceInfo {
     bool is_connected; // 新增：会议连接状态
 };
 
+struct HistoryMessage {
+    int64_t rowid;
+    std::string message;
+    std::string sender_pubkey;
+    uint32_t sender_number;
+    std::string direction;
+    std::string created_at;
+};
+
 class ToxAPI {
 public:
     ToxAPI(const std::string& baseUrl = "http://localhost:8181");
@@ -82,6 +91,10 @@ public:
     
     // Events (long polling, 30s timeout)
     std::vector<Event> pollEvents(uint64_t after);
+    
+    // Message history
+    bool getMessagesHistory(int contact_id, const std::string& contact_type,
+                            std::vector<HistoryMessage>& messages);
     
     // Member lists
     std::vector<PeerInfo> getConferenceMembers(int confId);

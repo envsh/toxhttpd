@@ -529,3 +529,63 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
     cJSON_Delete(root);
     return members;
 }
+
+// ===== Message History =====
+
+bool ToxAPI::getMessagesHistory(int contact_id, const std::string& contact_type,
+                                 std::vector<HistoryMessage>& messages) {
+    messages.clear();
+    
+    std::string url = "/api/messages/history?contact_id=" + std::to_string(contact_id)
+                   + "&contact_type=" + contact_type;
+    std::string response = httpGet(url);
+    if (response.empty()) return false;
+    
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return false;
+    
+    cJSON* msgsItem = cJSON_GetObjectItem(root, "messages");
+    if (!msgsItem || !cJSON_IsArray(msgsItem)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    
+    int msgCount = cJSON_GetArraySize(msgsItem);
+    for (int i = 0; i < msgCount; ++i) {
+        cJSON* msg = cJSON_GetArrayItem(msgsItem, i);
+        if (!msg) continue;
+        
+        HistoryMessage hm;
+        
+        cJSON* item = cJSON_GetObjectItem(msg, "rowid");
+        if (item) hm.rowid = (int64_t)(item->valuedouble);
+        
+        item = cJSON_GetObjectItem(msg, "message");
+        if (item && cJSON_IsString(item)) {
+            hm.message = cJSON_GetStringValue(item) ?: "";
+        }
+        
+        item = cJSON_GetObjectItem(msg, "sender_pubkey");
+        if (item && cJSON_IsString(item)) {
+            hm.sender_pubkey = cJSON_GetStringValue(item) ?: "";
+        }
+        
+        item = cJSON_GetObjectItem(msg, "sender_number");
+        if (item) hm.sender_number = (uint32_t)(item->valuedouble);
+        
+        item = cJSON_GetObjectItem(msg, "direction");
+        if (item && cJSON_IsString(item)) {
+            hm.direction = cJSON_GetStringValue(item) ?: "";
+        }
+        
+        item = cJSON_GetObjectItem(msg, "created_at");
+        if (item && cJSON_IsString(item)) {
+            hm.created_at = cJSON_GetStringValue(item) ?: "";
+        }
+        
+        messages.push_back(hm);
+    }
+    
+    cJSON_Delete(root);
+    return true;
+}

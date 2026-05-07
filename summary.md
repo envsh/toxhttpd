@@ -681,3 +681,132 @@ dialog.setInfo(id, ..., "", "", isConnected, "");  // ← publicKey 是空字符
 - q3tox 编译成功 ✅
 - 翻译缺失 `statuses.online` 解决 ✅
 - 群组和会议信息面板正确显示 public key ✅
+
+---
+## 2026-05-07 会话更新
+
+### SQLite 消息存储 + 历史消息 API
+
+#### 后端 (go-toxhttpd)
+
+##### 1. storage.go - SQLite 初始化
+- 创建 `pubkey_ids` 表：pkid INTEGER PRIMARY KEY AUTOINCREMENT，pubkey TEXT UNIQUE
+- 创建 `events` 表：rowid INTEGER PRIMARY KEY AUTOINCREMENT（从 10000 开始），chanid INTEGER，data TEXT，created_at TIMESTAMP
+- `getOrCreatePubKeyID(pubkey)`：pubkey ↔ 整数 ID 映射
+- `persistEventToSQLite(chanid, data)`：存储事件
+
+##### 2. server.go - 6处消息处理接入 SQLite
+- 好友接收消息：CallbackFriendMessage → persistEventToSQLite
+- 好友发送消息：handleSendMessage → persistEventToSQLite
+- 群组接收消息：CallbackGroupMessage → persistEventToSQLite
+- 群组发送消息：handleGroupSendMessage → persistEventToSQLite
+- 会议接收消息：CallbackConferenceMessage → persistEventToSQLite
+- 会议发送消息：handleConferenceMessages → persistEventToSQLite（当前禁用）
+
+##### 3. getContactNumber 函数
+```go
+// 根据 contactType 和 senderPubkey 查询发送者的 number
+// contactType: "friend" | "group" | "conference"
+// contactPubkey: 联系人公钥（chanid）
+// senderPubkey: 发送者公钥
+// 返回: uint32 (friend number 或 peer number)，未找到返回 ContactNotFound (0xFFFFFFFF)
+func (s *Server) getContactNumber(contactType string, contactPubkey string, senderPubkey string) (uint32, error)
+```
+- **friend**：调用 `FriendByPublicKey(senderPubkey)` 返回 friend number
+- **group**：`GroupByChatId(contactPubkey)` → 遍历 peer 0~99，`GroupPeerGetPublicKey` 比较公钥
+- **conference**：`ConferenceGetChatlist()` → 遍历，`ConferencePeerGetPublicKey` 比较公钥
+
+##### 4. handleMessageHistory API
+- **路由**：`/api/messages/history`
+- **参数**：`chanid`（pubkey）或 `contact_id`（数字）+ `contact_type`
+- **返回格式**：
+```json
+{
+  "messages": [
+    {
+      "rowid": 10001,
+      "message": "Hello",
+      "sender_pubkey": "56A1B2C3...",
+      "sender_number": 0,
+      "direction": "received",
+      "created_at": "2026-05-07 12:00:00"
+    }
+  ]
+}
+```
+- **顺序处理**：查询 DESC（最新在前）→ 反转数组 ASC（最旧在前）方便前端显示
+
+##### 5. 编译
+- 使用 `build.sh` 编译（设置 CGO 环境变量）
+- 编译产物：`/home/gzleo/aprog/toxhttpd/go-toxhttpd/toxhttpd-go` (约 14.9MB)
+- `AGENTS.md` 已更新：`go服务端的编译是 build.sh`
+
+#### 前端 (web/app.js)
+
+##### loadMessageHistory 函数
+- 在 `selectContact()` 中调用
+- 请求 `/api/messages/history?contact_id=XXX&contact_type=YYY`
+- 用 `sender_pubkey` 判断消息方向（比较 selfAddress 前64字符）
+- 显示 `sender_number`（未找到显示公钥前8位）
+
+#### q3tox 端 - 历史消息功能
+
+##### 1. api.h - 新增结构体和函数声明
+```cpp
+struct HistoryMessage {
+    int64_t rowid;
+    std::string message;
+    std::string sender_pubkey;
+    uint32_t sender_number;
+    std::string direction;
+    std::string created_at;
+};
+
+bool getMessagesHistory(int contact_id, const std::string& contact_type,
+                        std::vector<HistoryMessage>& messages);
+```
+
+##### 2. api.cpp - 实现 getMessagesHistory
+- 调用 `/api/messages/history?contact_id=XXX&contact_type=YYY`
+- 解析 JSON 响应，填充 `HistoryMessage` 数组
+
+##### 3. mainwindow.h - 新增成员和槽函数
+```cpp
+private:
+    std::string selfPubkey;  // 自己的公钥（地址前64字符）
+private slots:
+    void loadMessageHistory();
+```
+
+##### 4. mainwindow.cpp - 实现
+- `onContactSelected()`：切换联系人时调用 `loadMessageHistory()`
+- `loadMessageHistory()`：调用 API，解析消息，调用 `chatWidget->appendMessage()`
+- `customEvent()` 处理 `ApiLoadAllData`：保存 `selfPubkey = address.substr(0, 64)`
+
+##### 5. 编译
+- Qt3：`buildqt3.sh` → q3tox
+- Qt4：`buildqt4.sh` → q3tox
+
+### 关键文件修改清单
+
+#### 后端
+- `go-toxhttpd/storage.go` - SQLite 初始化、pubkey_ids、events 表
+- `go-toxhttpd/server.go` - getContactNumber、handleMessageHistory、6处消息处理
+- `go-toxhttpd/AGENTS.md` - 添加编译说明
+
+#### 前端 (web)
+- `go-toxhttpd/web/app.js` - loadMessageHistory 函数
+
+#### q3tox
+- `q3tox/api.h` - HistoryMessage 结构体 + getMessagesHistory 声明
+- `q3tox/api.cpp` - getMessagesHistory 实现
+- `q3tox/mainwindow.h` - selfPubkey + loadMessageHistory 声明
+- `q3tox/mainwindow.cpp` - onContactSelected 修改 + loadMessageHistory 实现
+
+### 测试要点
+1. 编译通过：`./build.sh` 生成 `toxhttpd-go`
+2. 启动服务：`./toxhttpd-go 8181`
+3. 产生消息（好友/群组/会议）
+4. 调用 API：`curl "http://localhost:8181/api/messages/history?contact_id=0&contact_type=friend"`
+5. 验证返回包含 `sender_pubkey` 和 `sender_number`
+6. q3tox 切换联系人，验证历史消息加载

@@ -142,6 +142,12 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 QString::fromUtf8(evt->selfConnStatus.c_str()),
                 QString::fromUtf8(evt->selfAddress.c_str()));
             
+            // 保存自己的公钥（地址前64字符是公钥）
+            std::string addr = evt->selfAddress;
+            if (addr.length() >= 64) {
+                selfPubkey = addr.substr(0, 64);
+            }
+            
             // 转换ContactData为Contact并更新列表
             ContactList contacts;
             qWarning("MainWindow: loading %d contacts", (int)evt->contacts.size());
@@ -208,6 +214,9 @@ void MainWindow::onContactSelected(int id, const QString& type) {
     
     chatWidget->setHeaderText(headerText);
     chatWidget->clearMessages();
+    
+    // 加载历史消息
+    loadMessageHistory();
 }
 
 void MainWindow::onMessageSent(const QString& message) {
@@ -690,5 +699,47 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
             // 拒绝群组邀请（直接忽略，无后端API）
             QMessageBox::information(this, _("group_rejected"), _("group_rejected"));
         }
+    }
+}
+
+void MainWindow::loadMessageHistory() {
+    if (currentChatId == -1 || currentChatType.isEmpty()) {
+        qWarning("loadMessageHistory: no contact selected");
+        return;
+    }
+    
+    ToxAPI api;  // 临时创建，或保存在成员变量中
+    std::vector<HistoryMessage> messages;
+    
+    if (api.getMessagesHistory(currentChatId, std::string(qToUtf8(currentChatType).data()), messages)) {
+        qWarning("loadMessageHistory: loaded %d messages", (int)messages.size());
+        
+        for (const auto& msg : messages) {
+            bool isSelf = (msg.sender_pubkey == selfPubkey);
+            QString senderLabel;
+            
+            if (isSelf) {
+                senderLabel = "Me";
+            } else {
+                // sender_number 未找到时显示公钥前8位
+                if (msg.sender_number == 0xFFFFFFFF) {
+                    senderLabel = QString("Peer %1...").arg(
+                        QString::fromUtf8(msg.sender_pubkey.substr(0, 8).c_str()));
+                } else {
+                    senderLabel = QString("Peer %1").arg(msg.sender_number);
+                }
+            }
+            
+            chatWidget->appendMessage(
+                QString::fromUtf8(msg.message.c_str()),
+                isSelf ? "self" : "other",
+                senderLabel
+            );
+        }
+        
+        // 滚动到底部（显示最新消息）
+        // chatWidget 内部已经处理了滚动
+    } else {
+        qWarning("loadMessageHistory: failed to load history");
     }
 }
