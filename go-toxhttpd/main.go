@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -128,68 +127,6 @@ func (q *EventQueue) PopAfter(after uint64) []Event {
 		}
 	}
 	return result
-}
-
-// initMsgHistDB initializes the SQLite database for message history
-func initMsgHistDB(dbPath string) (*sql.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0700); err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		return nil, err
-	}
-	// Create events table: no event_type column, chanid max 128 chars
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS events (
-			rowid      INTEGER PRIMARY KEY AUTOINCREMENT,
-			chanid     TEXT(128) NOT NULL,
-			data       TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		return nil, err
-	}
-	// Create required chanid index
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_events_chanid ON events(chanid)`)
-	if err != nil {
-		return nil, err
-	}
-	// Set rowid start to 10000 by initializing sqlite_sequence
-	// sqlite_sequence is auto-created by SQLite on first AUTOINCREMENT use
-	// We insert a dummy row to trigger its creation, then set seq to 9999
-	_, err = db.Exec(`INSERT INTO events(chanid, data) VALUES('__init__', '{}')`)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	// Get the dummy row's rowid, then delete it
-	var dummyRowid int
-	err = db.QueryRow(`SELECT rowid FROM events WHERE chanid = '__init__'`).Scan(&dummyRowid)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	_, err = db.Exec(`DELETE FROM events WHERE chanid = '__init__'`)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	// Now sqlite_sequence should exist, set events seq to 9999
-	_, err = db.Exec(`INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES('events', 9999)`)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	return db, nil
-}
-
-// persistEventToSQLite stores event copy to SQLite (only for friend/group/conference messages)
-func (s *Server) persistEventToSQLite(chanid string, data string) {
-	if _, err := s.db.Exec("INSERT INTO events(chanid, data) VALUES(?, ?)", chanid, data); err != nil {
-		log.Printf("Failed to persist event to SQLite: %v", err)
-	}
 }
 
 // RequestParams provides a unified way to access request parameters
@@ -336,14 +273,16 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackFriendMessage(func(this *tox.Tox, friendNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] FriendMessage: friend=%d, message=%s", friendNumber, message)
 		friendPubKey, _ := s.tox.FriendGetPublicKey(friendNumber)
+		chanidInt, _ := s.getOrCreatePubKeyID(friendPubKey)
+		senderInt, _ := s.getOrCreatePubKeyID(friendPubKey)
 		data, _ := json.Marshal(map[string]interface{}{
 			"message":   message,
-			"sender":    friendPubKey,
+			"sender":    senderInt,
 			"direction": "received",
 		})
 		s.eventQueue.Push("friend_message", string(data))
-		// Persist to SQLite with friend pubkey as chanid
-		s.persistEventToSQLite(friendPubKey, string(data))
+		// Persist to SQLite with integer chanid
+		s.persistEventToSQLite(chanidInt, string(data))
 	}, nil)
 
 	// Friend connection status callback
@@ -458,36 +397,36 @@ func setupCallbacks(s *Server) {
 	s.tox.CallbackConferenceMessage(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] ConferenceMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
 		chatId, _ := s.tox.ConferenceGetIdentifier(groupNumber)
-		// Get peer pubkey
+		chanidInt, _ := s.getOrCreatePubKeyID(chatId)
+		// Get peer pubkey and convert to integer ID
 		peerPubKey, _ := s.tox.ConferencePeerGetPublicKey(groupNumber, peerNumber)
+		senderInt, _ := s.getOrCreatePubKeyID(peerPubKey)
 		data, _ := json.Marshal(map[string]interface{}{
 			"message":   message,
-			"sender":    peerPubKey,
+			"sender":    senderInt,
 			"direction": "received",
 		})
 		s.eventQueue.Push("conference_message", string(data))
-		// Persist to SQLite with conference identifier as chanid
-		if chatId != "" {
-			s.persistEventToSQLite(chatId, string(data))
-		}
+		// Persist to SQLite with integer chanid
+		s.persistEventToSQLite(chanidInt, string(data))
 	}, nil)
 
 	// Group message callback (NGC)
 	s.tox.CallbackGroupMessage(func(this *tox.Tox, groupNumber tox.GroupNumber, peerNumber tox.GroupPeerNumber, message string, userData interface{}) {
 		log.Printf("[TOX_CALLBACK] GroupMessage: group=%d, peer=%d, message=%s", groupNumber, peerNumber, message)
 		chatId, _ := s.tox.GroupGetChatId(groupNumber)
-		// Get peer pubkey
+		chanidInt, _ := s.getOrCreatePubKeyID(chatId)
+		// Get peer pubkey and convert to integer ID
 		peerPubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, peerNumber)
+		senderInt, _ := s.getOrCreatePubKeyID(peerPubKey)
 		data, _ := json.Marshal(map[string]interface{}{
 			"message":   message,
-			"sender":    peerPubKey,
+			"sender":    senderInt,
 			"direction": "received",
 		})
 		s.eventQueue.Push("group_message", string(data))
-		// Persist to SQLite with group chat_id as chanid
-		if chatId != "" {
-			s.persistEventToSQLite(chatId, string(data))
-		}
+		// Persist to SQLite with integer chanid
+		s.persistEventToSQLite(chanidInt, string(data))
 	}, nil)
 
 	// Conference title callback
@@ -802,15 +741,17 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Persist outgoing friend message to SQLite with sender pubkey
+	// Persist outgoing friend message to SQLite with integer IDs
 	friendPubKey, _ := s.tox.FriendGetPublicKey(friendID)
+	chanidInt, _ := s.getOrCreatePubKeyID(friendPubKey)
 	selfPubKey := s.tox.SelfGetPublicKey()
+	senderInt, _ := s.getOrCreatePubKeyID(selfPubKey)
 	data, _ := json.Marshal(map[string]interface{}{
 		"message":   message,
-		"sender":    selfPubKey,
+		"sender":    senderInt,
 		"direction": "sent",
 	})
-	s.persistEventToSQLite(friendPubKey, string(data))
+	s.persistEventToSQLite(chanidInt, string(data))
 
 	resp := map[string]interface{}{
 		"message_id": msgID,
@@ -985,16 +926,18 @@ func (s *Server) handleGroupSendMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Persist outgoing group message to SQLite with sender pubkey
+	// Persist outgoing group message to SQLite with integer IDs
 	chatId, _ := s.tox.GroupGetChatId(groupNumber)
+	chanidInt, _ := s.getOrCreatePubKeyID(chatId)
 	selfPubKey := s.tox.SelfGetPublicKey()
+	senderInt, _ := s.getOrCreatePubKeyID(selfPubKey)
 	data, _ := json.Marshal(map[string]interface{}{
 		"message":   message,
-		"sender":    selfPubKey,
+		"sender":    senderInt,
 		"direction": "sent",
 	})
-	if chatId != "" {
-		s.persistEventToSQLite(chatId, string(data))
+	if true { // dup with callback msg
+		s.persistEventToSQLite(chanidInt, string(data))
 	}
 
 	resp := map[string]interface{}{
@@ -1028,18 +971,20 @@ func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Persist outgoing conference message to SQLite with sender pubkey
+	// Persist outgoing conference message to SQLite with integer IDs
 	chatId, _ := s.tox.ConferenceGetIdentifier(confID)
+	chanidInt, _ := s.getOrCreatePubKeyID(chatId)
 	selfPubKey := s.tox.SelfGetPublicKey()
+	senderInt, _ := s.getOrCreatePubKeyID(selfPubKey)
 	data, _ := json.Marshal(map[string]interface{}{
 		"message":   message,
-		"sender":    selfPubKey,
+		"sender":    senderInt,
 		"direction": "sent",
 	})
-	if chatId != "" {
-		s.persistEventToSQLite(chatId, string(data))
+	if false { // dup with callback msg
+		s.persistEventToSQLite(chanidInt, string(data))
 	}
-
+	
 	resp := map[string]interface{}{
 		"conference_id": confID,
 		"message":       "sent",
