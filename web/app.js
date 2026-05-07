@@ -495,9 +495,68 @@ function selectContact(id, type) {
     
     document.getElementById('chatHeaderText').textContent = headerText;
     document.getElementById('messageArea').innerHTML = '';
-    
+
+    // 加载历史消息
+    loadMessageHistory();
+
     // 只更新选中状态，不重新渲染整个列表
     updateSelection(id, type);
+}
+
+// Load message history for current chat
+function loadMessageHistory() {
+    if (!currentChatId || !currentChatType) {
+        console.warn('loadMessageHistory: no chat selected');
+        return;
+    }
+
+    const contactId = currentChatId;
+    const contactType = currentChatType;
+
+    fetch(`/api/messages/history?contact_id=${contactId}&contact_type=${contactType}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.messages || data.messages.length === 0) {
+                console.log('No message history found');
+                return;
+            }
+
+            const area = document.getElementById('messageArea');
+            area.innerHTML = '';
+
+            data.messages.forEach(msg => {
+                // selfAddress is full tox address (76 chars), sender_pubkey is pubkey (64 chars)
+                const selfPubkey = selfAddress ? selfAddress.toUpperCase().substring(0, 64) : '';
+                const isSelf = msg.sender_pubkey.toUpperCase() === selfPubkey;
+
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'message ' + (isSelf ? 'self' : 'other');
+
+                if (!isSelf) {
+                    let senderLabel = '';
+                    if (msg.sender_number === 0xFFFFFFFF || msg.sender_number === 4294967295) {
+                        senderLabel = `Peer ${msg.sender_pubkey.substring(0, 8)}...`;
+                    } else {
+                        senderLabel = `Peer ${msg.sender_number}`;
+                    }
+                    const senderDiv = document.createElement('div');
+                    senderDiv.className = 'sender';
+                    senderDiv.textContent = senderLabel;
+                    msgDiv.appendChild(senderDiv);
+                }
+
+                const textDiv = document.createElement('div');
+                textDiv.textContent = msg.message;
+                msgDiv.appendChild(textDiv);
+
+                area.appendChild(msgDiv);
+            });
+
+            area.scrollTop = area.scrollHeight;
+        })
+        .catch(err => {
+            console.error('Failed to load message history:', err);
+        });
 }
 
 // 只更新选中状态，不重新渲染整个列表

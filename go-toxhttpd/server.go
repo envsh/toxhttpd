@@ -176,6 +176,10 @@ func (p *RequestParams) Get(key string) string {
 	return p.formValues.Get(key)
 }
 
+// ContactNotFound is returned by getContactNumber when contact is not found
+// It is math.MaxUint32 (0xFFFFFFFF), which when cast to int32 is -1
+const ContactNotFound = uint32(0xFFFFFFFF)
+
 // Server holds the server state
 type Server struct {
 	tox                  *tox.Tox
@@ -1354,6 +1358,7 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/conferences/ignore", loggingMiddleware(s.handleConferenceIgnore))
 	http.HandleFunc("/api/bootstrap", loggingMiddleware(s.handleBootstrap))
 	http.HandleFunc("/api/events", loggingMiddleware(s.handleEvents))
+	http.HandleFunc("/api/messages/history", loggingMiddleware(s.handleMessageHistory))
 	http.HandleFunc("/", loggingMiddleware(s.handleWeb))
 
 	// Group Chat API 路由 (复数形式 /api/groups)
@@ -1625,4 +1630,175 @@ func (s *Server) getDefaultName(name string) string {
 		return "nonamed." + pubkey[:7]
 	}
 	return "nonamed"
+}
+
+// getContactNumber returns the contact number (friend number or peer number) for a given public key
+// contactType: "friend", "group", or "conference"
+// contactPubkey: the contact's public key (chatId for groups, identifier for conferences)
+// senderPubkey: the sender's public key to look up
+// Returns uint32 contact number, or ContactNotFound (0xFFFFFFFF) if not found
+func (s *Server) getContactNumber(contactType string, contactPubkey string, senderPubkey string) (uint32, error) {
+	switch contactType {
+	case "friend":
+		num, err := s.tox.FriendByPublicKey(senderPubkey)
+		if err != nil {
+			return ContactNotFound, nil
+		}
+		return num, nil
+
+	case "group":
+		// For groups (NGC), use GroupByChatId to get group number, then iterate peers
+		groupNum, err := s.tox.GroupByChatId(contactPubkey)
+		if err != nil {
+			return ContactNotFound, nil
+		}
+		// Iterate through peer list (0-99 should be enough for most groups)
+		for i := uint32(0); i < 100; i++ {
+			peerPubkey, err := s.tox.GroupPeerGetPublicKey(groupNum, tox.GroupPeerNumber(i))
+			if err != nil {
+				continue
+			}
+			if strings.EqualFold(peerPubkey, senderPubkey) {
+				return i, nil
+			}
+		}
+		return ContactNotFound, nil
+
+	case "conference":
+		// For conferences (legacy), iterate through all conferences to find matching identifier
+		chatlist := s.tox.ConferenceGetChatlist()
+		for _, confNum := range chatlist {
+			identifier, err := s.tox.ConferenceGetIdentifier(confNum)
+			if err != nil {
+				continue
+			}
+			if strings.EqualFold(identifier, contactPubkey) {
+				// Found the conference, now iterate through its peers
+				for j := uint32(0); j < 100; j++ {
+					peerPubkey, err := s.tox.ConferencePeerGetPublicKey(confNum, j)
+					if err != nil {
+						continue
+					}
+					if strings.EqualFold(peerPubkey, senderPubkey) {
+						return j, nil
+					}
+				}
+				return ContactNotFound, nil
+			}
+		}
+		return ContactNotFound, nil
+	}
+	return ContactNotFound, fmt.Errorf("unknown contact type: %s", contactType)
+}
+
+// handleMessageHistory returns message history for a channel
+// Query params: chanid (pubkey) or contact_id (numeric id) + contact_type (friend|group|conference)
+func (s *Server) handleMessageHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	chanid := r.URL.Query().Get("chanid")       // contact's pubkey
+	contactIDStr := r.URL.Query().Get("contact_id")
+	contactType := r.URL.Query().Get("contact_type")
+
+	if contactType == "" {
+		http.Error(w, `{"error":"missing contact_type"}`, http.StatusBadRequest)
+		return
+	}
+
+	// If contact_id is provided, resolve to pubkey (chanid)
+	if contactIDStr != "" {
+		id, err := strconv.ParseUint(contactIDStr, 10, 32)
+		if err != nil {
+			http.Error(w, `{"error":"invalid contact_id"}`, http.StatusBadRequest)
+			return
+		}
+		switch contactType {
+		case "friend":
+			chanid, err = s.tox.FriendGetPublicKey(uint32(id))
+		case "group":
+			chanid, err = s.tox.GroupGetChatId(tox.GroupNumber(id))
+		case "conference":
+			chanid, err = s.tox.ConferenceGetIdentifier(uint32(id))
+		default:
+			http.Error(w, `{"error":"unknown contact_type"}`, http.StatusBadRequest)
+			return
+		}
+		if err != nil {
+			http.Error(w, `{"error":"failed to resolve contact_id"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
+	if chanid == "" {
+		http.Error(w, `{"error":"missing chanid or contact_id"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Convert chanid (pubkey) to integer ID for database query
+	var chanidInt int64
+	err := s.db.QueryRow("SELECT pkid FROM pubkey_ids WHERE pubkey = ?", chanid).Scan(&chanidInt)
+	if err != nil {
+		http.Error(w, `{"error":"invalid chanid"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Query latest 50 messages, descending (newest first)
+	rows, err := s.db.Query(`SELECT rowid, data, created_at FROM events WHERE chanid = ? ORDER BY rowid DESC LIMIT 50`, chanidInt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	messages := []map[string]interface{}{}
+	for rows.Next() {
+		var rowid int64
+		var dataStr string
+		var createdAt string
+		if err := rows.Scan(&rowid, &dataStr, &createdAt); err != nil {
+			continue
+		}
+
+		var eventData map[string]interface{}
+		if err := json.Unmarshal([]byte(dataStr), &eventData); err != nil {
+			continue
+		}
+
+		// Get sender pubkey from sender ID
+		senderPubkey := ""
+		if sender, ok := eventData["sender"].(float64); ok {
+			var pk string
+			if err := s.db.QueryRow("SELECT pubkey FROM pubkey_ids WHERE pkid = ?", int64(sender)).Scan(&pk); err == nil {
+				senderPubkey = pk
+			}
+		}
+
+		// Get sender_number using getContactNumber
+		senderNumber := uint32(ContactNotFound)
+		if senderPubkey != "" {
+			senderNumber, _ = s.getContactNumber(contactType, chanid, senderPubkey)
+		}
+
+		messages = append(messages, map[string]interface{}{
+			"rowid":         rowid,
+			"message":       eventData["message"],
+			"sender_pubkey": senderPubkey,
+			"sender_number": senderNumber,
+			"direction":     eventData["direction"],
+			"created_at":    createdAt,
+		})
+	}
+
+	// Reverse array: DESC (newest first) -> ASC (oldest first) for display
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"messages": messages,
+	})
 }
