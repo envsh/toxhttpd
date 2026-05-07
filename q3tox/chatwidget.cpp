@@ -64,19 +64,61 @@ void ChatWidget::setHeaderText(const QString& text) {
     headerText->setText(text);
 }
 
-void ChatWidget::appendMessage(const QString& message, const QString& type, const QString& sender) {
-    QString html;
-    if (type == "self") {
-        html = QString("<p align=\"right\"><span style=\"background: #00d4aa; color: #0d1117; padding: 8px 12px; border-radius: 8px;\">%1</span></p>")
-                  .arg(message);
+void ChatWidget::appendMessage(const QString& message, const QString& type, 
+                              const QString& sender, const QString& time,
+                              const QString& avatarText) {
+    // 构建头像 HTML（预留 img 接口）
+    QString avatarHtml;
+    if (!avatarText.isEmpty()) {
+        QString displayLetter = qToUpper(avatarText.left(1));
+        avatarHtml = QString(
+            "<div style=\"width:48px;height:48px;border-radius:50%;background:#30363d;overflow:hidden;\">"
+            "  <!-- 预留头像接口：未来替换为 <img src=\"avatar_path\"> -->"
+            "  <div style=\"color:#8b949e;font-size:18px;font-weight:500;text-align:center;line-height:48px;\">%1</div>"
+            "</div>"
+        ).arg(displayLetter);
     } else {
-        QString senderHtml = sender.isEmpty() ? "" : 
-            QString("<div style=\"font-size: 11px; color: #6e7681; margin-bottom: 2px;\">%1</div>").arg(sender);
-        html = QString("<p><span style=\"background: #21262d; color: #c9d1d9; padding: 8px 12px; border-radius: 8px;\">%1%2</span></p>")
-                  .arg(senderHtml, message);
+        avatarHtml = 
+            "<div style=\"width:48px;height:48px;border-radius:50%;background:#30363d;\"></div>";
     }
     
-    messageArea->append(html);
+    QString html;
+    if (type == "self") {
+        // 自己消息：内容列（右对齐），头像列在右
+        html = QString(
+            "<table width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom:8px;\">"
+            "<tr>"
+            "  <td align=\"right\" valign=\"top\" style=\"width:100%;\">"
+            "    <div style=\"font-size:11px;color:#c9d1d9;margin-bottom:2px;\">"
+            "      <span style=\"font-weight:500;margin:0 8px;\">Me</span>"
+            "      <span style=\"font-size:10px;color:#8b949e;\">%1</span>"
+            "    </div>"
+            "    <div style=\"background:#21262d;color:#c9d1d9;padding:8px 12px;border-radius:8px;display:inline-block;max-width:80%;text-align:left;\">%2</div>"
+            "  </td>"
+            "  <td width=\"48\" valign=\"top\" style=\"padding-left:8px;\">%3</td>"
+            "</tr>"
+            "</table>"
+        ).arg(time).arg(message).arg(avatarHtml);
+    } else {
+        // 对方消息：头像左列，内容右列
+        QString senderHtml = sender.isEmpty() ? "Peer" : sender;
+        html = QString(
+            "<table width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom:8px;\">"
+            "<tr>"
+            "  <td width=\"48\" valign=\"top\" style=\"padding-right:8px;\">%4</td>"
+            "  <td valign=\"top\">"
+            "    <div style=\"font-size:11px;color:#c9d1d9;margin-bottom:2px;\">"
+            "      <span style=\"font-weight:500;margin-right:8px;\">%1</span>"
+            "      <span style=\"font-size:10px;color:#8b949e;\">%2</span>"
+            "    </div>"
+            "    <div style=\"background:#21262d;color:#c9d1d9;padding:8px 12px;border-radius:8px;display:inline-block;max-width:80%;\">%3</div>"
+            "  </td>"
+            "</tr>"
+            "</table>"
+        ).arg(senderHtml).arg(time).arg(message).arg(avatarHtml);
+    }
+    
+    qInsertHtml(messageArea, html);
 }
 
 void ChatWidget::clearMessages() {

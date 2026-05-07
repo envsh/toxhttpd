@@ -328,6 +328,10 @@ function loadContacts(filter = 'all') {
         .then(friendDetails => {
             console.log('Friend details loaded:', friendDetails);
             contacts.friends = friendDetails;
+            // 填充 friendNameMap
+            friendDetails.forEach(f => {
+                friendNameMap[f.friend_id] = f.name || '';
+            });
             // Load groups
             return fetch('/api/groups').then(r => r.json());
         })
@@ -525,29 +529,75 @@ function loadMessageHistory() {
             area.innerHTML = '';
 
             data.messages.forEach(msg => {
-                // selfAddress is full tox address (76 chars), sender_pubkey is pubkey (64 chars)
                 const selfPubkey = selfAddress ? selfAddress.toUpperCase().substring(0, 64) : '';
                 const isSelf = msg.sender_pubkey.toUpperCase() === selfPubkey;
 
+                // 获取昵称和头像文本
+                let displayName = 'Me';
+                let avatarText = 'M';
+                if (!isSelf) {
+                    if (contactType === 'friend') {
+                        // friendNameMap 的键是字符串类型
+                        const friendId = String(contactId);
+                        displayName = friendNameMap[friendId] || `Peer ${msg.sender_number}`;
+                        if (displayName !== 'Me' && displayName !== `Peer ${msg.sender_number}`) {
+                            avatarText = displayName.charAt(0).toUpperCase();
+                        } else {
+                            avatarText = '?';
+                        }
+                    } else {
+                        displayName = `Peer ${msg.sender_number}`;
+                        avatarText = 'P';
+                    }
+                }
+
+                // 格式化时间
+                const msgDate = new Date(msg.created_at);
+                const timeStr = msgDate.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                });
+
+                // 创建消息容器（两列布局）
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'message ' + (isSelf ? 'self' : 'other');
 
-                if (!isSelf) {
-                    let senderLabel = '';
-                    if (msg.sender_number === 0xFFFFFFFF || msg.sender_number === 4294967295) {
-                        senderLabel = `Peer ${msg.sender_pubkey.substring(0, 8)}...`;
-                    } else {
-                        senderLabel = `Peer ${msg.sender_number}`;
-                    }
-                    const senderDiv = document.createElement('div');
-                    senderDiv.className = 'sender';
-                    senderDiv.textContent = senderLabel;
-                    msgDiv.appendChild(senderDiv);
-                }
+                // 头像列
+                const avatarCol = document.createElement('div');
+                avatarCol.className = 'avatar-col';
+                avatarCol.innerHTML = `<div class="avatar-placeholder">${avatarText}</div>`;
 
-                const textDiv = document.createElement('div');
-                textDiv.textContent = msg.message;
-                msgDiv.appendChild(textDiv);
+                // 内容列
+                const contentCol = document.createElement('div');
+                contentCol.className = 'content-col';
+
+                // 消息头部
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'message-header';
+                const senderSpan = document.createElement('span');
+                senderSpan.className = 'message-sender';
+                senderSpan.textContent = displayName;
+                const timeSpan = document.createElement('span');
+                timeSpan.className = 'message-time';
+                timeSpan.textContent = timeStr;
+                headerDiv.appendChild(senderSpan);
+                headerDiv.appendChild(timeSpan);
+
+                // 消息气泡
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = 'message-bubble ' + (isSelf ? 'self-bubble' : 'other-bubble');
+                bubbleDiv.textContent = msg.message;
+
+                contentCol.appendChild(headerDiv);
+                contentCol.appendChild(bubbleDiv);
+
+                // 根据消息类型排列列顺序
+                if (isSelf) {
+                    msgDiv.appendChild(contentCol);
+                    msgDiv.appendChild(avatarCol);
+                } else {
+                    msgDiv.appendChild(avatarCol);
+                    msgDiv.appendChild(contentCol);
+                }
 
                 area.appendChild(msgDiv);
             });
@@ -601,7 +651,10 @@ function longPollEvents() {
                     if (event.event_type === 'friend_message') {
                         const data = JSON.parse(event.data);
                         if (data.friend_id == currentChatId && currentChatType === 'friend') {
-                            appendMessage(data.message, 'other', data.friend_id);
+                            // 对方消息：获取昵称首字母作为头像文本
+                            const friendName = friendNameMap[data.friend_id] || '?';
+                            const avatarText = friendName.charAt(0).toUpperCase();
+                            appendMessage(data.message, 'other', friendName, avatarText);
                         }
                     } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
                         // Friend info updated, refresh contacts with current filter
@@ -615,17 +668,19 @@ function longPollEvents() {
                         const data = JSON.parse(event.data);
                         // 使用 conference_number（与后端字段名一致）
                         if (data.conference_number == currentChatId && currentChatType === 'conference') {
-                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number);
+                            // 会议消息：头像文本是 Peer 的 P
+                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number, 'P');
+                        }
+                    } else if (event.event_type === 'group_message') {
+                        const data = JSON.parse(event.data);
+                        if (data.group_number == currentChatId && currentChatType === 'group') {
+                            // 群组消息：头像文本是 Peer 的 P
+                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number, 'P');
                         }
                     } else if (event.event_type === 'group_invite') {
                         const data = JSON.parse(event.data);
                         currentEventId = event.id; // Save event ID for deletion
                         showGroupInviteDialog(data);
-                    } else if (event.event_type === 'group_message') {
-                        const data = JSON.parse(event.data);
-                        if (data.group_number == currentChatId && currentChatType === 'group') {
-                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number);
-                        }
                     }
                 });
                 // Continue polling immediately if we got events
@@ -641,15 +696,60 @@ function longPollEvents() {
         });
 }
 
-// Append message to chat area
-function appendMessage(text, type, senderId) {
+// 好友昵称映射：friend_id → name
+let friendNameMap = {};
+
+// Append message to chat area (新布局：头像列 + 内容列)
+function appendMessage(text, type, sender, avatarText = "") {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message ' + type;
-    if (type === 'other') {
-        msgDiv.innerHTML = `<div class="sender">${t('friend_label', senderId)}</div>${escapeHtml(text)}`;
+
+    // 头像列
+    const avatarCol = document.createElement('div');
+    avatarCol.className = 'avatar-col';
+    if (avatarText) {
+        avatarCol.innerHTML = `<div class="avatar-placeholder">${avatarText.toUpperCase()}</div>`;
     } else {
-        msgDiv.textContent = text;
+        avatarCol.innerHTML = `<div class="avatar-placeholder"></div>`;
     }
+
+    // 内容列
+    const contentCol = document.createElement('div');
+    contentCol.className = 'content-col';
+
+    // 消息头部：昵称 + 时间
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'message-header';
+
+    const senderSpan = document.createElement('span');
+    senderSpan.className = 'message-sender';
+    senderSpan.textContent = sender || '';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'message-time';
+    const now = new Date();
+    timeSpan.textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    headerDiv.appendChild(senderSpan);
+    headerDiv.appendChild(timeSpan);
+
+    // 消息气泡
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'message-bubble ' + (type === 'self' ? 'self-bubble' : 'other-bubble');
+    bubbleDiv.textContent = text;
+
+    contentCol.appendChild(headerDiv);
+    contentCol.appendChild(bubbleDiv);
+
+    // 根据消息类型排列列顺序
+    if (type === 'self') {
+        msgDiv.appendChild(contentCol);
+        msgDiv.appendChild(avatarCol);
+    } else {
+        msgDiv.appendChild(avatarCol);
+        msgDiv.appendChild(contentCol);
+    }
+
     const area = document.getElementById('messageArea');
     area.appendChild(msgDiv);
     area.scrollTop = area.scrollHeight;
@@ -836,13 +936,14 @@ function sendMessage() {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: body
-    }).then(r => {
-        if (!r.ok) {
-            return r.json().then(err => { throw err; });
-        }
-        appendMessage(msg, 'self');
-        input.value = '';
-    }).catch(err => {
+        }).then(r => {
+            if (!r.ok) {
+                return r.json().then(err => { throw err; });
+            }
+            // 自己消息：传递 Me 和 M 作为头像文本
+            appendMessage(msg, 'self', 'Me', 'M');
+            input.value = '';
+        }).catch(err => {
         console.error('Send error:', err);
         alert(t('send_failed') + ': ' + (err.error || JSON.stringify(err)));
     });

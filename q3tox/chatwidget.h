@@ -9,7 +9,9 @@ public:
     ChatWidget(QWidget* parent = 0);
     
     void setHeaderText(const QString& text);
-    void appendMessage(const QString& message, const QString& type, const QString& sender = QString::null);
+    void appendMessage(const QString& message, const QString& type, 
+                    const QString& sender = QString::null, const QString& time = "",
+                    const QString& avatarText = "");
     void clearMessages();
     void retranslateUi();
     

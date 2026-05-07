@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <map>
 #include "compat34.h"
 #include "selfinfo.h"
 #include "contactlist.h"
@@ -35,6 +36,7 @@ public:
     
 private:
     std::string selfPubkey;  // 自己的公钥（地址前64字符）
+    std::map<int, std::string> friendNameMap;  // 好友昵称映射：friend_id → name
     
     QSplitter* splitter;
     QWidget* sidebarWidget;  // 左侧边栏容器

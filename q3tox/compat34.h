@@ -55,6 +55,7 @@
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QDateTime>
 #endif
 
 // QString API 兼容
@@ -204,6 +205,24 @@ typedef QCustomEvent CustomEventBase;
 typedef QEvent CustomEventBase;
 #endif
 
+// QTextEdit 插入 HTML 兼容
+inline void qInsertHtml(QTextEdit* edit, const QString& html) {
+#ifdef QT3_BUILD
+    edit->append(html);  // Qt3 的 append 支持 HTML
+#else
+    edit->insertHtml(html);
+#endif
+}
+
+// QTextEdit 清空兼容
+inline void qClearTextEdit(QTextEdit* edit) {
+#ifdef QT3_BUILD
+    edit->clear();
+#else
+    edit->clear();
+#endif
+}
+
 // QBoxLayout 构造函数兼容
 inline QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border = 0, int autoresize = -1) {
 #ifdef QT3_BUILD
@@ -213,6 +232,25 @@ inline QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int
     if (border != 0) layout->setContentsMargins(border, border, border, border);
     if (autoresize != -1) layout->setSpacing(autoresize);
     return layout;
+#endif
+}
+
+// 时间字符串解析：从 "yyyy-MM-dd hh:mm:ss" 提取 "hh:mm"
+inline QString qFormatTime(const QString& createdAt) {
+#ifdef QT3_BUILD
+    // Qt3: 手动解析，split 后取时间部分
+    QStringList parts = QStringList::split(" ", createdAt);
+    if (parts.count() >= 2) {
+        return parts[1].left(5);  // 取 "hh:mm"
+    }
+    return QString();
+#else
+    // Qt4: 使用 QDateTime
+    QDateTime dt = QDateTime::fromString(createdAt, "yyyy-MM-dd hh:mm:ss");
+    if (dt.isValid()) {
+        return dt.toString("hh:mm");
+    }
+    return QString();
 #endif
 }
 

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "compat34.h"
+//#include <QDateTime>
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
@@ -717,23 +718,38 @@ void MainWindow::loadMessageHistory() {
         for (const auto& msg : messages) {
             bool isSelf = (msg.sender_pubkey == selfPubkey);
             QString senderLabel;
+            QString avatarText;
             
             if (isSelf) {
                 senderLabel = "Me";
+                avatarText = "M";  // Me 的首字母
             } else {
-                // sender_number 未找到时显示公钥前8位
-                if (msg.sender_number == 0xFFFFFFFF) {
-                    senderLabel = QString("Peer %1...").arg(
-                        QString::fromUtf8(msg.sender_pubkey.substr(0, 8).c_str()));
+                if (currentChatType == "friend") {
+                    // 好友消息：尝试获取昵称
+                    auto it = friendNameMap.find(currentChatId);
+                    if (it != friendNameMap.end() && !it->second.empty()) {
+                        senderLabel = QString::fromUtf8(it->second.c_str());
+                        avatarText = qToUpper(senderLabel.left(1));  // 昵称首字母
+                    } else {
+                        senderLabel = QString("Peer %1").arg(msg.sender_number);
+                        avatarText = "?";  // 未知
+                    }
                 } else {
+                    // 群组/会议消息
                     senderLabel = QString("Peer %1").arg(msg.sender_number);
+                    avatarText = "P";  // Peer 的首字母
                 }
             }
+            
+            // 使用兼容函数格式化时间：从 "2026-05-07 12:00:00" 转换为 "12:00"
+            QString timeStr = qFormatTime(QString::fromUtf8(msg.created_at.c_str()));
             
             chatWidget->appendMessage(
                 QString::fromUtf8(msg.message.c_str()),
                 isSelf ? "self" : "other",
-                senderLabel
+                senderLabel,
+                timeStr,
+                avatarText  // 新增：头像文本
             );
         }
         

@@ -650,36 +650,101 @@ select option {
     gap: 8px;
 }
 
+/* 消息容器：flex 布局，头像 + 内容两列 */
 .message {
+    display: flex;
+    margin-bottom: 12px;
+    align-items: flex-start;
+}
+
+/* 头像列：固定48px */
+.avatar-col {
+    width: 48px;
+    flex-shrink: 0;
+    padding-top: 4px;
+}
+
+/* 头像：48x48px 圆形 */
+.avatar-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #30363d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8b949e;
+    font-size: 18px;
+    font-weight: 500;
+    overflow: hidden;
+}
+
+/* 内容列：自适应 */
+.content-col {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 消息头部：昵称 + 时间 */
+.message-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: #c9d1d9;
+}
+
+/* 自己消息的头部：右对齐 */
+.message.self .message-header {
+    justify-content: flex-end;
+}
+
+/* 发送者昵称 */
+.message-sender {
+    font-weight: 500;
+    margin: 0 8px;
+}
+
+/* 消息时间 */
+.message-time {
+    font-size: 10px;
+    color: #8b949e;
+}
+
+/* 气泡 */
+.message-bubble {
     padding: 8px 12px;
     border-radius: 8px;
-    max-width: 70%;
+    max-width: 80%;
     word-wrap: break-word;
-    line-height: 1.4;
+    display: inline-block;
 }
 
-.message.self {
-    background: #00d4aa;
-    color: #0d1117;
-    margin-left: auto;
-    border-bottom-right-radius: 2px;
-}
-
-.message.other {
+/* 气泡背景：统一深色，不区分自己/对方 */
+.self-bubble,
+.other-bubble {
     background: #21262d;
     color: #c9d1d9;
-    margin-right: auto;
-    border-bottom-left-radius: 2px;
 }
 
-.message .sender {
-    font-size: 11px;
-    color: #6e7681;
-    margin-bottom: 2px;
+/* 自己消息：头像在右侧 */
+.message.self {
+    flex-direction: row-reverse;
 }
 
-.message.self .sender {
-    color: #0a3d2e;
+/* 自己消息头部右对齐（时间+昵称） */
+.message.self .message-header {
+    justify-content: flex-end;
+}
+
+/* 自己消息内容右对齐 */
+.message.self .content-col {
+    text-align: right;
+}
+
+/* 自己消息气泡靠右 */
+.message.self .message-bubble {
+    margin-left: auto;
 }
 
 .input-area {
