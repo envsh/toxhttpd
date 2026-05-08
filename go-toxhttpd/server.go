@@ -305,6 +305,7 @@ func setupCallbacks(s *Server) {
 			"message":   message,
 			"sender":    senderInt,
 			"direction": "received",
+			"friend_id": friendNumber,
 		})
 		s.eventQueue.Push("friend_message", string(data))
 		// Persist to SQLite with integer chanid
@@ -428,9 +429,11 @@ func setupCallbacks(s *Server) {
 		peerPubKey, _ := s.tox.ConferencePeerGetPublicKey(groupNumber, peerNumber)
 		senderInt, _ := s.getOrCreatePubKeyID(peerPubKey)
 		data, _ := json.Marshal(map[string]interface{}{
-			"message":   message,
-			"sender":    senderInt,
-			"direction": "received",
+			"message":            message,
+			"sender":             senderInt,
+			"direction":          "received",
+			"conference_number": groupNumber,
+			"peer_number":       peerNumber,
 		})
 		s.eventQueue.Push("conference_message", string(data))
 		// Persist to SQLite with integer chanid
@@ -446,9 +449,11 @@ func setupCallbacks(s *Server) {
 		peerPubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, peerNumber)
 		senderInt, _ := s.getOrCreatePubKeyID(peerPubKey)
 		data, _ := json.Marshal(map[string]interface{}{
-			"message":   message,
-			"sender":    senderInt,
-			"direction": "received",
+			"message":      message,
+			"sender":       senderInt,
+			"direction":    "received",
+			"group_number": int(groupNumber),
+			"peer_number":  int(peerNumber),
 		})
 		s.eventQueue.Push("group_message", string(data))
 		// Persist to SQLite with integer chanid
