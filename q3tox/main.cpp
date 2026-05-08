@@ -1,6 +1,7 @@
 #include "compat34.h"
 #include "mainwindow.h"
 #include "translator.h"
+#include "appsetup.h"
 
 #include "ThemeManager.h"
 
@@ -32,6 +33,8 @@ static void saveLanguage(const QString& lang) {
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+
+    QtappSetup::setup(app);
     
     // 设置 UTF-8 编解码器
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
