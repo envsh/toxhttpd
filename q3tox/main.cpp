@@ -47,6 +47,7 @@ int main(int argc, char* argv[]) {
     
     // 加载语言
     Translator::instance().loadLanguage(savedLang);
+    QtappSetup::installQtTranslations(savedLang);
     
     // 创建主窗口
     MainWindow window;

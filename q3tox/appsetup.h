@@ -9,10 +9,13 @@
 #include <qobject.h>
 #include <qtimer.h>
 #include <qapplication.h>
+#include <qtranslator.h>
 #else
 #include <QObject>
 #include <QTimer>
 #include <QApplication>
+#include <QTranslator>
+#include <QLibraryInfo>
 #endif
 
 class QtappSetup : public QObject {
@@ -23,6 +26,9 @@ public:
     static int addTimer(unsigned int intervalMs, std::function<void()> callback);
     static void removeTimer(int timerId);
     static void onExit(std::function<void()> callback);
+    // langCode: 应用语言代码格式，如 "zh-CN", "zh-TW", "en-US"
+    // 内部自动转为 Qt 格式 "zh_CN", "zh_TW" 并加载对应 .qm 文件
+    static void installQtTranslations(const QString& langCode);
 
 private slots:
     void onTimerTimeout();

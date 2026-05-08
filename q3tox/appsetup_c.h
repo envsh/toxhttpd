@@ -8,6 +8,7 @@ extern "C" {
 void qtapp_onExit(void (*callback)());
 int  qtapp_addTimer(unsigned int intervalMs, void (*callback)());
 void qtapp_removeTimer(int timerId);
+void qtapp_installQtTranslations(const char* langCode);
 
 #ifdef __cplusplus
 }

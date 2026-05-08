@@ -16,6 +16,7 @@ static QString getCurrentTime() {
 #include "conferenceinvitedialog.h"
 #include "groupinvitedialog.h"
 #include "cJSON.h"
+#include "appsetup.h"
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
@@ -381,6 +382,7 @@ void MainWindow::handleEvents(const EventList& events) {
 void MainWindow::onLanguageChanged(const QString& langCode) {
     saveLanguage(langCode);
     Translator::instance().loadLanguage(langCode);
+    QtappSetup::installQtTranslations(langCode);
 }
 
 void MainWindow::retranslateUi() {
