@@ -32,6 +32,11 @@ static void saveLanguage(const QString& lang) {
 }
 
 int main(int argc, char* argv[]) {
+	// os.setenv('QT_IM_MODULE', "xim", true)
+    // os.setenv('XMODIFIERS', '@im=fcitx', true)
+    setenv("QT_IM_MODULE", "xim", true);
+    setenv("XMODIFIERS", "@im=fcitx", true);
+
     QApplication app(argc, argv);
 
     QtappSetup::setup(app);
