@@ -1,4 +1,7 @@
 #include "chatview.h"
+#ifdef EMOJI_RENDER_QT34
+#include "emojiutil.h"
+#endif
 #include <algorithm>
 
 #ifdef QT3_BUILD
@@ -109,6 +112,29 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
     if (bubbleTextWidth < 20) bubbleTextWidth = 20;
 
     int lineCount = 0;
+#ifdef EMOJI_RENDER_QT34
+    auto cps = toCodepoints(msg.messageText);
+    int tLen = (int)cps.size();
+    int pos = 0;
+    while (pos < tLen) {
+        if (cps[pos] == '\n') { lineCount++; pos++; continue; }
+        int lineWidth = 0, lastSpace = -1, end = pos;
+        while (end < tLen && cps[end] != '\n') {
+            int cw = isEmojiChar(cps[end]) ? emojiCharWidth(fm) : fm.width(QChar((ushort)cps[end]));
+            lineWidth += cw;
+            if (cps[end] == ' ') lastSpace = end;
+            if (lineWidth >= bubbleTextWidth) {
+                if (lastSpace > pos && end - pos > 10) {
+                    end = lastSpace + 1;
+                }
+                break;
+            }
+            end++;
+        }
+        lineCount++;
+        pos = end;
+    }
+#else
     int textLen = msg.messageText.length();
     int pos = 0;
     while (pos < textLen) {
@@ -134,6 +160,7 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
         lineCount++;
         pos = end;
     }
+#endif
     if (lineCount < 1) lineCount = 1;
 
     int textHeight = lineCount * fm.lineSpacing();
@@ -200,10 +227,14 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
                        bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
         p.setPen(kBubbleTextColor);
         p.setFont(font());
+#ifdef EMOJI_RENDER_QT34
+        EmojiRenderer::instance().drawText(p, textRect, msg.messageText);
+#else
 #ifdef QT3_BUILD
         p.drawText(textRect, Qt::WordBreak | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
 #else
         p.drawText(textRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
+#endif
 #endif
     } else {
         int ax = kPad;
@@ -255,10 +286,14 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
                        bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
         p.setPen(kBubbleTextColor);
         p.setFont(font());
+#ifdef EMOJI_RENDER_QT34
+        EmojiRenderer::instance().drawText(p, textRect, msg.messageText);
+#else
 #ifdef QT3_BUILD
         p.drawText(textRect, Qt::WordBreak | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
 #else
         p.drawText(textRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
+#endif
 #endif
     }
 }

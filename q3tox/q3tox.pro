@@ -7,13 +7,13 @@ SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp ThemeManager.cpp \
              friendinfodialog.cpp placeholderlineedit.cpp apilog.cpp memberlistdialog.cpp \
-             appsetup.cpp compat34.cpp
+             appsetup.cpp compat34.cpp emojiutil.cpp
 
 HEADERS = mainwindow.h api.h eventpoller.h \
             chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h ThemeManager.h compat34.h \
             friendinfodialog.h placeholderlineedit.h apilog.h memberlistdialog.h \
-            appsetup.h appsetup_c.h
+            appsetup.h appsetup_c.h emojiutil.h
 
 # moc 处理
 MOC_DIR = .
@@ -38,10 +38,15 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
 
 # 包含路径
 # INCLUDEPATH += /opt/qt338sh/include /opt/qt338sh/include/qt3
+INCLUDEPATH += /usr/include/freetype2
 
 # 库路径和链接
 # QMAKE_LIBDIR_FLAGS += -L/opt/qt338sh/lib
-LIBS += -lcurl
+LIBS += -lcurl -lfreetype
+
+# Emoji rendering with FreeType (color emoji fonts):
+# Uncomment the next line to enable EMOJI_RENDER_QT34
+DEFINES += EMOJI_RENDER_QT34
 isEmpty(QT_VERSION) {
     # Qt3: 手动指定库
     LIBS += -lqt-mt
