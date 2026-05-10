@@ -74,6 +74,7 @@ jobs:
             qt4-qmake \
             qt4-dev-tools \
             libcurl4-openssl-dev \
+            libfreetype-dev \
             libcjson-dev \
             libgl1-mesa-dev \
             libx11-dev \

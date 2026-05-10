@@ -38,11 +38,21 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
 
 # 包含路径
 # INCLUDEPATH += /opt/qt338sh/include /opt/qt338sh/include/qt3
-INCLUDEPATH += /usr/include/freetype2
+
+# FreeType2 自动检测
+FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
+!isEmpty(FREETYPE_LIBS) {
+    QMAKE_CXXFLAGS += $$system(pkg-config --cflags freetype2 2>/dev/null)
+    LIBS += -lcurl $$FREETYPE_LIBS
+    message("FreeType2: detected via pkg-config")
+} else {
+    INCLUDEPATH += /usr/include/freetype2
+    LIBS += -lcurl -lfreetype
+    message("FreeType2: pkg-config not found, using fallback paths")
+}
 
 # 库路径和链接
 # QMAKE_LIBDIR_FLAGS += -L/opt/qt338sh/lib
-LIBS += -lcurl -lfreetype
 
 # Emoji rendering with FreeType (color emoji fonts):
 # Uncomment the next line to enable EMOJI_RENDER_QT34
