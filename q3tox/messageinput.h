@@ -8,12 +8,17 @@ class MessageInput : public QTextEdit {
 public:
     MessageInput(QWidget* parent = 0);
 
+    void setPlaceholderText(const QString& t);
+    QString placeholderText() const;
+
 signals:
     void sendRequested();
     void filePasteRequested(const QString& filePath);
 
 protected:
     void keyPressEvent(QKeyEvent* e);
+    void focusInEvent(QFocusEvent* e);
+    void focusOutEvent(QFocusEvent* e);
     void dragEnterEvent(QDragEnterEvent* e);
     void dropEvent(QDropEvent* e);
 
@@ -26,6 +31,8 @@ protected:
 
 private:
     static int s_pasteCounter;
+    QString m_placeholder;
+    bool m_isPlaceholderActive;
 };
 
 #endif

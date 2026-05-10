@@ -47,12 +47,16 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     inputEdit = new MessageInput(this);
     inputGrid->addMultiCellWidget(inputEdit, 0, 1, 0, 0);
     emojiBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x98\x8A"), this);
+    emojiBtn->setFixedSize(24, 24);
     inputGrid->addWidget(emojiBtn, 0, 1);
     fileBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x93\x81"), this);
+    fileBtn->setFixedSize(24, 24);
     inputGrid->addWidget(fileBtn, 1, 1);
     sendBtn = new QPushButton(_("buttons.send"), this);
-    int h = inputEdit->fontMetrics().lineSpacing() * 2 + 6;
-    sendBtn->setFixedSize(h, h);
+    QFontMetrics fm = inputEdit->fontMetrics();
+    int twoLineH = fm.lineSpacing() * 2 + fm.lineSpacing() / 2 + 6;
+    inputEdit->setMaximumHeight(twoLineH);
+    sendBtn->setFixedSize(twoLineH, twoLineH);
     inputGrid->addMultiCellWidget(sendBtn, 0, 1, 2, 2);
     inputGrid->setColStretch(0, 1);
 #else
@@ -61,21 +65,21 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     inputEdit = new MessageInput(this);
     inputGrid->addWidget(inputEdit, 0, 0, 2, 1);
     emojiBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x98\x8A"), this);
+    emojiBtn->setFixedSize(24, 24);
     inputGrid->addWidget(emojiBtn, 0, 1);
     fileBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x93\x81"), this);
+    fileBtn->setFixedSize(24, 24);
     inputGrid->addWidget(fileBtn, 1, 1);
     sendBtn = new QPushButton(_("buttons.send"), this);
-    int h = inputEdit->fontMetrics().lineSpacing() * 2 + 6;
-    sendBtn->setFixedSize(h, h);
+    QFontMetrics fm = inputEdit->fontMetrics();
+    int twoLineH = fm.lineSpacing() * 2 + fm.lineSpacing() / 2 + 6;
+    inputEdit->setMaximumHeight(twoLineH);
+    sendBtn->setFixedSize(twoLineH, twoLineH);
     inputGrid->addWidget(sendBtn, 0, 2, 2, 1);
     inputGrid->setColumnStretch(0, 1);
 #endif
-    
-#ifdef QT3_BUILD
-    inputEdit->setText(_("placeholders.add_friend"));
-#else
-    inputEdit->setPlainText(_("placeholders.add_friend"));
-#endif
+
+        inputEdit->setPlaceholderText(_("placeholders.type_message"));
     
     connect(sendBtn, SIGNAL(clicked()), this, SLOT(onSendClicked()));
     connect(inputEdit, SIGNAL(sendRequested()), this, SLOT(onSendClicked()));
@@ -107,6 +111,13 @@ void ChatWidget::clearMessages() {
 }
 
 void ChatWidget::onSendClicked() {
+    if (inputEdit->placeholderText().length() > 0) {
+#ifdef QT3_BUILD
+        if (inputEdit->text() == inputEdit->placeholderText()) return;
+#else
+        if (inputEdit->toPlainText() == inputEdit->placeholderText()) return;
+#endif
+    }
 #ifdef QT3_BUILD
     QString msg = qTrim(inputEdit->text());
 #else
@@ -128,23 +139,9 @@ void ChatWidget::retranslateUi() {
     // 更新主题复选框文本
     if (themeCheckBox) themeCheckBox->setText(_("theme_dark"));
     
-    // 更新输入框 placeholder（如果当前显示的是默认值）
+    // 更新输入框 placeholder
     if (inputEdit) {
-#ifdef QT3_BUILD
-        QString text = inputEdit->text();
-        if (text == "输入 Tox ID 添加好友" || 
-            text == "Enter Tox ID to add friend" ||
-            text == "輸入 Tox ID 添加好友") {
-            inputEdit->setText(_("placeholders.add_friend"));
-        }
-#else
-        QString text = inputEdit->toPlainText();
-        if (text == "输入 Tox ID 添加好友" || 
-            text == "Enter Tox ID to add friend" ||
-            text == "輸入 Tox ID 添加好友") {
-            inputEdit->setPlainText(_("placeholders.add_friend"));
-        }
-#endif
+    inputEdit->setPlaceholderText(_("placeholders.type_message"));
     }
 }
 

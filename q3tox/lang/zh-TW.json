@@ -27,9 +27,10 @@
         "add": "新增",
         "join_group": "加入"
     },
-    "placeholders": {
-        "add_friend": "輸入 Tox ID 新增好友",
-        "join_group": "群組chat_id"
+"placeholders": {
+        "add_friend": "輸入 Tox ID 添加好友",
+        "join_group": "群組chat_id",
+        "type_message": "輸入訊息..."
     },
     "modals": {
         "edit_info_title": "編輯個人資訊",

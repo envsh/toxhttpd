@@ -20,16 +20,68 @@
 #include <QDropEvent>
 #include <QDragEnterEvent>
 #include <QKeyEvent>
+#include <QFocusEvent>
 #endif
 
 int MessageInput::s_pasteCounter = 0;
 
-MessageInput::MessageInput(QWidget* parent) : QTextEdit(parent) {
+MessageInput::MessageInput(QWidget* parent)
+    : QTextEdit(parent), m_isPlaceholderActive(false) {
 #ifdef QT3_BUILD
     setTextFormat(Qt::PlainText);
 #else
     setAcceptRichText(false);
 #endif
+}
+
+void MessageInput::setPlaceholderText(const QString& t) {
+    m_placeholder = t;
+#ifdef QT3_BUILD
+    QString cur = text();
+#else
+    QString cur = toPlainText();
+#endif
+    if (cur.isEmpty()) {
+        m_isPlaceholderActive = true;
+#ifdef QT3_BUILD
+        QTextEdit::setText(m_placeholder);
+#else
+        QTextEdit::setPlainText(m_placeholder);
+#endif
+    }
+}
+
+QString MessageInput::placeholderText() const {
+    return m_placeholder;
+}
+
+void MessageInput::focusInEvent(QFocusEvent* e) {
+    if (m_isPlaceholderActive) {
+        m_isPlaceholderActive = false;
+#ifdef QT3_BUILD
+        QTextEdit::setText(QString());
+#else
+        QTextEdit::setPlainText(QString());
+#endif
+    }
+    QTextEdit::focusInEvent(e);
+}
+
+void MessageInput::focusOutEvent(QFocusEvent* e) {
+#ifdef QT3_BUILD
+    QString t = text();
+#else
+    QString t = toPlainText();
+#endif
+    if (t.isEmpty() && !m_placeholder.isEmpty()) {
+        m_isPlaceholderActive = true;
+#ifdef QT3_BUILD
+        QTextEdit::setText(m_placeholder);
+#else
+        QTextEdit::setPlainText(m_placeholder);
+#endif
+    }
+    QTextEdit::focusOutEvent(e);
 }
 
 void MessageInput::keyPressEvent(QKeyEvent* e) {

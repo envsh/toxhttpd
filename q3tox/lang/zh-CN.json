@@ -29,7 +29,8 @@
     },
     "placeholders": {
         "add_friend": "输入 Tox ID 添加好友",
-        "join_group": "群组chat_id"
+        "join_group": "群组chat_id",
+        "type_message": "输入消息..."
     },
     "modals": {
         "edit_info_title": "编辑个人信息",

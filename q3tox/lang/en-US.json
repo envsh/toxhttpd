@@ -29,7 +29,8 @@
     },
     "placeholders": {
         "add_friend": "Enter Tox ID to add friend",
-        "join_group": "Group chat_id"
+        "join_group": "Group chat_id",
+        "type_message": "Type your message here..."
     },
     "modals": {
         "edit_info_title": "Edit Personal Info",
