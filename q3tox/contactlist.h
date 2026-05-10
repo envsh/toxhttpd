@@ -43,6 +43,9 @@ private slots:
     void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
     void showContextMenu(QPoint pos); // Qt4: right-click menu
     void onJoinGroupClicked();
+    void onAddFriendClicked();
+    void onCreateConferenceClicked();
+    void onCreateGroupClicked();
     
 private:
 #ifdef QT3_BUILD

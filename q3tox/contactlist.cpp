@@ -62,6 +62,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     addLayout->addWidget(addInput, 1);
     
     addBtn = new QPushButton(_("buttons.add"), this);
+    connect(addBtn, SIGNAL(clicked()), this, SLOT(onAddFriendClicked()));
     addLayout->addWidget(addBtn);
     layout->addLayout(addLayout);
     
@@ -78,9 +79,11 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     // 创建按钮行（第3行）
     QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     confBtn = new QPushButton(_("buttons.create_conference"), this);
+    connect(confBtn, SIGNAL(clicked()), this, SLOT(onCreateConferenceClicked()));
     btnLayout->addWidget(confBtn);
     
     groupBtn = new QPushButton(_("buttons.create_group"), this);
+    connect(groupBtn, SIGNAL(clicked()), this, SLOT(onCreateGroupClicked()));
     btnLayout->addWidget(groupBtn);
     layout->addLayout(btnLayout);
 }
@@ -468,5 +471,54 @@ void ContactListWidget::onJoinGroupClicked() {
     } else {
         QMessageBox::warning(this, _("group.join_failed"),
                              _("group.join_failed"));
+    }
+}
+
+void ContactListWidget::onAddFriendClicked() {
+    QString pubkey = qTrim(addInput->text());
+    if (pubkey.isEmpty()) {
+        QMessageBox::warning(this, _("warning"), _("add_friend_prompt"));
+        return;
+    }
+    // 验证长度：64 字符公钥 或 76 字符地址
+    int len = pubkey.length();
+    if (len != 64 && len != 76) {
+        QMessageBox::warning(this, _("warning"), _("add_friend_prompt"));
+        return;
+    }
+
+    ToxAPI api;
+    int friendId = api.addFriend(qToUtf8(pubkey).data());
+    if (friendId >= 0) {
+        QMessageBox::information(this, _("add_friend_success"),
+                                  _("add_friend_success"));
+        addInput->clear();
+    } else {
+        QMessageBox::warning(this, _("add_friend_failed"),
+                              _("add_friend_failed"));
+    }
+}
+
+void ContactListWidget::onCreateConferenceClicked() {
+    ToxAPI api;
+    int confId = api.createConference();
+    if (confId >= 0) {
+        QMessageBox::information(this, _("conference_created"),
+                                  _("conference_created"));
+    } else {
+        QMessageBox::warning(this, _("conference_create_failed"),
+                              _("conference_create_failed"));
+    }
+}
+
+void ContactListWidget::onCreateGroupClicked() {
+    ToxAPI api;
+    int groupId = api.createGroup("NewGroup", "me", "", false);
+    if (groupId >= 0) {
+        QMessageBox::information(this, _("group_created"),
+                                  _("group_created"));
+    } else {
+        QMessageBox::warning(this, _("group_create_failed"),
+                              _("group_create_failed"));
     }
 }

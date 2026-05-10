@@ -219,6 +219,13 @@ int ToxAPI::addFriend(const std::string& publicKey) {
     cJSON* root = cJSON_Parse(response.c_str());
     if (!root) return -1;
     
+    // 检查是否有 error 字段
+    cJSON* errorItem = cJSON_GetObjectItem(root, "error");
+    if (errorItem && cJSON_IsString(errorItem)) {
+        cJSON_Delete(root);
+        return -1;
+    }
+    
     cJSON* idItem = cJSON_GetObjectItem(root, "friend_id");
     int id = idItem ? idItem->valueint : -1;
     
@@ -424,7 +431,9 @@ int ToxAPI::createGroup(const std::string& groupName, const std::string& creator
     if (!password.empty()) {
         postData += "&password=" + password;
     }
-    postData += "&privacy=" + std::string(isPrivate ? "private" : "public");
+    if (isPrivate) {
+        postData += "&privacy_state=private";
+    }
     
     std::string response = httpPost("/api/groups", postData);
     if (response.empty()) return -1;
@@ -432,7 +441,14 @@ int ToxAPI::createGroup(const std::string& groupName, const std::string& creator
     cJSON* root = cJSON_Parse(response.c_str());
     if (!root) return -1;
     
-    cJSON* idItem = cJSON_GetObjectItem(root, "group_id");
+    // 检查是否有 error 字段
+    cJSON* errorItem = cJSON_GetObjectItem(root, "error");
+    if (errorItem && cJSON_IsString(errorItem)) {
+        cJSON_Delete(root);
+        return -1;
+    }
+    
+    cJSON* idItem = cJSON_GetObjectItem(root, "group_number");
     int id = idItem ? idItem->valueint : -1;
     
     cJSON_Delete(root);
