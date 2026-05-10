@@ -810,3 +810,173 @@ private slots:
 4. 调用 API：`curl "http://localhost:8181/api/messages/history?contact_id=0&contact_type=friend"`
 5. 验证返回包含 `sender_pubkey` 和 `sender_number`
 6. q3tox 切换联系人，验证历史消息加载
+
+---
+
+## 2026-05-10 会话更新
+
+### Goal
+- 修复 peer name 缓存键格式不统一问题（`"conf_"` vs `"conference_"`）
+- 将 q3tox 聊天消息区域从 `QTextEdit` 替换为虚拟化列表 `ChatView (QScrollView/QAbstractScrollArea)`
+- 添加鼠标滚轮和键盘翻页支持
+
+### 1. Peer Name 显示修复
+
+#### 问题
+- 事件处理器和预加载使用 `"conf_{N}_{M}"` 作为缓存键
+- 历史消息加载 `loadMessageHistory` 使用 `"conference_{id}_{sender}"`（即 `contactType` 直接拼接）
+- 会议（conference）的 `"conf_"` 和 `"conference_"` 不匹配 → 历史消息找不到 peer name
+
+#### 修复
+将所有 `"conf_"` 统一改为 `"conference_"`，保持和 `contactType`/`currentChatType` 一致。
+
+**web/app.js** 修改3处：
+| 行号 | 修改 |
+|------|------|
+| 513 | `conf_${id}_${m.peer_number}` → `conference_${id}_${m.peer_number}` |
+| 687 | `conf_${data.conference_number}_${data.peer_number}` → `conference_${data.conference_number}_${data.peer_number}` |
+| 707 | `conf_${data.conference_number}_${data.peer_number}` → `conference_${data.conference_number}_${data.peer_number}` |
+
+**q3tox/mainwindow.cpp** 修改4处：
+| 行号 | 修改 |
+|------|------|
+| 234 | `"conf_"` → `"conference_"` (preload) |
+| 340 | `"conf_"` → `"conference_"` (conference_message 事件) |
+| 350 | `"conf_"` → `"conference_"` (conference_message 查找) |
+| 428 | `"conf_"` → `"conference_"` (conference_peer_name 事件) |
+
+**web/app.js** 注释更新（第733行）。
+
+### 2. ChatView 虚拟化列表（替换 QTextEdit）
+
+#### 动机
+原有的 `QTextEdit` + `qInsertHtml()` 方式将所有消息渲染为 HTML 存入 `QTextDocument`，消息数量大时（数百条以上）性能急剧下降。
+
+#### 架构
+
+```
+ChatView : QWidget          ← 统一基类（Qt3/Qt4 共用）
+├── QScrollBar* m_vScrollBar   ← 手动滚动条
+├── std::vector<ChatMessage>   ← 消息存储
+├── paintEvent()               ← 只绘制可见消息
+├── wheelEvent()               ← 鼠标滚轮
+└── keyPressEvent()            ← 键盘翻页（PgUp/PgDn/↑/↓/Home/End）
+```
+
+#### 新增文件
+| 文件 | 说明 |
+|------|------|
+| `q3tox/chatview.h` | ChatView 类声明 + ChatMessage 结构体 |
+| `q3tox/chatview.cpp` | 完整实现（~330行） |
+
+#### ChatMessage 结构
+```cpp
+struct ChatMessage {
+    QString messageText;   // 消息正文（纯文本）
+    QString type;          // "self" / "other"
+    QString sender;        // 发送者名称
+    QString avatarText;    // 头像文字（首字母）
+    QString time;          // 格式化时间
+    int height;            // 缓存高度（px）
+};
+```
+
+#### 虚拟化机制
+| 组件 | 说明 |
+|------|------|
+| `paintEvent()` | 遍历消息列表，跳过 `y+h < scrollPos` 和 `y > scrollPos+viewportHeight` 的条目 |
+| `relayout()` | 计算每条消息高度（`calcMessageHeight`），更新滚动条范围 |
+| `drawMessage()` | 用 QPainter 原语绘制消息：`drawEllipse`（头像圆）+ `drawText`（名称/时间/正文）+ `drawRoundRect`（气泡背景） |
+| `onScrollChanged(int)` | 滚动条值变化 → `update()` 触发布局重绘 |
+
+#### HTML → QPainter 绘图拆分
+原有的 `<table>` HTML 布局完全拆分为 QPainter 原语：
+
+| 原始 HTML | QPainter 替代 |
+|-----------|--------------|
+| `<div style="width:48px;height:48px;border-radius:50%;background:#30363d;">` | `p.drawEllipse(ax, y+8, 48, 48)` + `p.drawText(ax, y+8, 48, 48, Qt::AlignCenter, letter)` |
+| `<span style="font-weight:500;...">Name</span>` | `p.drawText(contentX, y+8, ..., Qt::AlignLeft, sender)` |
+| `<span style="font-size:10px;color:#8b949e;">12:00</span>` | `p.drawText(timeX, y+8, ..., Qt::AlignLeft, time)` |
+| `<div style="background:#21262d;border-radius:8px;padding:8px 12px;width:80%;">` | `p.drawRoundRect(bubbleRect, 4, 4)` + `p.drawText(textRect, Qt::WordBreak, message)` |
+
+#### 布局常量（与原有 HTML 设计一致）
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| kAvatarSize | 48 | 头像圆圈直径 |
+| kPad | 8 | 通用内边距 |
+| kMsgSpacing | 8 | 消息间距 |
+| kBubbleHPad | 12 | 气泡水平内边距 |
+| kBubbleVPad | 8 | 气泡垂直内边距 |
+| kBubbleRadius | 8 | 气泡圆角半径 |
+
+#### 高度计算逻辑
+每条消息的高度 `calcMessageHeight()` 由两部分决定，取较大值：
+1. **内容区域** = 发送者行高(fm.lineSpacing) + 间距(8px) + 气泡高度(2×kBubbleVPad + 文本行数×行高)
+2. **头像区域** = kAvatarSize + 2×kPad
+
+文本行数通过 `QFontMetrics::width()` 逐字符累计，检测是否需要换行（Word Wrap）。
+
+#### 修改文件
+| 文件 | 修改 |
+|------|------|
+| `q3tox/chatwidget.h` | `QTextEdit* messageArea` → `ChatView* messageArea` |
+| `q3tox/chatwidget.cpp` | `appendMessage()` 改为构造 `ChatMessage` 结构，传入 `ChatView::appendMessage()`；`clearMessages()` 改为调用 `ChatView::clearMessages()` |
+| `q3tox/q3tox.pro` | SOURCES/HEADERS 添加 `chatview` |
+
+### 3. 鼠标滚轮 + 键盘翻页
+
+#### 问题
+`ChatView` 无焦点，滚轮事件穿透到左侧联系人列表。
+
+#### 修复
+
+**chatview.h** 添加：
+```cpp
+void wheelEvent(QWheelEvent* event);
+void keyPressEvent(QKeyEvent* event);
+```
+
+**chatview.cpp**：
+1. **构造函数**：`setFocusPolicy(QWidget::StrongFocus)` → 点击消息区域自动获取焦点
+2. **`wheelEvent`**：`event->delta()` 正/负对应上/下，单步 ×3 手感更佳
+3. **`keyPressEvent`**：
+
+| 按键 | 动作 |
+|------|------|
+| ↑ / ↓ | 单步滚动（lineStep） |
+| PgUp / PgDown | 翻页滚动（pageStep） |
+| Home | 滚动到顶部 |
+| End | 滚动到底部 |
+
+#### Qt3/Qt4 兼容差异
+
+| 特性 | Qt3 | Qt4+ |
+|------|-----|------|
+| FocusPolicy 值 | `QWidget::StrongFocus` | `Qt::StrongFocus` |
+| 单步步长 | `scrollBar->lineStep()` | `scrollBar->singleStep()` |
+| 最小值/最大值 | `minValue()` / `maxValue()` | `minimum()` / `maximum()` |
+| 文本换行标志 | `Qt::WordBreak` | `Qt::TextWordWrap` |
+| 滚轮delta | `event->delta()` | `event->delta()`（相同） |
+| 翻页步长 | `scrollBar->pageStep()` | `scrollBar->pageStep()`（相同） |
+
+### 编译
+
+| 环境 | 命令 | 结果 |
+|------|------|------|
+| Qt3 | `bash buildqt3.sh` | ✅ 编译通过 |
+| Qt4 | `qmake-qt4 && make` | ✅ `chatview.o` 编译通过（链接错误在无关文件） |
+
+### 关键文件修改清单
+
+#### q3tox 新增
+- `q3tox/chatview.h` - ChatView 虚拟化列表类声明
+- `q3tox/chatview.cpp` - 完整实现（绘制、布局、事件处理）
+
+#### q3tox 修改
+- `q3tox/chatwidget.h` - QTextEdit → ChatView
+- `q3tox/chatwidget.cpp` - appendMessage 重构
+- `q3tox/q3tox.pro` - 添加 chatview.h/.cpp
+- `q3tox/mainwindow.cpp` - `"conf_"` → `"conference_"`（4处）
+
+#### Web 修改
+- `web/app.js` - `"conf_"` → `"conference_"`（4处）

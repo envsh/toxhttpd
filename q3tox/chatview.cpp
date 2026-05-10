@@ -7,6 +7,8 @@
 #else
 #include <QPainter>
 #include <QScrollBar>
+#include <QWheelEvent>
+#include <QKeyEvent>
 #endif
 
 static const QColor kAvatarBg("#30363d");
@@ -23,7 +25,7 @@ ChatView::ChatView(QWidget* parent)
     m_totalHeight = 0;
     m_scrollPos = 0;
 
-    m_vScrollBar = new QScrollBar(QScrollBar::Vertical, this);
+    m_vScrollBar = new QScrollBar(Qt::Vertical, this);
 #ifdef QT3_BUILD
     m_vScrollBar->setSteps(10, 50);
 #else
@@ -31,6 +33,12 @@ ChatView::ChatView(QWidget* parent)
     m_vScrollBar->setPageStep(50);
 #endif
     connect(m_vScrollBar, SIGNAL(valueChanged(int)), this, SLOT(onScrollChanged(int)));
+
+#ifdef QT3_BUILD
+    setFocusPolicy(QWidget::StrongFocus);
+#else
+    setFocusPolicy(Qt::StrongFocus);
+#endif
 }
 
 void ChatView::appendMessage(const ChatMessage& msg) {
@@ -249,6 +257,43 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
         p.drawText(textRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
 #endif
     }
+}
+
+void ChatView::wheelEvent(QWheelEvent* event) {
+#ifdef QT3_BUILD
+    int step = m_vScrollBar->lineStep();
+#else
+    int step = m_vScrollBar->singleStep();
+#endif
+    int newVal = m_vScrollBar->value() + (event->delta() > 0 ? -step * 3 : step * 3);
+    m_vScrollBar->setValue(newVal);
+    event->accept();
+}
+
+void ChatView::keyPressEvent(QKeyEvent* event) {
+    int val = m_vScrollBar->value();
+    switch (event->key()) {
+#ifdef QT3_BUILD
+    case Qt::Key_PageUp:     val -= m_vScrollBar->pageStep(); break;
+    case Qt::Key_PageDown:   val += m_vScrollBar->pageStep(); break;
+    case Qt::Key_Up:         val -= m_vScrollBar->lineStep(); break;
+    case Qt::Key_Down:       val += m_vScrollBar->lineStep(); break;
+    case Qt::Key_Home:       val  = m_vScrollBar->minValue(); break;
+    case Qt::Key_End:        val  = m_vScrollBar->maxValue(); break;
+#else
+    case Qt::Key_PageUp:     val -= m_vScrollBar->pageStep(); break;
+    case Qt::Key_PageDown:   val += m_vScrollBar->pageStep(); break;
+    case Qt::Key_Up:         val -= m_vScrollBar->singleStep(); break;
+    case Qt::Key_Down:       val += m_vScrollBar->singleStep(); break;
+    case Qt::Key_Home:       val  = m_vScrollBar->minimum(); break;
+    case Qt::Key_End:        val  = m_vScrollBar->maximum(); break;
+#endif
+    default:
+        QWidget::keyPressEvent(event);
+        return;
+    }
+    m_vScrollBar->setValue(val);
+    event->accept();
 }
 
 void ChatView::paintEvent(QPaintEvent* event) {

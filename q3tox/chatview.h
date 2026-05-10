@@ -30,6 +30,8 @@ public:
 protected:
     void paintEvent(QPaintEvent* event);
     void resizeEvent(QResizeEvent* event);
+    void wheelEvent(QWheelEvent* event);
+    void keyPressEvent(QKeyEvent* event);
 
 private slots:
     void onScrollChanged(int value);
