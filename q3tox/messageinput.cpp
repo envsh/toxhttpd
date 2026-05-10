@@ -1,0 +1,178 @@
+#include "messageinput.h"
+#include "translator.h"
+#ifdef QT3_BUILD
+#include <qfile.h>
+#else
+#include <QFile>
+#endif
+
+#ifdef QT3_BUILD
+#include <qdragobject.h>
+#include <qclipboard.h>
+#include <qdatetime.h>
+#include <qimage.h>
+#else
+#include <QMimeData>
+#include <QClipboard>
+#include <QDateTime>
+#include <QImage>
+#include <QUrl>
+#include <QDropEvent>
+#include <QDragEnterEvent>
+#include <QKeyEvent>
+#endif
+
+int MessageInput::s_pasteCounter = 0;
+
+MessageInput::MessageInput(QWidget* parent) : QTextEdit(parent) {
+#ifdef QT3_BUILD
+    setTextFormat(Qt::PlainText);
+#else
+    setAcceptRichText(false);
+#endif
+}
+
+void MessageInput::keyPressEvent(QKeyEvent* e) {
+#ifdef QT3_BUILD
+    uint mod = e->state();
+    uint ctrl = Qt::ControlButton;
+    uint shift = Qt::ShiftButton;
+#else
+    Qt::KeyboardModifiers mod = e->modifiers();
+    Qt::KeyboardModifiers ctrl = Qt::ControlModifier;
+    Qt::KeyboardModifiers shift = Qt::ShiftModifier;
+#endif
+
+    if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && !(mod & shift)) {
+        emit sendRequested();
+        return;
+    }
+
+#ifdef QT3_BUILD
+    if (e->key() == Qt::Key_V && (mod & ctrl)) {
+        QMimeSource* src = QApplication::clipboard()->data();
+        if (src && handleMimeSource(src)) return;
+    }
+#endif
+
+    QTextEdit::keyPressEvent(e);
+}
+
+void MessageInput::dragEnterEvent(QDragEnterEvent* e) {
+    (void)e;
+    e->accept();
+}
+
+void MessageInput::dropEvent(QDropEvent* e) {
+#ifdef QT3_BUILD
+    if (handleMimeSource(e)) {
+        e->accept();
+        return;
+    }
+#else
+    if (handleMimeData(e->mimeData())) {
+        e->acceptProposedAction();
+        return;
+    }
+#endif
+    QTextEdit::dropEvent(e);
+}
+
+#ifdef QT3_BUILD
+
+bool MessageInput::handleMimeSource(QMimeSource* src) {
+    const char* fmt;
+    for (int i = 0; (fmt = src->format(i)) != 0; i++) {
+        if (qstrcmp(fmt, "text/uri-list") == 0) {
+            QByteArray ba = src->encodedData("text/uri-list");
+            QString uris = QString::fromUtf8(ba.data());
+            uris = uris.stripWhiteSpace();
+            int idx = uris.find('\n');
+            if (idx >= 0) uris = uris.left(idx);
+            QString path = uris;
+            if (path.startsWith("file://")) path = path.mid(7);
+            if (path.isEmpty() || !QFile::exists(path)) return false;
+            int ret = QMessageBox::question(this, _("confirm"),
+                        _("confirm_send_file").arg(path),
+                        QMessageBox::Yes, QMessageBox::No);
+            if (ret == QMessageBox::Yes) { emit filePasteRequested(path); return true; }
+            return false;
+        }
+    }
+    if (QImageDrag::canDecode(src)) {
+        QImage img;
+        if (QImageDrag::decode(src, img)) {
+            QString tmpPath = QString("/tmp/toxhttpd_paste_%1.png")
+                              .arg(s_pasteCounter++);
+            img.save(tmpPath, "PNG");
+            int ret = QMessageBox::question(this, _("confirm"),
+                        _("confirm_send_file").arg(tmpPath),
+                        QMessageBox::Yes, QMessageBox::No);
+            if (ret == QMessageBox::Yes) { emit filePasteRequested(tmpPath); return true; }
+            return false;
+        }
+    }
+    if (QTextDrag::canDecode(src)) {
+        QString text;
+        if (QTextDrag::decode(src, text)) {
+            text = text.stripWhiteSpace();
+            if (QFile::exists(text)) {
+                int ret = QMessageBox::question(this, _("confirm"),
+                            _("confirm_send_file").arg(text),
+                            QMessageBox::Yes, QMessageBox::No);
+                if (ret == QMessageBox::Yes) { emit filePasteRequested(text); return true; }
+                return false;
+            }
+        }
+    }
+    return false;
+}
+
+#else
+
+void MessageInput::insertFromMimeData(const QMimeData* source) {
+    if (handleMimeData(source)) return;
+    QTextEdit::insertFromMimeData(source);
+}
+
+bool MessageInput::handleMimeData(const QMimeData* data) {
+    if (data->hasUrls()) {
+        QList<QUrl> urls = data->urls();
+        for (int i = 0; i < urls.size(); i++) {
+            QString path = urls[i].toLocalFile();
+            if (!path.isEmpty() && QFile::exists(path)) {
+                int ret = QMessageBox::question(this, _("confirm"),
+                            _("confirm_send_file").arg(path),
+                            QMessageBox::Yes, QMessageBox::No);
+                if (ret == QMessageBox::Yes) { emit filePasteRequested(path); return true; }
+                return false;
+            }
+        }
+    }
+    if (data->hasImage()) {
+        QImage img = data->imageData().value<QImage>();
+        if (!img.isNull()) {
+            QString tmpPath = QString("/tmp/toxhttpd_paste_%1.png")
+                              .arg(s_pasteCounter++);
+            img.save(tmpPath, "PNG");
+            int ret = QMessageBox::question(this, _("confirm"),
+                        _("confirm_send_file").arg(tmpPath),
+                        QMessageBox::Yes, QMessageBox::No);
+            if (ret == QMessageBox::Yes) { emit filePasteRequested(tmpPath); return true; }
+            return false;
+        }
+    }
+    {
+        QString text = data->text().trimmed();
+        if (!text.isEmpty() && QFile::exists(text)) {
+            int ret = QMessageBox::question(this, _("confirm"),
+                        _("confirm_send_file").arg(text),
+                        QMessageBox::Yes, QMessageBox::No);
+            if (ret == QMessageBox::Yes) { emit filePasteRequested(text); return true; }
+            return false;
+        }
+    }
+    return false;
+}
+
+#endif

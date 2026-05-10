@@ -91,6 +91,8 @@
     "select_chat_object": "Select chat object",
     "please_enter_chat_id": "Please enter group chat_id",
     "theme_dark": "Dark Theme",
+    "confirm": "Confirm",
+    "confirm_send_file": "Confirm sending this file?\n%1",
     "confirm_delete_friend": "Delete friend %1?",
     "confirm_leave_conference": "Leave conference %1?",
     "invite_to_conference": "Invite to Conference",

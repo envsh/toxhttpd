@@ -3,6 +3,7 @@
 
 #include "compat34.h"
 #include "chatview.h"
+#include "messageinput.h"
 
 class ChatWidget : public QWidget {
     Q_OBJECT
@@ -19,18 +20,24 @@ public:
 signals:
     void messageSent(const QString& message);
     void languageChanged(const QString& langCode);
+    void fileSendRequested(const QString& filePath);
 
 private slots:
     void onSendClicked();
     void onLanguageChanged(int index);
     void onThemeToggled(bool checked);
+    void onEmojiClicked();
+    void onFileClicked();
+    void onFilePaste(const QString& filePath);
 
 private:
     QLabel* headerText;
     QComboBox* langSelector;
     QCheckBox* themeCheckBox;
     ChatView* messageArea;
-    QLineEdit* inputEdit;
+    MessageInput* inputEdit;
+    QPushButton* emojiBtn;
+    QPushButton* fileBtn;
     QPushButton* sendBtn;
 };
 
