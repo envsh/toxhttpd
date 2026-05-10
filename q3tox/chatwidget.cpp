@@ -169,7 +169,7 @@ void ChatWidget::onEmojiClicked() {
     QPoint btnPos = emojiBtn->mapToGlobal(QPoint(0, 0));
     int pickerW = emojiPicker->width();
     int pickerH = emojiPicker->height();
-    int x = btnPos.x();
+    int x = btnPos.x() + emojiBtn->width() - pickerW;
     int y = btnPos.y() - pickerH;
     if (y < 0) y = btnPos.y() + emojiBtn->height();
     emojiPicker->showAt(QPoint(x, y));
