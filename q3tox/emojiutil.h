@@ -15,6 +15,8 @@ std::vector<uint32_t> toCodepoints(const QString& text);
 #ifdef EMOJI_RENDER_QT34
 #include <map>
 
+bool textHasEmoji(const QString& text);
+
 class EmojiRenderer {
 public:
     static EmojiRenderer& instance();

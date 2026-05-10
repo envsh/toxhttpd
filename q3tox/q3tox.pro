@@ -7,13 +7,13 @@ SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp ThemeManager.cpp \
              friendinfodialog.cpp placeholderlineedit.cpp apilog.cpp memberlistdialog.cpp \
-             appsetup.cpp compat34.cpp emojiutil.cpp
+             appsetup.cpp compat34.cpp emojiutil.cpp emojiwidgets.cpp emojiitems.cpp
 
 HEADERS = mainwindow.h api.h eventpoller.h \
             chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h ThemeManager.h compat34.h \
             friendinfodialog.h placeholderlineedit.h apilog.h memberlistdialog.h \
-            appsetup.h appsetup_c.h emojiutil.h
+            appsetup.h appsetup_c.h emojiutil.h emojiwidgets.h emojiitems.h
 
 # moc 处理
 MOC_DIR = .

@@ -59,6 +59,13 @@ std::vector<uint32_t> toCodepoints(const QString& text) {
     return cps;
 }
 
+bool textHasEmoji(const QString& text) {
+    auto cps = toCodepoints(text);
+    for (size_t i = 0; i < cps.size(); i++)
+        if (isEmojiChar(cps[i])) return true;
+    return false;
+}
+
 #ifdef EMOJI_RENDER_QT34
 
 static QPixmap rawBytesToQPixmap(const unsigned char* bgra, int w, int h) {
