@@ -122,5 +122,14 @@
         "labels": {
             "type": "Type"
         }
+    },
+    "emoji": {
+        "search_placeholder": "Search emoji...",
+        "recently_used": "Recently Used",
+        "smileys": "Smileys & Emotions",
+        "people": "People & Gestures",
+        "nature": "Animals & Nature",
+        "objects": "Food & Objects",
+        "symbols": "Symbols & Travel"
     }
 }

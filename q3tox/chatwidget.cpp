@@ -80,6 +80,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
 #endif
 
         inputEdit->setPlaceholderText(_("placeholders.type_message"));
+
+    // Emoji picker
+    emojiPicker = new EmojiPicker(this);
+    connect(emojiPicker, SIGNAL(emojiSelected(QString)), this, SLOT(onEmojiInsert(QString)));
     
     connect(sendBtn, SIGNAL(clicked()), this, SLOT(onSendClicked()));
     connect(inputEdit, SIGNAL(sendRequested()), this, SLOT(onSendClicked()));
@@ -162,8 +166,22 @@ void ChatWidget::onThemeToggled(bool checked) {
 }
 
 void ChatWidget::onEmojiClicked() {
-    // TODO: open emoji picker
-    qWarning("onEmojiClicked: not implemented");
+    QPoint btnPos = emojiBtn->mapToGlobal(QPoint(0, 0));
+    int pickerW = emojiPicker->width();
+    int pickerH = emojiPicker->height();
+    int x = btnPos.x();
+    int y = btnPos.y() - pickerH;
+    if (y < 0) y = btnPos.y() + emojiBtn->height();
+    emojiPicker->showAt(QPoint(x, y));
+}
+
+void ChatWidget::onEmojiInsert(const QString& emoji) {
+#ifdef QT3_BUILD
+    inputEdit->insert(emoji);
+#else
+    inputEdit->insertPlainText(emoji);
+#endif
+    inputEdit->setFocus();
 }
 
 void ChatWidget::onFileClicked() {

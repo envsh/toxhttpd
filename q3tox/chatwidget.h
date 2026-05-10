@@ -5,6 +5,7 @@
 #include "chatview.h"
 #include "messageinput.h"
 #include "emojiwidgets.h"
+#include "emoji_picker.h"
 
 class ChatWidget : public QWidget {
     Q_OBJECT
@@ -28,6 +29,7 @@ private slots:
     void onLanguageChanged(int index);
     void onThemeToggled(bool checked);
     void onEmojiClicked();
+    void onEmojiInsert(const QString& emoji);
     void onFileClicked();
     void onFilePaste(const QString& filePath);
 
@@ -40,6 +42,7 @@ private:
     EmojiPushButton* emojiBtn;
     EmojiPushButton* fileBtn;
     QPushButton* sendBtn;
+    EmojiPicker* emojiPicker;
 };
 
 #endif // CHATWIDGET_H

@@ -122,5 +122,14 @@
         "labels": {
             "type": "類型"
         }
+    },
+    "emoji": {
+        "search_placeholder": "搜尋 emoji...",
+        "recently_used": "最近使用",
+        "smileys": "笑臉與表情",
+        "people": "人物與手勢",
+        "nature": "動物與自然",
+        "objects": "食物與物品",
+        "symbols": "符號與旅行"
     }
 }

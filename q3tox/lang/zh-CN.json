@@ -90,6 +90,15 @@
         "invite_to_group": "邀请进群组",
         "view_members": "查看成员"
     },
+    "emoji": {
+        "search_placeholder": "搜索 emoji...",
+        "recently_used": "最近使用",
+        "smileys": "笑脸与表情",
+        "people": "人物与手势",
+        "nature": "动物与自然",
+        "objects": "食物与物品",
+        "symbols": "符号与旅行"
+    },
     "member_list": {
         "title": "成员列表",
         "title.conference": "会议成员 - %1",
