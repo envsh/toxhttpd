@@ -27,6 +27,7 @@
 #include <qclipboard.h>
 #include <qfileinfo.h>
 #include <qdatetime.h>
+#include <qwidgetstack.h>
 #include <unistd.h>
 #else
 // ========== Qt4 头文件 ==========
@@ -57,6 +58,7 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QDateTime>
+#include <QStackedWidget>
 #endif
 
 // QString API 兼容
@@ -251,5 +253,20 @@ public:
     int count() const { return QList<T*>::count(); }
 };
 #endif
+
+// StackedWidget (QWidgetStack in Qt3, QStackedWidget in Qt4)
+#ifdef QT3_BUILD
+typedef QWidgetStack StackedWidget;
+#else
+typedef QStackedWidget StackedWidget;
+#endif
+
+inline void qStackSetCurrent(StackedWidget* stack, QWidget* page) {
+#ifdef QT3_BUILD
+    stack->raiseWidget(page);
+#else
+    stack->setCurrentWidget(page);
+#endif
+}
 
 #endif  // COMPAT34_H

@@ -32,7 +32,9 @@ private slots:
     void onEmojiButtonClicked();
 
 private:
-    void rebuildGrid();
+    void buildCategoryPages();
+    void rebuildRecentSection();
+    void rebuildSearchPage();
     void addToRecent(const QString& emoji);
 
     int m_activeCategory;
@@ -45,7 +47,10 @@ private:
     QLabel* m_recentLabel;
     QWidget* m_tabBar;
     QWidget* m_gridArea;
-    QWidget* m_pageGrid;
+    StackedWidget* m_pageStack;
+    QWidget* m_recentSection;
+    QWidget* m_searchPage;
+    std::vector<QWidget*> m_categoryPages;
 
     enum { MAX_RECENT = 30, GRID_COLS = 8 };
 };

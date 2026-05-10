@@ -259,6 +259,7 @@ EmojiPicker::EmojiPicker(QWidget* parent)
 #endif
     , m_activeCategory(0)
     , m_emojiCellSize(32)
+    , m_recentSection(0)
 {
     setFixedWidth(m_emojiCellSize * GRID_COLS + 16 + 200);
     setFixedHeight(400);
@@ -278,6 +279,11 @@ EmojiPicker::EmojiPicker(QWidget* parent)
     QFont recentFont = m_recentLabel->font();
     recentFont.setPointSize(recentFont.pointSize() - 2);
     m_recentLabel->setFont(recentFont);
+#ifdef QT3_BUILD
+    m_recentLabel->hide();
+#else
+    m_recentLabel->setVisible(false);
+#endif
     layout->addWidget(m_recentLabel);
 
     // Tab bar
@@ -297,15 +303,29 @@ EmojiPicker::EmojiPicker(QWidget* parent)
     }
     layout->addWidget(m_tabBar);
 
-    // Grid area
+    // Grid area: contains optional recent section + page stack
     m_gridArea = new QWidget(this);
     layout->addWidget(m_gridArea);
     QVBoxLayout* areaLayout = new QVBoxLayout(m_gridArea);
     areaLayout->setSpacing(0);
     qSetMargins(areaLayout, 0, 0, 0, 0);
-    m_pageGrid = new QWidget(m_gridArea);
-    areaLayout->addWidget(m_pageGrid);
-    rebuildGrid();
+
+    // Page stack: one page per category + search results page
+    m_pageStack = new StackedWidget(m_gridArea);
+    areaLayout->addWidget(m_pageStack, 1);
+
+    buildCategoryPages();
+
+    // Search results page (initially empty)
+    m_searchPage = new QWidget(m_pageStack);
+    m_pageStack->addWidget(m_searchPage);
+
+    // Show first category by default
+    if (!m_categoryPages.empty())
+        qStackSetCurrent(m_pageStack, m_categoryPages[0]);
+
+    // Rebuild recent section (initially empty → adds nothing)
+    rebuildRecentSection();
 }
 
 void EmojiPicker::showAt(const QPoint& pos) {
@@ -314,9 +334,186 @@ void EmojiPicker::showAt(const QPoint& pos) {
     show();
 }
 
+void EmojiPicker::buildCategoryPages() {
+    for (int ci = 0; categories[ci].key; ci++) {
+        QWidget* page = new QWidget(m_pageStack);
+#ifdef QT3_BUILD
+        QGridLayout* grid = new QGridLayout(page, 1, 1, 1);
+#else
+        QGridLayout* grid = new QGridLayout(page);
+        grid->setSpacing(1);
+#endif
+        for (int ei = 0; categories[ci].items[ei].emoji; ei++) {
+            const EmojiData& d = categories[ci].items[ei];
+            int row = ei / GRID_COLS;
+            int col = ei % GRID_COLS;
+            EmojiPushButton* btn = new EmojiPushButton(QString::fromUtf8(d.emoji), page);
+            btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
+            btn->setFlat(true);
+            qSetToolTip(btn, QString::fromUtf8(d.name));
+            connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
+            grid->addWidget(btn, row, col);
+        }
+        m_pageStack->addWidget(page);
+        m_categoryPages.push_back(page);
+    }
+}
+
+void EmojiPicker::rebuildRecentSection() {
+    if (m_recentSection) {
+#ifdef QT3_BUILD
+        m_gridArea->layout()->remove(m_recentSection);
+#else
+        m_gridArea->layout()->removeWidget(m_recentSection);
+#endif
+        delete m_recentSection;
+        m_recentSection = 0;
+    }
+
+    bool hasRecent = !m_recentEmojis.isEmpty();
+#ifdef QT3_BUILD
+    if (hasRecent)
+        m_recentLabel->show();
+    else
+        m_recentLabel->hide();
+#else
+    m_recentLabel->setVisible(hasRecent);
+#endif
+
+    if (!hasRecent) return;
+
+    m_recentSection = new QWidget(m_gridArea);
+#ifdef QT3_BUILD
+    QGridLayout* grid = new QGridLayout(m_recentSection, 1, 1, 1);
+#else
+    QGridLayout* grid = new QGridLayout(m_recentSection);
+    grid->setSpacing(1);
+#endif
+    int n = (int)m_recentEmojis.size() < MAX_RECENT ? (int)m_recentEmojis.size() : MAX_RECENT;
+    for (int i = 0; i < n; i++) {
+        int row = i / GRID_COLS;
+        int col = i % GRID_COLS;
+        EmojiPushButton* btn = new EmojiPushButton(m_recentEmojis[i], m_recentSection);
+        btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
+        btn->setFlat(true);
+        connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
+        grid->addWidget(btn, row, col);
+    }
+
+    // Insert at top of area layout (before the stack)
+    QBoxLayout* areaLayout = (QBoxLayout*)m_gridArea->layout();
+    areaLayout->insertWidget(0, m_recentSection);
+}
+
+void EmojiPicker::rebuildSearchPage() {
+    // Clear old child widgets
+#ifdef QT3_BUILD
+    {
+        QPtrList<QObject> kids;
+        if (m_searchPage->children())
+            kids = *(QPtrList<QObject>*)m_searchPage->children();
+        for (uint i = 0; i < kids.count(); i++) {
+            QObject* obj = kids.at(i);
+            if (obj->isWidgetType())
+                delete (QWidget*)obj;
+        }
+    }
+#else
+    {
+        QList<QObject*> kids = m_searchPage->children();
+        for (int i = 0; i < kids.size(); i++) {
+            QObject* obj = kids[i];
+            if (obj->isWidgetType())
+                delete static_cast<QWidget*>(obj);
+        }
+    }
+#endif
+    // Delete old layout to remove stale items (Qt3 issue)
+    QLayout* oldLayout = m_searchPage->layout();
+    delete oldLayout;
+
+    if (m_searchQuery.isEmpty()) return;
+
+    // Collect matching items across all categories
+    struct Item { const char* emoji; const char* name; };
+    std::vector<Item> items;
+    QString q = m_searchQuery;
+    for (int ci = 0; categories[ci].key; ci++) {
+        for (int ei = 0; categories[ci].items[ei].emoji; ei++) {
+            const EmojiData& d = categories[ci].items[ei];
+#ifdef QT3_BUILD
+            if (QString(d.name).find(q, 0, false) >= 0)
+#else
+            if (QString(d.name).contains(q, Qt::CaseInsensitive))
+#endif
+            {
+                Item it = {d.emoji, d.name};
+                items.push_back(it);
+            }
+        }
+    }
+    if (items.empty()) return;
+
+    // Build fresh grid
+    QVBoxLayout* innerLayout = new QVBoxLayout(m_searchPage);
+    innerLayout->setSpacing(1);
+#ifdef QT3_BUILD
+    innerLayout->setMargin(0);
+#else
+    innerLayout->setContentsMargins(0, 0, 0, 0);
+#endif
+
+    QWidget* emojiW = new QWidget(m_searchPage);
+#ifdef QT3_BUILD
+    QGridLayout* pageLayout = new QGridLayout(emojiW, 1, 1, 1);
+#else
+    QGridLayout* pageLayout = new QGridLayout(emojiW);
+    pageLayout->setSpacing(1);
+#endif
+    int n = (int)items.size();
+    for (int i = 0; i < n; i++) {
+        int row = i / GRID_COLS;
+        int col = i % GRID_COLS;
+        EmojiPushButton* btn = new EmojiPushButton(QString::fromUtf8(items[i].emoji), emojiW);
+        btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
+        btn->setFlat(true);
+        qSetToolTip(btn, QString::fromUtf8(items[i].name));
+        connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
+        pageLayout->addWidget(btn, row, col);
+    }
+    innerLayout->addWidget(emojiW);
+    innerLayout->activate();
+}
+
 void EmojiPicker::onSearchChanged(const QString& query) {
     m_searchQuery = query;
-    rebuildGrid();
+
+    if (query.isEmpty()) {
+        // No search → switch back to category page, show tab bar
+        qStackSetCurrent(m_pageStack, m_categoryPages[m_activeCategory]);
+#ifdef QT3_BUILD
+        m_tabBar->show();
+        if (!m_recentEmojis.isEmpty())
+            m_recentLabel->show();
+        else
+            m_recentLabel->hide();
+#else
+        m_tabBar->setVisible(true);
+        m_recentLabel->setVisible(!m_recentEmojis.isEmpty());
+#endif
+        return;
+    }
+
+    // Searching → show search page, hide tab bar and recent label
+    rebuildSearchPage();
+    qStackSetCurrent(m_pageStack, m_searchPage);
+#ifdef QT3_BUILD
+    m_tabBar->hide();
+    m_recentLabel->hide();
+#else
+    m_tabBar->setVisible(false);
+    m_recentLabel->setVisible(false);
+#endif
 }
 
 void EmojiPicker::onTabClicked() {
@@ -329,13 +526,26 @@ void EmojiPicker::onTabClicked() {
     }
     m_searchBar->clear();
     m_searchQuery = QString();
-    rebuildGrid();
+
+    qStackSetCurrent(m_pageStack, m_categoryPages[m_activeCategory]);
+
+#ifdef QT3_BUILD
+    m_tabBar->show();
+    if (!m_recentEmojis.isEmpty())
+        m_recentLabel->show();
+    else
+        m_recentLabel->hide();
+#else
+    m_tabBar->setVisible(true);
+    m_recentLabel->setVisible(!m_recentEmojis.isEmpty());
+#endif
 }
 
 void EmojiPicker::onEmojiButtonClicked() {
     QPushButton* btn = (QPushButton*)sender();
     QString emoji = btn->text();
     addToRecent(emoji);
+    rebuildRecentSection();
     emit emojiSelected(emoji);
     hide();
 }
@@ -350,132 +560,4 @@ void EmojiPicker::addToRecent(const QString& emoji) {
     while (m_recentEmojis.size() > MAX_RECENT) {
         m_recentEmojis.pop_back();
     }
-}
-
-void EmojiPicker::rebuildGrid() {
-    bool searching = !m_searchQuery.isEmpty();
-
-    // Show/hide recent label and tab bar
-#ifdef QT3_BUILD
-    if (!searching && !m_recentEmojis.isEmpty())
-        m_recentLabel->show();
-    else
-        m_recentLabel->hide();
-    if (!searching)
-        m_tabBar->show();
-    else
-        m_tabBar->hide();
-#else
-    m_recentLabel->setVisible(!searching && !m_recentEmojis.isEmpty());
-    m_tabBar->setVisible(!searching);
-#endif
-
-    // Rebuild the page grid (clear and rebuild in place)
-#ifdef QT3_BUILD
-    {
-        QPtrList<QObject> kids;
-        if (m_pageGrid->children())
-            kids = *(QPtrList<QObject>*)m_pageGrid->children();
-        for (uint i = 0; i < kids.count(); i++) {
-            QObject* obj = kids.at(i);
-            if (obj->isWidgetType())
-                delete (QWidget*)obj;
-        }
-    }
-#else
-    {
-        QList<QObject*> kids = m_pageGrid->children();
-        for (int i = 0; i < kids.size(); i++) {
-            QObject* obj = kids[i];
-            if (obj->isWidgetType())
-                delete static_cast<QWidget*>(obj);
-        }
-    }
-#endif
-    delete m_pageGrid->layout();
-
-    // Determine which emojis to show
-    struct Item { const char* emoji; const char* name; };
-    std::vector<Item> items;
-
-    if (searching) {
-        QString q = m_searchQuery;
-        for (int ci = 0; categories[ci].key; ci++) {
-            for (int ei = 0; categories[ci].items[ei].emoji; ei++) {
-                const EmojiData& d = categories[ci].items[ei];
-#ifdef QT3_BUILD
-                if (QString(d.name).find(q, 0, false) >= 0)
-#else
-                if (QString(d.name).contains(q, Qt::CaseInsensitive))
-#endif
-                {
-                    Item it = {d.emoji, d.name};
-                    items.push_back(it);
-                }
-            }
-        }
-    } else {
-        int ci = m_activeCategory;
-        if (ci >= 0 && categories[ci].items) {
-            for (int ei = 0; categories[ci].items[ei].emoji; ei++) {
-                Item it = {categories[ci].items[ei].emoji, categories[ci].items[ei].name};
-                items.push_back(it);
-            }
-        }
-    }
-
-    // Build the page content as a vertical layout with optional recent section + emoji grid
-    QVBoxLayout* innerLayout = new QVBoxLayout(m_pageGrid);
-    innerLayout->setSpacing(1);
-#ifdef QT3_BUILD
-    innerLayout->setMargin(0);
-#else
-    innerLayout->setContentsMargins(0, 0, 0, 0);
-#endif
-
-    // Recent items section (inside page grid, before emoji grid)
-    if (!searching && !m_recentEmojis.isEmpty()) {
-        QWidget* recentW = new QWidget(m_pageGrid);
-#ifdef QT3_BUILD
-        QGridLayout* recentGrid = new QGridLayout(recentW, 1, 1, 1);
-#else
-        QGridLayout* recentGrid = new QGridLayout(recentW);
-        recentGrid->setSpacing(1);
-#endif
-        int n = (int)m_recentEmojis.size() < MAX_RECENT ? (int)m_recentEmojis.size() : MAX_RECENT;
-        for (int i = 0; i < n; i++) {
-            int row = i / GRID_COLS;
-            int col = i % GRID_COLS;
-            EmojiPushButton* btn = new EmojiPushButton(m_recentEmojis[i], recentW);
-            btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
-            btn->setFlat(true);
-            connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
-            recentGrid->addWidget(btn, row, col);
-        }
-        innerLayout->addWidget(recentW);
-    }
-
-    // Emoji grid
-    {
-        QWidget* emojiW = new QWidget(m_pageGrid);
-#ifdef QT3_BUILD
-        QGridLayout* pageLayout = new QGridLayout(emojiW, 1, 1, 1);
-#else
-        QGridLayout* pageLayout = new QGridLayout(emojiW);
-        pageLayout->setSpacing(1);
-#endif
-        int n = (int)items.size();
-        for (int i = 0; i < n; i++) {
-            int row = i / GRID_COLS;
-            int col = i % GRID_COLS;
-            EmojiPushButton* btn = new EmojiPushButton(QString::fromUtf8(items[i].emoji), emojiW);
-            btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
-            btn->setFlat(true);
-            qSetToolTip(btn, QString::fromUtf8(items[i].name));
-            connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
-            pageLayout->addWidget(btn, row, col);
-        }
-        innerLayout->addWidget(emojiW);
-    }
-    layout()->activate();
 }
