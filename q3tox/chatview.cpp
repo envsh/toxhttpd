@@ -102,8 +102,11 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
 
     if (viewWidth <= 0) viewWidth = 400;
 
-    int bubbleTextWidth = viewWidth - 3 * kPad - kAvatarSize - 2 * kBubbleHPad;
-    if (bubbleTextWidth < 50) bubbleTextWidth = 50;
+    int contentW = viewWidth - 3 * kPad - kAvatarSize;
+    int bubbleW = (contentW * 80) / 100;
+    if (bubbleW < 100) bubbleW = contentW;
+    int bubbleTextWidth = bubbleW - 2 * kBubbleHPad;
+    if (bubbleTextWidth < 20) bubbleTextWidth = 20;
 
     int lineCount = 0;
     int textLen = msg.messageText.length();
@@ -136,8 +139,9 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
     int textHeight = lineCount * fm.lineSpacing();
     int bubbleHeight = 2 * kBubbleVPad + std::max(textHeight, fm.lineSpacing());
     int headerHeight = fm.lineSpacing() + kPad;
-    int contentHeight = headerHeight + bubbleHeight;
-    return std::max(contentHeight, kAvatarSize + 2 * kPad) + kMsgSpacing;
+    int contentHeight = kPad + headerHeight + bubbleHeight;
+    int avatarTotal = kPad + kAvatarSize;
+    return std::max(contentHeight, avatarTotal) + kMsgSpacing;
 }
 
 void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewWidth) {
@@ -265,7 +269,7 @@ void ChatView::wheelEvent(QWheelEvent* event) {
 #else
     int step = m_vScrollBar->singleStep();
 #endif
-    int newVal = m_vScrollBar->value() + (event->delta() > 0 ? -step * 3 : step * 3);
+    int newVal = m_vScrollBar->value() + (event->delta() > 0 ? -step * 5 : step * 5);
     m_vScrollBar->setValue(newVal);
     event->accept();
 }
