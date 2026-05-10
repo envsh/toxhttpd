@@ -61,6 +61,10 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     
     // 操作按钮
     QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    switchBtn = new QPushButton(_("buttons.switch_account"), this);
+    connect(switchBtn, SIGNAL(clicked()), this, SLOT(onSwitchAccount()));
+    btnLayout->addWidget(switchBtn);
+    
     editBtn = new QPushButton(_("buttons.edit_info"), this);
     connect(editBtn, SIGNAL(clicked()), this, SLOT(onEditInfo()));
     btnLayout->addWidget(editBtn);
@@ -209,6 +213,7 @@ void SelfInfoWidget::onShowQRCode() {
 
 void SelfInfoWidget::retranslateUi() {
     // 更新按钮文字
+    if (switchBtn) switchBtn->setText(_("buttons.switch_account"));
     if (editBtn) editBtn->setText(_("buttons.edit_info"));
     if (connectBtn) connectBtn->setText(_("buttons.connect_network"));
     if (qrBtn) qrBtn->setText(_("buttons.qrcode"));
@@ -221,6 +226,10 @@ void SelfInfoWidget::retranslateUi() {
         // 重新获取状态并更新
         // 这里简化：只更新默认状态文字
     }
+}
+
+void SelfInfoWidget::onSwitchAccount() {
+    emit switchAccountRequested();
 }
 
 void SelfInfoWidget::onCopyAddress() {

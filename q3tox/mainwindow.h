@@ -32,6 +32,7 @@ public:
     void onInviteToGroupRequested(int friendId);
     void onGroupInviteReceived(int friendNumber, const QString& chatId);
     void onViewMembersRequested(int id, const QString& type);
+    void onSwitchAccount();
     void loadMessageHistory();
     
 private:

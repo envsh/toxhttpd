@@ -95,6 +95,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     setCentralWidget(splitter);
     
     // 连接信号槽
+    connect(selfInfoWidget, SIGNAL(switchAccountRequested()),
+            this, SLOT(onSwitchAccount()));
     connect(contactListWidget, SIGNAL(contactSelected(int, const QString&)), 
             this, SLOT(onContactSelected(int, const QString&)));
     connect(contactListWidget, SIGNAL(viewInfoRequested(int, const QString&)),
@@ -784,6 +786,10 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
             QMessageBox::information(this, _("group_rejected"), _("group_rejected"));
         }
     }
+}
+
+void MainWindow::onSwitchAccount() {
+    QMessageBox::information(this, "", _("not_yet_implemented"));
 }
 
 void MainWindow::loadMessageHistory() {

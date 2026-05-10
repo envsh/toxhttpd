@@ -14,6 +14,7 @@
         "conferences": "Conferences"
     },
     "buttons": {
+        "switch_account": "Switch Account",
         "edit_info": "Edit Info",
         "connect_network": "Connect Network",
         "qrcode": "QR Code",
@@ -117,6 +118,7 @@
     "conference_leave_success": "Left conference",
     "invite_success": "Invited successfully",
     "invite_failed": "Invite failed",
+    "not_yet_implemented": "Not yet implemented",
     "no_conference": "No conferences available",
     "modals": {
         "labels": {

@@ -18,6 +18,10 @@ private slots:
     void onBootstrap();
     void onShowQRCode();
     void onCopyAddress();
+    void onSwitchAccount();
+    
+signals:
+    void switchAccountRequested();
     
 private:
     QLabel* avatarLabel;
@@ -26,6 +30,7 @@ private:
     QLabel* statusMsgLabel;
     QLabel* addressLabel;
     QPushButton* copyBtn;
+    QPushButton* switchBtn;
     QPushButton* editBtn;
     QPushButton* connectBtn;
     QPushButton* qrBtn;

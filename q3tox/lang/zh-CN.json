@@ -14,6 +14,7 @@
         "conferences": "会议"
     },
     "buttons": {
+        "switch_account": "切换账号",
         "edit_info": "编辑信息",
         "connect_network": "连接网络",
         "qrcode": "二维码",
@@ -132,6 +133,7 @@
     "conference_leave_success": "已离开会议",
     "invite_success": "邀请成功",
     "invite_failed": "邀请失败",
+    "not_yet_implemented": "尚未实现",
     "no_conference": "没有可用的会议",
     "modals": {
         "labels": {

@@ -14,6 +14,7 @@
         "conferences": "會議"
     },
     "buttons": {
+        "switch_account": "切換帳號",
         "edit_info": "編輯資訊",
         "connect_network": "連接網路",
         "qrcode": "QR碼",
@@ -117,6 +118,7 @@
     "conference_leave_success": "已離開會議",
     "invite_success": "邀請成功",
     "invite_failed": "邀請失敗",
+    "not_yet_implemented": "尚未實現",
     "no_conference": "沒有可用的會議",
     "modals": {
         "labels": {
