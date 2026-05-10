@@ -4,13 +4,13 @@ QT = core gui widgets
 CONFIG += moc
 
 SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
-             chatwidget.cpp contactlist.cpp selfinfo.cpp translator.cpp \
+             chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp ThemeManager.cpp \
              friendinfodialog.cpp placeholderlineedit.cpp apilog.cpp memberlistdialog.cpp \
              appsetup.cpp compat34.cpp
 
 HEADERS = mainwindow.h api.h eventpoller.h \
-            chatwidget.h contactlist.h selfinfo.h translator.h \
+            chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h ThemeManager.h compat34.h \
             friendinfodialog.h placeholderlineedit.h apilog.h memberlistdialog.h \
             appsetup.h appsetup_c.h

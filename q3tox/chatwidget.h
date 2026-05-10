@@ -2,6 +2,7 @@
 #define CHATWIDGET_H
 
 #include "compat34.h"
+#include "chatview.h"
 
 class ChatWidget : public QWidget {
     Q_OBJECT
@@ -28,7 +29,7 @@ private:
     QLabel* headerText;
     QComboBox* langSelector;
     QCheckBox* themeCheckBox;
-    QTextEdit* messageArea;
+    ChatView* messageArea;
     QLineEdit* inputEdit;
     QPushButton* sendBtn;
 };
