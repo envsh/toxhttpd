@@ -7,7 +7,7 @@
 #include "contactlist.h"
 #include "chatwidget.h"
 #include "eventpoller.h"
-#include "api.h"
+#include "restapi.h"
 #include "translator.h"
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"

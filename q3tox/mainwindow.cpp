@@ -11,7 +11,7 @@ static QString getCurrentTime() {
 #include "contactlist.h"
 #include "chatwidget.h"
 #include "eventpoller.h"
-#include "api.h"
+#include "restapi.h"
 #include "translator.h"
 #include "conferenceinvitedialog.h"
 #include "groupinvitedialog.h"
@@ -288,6 +288,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", 
                                          _("friend_label").arg(QString::number(friendId)), getCurrentTime());
                     }
+                    playNotifySound();
                 }
                 cJSON_Delete(root);
             }
@@ -356,8 +357,9 @@ void MainWindow::handleEvents(const EventList& events) {
                             sender = QString("Peer %1").arg(peerNumber);
                         }
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
-                        chatWidget->appendMessage(message, "other", sender, getCurrentTime());
+                                                    chatWidget->appendMessage(message, "other", sender, getCurrentTime());
                     }
+                    playNotifySound();
                 } else {
                     qWarning("conference_message: missing confNumber or message");
                 }
@@ -415,6 +417,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                         chatWidget->appendMessage(message, "other", sender, getCurrentTime());
                     }
+                    playNotifySound();
                 }
                 cJSON_Delete(root);
             }

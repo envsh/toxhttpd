@@ -1,7 +1,7 @@
 #include "selfinfo.h"
 #include "translator.h"
 #include "editinfodialog.h"
-#include "api.h"
+#include "restapi.h"
 #include "compat34.h"
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {

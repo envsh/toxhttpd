@@ -3,14 +3,14 @@ TARGET = q3tox
 QT = core gui widgets
 CONFIG += moc
 
-SOURCES = main.cpp mainwindow.cpp api.cpp eventpoller.cpp \
+SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp ThemeManager.cpp \
              friendinfodialog.cpp placeholderlineedit.cpp apilog.cpp memberlistdialog.cpp \
              appsetup.cpp compat34.cpp emojiutil.cpp emojiwidgets.cpp emojiitems.cpp messageinput.cpp \
              emoji_picker.cpp
 
-HEADERS = mainwindow.h api.h eventpoller.h \
+HEADERS = mainwindow.h restapi.h eventpoller.h \
             chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h ThemeManager.h compat34.h \
             friendinfodialog.h placeholderlineedit.h apilog.h memberlistdialog.h \

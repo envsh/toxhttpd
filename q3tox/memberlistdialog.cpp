@@ -1,5 +1,5 @@
 #include "memberlistdialog.h"
-#include "api.h"
+#include "restapi.h"
 #include "translator.h"
 #include "compat34.h"
 #include <qstring.h>

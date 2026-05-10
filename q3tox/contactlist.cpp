@@ -1,7 +1,7 @@
 #include "contactlist.h"
 #include "translator.h"
 #include "compat34.h"
-#include "api.h"
+#include "restapi.h"
 #include "placeholderlineedit.h"
 
 // 静态数组定义
