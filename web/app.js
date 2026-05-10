@@ -505,6 +505,21 @@ function selectContact(id, type) {
 
     // 只更新选中状态，不重新渲染整个列表
     updateSelection(id, type);
+
+    // 预加载成员列表到 peerNameMap 缓存
+    if (type === 'conference') {
+        fetchConferenceMembers(id).then(members => {
+            members.forEach(m => {
+                peerNameMap[`conference_${id}_${m.peer_number}`] = m.name;
+            });
+        }).catch(() => {});
+    } else if (type === 'group') {
+        fetchGroupMembers(id).then(members => {
+            members.forEach(m => {
+                peerNameMap[`group_${id}_${m.peer_number}`] = m.name;
+            });
+        }).catch(() => {});
+    }
 }
 
 // Load message history for current chat
@@ -546,8 +561,9 @@ function loadMessageHistory() {
                             avatarText = '?';
                         }
                     } else {
-                        displayName = `Peer ${msg.sender_number}`;
-                        avatarText = 'P';
+                        const peerKey = `${contactType}_${contactId}_${msg.sender_number}`;
+                        displayName = peerNameMap[peerKey] || `Peer ${msg.sender_number}`;
+                        avatarText = displayName.charAt(0).toUpperCase();
                     }
                 }
 
@@ -666,17 +682,32 @@ function longPollEvents() {
                         showConferenceInviteDialog(data);
                     } else if (event.event_type === 'conference_message') {
                         const data = JSON.parse(event.data);
-                        // 使用 conference_number（与后端字段名一致）
+                        // 更新 peer name 缓存
+                        if (data.peer_name) {
+                            peerNameMap[`conference_${data.conference_number}_${data.peer_number}`] = data.peer_name;
+                        }
                         if (data.conference_number == currentChatId && currentChatType === 'conference') {
-                            // 会议消息：头像文本是 Peer 的 P
-                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number, 'P');
+                            const peerName = peerNameMap[`conference_${data.conference_number}_${data.peer_number}`] || 'Peer ' + data.peer_number;
+                            const avatarText = peerName.charAt(0).toUpperCase();
+                            appendMessage(data.message, 'other', peerName, avatarText);
                         }
                     } else if (event.event_type === 'group_message') {
                         const data = JSON.parse(event.data);
-                        if (data.group_number == currentChatId && currentChatType === 'group') {
-                            // 群组消息：头像文本是 Peer 的 P
-                            appendMessage(data.message, 'other', 'Peer ' + data.peer_number, 'P');
+                        // 更新 peer name 缓存
+                        if (data.peer_name) {
+                            peerNameMap[`group_${data.group_number}_${data.peer_number}`] = data.peer_name;
                         }
+                        if (data.group_number == currentChatId && currentChatType === 'group') {
+                            const peerName = peerNameMap[`group_${data.group_number}_${data.peer_number}`] || 'Peer ' + data.peer_number;
+                            const avatarText = peerName.charAt(0).toUpperCase();
+                            appendMessage(data.message, 'other', peerName, avatarText);
+                        }
+                    } else if (event.event_type === 'conference_peer_name') {
+                        const data = JSON.parse(event.data);
+                        peerNameMap[`conference_${data.conference_number}_${data.peer_number}`] = data.name;
+                    } else if (event.event_type === 'group_peer_name') {
+                        const data = JSON.parse(event.data);
+                        peerNameMap[`group_${data.group_number}_${data.peer_number}`] = data.name;
                     } else if (event.event_type === 'group_invite') {
                         const data = JSON.parse(event.data);
                         currentEventId = event.id; // Save event ID for deletion
@@ -698,6 +729,9 @@ function longPollEvents() {
 
 // 好友昵称映射：friend_id → name
 let friendNameMap = {};
+
+// 会议/群组 peer name 缓存：键 "conference_{conference_number}_{peer_number}" / "group_{group_number}_{peer_number}"
+let peerNameMap = {};
 
 // Append message to chat area (新布局：头像列 + 内容列)
 function appendMessage(text, type, sender, avatarText = "") {

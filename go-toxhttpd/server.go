@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	tox "github.com/TokTok/go-toxcore-c"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // BootstrapNode represents a Tox bootstrap node
@@ -39,14 +39,13 @@ var bootstrapNodes = []BootstrapNode{
 		PublicKey:  "AD13AB0D434BCE6C83FE2649237183964AE3341D0AFB3BE1694B18505E4E135E",
 		Maintainer: "AnthonyBilinski (C version)",
 	},
-    {
-      IPv4: "86.107.187.54",
-      IPv6: "-",
-      Port: 33445,
-      PublicKey: "2C0F90965134C7BEFAFE72B077A19221628D7045BB51C1165A2C75CDB2B32634",
-      Maintainer: "Boca",
-    },	
-	
+	{
+		IPv4:       "86.107.187.54",
+		IPv6:       "-",
+		Port:       33445,
+		PublicKey:  "2C0F90965134C7BEFAFE72B077A19221628D7045BB51C1165A2C75CDB2B32634",
+		Maintainer: "Boca",
+	},
 }
 
 // bootstrapAll bootstraps the Tox instance to all nodes (UDP + TCP relay)
@@ -98,16 +97,16 @@ func (q *EventQueue) Push(eventType string, data string) uint64 {
 
 // DeleteEvent removes an event from the queue by ID
 func (q *EventQueue) DeleteEvent(id uint64) {
-    q.mu.Lock()
-    defer q.mu.Unlock()
-    
-    newEvents := make([]Event, 0, len(q.events))
-    for _, e := range q.events {
-        if e.ID != id {
-            newEvents = append(newEvents, e)
-        }
-    }
-    q.events = newEvents
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	newEvents := make([]Event, 0, len(q.events))
+	for _, e := range q.events {
+		if e.ID != id {
+			newEvents = append(newEvents, e)
+		}
+	}
+	q.events = newEvents
 }
 
 func (q *EventQueue) PopAfter(after uint64) []Event {
@@ -177,11 +176,11 @@ const ContactNotFound = uint32(0xFFFFFFFF)
 // Server holds the server state
 type Server struct {
 	tox                  *tox.Tox
-	db                   *sql.DB  // SQLite connection for event copy only
+	db                   *sql.DB // SQLite connection for event copy only
 	eventQueue           *EventQueue
 	selfConnectionStatus string
 	friendStatuses       map[uint32]string
-	conferenceConnected  map[uint32]bool  // 新增：会议连接状态
+	conferenceConnected  map[uint32]bool // 新增：会议连接状态
 	mu                   sync.RWMutex
 }
 
@@ -386,8 +385,8 @@ func setupCallbacks(s *Server) {
 		log.Printf("[TOX_CALLBACK] ConferenceInvite: friend=%d, type=%d, cookie=%s", friendNumber, itype, cookie)
 		data, _ := json.Marshal(map[string]interface{}{
 			"friend_number": friendNumber,
-			"type":         itype,
-			"cookie":       cookie,
+			"type":          itype,
+			"cookie":        cookie,
 		})
 		s.eventQueue.Push("conference_invite", string(data))
 	}, nil)
@@ -400,12 +399,15 @@ func setupCallbacks(s *Server) {
 		// Get peer pubkey and convert to integer ID
 		peerPubKey, _ := s.tox.ConferencePeerGetPublicKey(groupNumber, peerNumber)
 		senderInt, _ := s.getOrCreatePubKeyID(peerPubKey)
+		// 获取 peer name
+		peerName, _ := s.tox.ConferencePeerGetName(groupNumber, peerNumber)
 		data, _ := json.Marshal(map[string]interface{}{
-			"message":            message,
-			"sender":             senderInt,
-			"direction":          "received",
+			"message":           message,
+			"sender":            senderInt,
+			"direction":         "received",
 			"conference_number": groupNumber,
 			"peer_number":       peerNumber,
+			"peer_name":         peerName,
 		})
 		s.eventQueue.Push("conference_message", string(data))
 		// Persist to SQLite with integer chanid
@@ -420,12 +422,15 @@ func setupCallbacks(s *Server) {
 		// Get peer pubkey and convert to integer ID
 		peerPubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, peerNumber)
 		senderInt, _ := s.getOrCreatePubKeyID(peerPubKey)
+		// 获取 peer name
+		peerName, _ := s.tox.GroupPeerGetName(groupNumber, peerNumber)
 		data, _ := json.Marshal(map[string]interface{}{
 			"message":      message,
 			"sender":       senderInt,
 			"direction":    "received",
 			"group_number": int(groupNumber),
 			"peer_number":  int(peerNumber),
+			"peer_name":    peerName,
 		})
 		s.eventQueue.Push("group_message", string(data))
 		// Persist to SQLite with integer chanid
@@ -437,8 +442,8 @@ func setupCallbacks(s *Server) {
 		log.Printf("[TOX_CALLBACK] ConferenceTitle: group=%d, peer=%d, title=%s", groupNumber, peerNumber, title)
 		data, _ := json.Marshal(map[string]interface{}{
 			"conference_number": groupNumber,
-			"peer_number":      peerNumber,
-			"title":            title,
+			"peer_number":       peerNumber,
+			"title":             title,
 		})
 		s.eventQueue.Push("conference_title", string(data))
 	}, nil)
@@ -448,8 +453,8 @@ func setupCallbacks(s *Server) {
 		log.Printf("[TOX_CALLBACK] ConferencePeerName: group=%d, peer=%d, name=%s", groupNumber, peerNumber, name)
 		data, _ := json.Marshal(map[string]interface{}{
 			"conference_number": groupNumber,
-			"peer_number":      peerNumber,
-			"name":             name,
+			"peer_number":       peerNumber,
+			"name":              name,
 		})
 		s.eventQueue.Push("conference_peer_name", string(data))
 	}, nil)
@@ -462,7 +467,7 @@ func setupCallbacks(s *Server) {
 		})
 		s.eventQueue.Push("conference_peer_list_changed", string(data))
 	}, nil)
-	
+
 	// 1. CallbackGroupInvite - 邀请回调
 	s.tox.CallbackGroupInvite(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		friendNumber uint32, data string, userData interface{}) {
@@ -476,12 +481,12 @@ func setupCallbacks(s *Server) {
 		// 推送群组邀请事件到前端
 		eventData, _ := json.Marshal(map[string]interface{}{
 			"friend_number": friendNumber,
-			"chat_id":      data, // 64字符十六进制chat_id (cookie)
+			"chat_id":       data, // 64字符十六进制chat_id (cookie)
 		})
 		s.eventQueue.Push("group_invite", string(eventData))
 		log.Printf("[GroupInvite] Pushed event: friend=%d, chat_id=%s", friendNumber, data)
 	}, nil)
-	
+
 	// 2. CallbackGroupSelfJoin - 自己加入群组回调
 	s.tox.CallbackGroupSelfJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		userData interface{}) {
@@ -492,18 +497,18 @@ func setupCallbacks(s *Server) {
 		})
 		s.eventQueue.Push("group_self_join", string(data))
 	}, nil)
-	
+
 	// 3. CallbackGroupPeerJoin - Peer 加入回调
 	s.tox.CallbackGroupPeerJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		peerNumber tox.GroupPeerNumber, userData interface{}) {
 		log.Printf("[GroupPeerJoin] group=%d, peer=%d", int(groupNumber), int(peerNumber))
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": int(groupNumber),
-			"peer_number": int(peerNumber),
+			"peer_number":  int(peerNumber),
 		})
 		s.eventQueue.Push("group_peer_join", string(data))
 	}, nil)
-	
+
 	// 4. CallbackGroupPeerExit - Peer 退出回调
 	s.tox.CallbackGroupPeerExit(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		peerNumber tox.GroupPeerNumber, exitType tox.GroupExitType, name string, userData interface{}) {
@@ -511,21 +516,21 @@ func setupCallbacks(s *Server) {
 			int(groupNumber), int(peerNumber), tox.GroupExitTypeToString(exitType), name)
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": int(groupNumber),
-			"peer_number": int(peerNumber),
-			"exit_type":   tox.GroupExitTypeToString(exitType),
-			"name":        name,
+			"peer_number":  int(peerNumber),
+			"exit_type":    tox.GroupExitTypeToString(exitType),
+			"name":         name,
 		})
 		s.eventQueue.Push("group_peer_exit", string(data))
 	}, nil)
-	
+
 	// 5. CallbackGroupPeerStatus - Peer 状态变化回调
 	s.tox.CallbackGroupPeerStatus(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		peerNumber tox.GroupPeerNumber, status int, userData interface{}) {
 		log.Printf("[GroupPeerStatus] group=%d, peer=%d, status=%d", int(groupNumber), int(peerNumber), status)
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": int(groupNumber),
-			"peer_number": int(peerNumber),
-			"status":      status,
+			"peer_number":  int(peerNumber),
+			"status":       status,
 		})
 		s.eventQueue.Push("group_peer_status", string(data))
 	}, nil)
@@ -538,9 +543,22 @@ func setupCallbacks(s *Server) {
 			int(groupNumber), int(failType), failStr)
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": int(groupNumber),
-			"error":       failStr,
+			"error":        failStr,
 		})
 		s.eventQueue.Push("group_join_fail", string(data))
+	}, nil)
+
+	// 8. CallbackGroupPeerName - NGC 群组 Peer 名字变化回调
+	s.tox.CallbackGroupPeerName(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		peerNumber tox.GroupPeerNumber, name string, userData interface{}) {
+		log.Printf("[GroupPeerName] group=%d, peer=%d, name=%s",
+			int(groupNumber), int(peerNumber), name)
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": int(groupNumber),
+			"peer_number":  int(peerNumber),
+			"name":         name,
+		})
+		s.eventQueue.Push("group_peer_name", string(data))
 	}, nil)
 
 	// 6. CallbackConferenceConnected - 会议连接状态回调
@@ -553,7 +571,7 @@ func setupCallbacks(s *Server) {
 		// 推送连接状态事件到前端
 		data, _ := json.Marshal(map[string]interface{}{
 			"conference_number": groupNumber,
-			"is_connected":     true,
+			"is_connected":      true,
 		})
 		s.eventQueue.Push("conference_connected", string(data))
 	}, nil)
@@ -720,14 +738,14 @@ func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	resp := map[string]interface{}{
-		"friend_id":               friendID,
-		"name":                    name,
-		"status":                  "",
-		"status_enum":             0,
-		"public_key":              pk,
-		"connection_status":       connStatus,
+		"friend_id":              friendID,
+		"name":                   name,
+		"status":                 "",
+		"status_enum":            0,
+		"public_key":             pk,
+		"connection_status":      connStatus,
 		"self_connection_status": "offline",
-		"self_address":            "",
+		"self_address":           "",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -852,7 +870,7 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 
 		resp := map[string]interface{}{
 			"group_number": uint32(groupNumber),
-			"message": "group created",
+			"message":      "group created",
 		}
 		json.NewEncoder(w).Encode(resp)
 	}
@@ -958,7 +976,7 @@ func (s *Server) handleGroupSendMessage(w http.ResponseWriter, r *http.Request) 
 
 	resp := map[string]interface{}{
 		"message_id": uint64(msgId),
-		"message":   "message sent",
+		"message":    "message sent",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -1000,7 +1018,7 @@ func (s *Server) handleConferenceMessages(w http.ResponseWriter, r *http.Request
 	if false { // dup with callback msg
 		s.persistEventToSQLite(chanidInt, string(data))
 	}
-	
+
 	resp := map[string]interface{}{
 		"conference_id": confID,
 		"message":       "sent",
@@ -1218,7 +1236,7 @@ func (s *Server) handleGroupLeave(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
-	}
+}
 
 func (s *Server) handleGroupInvite(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1255,7 +1273,7 @@ func (s *Server) handleGroupInvite(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
-	}
+}
 
 func (s *Server) handleGroupAccept(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1468,7 +1486,7 @@ func logToxStatus(t *tox.Tox) {
 // saveToxData saves the Tox instance data to file
 func saveToxData(t *tox.Tox, path string) {
 	os.MkdirAll("data", 0700)
-	
+
 	// Use go-toxcore-c's WriteSavedata method
 	err := t.WriteSavedata(path)
 	if err != nil {
@@ -1491,7 +1509,7 @@ func setLogLevel(level string) {
 	default:
 		log.SetFlags(log.LstdFlags)
 	}
-	
+
 	// Set toxcore log level (integer)
 	var toxLevel int
 	switch level {
@@ -1509,7 +1527,7 @@ func setLogLevel(level string) {
 		toxLevel = tox.LOG_LEVEL_INFO
 	}
 	tox.SetLogLevel(toxLevel)
-	
+
 	log.Printf("[MAIN] Log level set to: %s (toxcore level: %d)", level, toxLevel)
 }
 
@@ -1725,7 +1743,7 @@ func (s *Server) handleMessageHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chanid := r.URL.Query().Get("chanid")       // contact's pubkey
+	chanid := r.URL.Query().Get("chanid") // contact's pubkey
 	contactIDStr := r.URL.Query().Get("contact_id")
 	contactType := r.URL.Query().Get("contact_type")
 

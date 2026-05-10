@@ -225,6 +225,22 @@ void MainWindow::onContactSelected(int id, const QString& type) {
     
     // 加载历史消息
     loadMessageHistory();
+
+    // 预加载成员列表到 peerNameMap 缓存
+    ToxAPI api;
+    if (type == "conference") {
+        auto members = api.getConferenceMembers(id);
+        for (const auto& m : members) {
+            std::string key = "conference_" + std::to_string(id) + "_" + std::to_string(m.peerNumber);
+            peerNameMap[key] = m.name;
+        }
+    } else if (type == "group") {
+        auto members = api.getGroupMembers(id);
+        for (const auto& m : members) {
+            std::string key = "group_" + std::to_string(id) + "_" + std::to_string(m.peerNumber);
+            peerNameMap[key] = m.name;
+        }
+    }
 }
 
 void MainWindow::onMessageSent(const QString& message) {
@@ -312,18 +328,33 @@ void MainWindow::handleEvents(const EventList& events) {
                 cJSON* confNumberItem = cJSON_GetObjectItem(root, "conference_number");
                 cJSON* messageItem = cJSON_GetObjectItem(root, "message");
                 cJSON* peerNumberItem = cJSON_GetObjectItem(root, "peer_number");
+                cJSON* peerNameItem = cJSON_GetObjectItem(root, "peer_name");
                 
                 if (confNumberItem && messageItem) {
                     int confNumber = confNumberItem->valueint;
                     QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
+                    // 更新 peer name 缓存
+                    if (peerNameItem && cJSON_IsString(peerNameItem)) {
+                        std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
+                        peerNameMap[key] = std::string(cJSON_GetStringValue(peerNameItem));
+                    }
+                    
                     qWarning("confNumber=%d, currentChatId=%d, currentChatType=%s, match=%d", 
                              confNumber, currentChatId, qToUtf8(currentChatType).data(),
                              (confNumber == currentChatId && currentChatType == "conference"));
                     
                     if (confNumber == currentChatId && currentChatType == "conference") {
-                    QString sender = QString("Peer %1").arg(peerNumber);
+                        // 查询缓存获取 peer 名字
+                        std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
+                        auto it = peerNameMap.find(key);
+                        QString sender;
+                        if (it != peerNameMap.end() && !it->second.empty()) {
+                            sender = QString::fromUtf8(it->second.c_str());
+                        } else {
+                            sender = QString("Peer %1").arg(peerNumber);
+                        }
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", sender, getCurrentTime());
                     }
@@ -357,17 +388,59 @@ void MainWindow::handleEvents(const EventList& events) {
                 cJSON* groupNumberItem = cJSON_GetObjectItem(root, "group_number");
                 cJSON* messageItem = cJSON_GetObjectItem(root, "message");
                 cJSON* peerNumberItem = cJSON_GetObjectItem(root, "peer_number");
+                cJSON* peerNameItem = cJSON_GetObjectItem(root, "peer_name");
                 
                 if (groupNumberItem && messageItem) {
                     int groupNumber = groupNumberItem->valueint;
                     QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
+                    // 更新 peer name 缓存
+                    if (peerNameItem && cJSON_IsString(peerNameItem)) {
+                        std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
+                        peerNameMap[key] = std::string(cJSON_GetStringValue(peerNameItem));
+                    }
+                    
                     if (groupNumber == currentChatId && currentChatType == "group") {
-                        QString sender = (peerNumber >= 0) ? 
-                            QString("Peer %1").arg(peerNumber) : _("group_item");
+                        // 查询缓存获取 peer 名字
+                        std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
+                        auto it = peerNameMap.find(key);
+                        QString sender;
+                        if (it != peerNameMap.end() && !it->second.empty()) {
+                            sender = QString::fromUtf8(it->second.c_str());
+                        } else if (peerNumber >= 0) {
+                            sender = QString("Peer %1").arg(peerNumber);
+                        } else {
+                            sender = _("group_item");
+                        }
                         chatWidget->appendMessage(message, "other", sender, getCurrentTime());
                     }
+                }
+                cJSON_Delete(root);
+            }
+        } else if (e.type == "conference_peer_name") {
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* confNumberItem = cJSON_GetObjectItem(root, "conference_number");
+                cJSON* peerNumberItem = cJSON_GetObjectItem(root, "peer_number");
+                cJSON* nameItem = cJSON_GetObjectItem(root, "name");
+                if (confNumberItem && peerNumberItem && nameItem && cJSON_IsString(nameItem)) {
+                    std::string key = "conference_" + std::to_string(confNumberItem->valueint)
+                        + "_" + std::to_string(peerNumberItem->valueint);
+                    peerNameMap[key] = std::string(cJSON_GetStringValue(nameItem));
+                }
+                cJSON_Delete(root);
+            }
+        } else if (e.type == "group_peer_name") {
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* groupNumberItem = cJSON_GetObjectItem(root, "group_number");
+                cJSON* peerNumberItem = cJSON_GetObjectItem(root, "peer_number");
+                cJSON* nameItem = cJSON_GetObjectItem(root, "name");
+                if (groupNumberItem && peerNumberItem && nameItem && cJSON_IsString(nameItem)) {
+                    std::string key = "group_" + std::to_string(groupNumberItem->valueint)
+                        + "_" + std::to_string(peerNumberItem->valueint);
+                    peerNameMap[key] = std::string(cJSON_GetStringValue(nameItem));
                 }
                 cJSON_Delete(root);
             }
@@ -742,9 +815,18 @@ void MainWindow::loadMessageHistory() {
                         avatarText = "F";
                     }
                 } else {
-                    // 群组/会议消息：直接显示后端返回的 peer number
-                    senderLabel = QString("Peer %1").arg(msg.sender_number);
-                    avatarText = "P";  // Peer 的首字母
+                    // 群组/会议消息：从缓存获取 peer 名字
+                    std::string key = std::string(qToUtf8(currentChatType).data())
+                        + "_" + std::to_string(currentChatId)
+                        + "_" + std::to_string(msg.sender_number);
+                    auto it = peerNameMap.find(key);
+                    if (it != peerNameMap.end() && !it->second.empty()) {
+                        senderLabel = QString::fromUtf8(it->second.c_str());
+                        avatarText = qToUpper(senderLabel.left(1));
+                    } else {
+                        senderLabel = QString("Peer %1").arg(msg.sender_number);
+                        avatarText = "P";
+                    }
                 }
             }
             
