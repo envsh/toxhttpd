@@ -61,7 +61,13 @@ FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
 DEFINES += EMOJI_RENDER_QT34
 isEmpty(QT_VERSION) {
     # Qt3: 手动指定库
-    LIBS += -lqt-mt
+    # LIBS += $$(QMAKE_LIBS_QT_THREAD) -lqt-mt
+    # override Makefile prefixed with $(QTDIR)
+    INCLUDEPATH += $$(QTDIR)/include
+    QMAKE_INCDIR_QT    = $$(QTDIR)/include
+    QMAKE_LIBDIR_QT    = $$(QTDIR)/lib
+    QMAKE_MOC          = $$(QTDIR)/bin/moc
+    QMAKE_UIC          = $$(QTDIR)/bin/uic
 } else {
     # Qt4: Qt 库由 qmake 自动处理
     message("Linking with Qt4 libraries")
