@@ -461,7 +461,35 @@ bool ToxAPI::joinGroup(int friendNumber, const std::string& chatId,
         postData += "&password=" + password;
     }
     std::string response = httpPost("/api/groups/join", postData);
-    return !response.empty();
+
+    // 解析 JSON 确认服务器没有返回错误
+    if (response.empty()) return false;
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return false;
+    cJSON* error = cJSON_GetObjectItem(root, "error");
+    bool success = (error == NULL || !cJSON_IsString(error));
+    cJSON_Delete(root);
+    return success;
+}
+
+bool ToxAPI::joinGroupByChatId(const std::string& chatId,
+                               const std::string& name, const std::string& password) {
+    std::string postData = "chat_id=" + chatId;
+    if (!name.empty()) {
+        postData += "&name=" + name;
+    }
+    if (!password.empty()) {
+        postData += "&password=" + password;
+    }
+    std::string response = httpPost("/api/groups/join", postData);
+
+    if (response.empty()) return false;
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return false;
+    cJSON* error = cJSON_GetObjectItem(root, "error");
+    bool success = (error == NULL || !cJSON_IsString(error));
+    cJSON_Delete(root);
+    return success;
 }
 
 std::vector<PeerInfo> ToxAPI::getConferenceMembers(int confId) {

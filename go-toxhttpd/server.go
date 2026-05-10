@@ -33,40 +33,12 @@ type BootstrapNode struct {
 // Bootstrap nodes from C version (bootstrap.c)
 var bootstrapNodes = []BootstrapNode{
 	{
-		IPv4:       "104.225.141.59",
-		IPv6:       "-",
-		Port:       33445,
-		PublicKey:  "933BA20B2E258B4C0D475B6DECE90C7E827FE83EFA9655414E7841251B19A72C",
-		Maintainer: "velusip (C version)",
-	},
-	{
 		IPv4:       "43.198.227.166",
 		IPv6:       "-",
 		Port:       3389,
 		PublicKey:  "AD13AB0D434BCE6C83FE2649237183964AE3341D0AFB3BE1694B18505E4E135E",
 		Maintainer: "AnthonyBilinski (C version)",
 	},
-	{
-		IPv4:       "3.0.24.15",
-		IPv6:       "-",
-		Port:       33445,
-		PublicKey:  "E20ABCF38CDBFFD7D04B29C956B33F7B27A3BB7AF0618101617B036E4AEA402D",
-		Maintainer: "2mf (C version)",
-	},
-	{
-      IPv4: "144.217.167.73",
-      IPv6: "-",
-      Port: 33445,
-      PublicKey: "7E5668E0EE09E19F320AD47902419331FFEE147BB3606769CFBE921A2A2FD34C",
-      Maintainer: "velusip",
-    },
-    {
-      IPv4: "tox.abilinski.com",
-      IPv6: "-",
-      Port: 33445,
-      PublicKey: "10C00EB250C3233E343E2AEBA07115A5C28920E9C8D29492F6D00B29049EDC7E",
-      Maintainer: "AnthonyBilinski",
-    },
     {
       IPv4: "86.107.187.54",
       IPv6: "-",
@@ -556,6 +528,19 @@ func setupCallbacks(s *Server) {
 			"status":      status,
 		})
 		s.eventQueue.Push("group_peer_status", string(data))
+	}, nil)
+
+	// 7. CallbackGroupJoinFail - 群组加入失败回调
+	s.tox.CallbackGroupJoinFail(func(this *tox.Tox, groupNumber tox.GroupNumber,
+		failType tox.GroupJoinFail, userData interface{}) {
+		failStr := tox.GroupJoinFailToString(failType)
+		log.Printf("[GroupJoinFail] group=%d, error=%d (%s)",
+			int(groupNumber), int(failType), failStr)
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": int(groupNumber),
+			"error":       failStr,
+		})
+		s.eventQueue.Push("group_join_fail", string(data))
 	}, nil)
 
 	// 6. CallbackConferenceConnected - 会议连接状态回调
@@ -1153,9 +1138,13 @@ func (s *Server) handleGroupJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[GroupJoin] Attempting to join group: chat_id=%s..., name=%s, has_password=%v",
+		safeTruncate(chatId, 16), name, password != "")
+
 	groupNumber, err := s.tox.GroupJoin(chatId, name, password)
 	if err != nil {
 		errStr := err.Error()
+		log.Printf("[GroupJoin] FAILED: chat_id=%s..., error=%s", safeTruncate(chatId, 16), errStr)
 		// 提供更友好的错误信息
 		if strings.Contains(errStr, "chat id invalid") || strings.Contains(errStr, "3") {
 			http.Error(w, `{"error":"无效的群组ID：群组不存在、已过期或需要密码"}`, http.StatusBadRequest)
@@ -1168,6 +1157,8 @@ func (s *Server) handleGroupJoin(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	log.Printf("[GroupJoin] SUCCESS: group_number=%d, chat_id=%s...", uint32(groupNumber), safeTruncate(chatId, 16))
 
 	resp := map[string]interface{}{
 		"group_number": uint32(groupNumber),
@@ -1639,6 +1630,14 @@ func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// safeTruncate truncates a string to the given length for safe logging.
+func safeTruncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
 }
 
 // getDefaultName returns a default name for group join.

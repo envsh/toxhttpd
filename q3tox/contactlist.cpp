@@ -459,7 +459,7 @@ void ContactListWidget::onJoinGroupClicked() {
     }
 
     ToxAPI api;
-    bool success = api.joinGroup(-1, qToUtf8(chatId).data(), "", "");
+    bool success = api.joinGroupByChatId(qToUtf8(chatId).data(), "", "");
 
     if (success) {
         QMessageBox::information(this, _("group.joined"),

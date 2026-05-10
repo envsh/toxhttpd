@@ -40,11 +40,7 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
     QtappSetup::setup(app);
-    
-    // 设置 UTF-8 编解码器
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
-//    QTextCodec::setCodecForTr(QTextCodec::codecForName("UTF-8"));
-    
+        
     ThemeManager::applyTheme(true);
     
     // 读取保存的语言设置

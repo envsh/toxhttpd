@@ -4,6 +4,11 @@
 void QtappSetup::setup(QApplication& app) {
     QtappSetup& s = inst();
 
+    // 设置 UTF-8 编解码器
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
+//    QTextCodec::setCodecForTr(QTextCodec::codecForName("UTF-8"));
+
+
     QObject::connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
 
 #ifdef QT3_BUILD

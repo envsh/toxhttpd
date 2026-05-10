@@ -89,6 +89,8 @@ public:
     bool inviteToGroup(int friendId, int groupId);
     bool joinGroup(int friendNumber, const std::string& chatId, 
                   const std::string& name = "", const std::string& password = "");
+    bool joinGroupByChatId(const std::string& chatId,
+                          const std::string& name = "", const std::string& password = "");
     
     // Events (long polling, 30s timeout)
     std::vector<Event> pollEvents(uint64_t after);
