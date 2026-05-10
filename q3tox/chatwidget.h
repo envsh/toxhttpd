@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include "chatview.h"
 #include "messageinput.h"
+#include "emojiwidgets.h"
 
 class ChatWidget : public QWidget {
     Q_OBJECT
@@ -36,8 +37,8 @@ private:
     QCheckBox* themeCheckBox;
     ChatView* messageArea;
     MessageInput* inputEdit;
-    QPushButton* emojiBtn;
-    QPushButton* fileBtn;
+    EmojiPushButton* emojiBtn;
+    EmojiPushButton* fileBtn;
     QPushButton* sendBtn;
 };
 

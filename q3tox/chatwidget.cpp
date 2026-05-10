@@ -46,10 +46,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     QGridLayout* inputGrid = new QGridLayout(2, 3, 2);
     inputEdit = new MessageInput(this);
     inputGrid->addMultiCellWidget(inputEdit, 0, 1, 0, 0);
-    emojiBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x98\x8A"), this);
+    emojiBtn = new EmojiPushButton(QString::fromUtf8("😊"), this);
     emojiBtn->setFixedSize(24, 24);
     inputGrid->addWidget(emojiBtn, 0, 1);
-    fileBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x93\x81"), this);
+    fileBtn = new EmojiPushButton(QString::fromUtf8("📎"), this);
     fileBtn->setFixedSize(24, 24);
     inputGrid->addWidget(fileBtn, 1, 1);
     sendBtn = new QPushButton(_("buttons.send"), this);
@@ -64,10 +64,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     inputGrid->setSpacing(2);
     inputEdit = new MessageInput(this);
     inputGrid->addWidget(inputEdit, 0, 0, 2, 1);
-    emojiBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x98\x8A"), this);
+    emojiBtn = new EmojiPushButton(QString::fromUtf8("😊"), this);
     emojiBtn->setFixedSize(24, 24);
     inputGrid->addWidget(emojiBtn, 0, 1);
-    fileBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x93\x81"), this);
+    fileBtn = new EmojiPushButton(QString::fromUtf8("📎"), this);
     fileBtn->setFixedSize(24, 24);
     inputGrid->addWidget(fileBtn, 1, 1);
     sendBtn = new QPushButton(_("buttons.send"), this);
