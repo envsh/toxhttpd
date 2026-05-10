@@ -303,14 +303,10 @@ void ContactListWidget::retranslateUi() {
     }
     
     // 更新添加好友输入框
-    if (addInput) {
-        QString text = addInput->text();
-        if (text == "输入 Tox ID 添加好友" ||
-            text == "Enter Tox ID to add friend" ||
-            text == "輸入 Tox ID 添加好友") {
-            addInput->setText(_("placeholders.add_friend"));
-        }
-    }
+    if (addInput) addInput->setPlaceholderText(_("placeholders.add_friend"));
+    
+    // 更新加入群组输入框
+    if (joinGroupInput) joinGroupInput->setPlaceholderText(_("placeholders.join_group"));
     
     // 更新底部按钮
     if (addBtn) addBtn->setText(_("buttons.add"));

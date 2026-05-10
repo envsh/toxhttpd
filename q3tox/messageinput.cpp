@@ -37,11 +37,11 @@ MessageInput::MessageInput(QWidget* parent)
 void MessageInput::setPlaceholderText(const QString& t) {
     m_placeholder = t;
 #ifdef QT3_BUILD
-    QString cur = text();
+    bool empty = text().isEmpty();
 #else
-    QString cur = toPlainText();
+    bool empty = toPlainText().isEmpty();
 #endif
-    if (cur.isEmpty()) {
+    if (m_isPlaceholderActive || empty) {
         m_isPlaceholderActive = true;
 #ifdef QT3_BUILD
         QTextEdit::setText(m_placeholder);
