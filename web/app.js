@@ -498,7 +498,7 @@ function selectContact(id, type) {
     }
     
     document.getElementById('chatHeaderText').textContent = headerText;
-    document.getElementById('messageArea').innerHTML = '';
+    vsc.clear();
 
     // 加载历史消息
     loadMessageHistory();
@@ -540,26 +540,19 @@ function loadMessageHistory() {
                 return;
             }
 
-            const area = document.getElementById('messageArea');
-            area.innerHTML = '';
-
+            const batch = [];
             data.messages.forEach(msg => {
                 const selfPubkey = selfAddress ? selfAddress.toUpperCase().substring(0, 64) : '';
                 const isSelf = msg.sender_pubkey.toUpperCase() === selfPubkey;
 
-                // 获取昵称和头像文本
                 let displayName = 'Me';
                 let avatarText = 'M';
                 if (!isSelf) {
                     if (contactType === 'friend') {
-                        // friendNameMap 的键是字符串类型
                         const friendId = String(contactId);
                         displayName = friendNameMap[friendId] || `Peer ${msg.sender_number}`;
-                        if (displayName !== 'Me' && displayName !== `Peer ${msg.sender_number}`) {
-                            avatarText = displayName.charAt(0).toUpperCase();
-                        } else {
-                            avatarText = '?';
-                        }
+                        avatarText = (displayName !== 'Me' && displayName !== `Peer ${msg.sender_number}`)
+                            ? displayName.charAt(0).toUpperCase() : '?';
                     } else {
                         const peerKey = `${contactType}_${contactId}_${msg.sender_number}`;
                         displayName = peerNameMap[peerKey] || `Peer ${msg.sender_number}`;
@@ -567,58 +560,22 @@ function loadMessageHistory() {
                     }
                 }
 
-                // 格式化时间
                 const msgDate = new Date(msg.created_at);
-                const timeStr = msgDate.toLocaleTimeString('zh-CN', {
+                const timestamp = msgDate.toLocaleTimeString('zh-CN', {
                     hour: '2-digit', minute: '2-digit', hour12: false
                 });
 
-                // 创建消息容器（两列布局）
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'message ' + (isSelf ? 'self' : 'other');
-
-                // 头像列
-                const avatarCol = document.createElement('div');
-                avatarCol.className = 'avatar-col';
-                avatarCol.innerHTML = `<div class="avatar-placeholder">${avatarText}</div>`;
-
-                // 内容列
-                const contentCol = document.createElement('div');
-                contentCol.className = 'content-col';
-
-                // 消息头部
-                const headerDiv = document.createElement('div');
-                headerDiv.className = 'message-header';
-                const senderSpan = document.createElement('span');
-                senderSpan.className = 'message-sender';
-                senderSpan.textContent = displayName;
-                const timeSpan = document.createElement('span');
-                timeSpan.className = 'message-time';
-                timeSpan.textContent = timeStr;
-                headerDiv.appendChild(senderSpan);
-                headerDiv.appendChild(timeSpan);
-
-                // 消息气泡
-                const bubbleDiv = document.createElement('div');
-                bubbleDiv.className = 'message-bubble ' + (isSelf ? 'self-bubble' : 'other-bubble');
-                bubbleDiv.textContent = msg.message;
-
-                contentCol.appendChild(headerDiv);
-                contentCol.appendChild(bubbleDiv);
-
-                // 根据消息类型排列列顺序
-                if (isSelf) {
-                    msgDiv.appendChild(contentCol);
-                    msgDiv.appendChild(avatarCol);
-                } else {
-                    msgDiv.appendChild(avatarCol);
-                    msgDiv.appendChild(contentCol);
-                }
-
-                area.appendChild(msgDiv);
+                batch.push({
+                    text: msg.message,
+                    type: isSelf ? 'self' : 'other',
+                    sender: displayName,
+                    avatarText: avatarText,
+                    timestamp: timestamp
+                });
             });
 
-            area.scrollTop = area.scrollHeight;
+            vsc.appendBatch(batch);
+            vsc.scrollToBottom();
         })
         .catch(err => {
             console.error('Failed to load message history:', err);
@@ -733,60 +690,296 @@ let friendNameMap = {};
 // 会议/群组 peer name 缓存：键 "conference_{conference_number}_{peer_number}" / "group_{group_number}_{peer_number}"
 let peerNameMap = {};
 
-// Append message to chat area (新布局：头像列 + 内容列)
+// ── VirtualScroller ──
+class VirtualScroller {
+    constructor(container) {
+        this.container = container;
+        this.container.style.position = 'relative';
+        this.buffer = 10;
+        this.avgCharWidth = 8;
+
+        this.viewport = document.createElement('div');
+        this.viewport.style.position = 'relative';
+        this.viewport.style.width = '100%';
+        this.container.appendChild(this.viewport);
+
+        this.data = [];
+        this.heights = [];
+        this.cumulative = [0];
+        this.totalHeight = 0;
+
+        this.pool = [];
+        this.usedSlots = new Map();
+        this.freeSlots = [];
+
+        this.startIndex = 0;
+        this.endIndex = 0;
+
+        this._rafId = null;
+        this._measureRafId = null;
+        this._measureQueue = new Set();
+
+        this._onScroll = this._onScroll.bind(this);
+        this._onResize = this._onResize.bind(this);
+        this.container.addEventListener('scroll', this._onScroll, { passive: true });
+        window.addEventListener('resize', this._onResize);
+
+        requestAnimationFrame(() => this._ensurePool());
+    }
+
+    _ensurePool() {
+        const viewH = this.container.clientHeight || 600;
+        const visible = Math.ceil(viewH / 80);
+        const target = visible + 2 * this.buffer + 5;
+        while (this.pool.length < target) {
+            const node = this._createNode();
+            node.style.display = 'none';
+            this.viewport.appendChild(node);
+            this.freeSlots.push(this.pool.length);
+            this.pool.push({ node, dataIndex: -1 });
+        }
+    }
+
+    _createNode() {
+        const el = document.createElement('div');
+        el.className = 'message';
+        el.style.position = 'absolute';
+        el.style.left = '0';
+        el.style.width = '100%';
+
+        const avatarCol = document.createElement('div');
+        avatarCol.className = 'avatar-col';
+        avatarCol.innerHTML = '<div class="avatar-placeholder"></div>';
+
+        const contentCol = document.createElement('div');
+        contentCol.className = 'content-col';
+        const header = document.createElement('div');
+        header.className = 'message-header';
+        header.innerHTML = '<span class="message-sender"></span><span class="message-time"></span>';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        contentCol.appendChild(header);
+        contentCol.appendChild(bubble);
+
+        el.appendChild(avatarCol);
+        el.appendChild(contentCol);
+
+        el._ap = avatarCol.firstChild;
+        el._ss = header.firstChild;
+        el._ts = header.lastChild;
+        el._bb = bubble;
+        el._ac = avatarCol;
+        el._cc = contentCol;
+
+        return el;
+    }
+
+    _updateNode(el, msg, top, dataIdx) {
+        el.className = 'message ' + msg.type;
+        el.style.top = top + 'px';
+        el.style.display = '';
+
+        el._ap.textContent = (msg.avatarText || '').toUpperCase();
+        el._ss.textContent = msg.sender || '';
+        el._ts.textContent = msg.timestamp;
+        el._bb.textContent = msg.text;
+        el._bb.className = 'message-bubble ' + (msg.type === 'self' ? 'self-bubble' : 'other-bubble');
+
+        if (msg.type === 'self') {
+            if (el.dataset.layout !== 'self') {
+                el.appendChild(el._cc);
+                el.appendChild(el._ac);
+                el.dataset.layout = 'self';
+            }
+        } else {
+            if (el.dataset.layout !== 'other') {
+                el.appendChild(el._ac);
+                el.appendChild(el._cc);
+                el.dataset.layout = 'other';
+            }
+        }
+
+        this._requestMeasure(dataIdx);
+    }
+
+    _requestMeasure(dataIdx) {
+        this._measureQueue.add(dataIdx);
+        if (!this._measureRafId) {
+            this._measureRafId = requestAnimationFrame(() => this._flushMeasure());
+        }
+    }
+
+    _flushMeasure() {
+        this._measureRafId = null;
+        if (this._measureQueue.size === 0) return;
+        let changed = false;
+        let minIdx = Infinity;
+        for (const dataIdx of this._measureQueue) {
+            const pi = this.usedSlots.get(dataIdx);
+            if (pi === undefined) continue;
+            const actual = this.pool[pi].node.offsetHeight;
+            if (actual !== this.heights[dataIdx]) {
+                this.heights[dataIdx] = actual;
+                minIdx = Math.min(minIdx, dataIdx);
+                changed = true;
+            }
+        }
+        this._measureQueue.clear();
+        if (changed && minIdx < this.data.length) {
+            this._recalcCumulative(minIdx);
+            this._render();
+        }
+    }
+
+    _estimateHeight(text) {
+        if (!text) return 80;
+        const cw = this.container.clientWidth;
+        if (!cw || cw < 100) return 80;
+        const bubbleW = Math.max(50, (cw - 84) * 0.8);
+        const cpl = Math.max(1, Math.floor(bubbleW / this.avgCharWidth));
+        const lines = Math.ceil(text.length / cpl) || 1;
+        return Math.max(56, 18 + 16 + lines * 20 + 4);
+    }
+
+    _recalcCumulative(from) {
+        let acc = from > 0 ? this.cumulative[from] : 0;
+        for (let i = from; i < this.data.length; i++) {
+            this.cumulative[i] = acc;
+            acc += this.heights[i];
+        }
+        this.totalHeight = acc;
+        this.viewport.style.height = this.totalHeight + 'px';
+    }
+
+    _calcStart(st) {
+        const cum = this.cumulative;
+        let lo = 0, hi = this.data.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >>> 1;
+            if (cum[mid] < st) lo = mid + 1; else hi = mid;
+        }
+        return Math.max(0, lo - this.buffer);
+    }
+
+    _calcEnd(st, ch) {
+        const bottom = st + ch;
+        const cum = this.cumulative;
+        let lo = 0, hi = this.data.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >>> 1;
+            if (cum[mid] < bottom) lo = mid + 1; else hi = mid;
+        }
+        return Math.min(this.data.length, lo + this.buffer);
+    }
+
+    _render() {
+        this._ensurePool();
+        const st = this.container.scrollTop;
+        const ch = this.container.clientHeight;
+        const ns = this._calcStart(st);
+        const ne = this._calcEnd(st, ch);
+
+        if (ns === this.startIndex && ne === this.endIndex) return;
+
+        for (const [di, pi] of this.usedSlots) {
+            if (di < ns || di >= ne) {
+                this.pool[pi].node.style.display = 'none';
+                this.pool[pi].dataIndex = -1;
+                this.freeSlots.push(pi);
+                this.usedSlots.delete(di);
+            }
+        }
+
+        for (let i = ns; i < ne; i++) {
+            if (this.usedSlots.has(i) || !this.data[i]) continue;
+            let pi;
+            if (this.freeSlots.length > 0) {
+                pi = this.freeSlots.pop();
+            } else {
+                this._ensurePool();
+                pi = this.freeSlots.pop();
+                if (pi === undefined) break;
+            }
+            this.usedSlots.set(i, pi);
+            this.pool[pi].dataIndex = i;
+            this._updateNode(this.pool[pi].node, this.data[i], this.cumulative[i], i);
+        }
+
+        this.startIndex = ns;
+        this.endIndex = ne;
+    }
+
+    _onScroll() {
+        if (this._rafId) return;
+        this._rafId = requestAnimationFrame(() => {
+            this._rafId = null;
+            this._render();
+        });
+    }
+
+    _onResize() {
+        for (let i = 0; i < this.data.length; i++) {
+            this.heights[i] = this._estimateHeight(this.data[i].text);
+        }
+        this._recalcCumulative(0);
+        this._render();
+    }
+
+    append(msgData) {
+        const idx = this.data.length;
+        this.data.push(msgData);
+        this.heights.push(this._estimateHeight(msgData.text));
+        this._recalcCumulative(idx);
+        this._render();
+    }
+
+    appendBatch(arr) {
+        if (!arr || arr.length === 0) return;
+        const from = this.data.length;
+        for (const m of arr) {
+            this.data.push(m);
+            this.heights.push(this._estimateHeight(m.text));
+        }
+        this._recalcCumulative(from);
+        this._render();
+    }
+
+    clear() {
+        for (const [, pi] of this.usedSlots) {
+            this.pool[pi].node.style.display = 'none';
+            this.pool[pi].dataIndex = -1;
+            this.freeSlots.push(pi);
+        }
+        this.usedSlots.clear();
+        this.data = [];
+        this.heights = [];
+        this.cumulative = [0];
+        this.totalHeight = 0;
+        this.viewport.style.height = '0';
+        this.startIndex = 0;
+        this.endIndex = 0;
+        this.container.scrollTop = 0;
+    }
+
+    scrollToBottom() {
+        this.container.scrollTop = this.container.scrollHeight;
+    }
+
+    destroy() {
+        this.container.removeEventListener('scroll', this._onScroll);
+        window.removeEventListener('resize', this._onResize);
+    }
+}
+
+const messageArea = document.getElementById('messageArea');
+const vsc = new VirtualScroller(messageArea);
+
+// Append message to chat area (VirtualScroller)
 function appendMessage(text, type, sender, avatarText = "") {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'message ' + type;
-
-    // 头像列
-    const avatarCol = document.createElement('div');
-    avatarCol.className = 'avatar-col';
-    if (avatarText) {
-        avatarCol.innerHTML = `<div class="avatar-placeholder">${avatarText.toUpperCase()}</div>`;
-    } else {
-        avatarCol.innerHTML = `<div class="avatar-placeholder"></div>`;
-    }
-
-    // 内容列
-    const contentCol = document.createElement('div');
-    contentCol.className = 'content-col';
-
-    // 消息头部：昵称 + 时间
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'message-header';
-
-    const senderSpan = document.createElement('span');
-    senderSpan.className = 'message-sender';
-    senderSpan.textContent = sender || '';
-
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'message-time';
     const now = new Date();
-    timeSpan.textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-    headerDiv.appendChild(senderSpan);
-    headerDiv.appendChild(timeSpan);
-
-    // 消息气泡
-    const bubbleDiv = document.createElement('div');
-    bubbleDiv.className = 'message-bubble ' + (type === 'self' ? 'self-bubble' : 'other-bubble');
-    bubbleDiv.textContent = text;
-
-    contentCol.appendChild(headerDiv);
-    contentCol.appendChild(bubbleDiv);
-
-    // 根据消息类型排列列顺序
-    if (type === 'self') {
-        msgDiv.appendChild(contentCol);
-        msgDiv.appendChild(avatarCol);
-    } else {
-        msgDiv.appendChild(avatarCol);
-        msgDiv.appendChild(contentCol);
-    }
-
-    const area = document.getElementById('messageArea');
-    area.appendChild(msgDiv);
-    area.scrollTop = area.scrollHeight;
+    const timestamp = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    vsc.append({ text, type, sender, avatarText, timestamp });
+    vsc.scrollToBottom();
 }
 
 // Escape HTML
@@ -1141,7 +1334,7 @@ function leaveGroup() {
                   currentChatId = null;
                   currentChatType = null;
                   document.getElementById('chatHeaderText').textContent = t('select_chat_object');
-                  document.getElementById('messageArea').innerHTML = '';
+                  vsc.clear();
               }
               loadContacts('groups');
           }
