@@ -696,7 +696,6 @@ class VirtualScroller {
         this.container = container;
         this.container.style.position = 'relative';
         this.buffer = 10;
-        this.avgCharWidth = 8;
 
         this.viewport = document.createElement('div');
         this.viewport.style.position = 'relative';
@@ -729,7 +728,7 @@ class VirtualScroller {
 
     _ensurePool() {
         const viewH = this.container.clientHeight || 600;
-        const visible = Math.ceil(viewH / 80);
+        const visible = Math.ceil(viewH / 92);
         const target = visible + 2 * this.buffer + 5;
         while (this.pool.length < target) {
             const node = this._createNode();
@@ -817,7 +816,7 @@ class VirtualScroller {
         for (const dataIdx of this._measureQueue) {
             const pi = this.usedSlots.get(dataIdx);
             if (pi === undefined) continue;
-            const actual = this.pool[pi].node.offsetHeight;
+            const actual = this.pool[pi].node.offsetHeight + 12;
             if (actual !== this.heights[dataIdx]) {
                 this.heights[dataIdx] = actual;
                 minIdx = Math.min(minIdx, dataIdx);
@@ -827,18 +826,23 @@ class VirtualScroller {
         this._measureQueue.clear();
         if (changed && minIdx < this.data.length) {
             this._recalcCumulative(minIdx);
-            this._render();
+            this._render(true);
         }
     }
 
     _estimateHeight(text) {
-        if (!text) return 80;
+        if (!text) return 92;
         const cw = this.container.clientWidth;
-        if (!cw || cw < 100) return 80;
+        if (!cw || cw < 100) return 92;
         const bubbleW = Math.max(50, (cw - 84) * 0.8);
-        const cpl = Math.max(1, Math.floor(bubbleW / this.avgCharWidth));
-        const lines = Math.ceil(text.length / cpl) || 1;
-        return Math.max(56, 18 + 16 + lines * 20 + 4);
+        if (!this._ctx) {
+            const canvas = document.createElement('canvas');
+            this._ctx = canvas.getContext('2d');
+            this._ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+        }
+        const textWidth = this._ctx.measureText(text).width;
+        const lines = Math.max(1, Math.ceil(textWidth / bubbleW));
+        return Math.max(92, 45 + lines * 21);
     }
 
     _recalcCumulative(from) {
@@ -872,14 +876,14 @@ class VirtualScroller {
         return Math.min(this.data.length, lo + this.buffer);
     }
 
-    _render() {
+    _render(forceUpdate) {
         this._ensurePool();
         const st = this.container.scrollTop;
         const ch = this.container.clientHeight;
         const ns = this._calcStart(st);
         const ne = this._calcEnd(st, ch);
 
-        if (ns === this.startIndex && ne === this.endIndex) return;
+        if (ns === this.startIndex && ne === this.endIndex && !forceUpdate) return;
 
         for (const [di, pi] of this.usedSlots) {
             if (di < ns || di >= ne) {
@@ -887,6 +891,15 @@ class VirtualScroller {
                 this.pool[pi].dataIndex = -1;
                 this.freeSlots.push(pi);
                 this.usedSlots.delete(di);
+            }
+        }
+
+        for (const [di, pi] of this.usedSlots) {
+            if (di >= ns && di < ne) {
+                const newTop = this.cumulative[di] + 'px';
+                if (this.pool[pi].node.style.top !== newTop) {
+                    this.pool[pi].node.style.top = newTop;
+                }
             }
         }
 
@@ -918,11 +931,15 @@ class VirtualScroller {
     }
 
     _onResize() {
-        for (let i = 0; i < this.data.length; i++) {
-            this.heights[i] = this._estimateHeight(this.data[i].text);
-        }
-        this._recalcCumulative(0);
-        this._render();
+        if (this._resizeRafId) cancelAnimationFrame(this._resizeRafId);
+        this._resizeRafId = requestAnimationFrame(() => {
+            this._resizeRafId = null;
+            for (let i = 0; i < this.data.length; i++) {
+                this.heights[i] = this._estimateHeight(this.data[i].text);
+            }
+            this._recalcCumulative(0);
+            this._render();
+        });
     }
 
     append(msgData) {
