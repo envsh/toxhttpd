@@ -224,11 +224,12 @@ void SelfInfoWidget::retranslateUi() {
     
     // 更新状态标签（如果当前显示的是默认值）
     QString currentStatus = statusBadge->text();
-    if (currentStatus == "离线" || currentStatus == "TCP" || currentStatus == "UDP" ||
-        currentStatus == "Offline" || currentStatus == "TCP" || currentStatus == "UDP") {
-        // 重新获取状态并更新
-        // 这里简化：只更新默认状态文字
-    }
+    // 重新获取状态并更新???
+    if (currentStatus == "TCP" || currentStatus == "UDP") {
+		// statusBadge->setText(currentStatus);
+	} else {
+		statusBadge->setText(_("statuses.offline"));
+	}
 }
 
 void SelfInfoWidget::onSwitchAccount() {

@@ -307,6 +307,7 @@ void ContactListWidget::retranslateUi() {
     
     // 更新加入群组输入框
     if (joinGroupInput) joinGroupInput->setPlaceholderText(_("placeholders.join_group"));
+    if (joinGroupBtn) joinGroupBtn->setText(_("buttons.join_group"));
     
     // 更新底部按钮
     if (addBtn) addBtn->setText(_("buttons.add"));

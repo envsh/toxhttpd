@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"flag"
@@ -1438,11 +1439,22 @@ func main() {
 	// Log initial Tox status
 	logToxStatus(server.tox)
 
+	// Context for shutdown coordination
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+
 	// Start tox iteration in background
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
-			server.tox.Iterate()
-			time.Sleep(time.Millisecond * time.Duration(server.tox.IterationInterval()))
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				server.tox.Iterate()
+				time.Sleep(time.Millisecond * time.Duration(server.tox.IterationInterval()))
+			}
 		}
 	}()
 
@@ -1452,6 +1464,8 @@ func main() {
 	go func() {
 		<-sig
 		log.Println("Shutting down...")
+		cancel()          // signal goroutine to stop
+		wg.Wait()         // wait for iteration to finish
 		// Save Tox data
 		saveToxData(server.tox, "data/savedata.bin")
 		server.tox.Kill()
