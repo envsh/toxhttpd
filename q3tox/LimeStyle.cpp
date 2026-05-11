@@ -1173,32 +1173,39 @@ void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
 
     switch (cc) {
     case CC_ScrollBar: {
+        p->save();
+        p->fillRect(r, pal.windowBg);
         int sliderMin = 16;
         QRect sliderRect;
+        bool horiz = false;
         if (widget) {
             const QScrollBar *sb = static_cast<const QScrollBar*>(widget);
+            horiz = (sb->orientation() == Qt::Horizontal);
             int range = sb->maxValue() - sb->minValue();
-            int viewSize = (sb->orientation() == Qt::Horizontal)
-                           ? r.width() : r.height();
+            int viewSize = horiz ? r.width() : r.height();
             int sliderSize = range > 0
                 ? std::max(sliderMin, viewSize * viewSize / (viewSize + range))
                 : viewSize;
             int pos = range > 0
                 ? (sb->value() - sb->minValue()) * (viewSize - sliderSize) / range
                 : 0;
-            if (sb->orientation() == Qt::Horizontal) {
+            if (horiz) {
                 sliderRect = QRect(r.x() + pos, r.y(), sliderSize, r.height());
             } else {
                 sliderRect = QRect(r.x(), r.y() + pos, r.width(), sliderSize);
             }
         }
+        QRect groove = horiz
+            ? QRect(r.x(), r.center().y() - 1, r.width(), 3)
+            : QRect(r.center().x() - 1, r.y(), 3, r.height());
+        p->setBrush(pal.surfaceBg);
+        p->setPen(Qt::NoPen);
+        p->drawRect(groove);
         if (sliderRect.isValid()) {
-            p->save();
             p->setBrush(pal.scrollbarSlider);
-            p->setPen(Qt::NoPen);
             p->drawRoundRect(sliderRect, 4, 4);
-            p->restore();
         }
+        p->restore();
         return;
     }
     case CC_ComboBox: {
@@ -1270,17 +1277,18 @@ void LimeStyle::drawComplexControlMask(ComplexControl cc, QPainter *p,
 }
 
 QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
-                                        const QStyleControlElementData &,
+                                        const QStyleControlElementData &ceData,
                                         ControlElementFlags,
                                         SubControl sc, const QStyleOption &opt,
                                         const QWidget *widget) const {
     if (!widget) return QRect();
     const StyleParams& params = makeCurrentParams();
     int sbw = params.scrollbarWidth;
+    QRect wr = ceData.rect.isValid() ? ceData.rect : widget->rect();
 
     switch (cc) {
     case CC_ScrollBar: {
-        QRect r = opt.rect();
+        QRect r = wr;
         const QScrollBar *sb = static_cast<const QScrollBar*>(widget);
         int min = sb->minValue();
         int max = sb->maxValue();
@@ -1320,7 +1328,7 @@ QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
         }
     }
     case CC_ComboBox: {
-        QRect r = opt.rect();
+        QRect r = wr;
         int fw = pixelMetric(PM_DefaultFrameWidth, widget);
         switch (sc) {
         case SC_ComboBoxFrame: return r;
@@ -1333,7 +1341,7 @@ QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
         }
     }
     case CC_Slider: {
-        QRect r = opt.rect();
+        QRect r = wr;
         int handleSize = (r.width() < r.height() ? r.width() : r.height()) - 4;
         switch (sc) {
         case SC_SliderGroove: return QRect(r.x()+4, r.y(), r.width()-8, r.height());
@@ -1345,7 +1353,7 @@ QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
         }
     }
     case CC_SpinWidget: {
-        QRect r = opt.rect();
+        QRect r = wr;
         int btnH = r.height() / 2;
         switch (sc) {
         case SC_SpinWidgetFrame: return r;

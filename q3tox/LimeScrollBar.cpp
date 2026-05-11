@@ -184,6 +184,19 @@ void LimeScrollBar::paintEvent(QPaintEvent* event) {
         m_lastParams = g_activeParams;
     }
 
+    QPainter p(this);
+#ifndef QT3_BUILD
+    p.setRenderHint(QPainter::Antialiasing);
+#endif
+    p.setClipRect(event->rect());
+
+    // always clear background first (prevents smearing)
+#ifdef QT3_BUILD
+    p.eraseRect(event->rect());
+#else
+    p.fillRect(event->rect(), QColor(0, 0, 0, 0));
+#endif
+
     if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
         // AlwaysFaint: always draw
     } else if (g_activeParams && g_activeParams->compositingMode == JumpCut) {
@@ -191,17 +204,6 @@ void LimeScrollBar::paintEvent(QPaintEvent* event) {
     } else {
         if (m_fadeState == Hidden && m_animRatio <= 0.0f) return;
     }
-
-    QPainter p(this);
-#ifndef QT3_BUILD
-    p.setRenderHint(QPainter::Antialiasing);
-#endif
-    p.setClipRect(event->rect());
-
-    // track background - transparent
-#ifndef QT3_BUILD
-    p.fillRect(event->rect(), QColor(0, 0, 0, 0));
-#endif
 
     // compute thumb rect
     int sliderSize = 8;
