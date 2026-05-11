@@ -1,6 +1,8 @@
 #ifndef THEMEMANAGER_H
 #define THEMEMANAGER_H
 
+#include "StyleParams.h"
+
 #ifdef QT3_BUILD
 #define THEME_API
 
@@ -22,9 +24,12 @@ public:
     static void applyTheme(QWidget* widget, bool darkMode);
     static void setDarkMode(bool dark);
     static bool isDarkMode() { return m_darkMode; }
+    static void setStyle(const char* id, bool dark);
+    static const char* styleId() { return m_styleId; }
     
 private:
     static bool m_darkMode;
+    static const char* m_styleId;
 };
 
 #endif

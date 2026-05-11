@@ -9,16 +9,11 @@
 #include <Qt>
 #endif
 
-enum StyleId { StyleQtFusion, StyleMacOS, StyleWindows, StyleMaterial };
+#include <vector>
 
-enum CompositingMode {
-    AlphaBlend,
-    ColorBlend,
-    JumpCut
-};
+enum CompositingMode { AlphaBlend, ColorBlend, JumpCut };
 
 struct StyleParams {
-
     struct Palette {
         QColor windowBg;
         QColor surfaceBg;
@@ -32,33 +27,31 @@ struct StyleParams {
         QColor accentText;
         QColor border;
         QColor borderFocus;
+        QColor link;
         QColor scrollbarSlider;
         QColor scrollbarHover;
-
         Palette();
     };
-
     Palette dark;
     Palette light;
-
     int buttonRadius;
     int inputRadius;
     int scrollbarWidth;
     int spacing;
     int touchTarget;
-
     enum ScrollbarMode { AlwaysFaint, OverlayFade } scrollbarMode;
     enum ButtonStyle { Flat, Border, Capsule, Elevated } buttonStyle;
     CompositingMode compositingMode;
-
     StyleParams();
 
-    static StyleParams qtFusion(bool dark);
-    static StyleParams macOS(bool dark);
-    static StyleParams windows11(bool dark);
-    static StyleParams materialYou(bool dark);
-
-    static StyleParams make(StyleId id, bool dark);
+    struct Definition {
+        const char* id;
+        const char* displayKey;
+        StyleParams (*factory)(bool dark);
+    };
+    static void registerStyle(const Definition& def);
+    static const std::vector<Definition>& registeredStyles();
+    static StyleParams make(const char* id, bool dark);
 };
 
 extern const StyleParams* g_activeParams;

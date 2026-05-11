@@ -133,5 +133,10 @@
         "nature": "動物與自然",
         "objects": "食物與物品",
         "symbols": "符號與旅行"
-    }
+    },
+    "style.fusion": "Qt Fusion",
+    "style.macos": "macOS",
+    "style.windows": "Windows 11",
+    "style.material": "Material You",
+    "style.github": "GitHub"
 }

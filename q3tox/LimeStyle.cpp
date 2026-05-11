@@ -3,40 +3,27 @@
 
 const StyleParams* g_activeParams = nullptr;
 
-// ========== Palette defaults ==========
-
-StyleParams::Palette::Palette()
-    : windowBg("#161b22"), surfaceBg("#21262d"), baseBg("#161b22"),
-      hoverBg("#30363d"), activeBg("#3d444d"), textPrimary("#c9d1d9"),
-      textMuted("#8b949e"), textDisabled("#484f58"), accent("#1f6feb"),
-      accentText("#ffffff"), border("#30363d"), borderFocus("#1f6feb"),
-      scrollbarSlider("#30363d"), scrollbarHover("#3d444d") {}
-
-StyleParams::StyleParams()
-    : buttonRadius(6), inputRadius(6), scrollbarWidth(8), spacing(8),
-      touchTarget(32), scrollbarMode(AlwaysFaint), buttonStyle(Flat),
-      compositingMode(ColorBlend) {}
-
 // ========== Color tables ==========
 
-StyleParams StyleParams::qtFusion(bool dark) {
+static StyleParams makeQtFusion(bool dark) {
     StyleParams p;
     auto& c = dark ? p.dark : p.light;
     if (dark) {
-        c.windowBg       = QColor("#0d1117");
-        c.surfaceBg      = QColor("#21262d");
-        c.baseBg         = QColor("#161b22");
-        c.hoverBg        = QColor("#30363d");
-        c.activeBg       = QColor("#3d444d");
-        c.textPrimary    = QColor("#c9d1d9");
-        c.textMuted      = QColor("#8b949e");
-        c.textDisabled   = QColor("#484f58");
-        c.accent         = QColor("#1f6feb");
+        c.windowBg       = QColor("#353535");
+        c.surfaceBg      = QColor("#353535");
+        c.baseBg         = QColor("#232323");
+        c.hoverBg        = QColor("#404040");
+        c.activeBg       = QColor("#484848");
+        c.textPrimary    = QColor("#dcdcdc");
+        c.textMuted      = QColor("#a0a0a0");
+        c.textDisabled   = QColor("#7a7a7a");
+        c.accent         = QColor("#2a82da");
         c.accentText     = QColor("#ffffff");
-        c.border         = QColor("#30363d");
-        c.borderFocus    = QColor("#1f6feb");
-        c.scrollbarSlider= QColor("#30363d");
-        c.scrollbarHover = QColor("#3d444d");
+        c.border         = QColor("#505050");
+        c.borderFocus    = QColor("#2a82da");
+        c.link           = QColor("#2a82da");
+        c.scrollbarSlider= QColor("#606060");
+        c.scrollbarHover = QColor("#707070");
     } else {
         c.windowBg       = QColor("#f0f0f0");
         c.surfaceBg      = QColor("#ffffff");
@@ -50,6 +37,7 @@ StyleParams StyleParams::qtFusion(bool dark) {
         c.accentText     = QColor("#ffffff");
         c.border         = QColor("#c0c0c0");
         c.borderFocus    = QColor("#0969da");
+        c.link           = QColor("#0550ae");
         c.scrollbarSlider= QColor("#c0c0c0");
         c.scrollbarHover = QColor("#a0a0a0");
     }
@@ -64,7 +52,7 @@ StyleParams StyleParams::qtFusion(bool dark) {
     return p;
 }
 
-StyleParams StyleParams::macOS(bool dark) {
+static StyleParams makeMacOS(bool dark) {
     StyleParams p;
     auto& c = dark ? p.dark : p.light;
     if (dark) {
@@ -80,6 +68,7 @@ StyleParams StyleParams::macOS(bool dark) {
         c.accentText     = QColor("#ffffff");
         c.border         = QColor("#48484a");
         c.borderFocus    = QColor("#007aff");
+        c.link           = QColor("#007aff");
         c.scrollbarSlider= QColor("#8e8e93");
         c.scrollbarHover = QColor("#a0a0a5");
     } else {
@@ -95,6 +84,7 @@ StyleParams StyleParams::macOS(bool dark) {
         c.accentText     = QColor("#ffffff");
         c.border         = QColor("#d2d2d7");
         c.borderFocus    = QColor("#007aff");
+        c.link           = QColor("#007aff");
         c.scrollbarSlider= QColor("#c6c6c8");
         c.scrollbarHover = QColor("#a1a1a3");
     }
@@ -109,7 +99,7 @@ StyleParams StyleParams::macOS(bool dark) {
     return p;
 }
 
-StyleParams StyleParams::windows11(bool dark) {
+static StyleParams makeWindows11(bool dark) {
     StyleParams p;
     auto& c = dark ? p.dark : p.light;
     if (dark) {
@@ -125,6 +115,7 @@ StyleParams StyleParams::windows11(bool dark) {
         c.accentText     = QColor("#000000");
         c.border         = QColor("#555555");
         c.borderFocus    = QColor("#60cdff");
+        c.link           = QColor("#60cdff");
         c.scrollbarSlider= QColor("#555555");
         c.scrollbarHover = QColor("#757575");
     } else {
@@ -140,6 +131,7 @@ StyleParams StyleParams::windows11(bool dark) {
         c.accentText     = QColor("#ffffff");
         c.border         = QColor("#d2d2d2");
         c.borderFocus    = QColor("#0078d4");
+        c.link           = QColor("#0078d4");
         c.scrollbarSlider= QColor("#c0c0c0");
         c.scrollbarHover = QColor("#a0a0a0");
     }
@@ -154,7 +146,7 @@ StyleParams StyleParams::windows11(bool dark) {
     return p;
 }
 
-StyleParams StyleParams::materialYou(bool dark) {
+static StyleParams makeMaterialYou(bool dark) {
     StyleParams p;
     auto& c = dark ? p.dark : p.light;
     if (dark) {
@@ -170,6 +162,7 @@ StyleParams StyleParams::materialYou(bool dark) {
         c.accentText     = QColor("#381e72");
         c.border         = QColor("#938f99");
         c.borderFocus    = QColor("#d0bcff");
+        c.link           = QColor("#d0bcff");
         c.scrollbarSlider= QColor("#938f99");
         c.scrollbarHover = QColor("#cac4d0");
     } else {
@@ -185,6 +178,7 @@ StyleParams StyleParams::materialYou(bool dark) {
         c.accentText     = QColor("#ffffff");
         c.border         = QColor("#79747e");
         c.borderFocus    = QColor("#6750a4");
+        c.link           = QColor("#6750a4");
         c.scrollbarSlider= QColor("#cac4d0");
         c.scrollbarHover = QColor("#49454f");
     }
@@ -199,15 +193,61 @@ StyleParams StyleParams::materialYou(bool dark) {
     return p;
 }
 
-StyleParams StyleParams::make(StyleId id, bool dark) {
-    switch (id) {
-        case StyleQtFusion:  return qtFusion(dark);
-        case StyleMacOS:     return macOS(dark);
-        case StyleWindows:   return windows11(dark);
-        case StyleMaterial:  return materialYou(dark);
+static StyleParams makeGitHub(bool dark) {
+    StyleParams p = makeQtFusion(dark);
+    auto& c = dark ? p.dark : p.light;
+    if (dark) {
+        c.windowBg       = QColor("#0d1117");
+        c.surfaceBg      = QColor("#21262d");
+        c.baseBg         = QColor("#161b22");
+        c.hoverBg        = QColor("#30363d");
+        c.activeBg       = QColor("#3d444d");
+        c.textPrimary    = QColor("#c9d1d9");
+        c.textMuted      = QColor("#8b949e");
+        c.textDisabled   = QColor("#484f58");
+        c.accent         = QColor("#1f6feb");
+        c.accentText     = QColor("#ffffff");
+        c.border         = QColor("#30363d");
+        c.borderFocus    = QColor("#1f6feb");
+        c.link           = QColor("#58a6ff");
+        c.scrollbarSlider= QColor("#30363d");
+        c.scrollbarHover = QColor("#3d444d");
+    } else {
+        c.windowBg       = QColor("#f0f0f0");
+        c.surfaceBg      = QColor("#ffffff");
+        c.baseBg         = QColor("#ffffff");
+        c.hoverBg        = QColor("#e5e5e5");
+        c.activeBg       = QColor("#d0d0d0");
+        c.textPrimary    = QColor("#1a1a1a");
+        c.textMuted      = QColor("#666666");
+        c.textDisabled   = QColor("#999999");
+        c.accent         = QColor("#0969da");
+        c.accentText     = QColor("#ffffff");
+        c.border         = QColor("#c0c0c0");
+        c.borderFocus    = QColor("#0969da");
+        c.link           = QColor("#0550ae");
+        c.scrollbarSlider= QColor("#c0c0c0");
+        c.scrollbarHover = QColor("#a0a0a0");
     }
-    return qtFusion(dark);
+    p.buttonRadius    = 6;
+    p.inputRadius     = 6;
+    p.scrollbarWidth  = 8;
+    p.spacing         = 8;
+    p.touchTarget     = 32;
+    p.scrollbarMode   = StyleParams::AlwaysFaint;
+    p.buttonStyle     = StyleParams::Flat;
+    p.compositingMode = ColorBlend;
+    return p;
 }
+
+static bool s_stylesRegistered = ([]() -> bool {
+    StyleParams::registerStyle({"qtFusion",  "style.fusion",  &makeQtFusion});
+    StyleParams::registerStyle({"macOS",     "style.macos",   &makeMacOS});
+    StyleParams::registerStyle({"windows",   "style.windows", &makeWindows11});
+    StyleParams::registerStyle({"material",  "style.material", &makeMaterialYou});
+    StyleParams::registerStyle({"github",    "style.github",  &makeGitHub});
+    return true;
+})();
 
 // ========== Helpers ==========
 
@@ -267,7 +307,7 @@ const StyleParams::Palette& currentPalette() {
 }
 
 StyleParams makeCurrentParams() {
-    if (!g_activeParams) return StyleParams::qtFusion(isGlobalDark());
+    if (!g_activeParams) return StyleParams::make("qtFusion", isGlobalDark());
     return *g_activeParams;
 }
 

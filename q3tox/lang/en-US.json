@@ -133,5 +133,10 @@
         "nature": "Animals & Nature",
         "objects": "Food & Objects",
         "symbols": "Symbols & Travel"
-    }
+    },
+    "style.fusion": "Qt Fusion",
+    "style.macos": "macOS",
+    "style.windows": "Windows 11",
+    "style.material": "Material You",
+    "style.github": "GitHub"
 }

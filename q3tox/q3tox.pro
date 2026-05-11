@@ -19,7 +19,7 @@ HEADERS = mainwindow.h restapi.h eventpoller.h \
 
 # LimeStyle theme system
 LIME_STYLE_H = StyleParams.h LimeStyle.h LimeScrollBar.h
-LIME_STYLE_CPP = LimeStyle.cpp LimeScrollBar.cpp
+LIME_STYLE_CPP = StyleParams.cpp LimeStyle.cpp LimeScrollBar.cpp
 
 HEADERS += $$LIME_STYLE_H
 SOURCES += $$LIME_STYLE_CPP

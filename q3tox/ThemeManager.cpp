@@ -1,4 +1,5 @@
 #include "ThemeManager.h"
+#include "LimeStyle.h"
 
 #ifdef QT3_BUILD
 #include <qapplication.h>
@@ -11,65 +12,77 @@
 #endif
 
 bool ThemeManager::m_darkMode = false;
+const char* ThemeManager::m_styleId = "qtFusion";
 
 void ThemeManager::setDarkMode(bool dark) {
     m_darkMode = dark;
 }
 
-void ThemeManager::applyTheme(bool darkMode) {
-    m_darkMode = darkMode;
-    
+void ThemeManager::setStyle(const char* id, bool dark) {
+    static StyleParams params;
+    params = StyleParams::make(id, dark);
+    g_activeParams = &params;
+    m_styleId = id;
+    m_darkMode = dark;
+
+    const auto& pal = dark ? params.dark : params.light;
+
 #ifdef QT3_BUILD
-    if (darkMode) {
-        QColor bg(53, 53, 53);
-        QColor fg(212, 212, 212);
-        QColor btn(53, 53, 53);
-        QColor highlight(42, 130, 218);
-        
-        QPalette pal;
-        pal.setColor(QPalette::Active, QColorGroup::Background, bg);
-        pal.setColor(QPalette::Active, QColorGroup::Foreground, fg);
-        pal.setColor(QPalette::Active, QColorGroup::Base, QColor(25, 25, 25));
-        pal.setColor(QPalette::Active, QColorGroup::Text, fg);
-        pal.setColor(QPalette::Active, QColorGroup::Button, btn);
-        pal.setColor(QPalette::Active, QColorGroup::ButtonText, fg);
-        pal.setColor(QPalette::Active, QColorGroup::Highlight, highlight);
-        pal.setColor(QPalette::Active, QColorGroup::HighlightedText, QColor(240, 240, 240));
-        pal.setColor(QPalette::Active, QColorGroup::Link, highlight);
-        
-        pal.setColor(QPalette::Inactive, QColorGroup::Background, bg);
-        pal.setColor(QPalette::Inactive, QColorGroup::Foreground, fg);
-        pal.setColor(QPalette::Inactive, QColorGroup::Base, QColor(25, 25, 25));
-        pal.setColor(QPalette::Inactive, QColorGroup::Text, fg);
-        pal.setColor(QPalette::Inactive, QColorGroup::Button, btn);
-        pal.setColor(QPalette::Inactive, QColorGroup::ButtonText, fg);
-        
-        pal.setColor(QPalette::Disabled, QColorGroup::Background, bg);
-        pal.setColor(QPalette::Disabled, QColorGroup::Foreground, QColor(127, 127, 127));
-        pal.setColor(QPalette::Disabled, QColorGroup::Button, btn);
-        pal.setColor(QPalette::Disabled, QColorGroup::Text, QColor(127, 127, 127));
-        
-        qApp->setPalette(pal);
-    } else {
-        qApp->setPalette(QPalette());
-    }
+    QPalette qpal;
+    qpal.setColor(QPalette::Active, QColorGroup::Background, pal.windowBg);
+    qpal.setColor(QPalette::Active, QColorGroup::Foreground, pal.textPrimary);
+    qpal.setColor(QPalette::Active, QColorGroup::Base, pal.baseBg);
+    qpal.setColor(QPalette::Active, QColorGroup::Text, pal.textPrimary);
+    qpal.setColor(QPalette::Active, QColorGroup::Button, pal.surfaceBg);
+    qpal.setColor(QPalette::Active, QColorGroup::ButtonText, pal.textPrimary);
+    qpal.setColor(QPalette::Active, QColorGroup::Highlight, pal.accent);
+    qpal.setColor(QPalette::Active, QColorGroup::HighlightedText, pal.accentText);
+    qpal.setColor(QPalette::Active, QColorGroup::Link, pal.link);
+    qpal.setColor(QPalette::Active, QColorGroup::Light, pal.hoverBg);
+    qpal.setColor(QPalette::Active, QColorGroup::Midlight, lerpColor(pal.surfaceBg, pal.hoverBg, 0.5f));
+    qpal.setColor(QPalette::Active, QColorGroup::Mid, pal.surfaceBg);
+    qpal.setColor(QPalette::Active, QColorGroup::Dark, lerpColor(pal.windowBg, pal.surfaceBg, 0.3f));
+    qpal.setColor(QPalette::Active, QColorGroup::Shadow, pal.windowBg);
+    qpal.setColor(QPalette::Active, QColorGroup::BrightText, QColor("#ffffff"));
+
+    qpal.setColor(QPalette::Inactive, QColorGroup::Background, pal.windowBg);
+    qpal.setColor(QPalette::Inactive, QColorGroup::Foreground, pal.textPrimary);
+    qpal.setColor(QPalette::Inactive, QColorGroup::Base, pal.baseBg);
+    qpal.setColor(QPalette::Inactive, QColorGroup::Text, pal.textPrimary);
+    qpal.setColor(QPalette::Inactive, QColorGroup::Button, pal.surfaceBg);
+    qpal.setColor(QPalette::Inactive, QColorGroup::ButtonText, pal.textPrimary);
+
+    qpal.setColor(QPalette::Disabled, QColorGroup::Background, pal.windowBg);
+    qpal.setColor(QPalette::Disabled, QColorGroup::Foreground, pal.textDisabled);
+    qpal.setColor(QPalette::Disabled, QColorGroup::Text, pal.textDisabled);
+    qpal.setColor(QPalette::Disabled, QColorGroup::Button, pal.surfaceBg);
+    qpal.setColor(QPalette::Disabled, QColorGroup::ButtonText, pal.textDisabled);
+
+    qApp->setPalette(qpal);
 #else
-    if (darkMode) {
-        QPalette darkPalette;
-        darkPalette.setColor(QPalette::Window, QColor(53, 53, 53));
-        darkPalette.setColor(QPalette::WindowText, QColor(212, 212, 212));
-        darkPalette.setColor(QPalette::Base, QColor(25, 25, 25));
-        darkPalette.setColor(QPalette::Text, QColor(212, 212, 212));
-        darkPalette.setColor(QPalette::Button, QColor(53, 53, 53));
-        darkPalette.setColor(QPalette::ButtonText, QColor(212, 212, 212));
-        darkPalette.setColor(QPalette::Highlight, QColor(42, 130, 218));
-        darkPalette.setColor(QPalette::HighlightedText, QColor(240, 240, 240));
-        darkPalette.setColor(QPalette::Link, QColor(42, 130, 218));
-        qApp->setPalette(darkPalette);
-    } else {
-        qApp->setPalette(QPalette());
-    }
+    QPalette qpal;
+    qpal.setColor(QPalette::Window, pal.windowBg);
+    qpal.setColor(QPalette::WindowText, pal.textPrimary);
+    qpal.setColor(QPalette::Base, pal.baseBg);
+    qpal.setColor(QPalette::Text, pal.textPrimary);
+    qpal.setColor(QPalette::Button, pal.surfaceBg);
+    qpal.setColor(QPalette::ButtonText, pal.textPrimary);
+    qpal.setColor(QPalette::Highlight, pal.accent);
+    qpal.setColor(QPalette::HighlightedText, pal.accentText);
+    qpal.setColor(QPalette::Link, pal.link);
+    qpal.setColor(QPalette::Light, pal.hoverBg);
+    qpal.setColor(QPalette::Midlight, lerpColor(pal.surfaceBg, pal.hoverBg, 0.5f));
+    qpal.setColor(QPalette::Mid, pal.surfaceBg);
+    qpal.setColor(QPalette::Dark, lerpColor(pal.windowBg, pal.surfaceBg, 0.3f));
+    qpal.setColor(QPalette::Shadow, pal.windowBg);
+    qpal.setColor(QPalette::BrightText, QColor("#ffffff"));
+
+    qApp->setPalette(qpal);
 #endif
+}
+
+void ThemeManager::applyTheme(bool darkMode) {
+    setStyle(m_styleId, darkMode);
 }
 
 void ThemeManager::applyTheme(QWidget* widget, bool darkMode) {
