@@ -108,6 +108,7 @@
     "select_chat_object": "选择聊天对象",
     "please_enter_chat_id": "请输入群组chat_id",
     "theme_dark": "深色主题",
+    "theme_light": "浅色主题",
     "confirm": "确认",
     "confirm_send_file": "确认发送该文件？\n%1",
     "confirm_delete_friend": "确定删除好友 %1 吗？",

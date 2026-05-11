@@ -279,7 +279,7 @@ static QColor compositeColor(const QColor& bg, const QColor& fg, float ratio,
     switch (mode) {
         case AlphaBlend: {
 #ifdef QT3_BUILD
-            return fg;
+            return lerpColor(bg, fg, ratio);
 #else
             QColor c = fg;
             c.setAlphaF(ratio);
@@ -330,7 +330,7 @@ static QColor disabledBlend(const QColor& enabled, const QColor& disabled,
     switch (mode) {
         case AlphaBlend: {
 #ifdef QT3_BUILD
-            return lerpColor(enabled, disabled, 0.0f);
+            return lerpColor(disabled, enabled, 0.4f);
 #else
             QColor c = enabled;
             c.setAlphaF(0.4f);
@@ -354,9 +354,6 @@ LimeStyle::LimeStyle() :
     QProxyStyle()
 #endif
 {
-#ifdef QT3_BUILD
-    m_baseStyle = &QApplication::style();
-#endif
 }
 
 // ========== drawPrimitive ==========
@@ -405,11 +402,70 @@ void LimeStyle::drawPrimitive(PrimitiveElement pe, QPainter *p, const QRect &r,
         p->restore();
         return;
     }
+    case PE_Indicator: {
+        bool on = (flags & Style_On);
+        bool disabled = !(flags & Style_Enabled);
+        p->save();
+        p->setBrush(on ? pal.accent : pal.baseBg);
+        p->setPen(disabled ? pal.textDisabled : pal.border);
+        p->drawRect(r);
+        if (on) {
+            QPen checkPen(pal.accentText, 2);
+            p->setPen(checkPen);
+            p->drawLine(r.x()+r.width()/4, r.y()+r.height()/2,
+                        r.x()+r.width()/2, r.y()+r.height()*3/4);
+            p->drawLine(r.x()+r.width()/2, r.y()+r.height()*3/4,
+                        r.x()+r.width()*3/4, r.y()+r.height()/4);
+        }
+        p->restore();
+        return;
+    }
+    case PE_ExclusiveIndicator: {
+        bool on = (flags & Style_On);
+        p->save();
+        p->setBrush(on ? pal.accent : pal.baseBg);
+        p->setPen(pal.border);
+        p->drawEllipse(r);
+        if (on) {
+            int inset = r.width() / 4;
+            p->setBrush(pal.accentText);
+            p->setPen(Qt::NoPen);
+            p->drawEllipse(QRect(r.x()+inset, r.y()+inset,
+                                 r.width()-2*inset, r.height()-2*inset));
+        }
+        p->restore();
+        return;
+    }
+    case PE_Panel:
+    case PE_PanelPopup:
+    case PE_PanelGroupBox:
+    case PE_PanelMenuBar: {
+        p->save();
+        p->setPen(pal.border);
+        p->setBrush(Qt::NoBrush);
+        p->drawRect(r);
+        p->restore();
+        return;
+    }
+    case PE_HeaderArrow: {
+        bool up = (flags & Style_Up);
+        p->save();
+        p->setPen(pal.textPrimary);
+        int cx = r.center().x();
+        int cy = r.center().y();
+        if (up) {
+            p->drawLine(cx-4, cy+2, cx, cy-2);
+            p->drawLine(cx+4, cy+2, cx, cy-2);
+        } else {
+            p->drawLine(cx-4, cy-2, cx, cy+2);
+            p->drawLine(cx+4, cy-2, cx, cy+2);
+        }
+        p->restore();
+        return;
+    }
     default:
         break;
     }
-
-    m_baseStyle->drawPrimitive(pe, p, r, cg, flags, opt);
 }
 
 #else // Qt4
@@ -491,7 +547,7 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
 
         p->save();
         p->setBrush(bg);
-        p->setPen(pal.border);
+        p->setPen(Qt::NoPen);
         int rad = buttonRadiusFor(params, r);
         if (rad > 0)
             p->drawRoundRect(r, rad * 200 / r.width(), rad * 200 / r.height());
@@ -508,15 +564,24 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
         }
         break;
     }
-    case CE_CheckBox:
-    case CE_CheckBoxLabel:
-    default:
+    case CE_CheckBox: {
+        p->save();
+        p->fillRect(r, pal.surfaceBg);
+        p->restore();
         break;
     }
-
-    {
-        QColorGroup cg = widget ? widget->colorGroup() : QApplication::palette().active();
-        m_baseStyle->drawControl(ce, p, widget, r, cg, flags, opt);
+    case CE_MenuBarItem: {
+        bool hover = (flags & Style_MouseOver);
+        if (hover)
+            p->fillRect(r, pal.hoverBg);
+        break;
+    }
+    case CE_MenuBarEmptyArea: {
+        p->fillRect(r, pal.windowBg);
+        return;
+    }
+    default:
+        break;
     }
 }
 
@@ -643,8 +708,26 @@ void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
 
     switch (cc) {
     case CC_ScrollBar: {
-        QRect sliderRect = querySubControlMetrics(CC_ScrollBar, widget,
-                                                  SC_ScrollBarSlider, opt);
+        int sliderMin = 16;
+        int extent = params.scrollbarWidth;
+        QRect sliderRect;
+        if (widget) {
+            const QScrollBar *sb = static_cast<const QScrollBar*>(widget);
+            int range = sb->maxValue() - sb->minValue();
+            int viewSize = (sb->orientation() == Qt::Horizontal)
+                           ? r.width() : r.height();
+            int sliderSize = range > 0
+                ? std::max(sliderMin, viewSize * viewSize / (viewSize + range))
+                : viewSize;
+            int pos = range > 0
+                ? (sb->value() - sb->minValue()) * (viewSize - sliderSize) / range
+                : 0;
+            if (sb->orientation() == Qt::Horizontal) {
+                sliderRect = QRect(r.x() + pos, r.y(), sliderSize, r.height());
+            } else {
+                sliderRect = QRect(r.x(), r.y() + pos, r.width(), sliderSize);
+            }
+        }
         if (sliderRect.isValid()) {
             p->save();
             p->setBrush(pal.scrollbarSlider);
@@ -667,21 +750,33 @@ void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
         int rad = buttonRadiusFor(params, r);
         p->drawRoundRect(r, rad * 200 / r.width(), rad * 200 / r.height());
 
-        QRect arrowRect = querySubControlMetrics(CC_ComboBox, widget,
-                                                 SC_ComboBoxArrow, opt);
-        bool popupOpen = (active & SC_ComboBoxArrow);
-        QString arrow = popupOpen ? QString(QChar(0x25B2)) : QString(QChar(0x25BC));
+        QRect arrowRect(r.right() - 20, r.y(), 20, r.height());
+        QString arrow = (active & SC_ComboBoxArrow)
+                        ? QString(QChar(0x25B2)) : QString(QChar(0x25BC));
         p->setPen(fg);
         p->drawText(arrowRect, Qt::AlignCenter, arrow);
+        p->restore();
+        return;
+    }
+    case CC_Slider: {
+        bool disabled = !(flags & Style_Enabled);
+        p->save();
+        QRect groove(r.x()+4, r.y(), r.width()-8, r.height());
+        p->fillRect(groove, pal.baseBg);
+        QColor handleColor = disabled ? pal.textDisabled : pal.accent;
+        int handleSize = (r.width() < r.height() ? r.width() : r.height()) - 4;
+        QRect handleRect(r.center().x() - handleSize/2,
+                         r.center().y() - handleSize/2,
+                         handleSize, handleSize);
+        p->setBrush(handleColor);
+        p->setPen(pal.border);
+        p->drawRoundRect(handleRect, 4, 4);
         p->restore();
         return;
     }
     default:
         break;
     }
-
-    m_baseStyle->drawComplexControl(cc, p, widget, r, cg, flags,
-                                     controls, active, opt);
 }
 
 #else // Qt4
@@ -751,10 +846,9 @@ int LimeStyle::pixelMetric(PixelMetric m, const QWidget *w) const {
     case PM_ScrollBarExtent: return params.scrollbarWidth;
     case PM_ButtonMargin:    return 6;
     case PM_DefaultFrameWidth: return 1;
-    default: break;
+    case PM_DockWindowHandleExtent: return 14;
+    default: return 0;
     }
-
-    return m_baseStyle->pixelMetric(m, w);
 }
 
 #else
@@ -784,10 +878,14 @@ int LimeStyle::styleHint(StyleHint sh, const QStyleOption &opt,
     const StyleParams& params = makeCurrentParams();
 
     switch (sh) {
-    default: break;
+    case SH_EtchDisabledText:      return 0;
+    case SH_GUIStyle:              return 0;
+    case SH_GroupBox_TextLabelVerticalAlignment: return Qt::AlignVCenter;
+    case SH_ScrollBar_LeftClickAbsolutePosition: return 1;
+    case SH_Slider_SnapToValue: return 1;
+    case SH_UnderlineAccelerator: return 1;
+    default: return 0;
     }
-
-    return m_baseStyle->styleHint(sh, w, opt, hret);
 }
 
 #else
@@ -797,10 +895,125 @@ int LimeStyle::styleHint(StyleHint sh, const QStyleOption *opt,
     const StyleParams& params = makeCurrentParams();
 
     switch (sh) {
+    case SH_EtchDisabledText:      return 0;
+    case SH_GroupBox_TextLabelVerticalAlignment: return Qt::AlignVCenter;
+    case SH_ScrollBar_LeftClickAbsolutePosition: return 1;
+    case SH_Slider_SnapToValue: return 1;
     default: break;
     }
 
     return QProxyStyle::styleHint(sh, opt, w, hret);
+}
+
+#endif
+
+// ========== New API pure virtuals (forked Qt3 only) ==========
+// These forward to old API overloads to avoid passing potentially null
+// QStyleControlElementData references during early widget construction.
+
+#ifdef QT3_BUILD
+
+void LimeStyle::polishPopupMenu(const QStyleControlElementData &ceData,
+                                ControlElementFlags elementFlags, void *ptr) {
+}
+
+void LimeStyle::drawPrimitive(PrimitiveElement pe, QPainter *p,
+                              const QStyleControlElementData &,
+                              ControlElementFlags,
+                              const QRect &r, const QColorGroup &cg,
+                              SFlags flags,
+                              const QStyleOption &opt) const {
+    drawPrimitive(pe, p, r, cg, flags, opt);
+}
+
+void LimeStyle::drawControl(ControlElement ce, QPainter *p,
+                            const QStyleControlElementData &,
+                            ControlElementFlags,
+                            const QRect &r, const QColorGroup &cg,
+                            SFlags flags, const QStyleOption &opt,
+                            const QWidget *widget) const {
+    drawControl(ce, p, widget, r, flags, opt);
+}
+
+void LimeStyle::drawControlMask(ControlElement ce, QPainter *p,
+                                const QStyleControlElementData &,
+                                ControlElementFlags,
+                                const QRect &r, const QStyleOption &opt,
+                                const QWidget *widget) const {
+}
+
+QRect LimeStyle::subRect(SubRect r, const QStyleControlElementData &,
+                         const ControlElementFlags,
+                         const QWidget *widget) const {
+    return QRect();
+}
+
+void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
+                                   const QStyleControlElementData &,
+                                   ControlElementFlags,
+                                   const QRect &r, const QColorGroup &cg,
+                                   SFlags flags, SCFlags controls,
+                                   SCFlags active, const QStyleOption &opt,
+                                   const QWidget *widget) const {
+    drawComplexControl(cc, p, widget, r, cg, flags, controls, active, opt);
+}
+
+void LimeStyle::drawComplexControlMask(ComplexControl cc, QPainter *p,
+                                       const QStyleControlElementData &,
+                                       const ControlElementFlags,
+                                       const QRect &r, const QStyleOption &opt,
+                                       const QWidget *widget) const {
+}
+
+QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
+                                        const QStyleControlElementData &,
+                                        ControlElementFlags,
+                                        SubControl sc, const QStyleOption &opt,
+                                        const QWidget *widget) const {
+    return QRect();
+}
+
+QStyle::SubControl LimeStyle::querySubControl(ComplexControl cc,
+                                      const QStyleControlElementData &,
+                                      ControlElementFlags,
+                                      const QPoint &pos,
+                                      const QStyleOption &opt,
+                                      const QWidget *widget) const {
+    return SC_None;
+}
+
+int LimeStyle::pixelMetric(PixelMetric m,
+                           const QStyleControlElementData &,
+                           ControlElementFlags,
+                           const QWidget *widget) const {
+    return pixelMetric(m, widget);
+}
+
+QSize LimeStyle::sizeFromContents(ContentsType ct,
+                                  const QStyleControlElementData &,
+                                  ControlElementFlags,
+                                  const QSize &contentsSize,
+                                  const QStyleOption &opt,
+                                  const QWidget *widget) const {
+    return contentsSize;
+}
+
+int LimeStyle::styleHint(StyleHint sh,
+                         const QStyleControlElementData &,
+                         ControlElementFlags,
+                         const QStyleOption &opt,
+                         QStyleHintReturn *returnData,
+                         const QWidget *widget) const {
+    return styleHint(sh, opt, widget, returnData);
+}
+
+QPixmap LimeStyle::stylePixmap(StylePixmap sp,
+                               const QStyleControlElementData &,
+                               ControlElementFlags,
+                               const QStyleOption &opt,
+                               const QWidget *widget) const {
+    QPixmap pm(1, 1);
+    return pm;
 }
 
 #endif

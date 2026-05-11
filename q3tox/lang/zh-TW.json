@@ -93,6 +93,7 @@
     "select_chat_object": "選擇聊天對象",
     "please_enter_chat_id": "請輸入群組chat_id",
     "theme_dark": "深色主題",
+    "theme_light": "淺色主題",
     "confirm": "確認",
     "confirm_send_file": "確認發送該檔案？\n%1",
     "confirm_delete_friend": "確定刪除好友 %1 嗎？",

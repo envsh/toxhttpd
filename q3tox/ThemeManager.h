@@ -21,7 +21,6 @@
 class THEME_API ThemeManager {
 public:
     static void applyTheme(bool darkMode);
-    static void applyTheme(QWidget* widget, bool darkMode);
     static void setDarkMode(bool dark);
     static bool isDarkMode() { return m_darkMode; }
     static void setStyle(const char* id, bool dark);

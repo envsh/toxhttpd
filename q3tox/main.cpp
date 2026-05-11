@@ -4,6 +4,7 @@
 #include "appsetup.h"
 
 #include "ThemeManager.h"
+#include "LimeStyle.h"
 
 // 读取保存的语言设置（替代 QSettings）
 static QString loadSavedLanguage() {
@@ -42,6 +43,7 @@ int main(int argc, char* argv[]) {
     QtappSetup::setup(app);
         
     ThemeManager::setStyle("qtFusion", true);
+    app.setStyle(new LimeStyle);
     
     // 读取保存的语言设置
     QString savedLang = loadSavedLanguage();

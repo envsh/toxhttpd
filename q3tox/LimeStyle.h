@@ -54,8 +54,78 @@ public:
     int styleHint(StyleHint sh, const QStyleOption &opt = QStyleOption(),
                   const QWidget *w = 0, QStyleHintReturn *hret = 0) const;
 
-private:
-    QStyle* m_baseStyle;
+    // New API pure virtuals (forked Qt3 with QStyleControlElementData)
+    void polishPopupMenu(const QStyleControlElementData &ceData,
+                         ControlElementFlags elementFlags, void *ptr);
+    void drawPrimitive(PrimitiveElement pe, QPainter *p,
+                       const QStyleControlElementData &ceData,
+                       ControlElementFlags elementFlags,
+                       const QRect &r, const QColorGroup &cg,
+                       SFlags flags = Style_Default,
+                       const QStyleOption &opt = QStyleOption()) const;
+    void drawControl(ControlElement ce, QPainter *p,
+                     const QStyleControlElementData &ceData,
+                     ControlElementFlags elementFlags,
+                     const QRect &r, const QColorGroup &cg,
+                     SFlags flags = Style_Default,
+                     const QStyleOption &opt = QStyleOption(),
+                     const QWidget *widget = 0) const;
+    void drawControlMask(ControlElement ce, QPainter *p,
+                         const QStyleControlElementData &ceData,
+                         ControlElementFlags elementFlags,
+                         const QRect &r,
+                         const QStyleOption &opt = QStyleOption(),
+                         const QWidget *widget = 0) const;
+    QRect subRect(SubRect r, const QStyleControlElementData &ceData,
+                  const ControlElementFlags elementFlags,
+                  const QWidget *widget) const;
+    void drawComplexControl(ComplexControl cc, QPainter *p,
+                            const QStyleControlElementData &ceData,
+                            ControlElementFlags elementFlags,
+                            const QRect &r, const QColorGroup &cg,
+                            SFlags flags = Style_Default,
+                            SCFlags controls = SC_All,
+                            SCFlags active = SC_None,
+                            const QStyleOption &opt = QStyleOption(),
+                            const QWidget *widget = 0) const;
+    void drawComplexControlMask(ComplexControl cc, QPainter *p,
+                                const QStyleControlElementData &ceData,
+                                const ControlElementFlags elementFlags,
+                                const QRect &r,
+                                const QStyleOption &opt = QStyleOption(),
+                                const QWidget *widget = 0) const;
+    QRect querySubControlMetrics(ComplexControl cc,
+                                 const QStyleControlElementData &ceData,
+                                 ControlElementFlags elementFlags,
+                                 SubControl sc,
+                                 const QStyleOption &opt = QStyleOption(),
+                                 const QWidget *widget = 0) const;
+    SubControl querySubControl(ComplexControl cc,
+                               const QStyleControlElementData &ceData,
+                               ControlElementFlags elementFlags,
+                               const QPoint &pos,
+                               const QStyleOption &opt = QStyleOption(),
+                               const QWidget *widget = 0) const;
+    int pixelMetric(PixelMetric m, const QStyleControlElementData &ceData,
+                    ControlElementFlags elementFlags,
+                    const QWidget *widget = 0) const;
+    QSize sizeFromContents(ContentsType ct,
+                           const QStyleControlElementData &ceData,
+                           ControlElementFlags elementFlags,
+                           const QSize &contentsSize,
+                           const QStyleOption &opt = QStyleOption(),
+                           const QWidget *widget = 0) const;
+    int styleHint(StyleHint sh, const QStyleControlElementData &ceData,
+                  ControlElementFlags elementFlags,
+                  const QStyleOption &opt = QStyleOption(),
+                  QStyleHintReturn *returnData = 0,
+                  const QWidget *widget = 0) const;
+    QPixmap stylePixmap(StylePixmap sp,
+                        const QStyleControlElementData &ceData,
+                        ControlElementFlags elementFlags,
+                        const QStyleOption &opt = QStyleOption(),
+                        const QWidget *widget = 0) const;
+
 };
 
 #else

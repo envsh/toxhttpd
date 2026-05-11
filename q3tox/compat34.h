@@ -133,13 +133,18 @@ inline void qSetMargins(QBoxLayout* layout, int left, int top, int right, int bo
 }
 
 // 按钮状态
-inline void qSetChecked(QPushButton* btn, bool checked) {
 #ifdef QT3_BUILD
+inline void qSetChecked(QPushButton* btn, bool checked) {
     btn->setOn(checked);
-#else
-    btn->setChecked(checked);
-#endif
 }
+inline void qSetChecked(QCheckBox* btn, bool checked) {
+    btn->setChecked(checked);
+}
+#else
+inline void qSetChecked(QAbstractButton* btn, bool checked) {
+    btn->setChecked(checked);
+}
+#endif
 
 inline void qSetCheckable(QPushButton* btn, bool checkable) {
 #ifdef QT3_BUILD

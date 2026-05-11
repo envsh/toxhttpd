@@ -48,10 +48,10 @@ private:
     enum FadeState { Hidden, FadeIn, Visible, FadeOut };
 
     float m_animRatio;
-    float m_targetRatio;
     FadeState m_fadeState;
     bool m_hovered;
     bool m_isVisible;
+    const StyleParams* m_lastParams;
 
     QTimer* m_fadeTimer;
     QTimer* m_hideTimer;

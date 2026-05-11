@@ -15,8 +15,6 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     avatarLabel = new QLabel("?", this);
     avatarLabel->setFixedSize(40, 40);
     avatarLabel->setAlignment(Qt::AlignCenter);
-    avatarLabel->setPalette(QPalette(QColor("#21262d")));
-    avatarLabel->setFrameStyle(QFrame::Box | QFrame::Raised);
     avatarLabel->setLineWidth(2);
     headerLayout->addWidget(avatarLabel);
     
@@ -32,15 +30,12 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     statusBadge = new QLabel(_("statuses.offline"), this);
     statusBadge->setAlignment(Qt::AlignCenter);
     statusBadge->setFixedSize(60, 20);
-    statusBadge->setPalette(QPalette(QColor("#482121")));
-    statusBadge->setFrameStyle(QFrame::Box | QFrame::Raised);
     nameRowLayout->addWidget(statusBadge);
     infoLayout->addLayout(nameRowLayout);
     
     // 状态消息
     statusMsgLabel = new QLabel(_("no_status"), this);
     statusMsgLabel->setFont(QFont("Helvetica", 12));
-    statusMsgLabel->setPalette(QPalette(QColor("#6e7681")));
     infoLayout->addWidget(statusMsgLabel);
     
     headerLayout->addLayout(infoLayout, 1);
@@ -50,7 +45,6 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     QBoxLayout* addrLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     addressLabel = new QLabel("...", this);
     addressLabel->setFont(QFont("Monospace", 11));
-    addressLabel->setPalette(QPalette(QColor("#6e7681")));
     addrLayout->addWidget(addressLabel, 1);
     
     copyBtn = new QPushButton(_("buttons.copy"), this);
@@ -89,6 +83,8 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     
     if (!name.isEmpty()) {
         avatarLabel->setPalette(QPalette(QColor("#1c3a5f")));
+    } else {
+        avatarLabel->setPalette(QPalette());
     }
     
     // 更新名称
@@ -105,6 +101,9 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     } else {
         statusBadge->setPalette(QPalette(QColor("#1a4731")));
     }
+#ifndef QT3_BUILD
+    statusBadge->setAutoFillBackground(true);
+#endif
     
     // 更新状态消息
     statusMsgLabel->setText(statusMsg.isEmpty() ? _("no_status") : statusMsg);

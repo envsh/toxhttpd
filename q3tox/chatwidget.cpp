@@ -55,6 +55,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
 
     // 主题切换复选框
     themeCheckBox = new QCheckBox(_("theme_dark"), this);
+    qSetChecked(themeCheckBox, true);
     connect(themeCheckBox, SIGNAL(toggled(bool)), this, SLOT(onThemeToggled(bool)));
     headerLayout->addWidget(themeCheckBox);
     

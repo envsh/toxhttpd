@@ -84,8 +84,3 @@ void ThemeManager::setStyle(const char* id, bool dark) {
 void ThemeManager::applyTheme(bool darkMode) {
     setStyle(m_styleId, darkMode);
 }
-
-void ThemeManager::applyTheme(QWidget* widget, bool darkMode) {
-    Q_UNUSED(widget);
-    applyTheme(darkMode);
-}
