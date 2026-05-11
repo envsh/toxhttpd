@@ -16,7 +16,7 @@
 
 - `compat34.h` handles API diffs (QString, layout, events, files). Use it.
 - `.pro` file auto-detects Qt version: sets `QT3_BUILD` for Qt3 (no `QT_VERSION`), no define for Qt4.
-- Qt3 moc chokes on `#ifdef` inside class body. Affected classes use `QWidget` base + manual `QScrollBar` (see `ChatView`).
+- Qt3 moc chokes on `#ifdef` inside class body. When `#ifdef QT3_BUILD`/`#else` changes the **base class** inside the class body, Qt3 3.5.0 moc v26 processes BOTH branches, generating duplicate moc code (redefinition errors). Fix: never put `Q_OBJECT` inside an `#ifdef` block; if the class has no custom signals/slots, remove `Q_OBJECT` entirely. For different base classes, define the base via a macro OUTSIDE the class body (`#define LIME_BASE QStyle` / `#else` / `#define LIME_BASE QProxyStyle`), but note that moc always sees the `#else` branch (no `-DQT3_BUILD`), so the moc file will reference the Qt4 base — only safe when `Q_OBJECT` is omitted. Affected classes use `QWidget` base + manual `QScrollBar` (see `ChatView`), or no `Q_OBJECT` (see `LimeStyle`).
 - `MOC_DIR = .` and `OBJECTS_DIR = .` — generated moc/source files land in source dir.
 
 # Important constraints
