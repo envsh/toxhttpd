@@ -152,6 +152,9 @@ public:
 
     int styleHint(StyleHint sh, const QStyleOption *opt = 0,
                   const QWidget *w = 0, QStyleHintReturn *hret = 0) const;
+
+    QRect subControlRect(ComplexControl cc, const QStyleOptionComplex *opt,
+                         SubControl sc, const QWidget *w = 0) const;
 };
 
 #endif

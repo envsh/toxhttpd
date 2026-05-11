@@ -386,83 +386,6 @@ void LimeStyle::drawPrimitive(PrimitiveElement pe, QPainter *p, const QRect &r,
     }
     case PE_FocusRect:
         return;
-    case PE_ButtonCommand: {
-        bool hover = (flags & Style_MouseOver);
-        bool down = (flags & Style_Down);
-        bool disabled = !(flags & Style_Enabled);
-        QColor bg = buttonColor(pal, params, hover, down, disabled);
-        p->save();
-        p->setBrush(bg);
-        p->setPen(Qt::NoPen);
-        int rad = buttonRadiusFor(params, r);
-        if (rad > 0)
-            p->drawRoundRect(r, rad * 200 / r.width(), rad * 200 / r.height());
-        else
-            p->drawRect(r);
-        p->restore();
-        return;
-    }
-    case PE_Indicator: {
-        bool on = (flags & Style_On);
-        bool disabled = !(flags & Style_Enabled);
-        p->save();
-        p->setBrush(on ? pal.accent : pal.baseBg);
-        p->setPen(disabled ? pal.textDisabled : pal.border);
-        p->drawRect(r);
-        if (on) {
-            QPen checkPen(pal.accentText, 2);
-            p->setPen(checkPen);
-            p->drawLine(r.x()+r.width()/4, r.y()+r.height()/2,
-                        r.x()+r.width()/2, r.y()+r.height()*3/4);
-            p->drawLine(r.x()+r.width()/2, r.y()+r.height()*3/4,
-                        r.x()+r.width()*3/4, r.y()+r.height()/4);
-        }
-        p->restore();
-        return;
-    }
-    case PE_ExclusiveIndicator: {
-        bool on = (flags & Style_On);
-        p->save();
-        p->setBrush(on ? pal.accent : pal.baseBg);
-        p->setPen(pal.border);
-        p->drawEllipse(r);
-        if (on) {
-            int inset = r.width() / 4;
-            p->setBrush(pal.accentText);
-            p->setPen(Qt::NoPen);
-            p->drawEllipse(QRect(r.x()+inset, r.y()+inset,
-                                 r.width()-2*inset, r.height()-2*inset));
-        }
-        p->restore();
-        return;
-    }
-    case PE_Panel:
-    case PE_PanelPopup:
-    case PE_PanelGroupBox:
-    case PE_PanelMenuBar: {
-        p->save();
-        p->setPen(pal.border);
-        p->setBrush(Qt::NoBrush);
-        p->drawRect(r);
-        p->restore();
-        return;
-    }
-    case PE_HeaderArrow: {
-        bool up = (flags & Style_Up);
-        p->save();
-        p->setPen(pal.textPrimary);
-        int cx = r.center().x();
-        int cy = r.center().y();
-        if (up) {
-            p->drawLine(cx-4, cy+2, cx, cy-2);
-            p->drawLine(cx+4, cy+2, cx, cy-2);
-        } else {
-            p->drawLine(cx-4, cy-2, cx, cy+2);
-            p->drawLine(cx+4, cy-2, cx, cy+2);
-        }
-        p->restore();
-        return;
-    }
     default:
         break;
     }
@@ -578,6 +501,35 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
     }
     case CE_MenuBarEmptyArea: {
         p->fillRect(r, pal.windowBg);
+        return;
+    }
+    case CE_RadioButton:
+    case CE_RadioButtonLabel: {
+        p->fillRect(r, pal.surfaceBg);
+        break;
+    }
+    case CE_TabBarTab: {
+        bool selected = (flags & Style_Selected);
+        if (selected) {
+            p->fillRect(r, pal.baseBg);
+        } else {
+            p->fillRect(r, pal.surfaceBg);
+        }
+        p->setPen(pal.border);
+        p->drawLine(r.bottomLeft(), r.bottomRight());
+        return;
+    }
+    case CE_ProgressBarGroove: {
+        p->fillRect(r, pal.baseBg);
+        return;
+    }
+    case CE_ProgressBarContents: {
+        p->fillRect(r, pal.accent);
+        return;
+    }
+    case CE_ProgressBarLabel: {
+        p->setPen(pal.textPrimary);
+        p->drawText(r, Qt::AlignCenter, QString());
         return;
     }
     default:
@@ -956,6 +908,79 @@ int LimeStyle::styleHint(StyleHint sh, const QStyleOption *opt,
     return QProxyStyle::styleHint(sh, opt, w, hret);
 }
 
+// ========== subControlRect (Qt4) ==========
+
+QRect LimeStyle::subControlRect(ComplexControl cc, const QStyleOptionComplex *opt,
+                                SubControl sc, const QWidget *w) const {
+    const StyleParams& params = makeCurrentParams();
+
+    switch (cc) {
+    case CC_ScrollBar: {
+        if (const QStyleOptionSlider *sb = qstyleoption_cast<const QStyleOptionSlider*>(opt)) {
+            QRect r = opt->rect;
+            int min = sb->minimum;
+            int max = sb->maximum;
+            int val = sb->sliderValue;
+            bool horiz = sb->orientation == Qt::Horizontal;
+            int viewSize = horiz ? r.width() : r.height();
+            int sliderSize = std::max(16, viewSize * viewSize / (viewSize + (max - min)));
+            int avail = viewSize - sliderSize;
+            int pos = (max > min) ? (val - min) * avail / (max - min) : 0;
+
+            switch (sc) {
+            case SC_ScrollBarSlider:
+                if (horiz) return QRect(r.x() + pos, r.y(), sliderSize, r.height());
+                else return QRect(r.x(), r.y() + pos, r.width(), sliderSize);
+            case SC_ScrollBarGroove: return r;
+            case SC_ScrollBarAddLine: {
+                int sz = horiz ? r.height() : r.width();
+                if (horiz) return QRect(r.right() - sz, r.y(), sz, r.height());
+                else return QRect(r.x(), r.bottom() - sz, r.width(), sz);
+            }
+            case SC_ScrollBarSubLine: {
+                int sz = horiz ? r.height() : r.width();
+                if (horiz) return QRect(r.x(), r.y(), sz, r.height());
+                else return QRect(r.x(), r.y(), r.width(), sz);
+            }
+            default: break;
+            }
+        }
+        break;
+    }
+    case CC_ComboBox: {
+        QRect r = opt->rect;
+        int fw = pixelMetric(PM_DefaultFrameWidth, opt, w);
+        switch (sc) {
+        case SC_ComboBoxFrame: return r;
+        case SC_ComboBoxEditField:
+            return QRect(r.x() + fw, r.y() + fw,
+                         r.width() - 2*fw - 20, r.height() - 2*fw);
+        case SC_ComboBoxArrow:
+            return QRect(r.right() - 20, r.y(), 20, r.height());
+        default: break;
+        }
+        break;
+    }
+    case CC_Slider: {
+        QRect r = opt->rect;
+        int handleSize = qMin(r.width(), r.height()) - 4;
+        switch (sc) {
+        case SC_SliderGroove: return QRect(r.x()+4, r.y(), r.width()-8, r.height());
+        case SC_SliderHandle:
+            return QRect(r.center().x() - handleSize/2,
+                         r.center().y() - handleSize/2,
+                         handleSize, handleSize);
+        default: break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return QProxyStyle::subControlRect(cc, opt, sc, w);
+}
+
 #endif
 
 // ========== Polish / UnPolish (Qt3 hover tracking) ==========
@@ -1017,6 +1042,18 @@ void LimeStyle::drawControlMask(ControlElement ce, QPainter *p,
                                 ControlElementFlags,
                                 const QRect &r, const QStyleOption &opt,
                                 const QWidget *widget) const {
+    Q_UNUSED(ce); Q_UNUSED(opt); Q_UNUSED(widget);
+    p->fillRect(r, Qt::color0);
+    p->setBrush(Qt::color1);
+    p->setPen(Qt::NoPen);
+    {
+        int w = r.width(), h = r.height();
+        int rad = (w < h ? w : h) / 6;
+        if (rad > 0)
+            p->drawRoundRect(r, rad * 200 / w, rad * 200 / h);
+        else
+            p->fillRect(r, Qt::color1);
+    }
 }
 
 QRect LimeStyle::subRect(SubRect r, const QStyleControlElementData &,
@@ -1094,10 +1131,15 @@ void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
 }
 
 void LimeStyle::drawComplexControlMask(ComplexControl cc, QPainter *p,
-                                       const QStyleControlElementData &,
-                                       const ControlElementFlags,
-                                       const QRect &r, const QStyleOption &opt,
-                                       const QWidget *widget) const {
+                                        const QStyleControlElementData &,
+                                        const ControlElementFlags,
+                                        const QRect &r, const QStyleOption &opt,
+                                        const QWidget *widget) const {
+    Q_UNUSED(cc); Q_UNUSED(opt); Q_UNUSED(widget);
+    p->fillRect(r, Qt::color0);
+    p->setBrush(Qt::color1);
+    p->setPen(Qt::NoPen);
+    p->drawRoundRect(r, 20, 20);
 }
 
 QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
@@ -1341,8 +1383,122 @@ QPixmap LimeStyle::stylePixmap(StylePixmap sp,
                                ControlElementFlags,
                                const QStyleOption &opt,
                                const QWidget *widget) const {
-    QPixmap pm(1, 1);
-    return pm;
+    Q_UNUSED(opt); Q_UNUSED(widget);
+    const StyleParams::Palette& pal = currentPalette();
+    QColor bg = pal.baseBg;
+    QColor fg = pal.textPrimary;
+    QColor accent = pal.accent;
+
+    auto makePm = [](int w, int h, QColor bg) -> QPixmap {
+        QPixmap pm(w, h);
+        pm.fill(bg);
+        return pm;
+    };
+
+    auto drawCircle = [](QPixmap &pm, int x, int y, int r, QColor c) {
+        QPainter p(&pm);
+        p.setBrush(c);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(x - r, y - r, r*2, r*2);
+    };
+
+    auto drawRect = [](QPixmap &pm, int x, int y, int w, int h, QColor c) {
+        QPainter p(&pm);
+        p.fillRect(x, y, w, h, c);
+    };
+
+    auto drawLine = [](QPixmap &pm, int x1, int y1, int x2, int y2, QColor c, int lw) {
+        QPainter p(&pm);
+        p.setPen(QPen(c, lw));
+        p.drawLine(x1, y1, x2, y2);
+    };
+
+    switch (sp) {
+    case SP_TitleBarNormalButton:
+    case SP_TitleBarMaxButton: {
+        QPixmap pm = makePm(16, 16, bg);
+        drawRect(pm, 2, 3, 12, 10, fg);
+        drawRect(pm, 3, 4, 10, 8, bg);
+        drawRect(pm, 2, 3, 12, 10, fg);
+        return pm;
+    }
+    case SP_TitleBarMinButton: {
+        QPixmap pm = makePm(16, 16, bg);
+        drawRect(pm, 2, 12, 12, 2, fg);
+        return pm;
+    }
+    case SP_TitleBarCloseButton: {
+        QPixmap pm = makePm(16, 16, bg);
+        drawLine(pm, 3, 3, 13, 13, fg, 2);
+        drawLine(pm, 13, 3, 3, 13, fg, 2);
+        return pm;
+    }
+    case SP_TitleBarShadeButton:
+    case SP_TitleBarUnshadeButton: {
+        QPixmap pm = makePm(16, 16, bg);
+        bool down = (sp == SP_TitleBarShadeButton);
+        int cy = down ? 10 : 6;
+        QPainter p(&pm);
+        p.setBrush(fg);
+        p.setPen(Qt::NoPen);
+        QPointArray pa(3);
+        pa.setPoint(0, 3, cy - 3);
+        pa.setPoint(1, 13, cy - 3);
+        pa.setPoint(2, 8, cy + 3);
+        p.drawPolygon(pa);
+        return pm;
+    }
+    case SP_DockWindowCloseButton: {
+        QPixmap pm = makePm(12, 12, bg);
+        drawLine(pm, 2, 2, 10, 10, fg, 2);
+        drawLine(pm, 10, 2, 2, 10, fg, 2);
+        return pm;
+    }
+    case SP_MessageBoxInformation: {
+        QPixmap pm = makePm(32, 32, bg);
+        drawCircle(pm, 16, 16, 14, accent);
+        QPainter p(&pm);
+        p.setPen(QPen(bg, 3));
+        p.drawText(QRect(8, 10, 16, 20), Qt::AlignCenter, "i");
+        return pm;
+    }
+    case SP_MessageBoxWarning: {
+        QPixmap pm = makePm(32, 32, bg);
+        QPainter p(&pm);
+        p.setBrush(QColor(255, 200, 0));
+        p.setPen(Qt::NoPen);
+        QPointArray pa(3);
+        pa.setPoint(0, 16, 2);
+        pa.setPoint(1, 2, 28);
+        pa.setPoint(2, 30, 28);
+        p.drawPolygon(pa);
+        p.setPen(QPen(bg, 3));
+        p.drawText(QRect(8, 12, 16, 16), Qt::AlignCenter, "!");
+        return pm;
+    }
+    case SP_MessageBoxCritical: {
+        QPixmap pm = makePm(32, 32, bg);
+        drawCircle(pm, 16, 16, 14, QColor(220, 40, 40));
+        QPainter p(&pm);
+        p.setPen(QPen(bg, 3));
+        p.drawLine(8, 8, 24, 24);
+        p.drawLine(24, 8, 8, 24);
+        return pm;
+    }
+    case SP_MessageBoxQuestion: {
+        QPixmap pm = makePm(32, 32, bg);
+        drawCircle(pm, 16, 16, 14, accent);
+        QPainter p(&pm);
+        p.setPen(QPen(bg, 3));
+        QFont f = p.font();
+        f.setBold(true);
+        p.setFont(f);
+        p.drawText(QRect(8, 10, 16, 20), Qt::AlignCenter, "?");
+        return pm;
+    }
+    default:
+        return QPixmap(1, 1);
+    }
 }
 
 #endif
