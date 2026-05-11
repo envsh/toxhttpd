@@ -5,6 +5,7 @@
 #include <qapplication.h>
 #include <qpalette.h>
 #include <qcolor.h>
+#include <qwidgetlist.h>
 #else
 #include <QApplication>
 #include <QPalette>
@@ -59,6 +60,14 @@ void ThemeManager::setStyle(const char* id, bool dark) {
     qpal.setColor(QPalette::Disabled, QColorGroup::ButtonText, pal.textDisabled);
 
     qApp->setPalette(qpal);
+    QWidgetList *list = QApplication::topLevelWidgets();
+    if (list) {
+        QWidget *w = list->first();
+        while (w) {
+            w->update();
+            w = list->next();
+        }
+    }
 #else
     QPalette qpal;
     qpal.setColor(QPalette::Window, pal.windowBg);

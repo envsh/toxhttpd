@@ -1,5 +1,6 @@
 #include "chatview.h"
 #include "LimeScrollBar.h"
+#include "LimeStyle.h"
 #ifdef EMOJI_RENDER_QT34
 #include "emojiutil.h"
 #endif
@@ -12,14 +13,6 @@
 #include <QWheelEvent>
 #include <QKeyEvent>
 #endif
-
-static const QColor kAvatarBg("#30363d");
-static const QColor kAvatarTextColor("#8b949e");
-static const QColor kBubbleBg("#21262d");
-static const QColor kBubbleTextColor("#c9d1d9");
-static const QColor kHeaderNameColor("#c9d1d9");
-static const QColor kHeaderTimeColor("#8b949e");
-static const QColor kWindowBg("#0d1117");
 
 ChatView::ChatView(QWidget* parent)
     : QWidget(parent)
@@ -177,12 +170,12 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
 
     if (msg.type == "self") {
         int ax = viewWidth - kPad - kAvatarSize;
-        p.setBrush(kAvatarBg);
+        p.setBrush(currentPalette().surfaceBg);
         p.setPen(Qt::NoPen);
         p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
 
         if (!msg.avatarText.isEmpty()) {
-            p.setPen(kAvatarTextColor);
+            p.setPen(currentPalette().textMuted);
             f.setPointSize(18);
             f.setBold(true);
             p.setFont(f);
@@ -197,13 +190,13 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
 
         f.setPointSize(11);
         p.setFont(f);
-        p.setPen(kHeaderNameColor);
+        p.setPen(currentPalette().textPrimary);
         int nameW = fm.width(msg.sender) + fm.width("  ");
         p.drawText(contentRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, msg.sender);
 
         f.setPointSize(10);
         p.setFont(f);
-        p.setPen(kHeaderTimeColor);
+        p.setPen(currentPalette().textMuted);
         p.drawText(contentRight - nameW - fm.width(msg.time) - kPad, y + kPad,
                    fm.width(msg.time), headerH, Qt::AlignRight | Qt::AlignVCenter, msg.time);
 
@@ -214,7 +207,7 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
         int bubbleH = msg.height - (kPad + headerH + kPad) - kMsgSpacing;
         QRect bubbleRect(bubbleX, bubbleY, bubbleW, bubbleH);
 
-        p.setBrush(kBubbleBg);
+        p.setBrush(currentPalette().baseBg);
         p.setPen(Qt::NoPen);
 #ifdef QT3_BUILD
         p.drawRoundRect(bubbleRect, 4, 4);
@@ -224,7 +217,7 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
 
         QRect textRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                        bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
-        p.setPen(kBubbleTextColor);
+        p.setPen(currentPalette().textPrimary);
         p.setFont(font());
 #ifdef EMOJI_RENDER_QT34
         EmojiRenderer::instance().drawText(p, textRect, msg.messageText);
@@ -237,12 +230,12 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
 #endif
     } else {
         int ax = kPad;
-        p.setBrush(kAvatarBg);
+        p.setBrush(currentPalette().surfaceBg);
         p.setPen(Qt::NoPen);
         p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
 
         if (!msg.avatarText.isEmpty()) {
-            p.setPen(kAvatarTextColor);
+            p.setPen(currentPalette().textMuted);
             f.setPointSize(18);
             f.setBold(true);
             p.setFont(f);
@@ -255,12 +248,12 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
 
         f.setPointSize(11);
         p.setFont(f);
-        p.setPen(kHeaderNameColor);
+        p.setPen(currentPalette().textPrimary);
         p.drawText(contentX, y + kPad, contentW, headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.sender);
 
         f.setPointSize(10);
         p.setFont(f);
-        p.setPen(kHeaderTimeColor);
+        p.setPen(currentPalette().textMuted);
         int timeX = contentX + fm.width(msg.sender) + kPad;
         p.drawText(timeX, y + kPad, contentW - (timeX - contentX), headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.time);
 
@@ -273,7 +266,7 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
         if (bubbleH < 30) bubbleH = 30;
         QRect bubbleRect(contentX, bubbleY, bubbleW, bubbleH);
 
-        p.setBrush(kBubbleBg);
+        p.setBrush(currentPalette().baseBg);
         p.setPen(Qt::NoPen);
 #ifdef QT3_BUILD
         p.drawRoundRect(bubbleRect, 4, 4);
@@ -283,7 +276,7 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
 
         QRect textRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                        bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
-        p.setPen(kBubbleTextColor);
+        p.setPen(currentPalette().textPrimary);
         p.setFont(font());
 #ifdef EMOJI_RENDER_QT34
         EmojiRenderer::instance().drawText(p, textRect, msg.messageText);
@@ -337,7 +330,7 @@ void ChatView::keyPressEvent(QKeyEvent* event) {
 void ChatView::paintEvent(QPaintEvent* event) {
     QPainter p(this);
     p.setClipRect(event->rect());
-    p.fillRect(event->rect(), kWindowBg);
+    p.fillRect(event->rect(), currentPalette().windowBg);
 
     int viewW = contentWidth();
     int vpH = height();

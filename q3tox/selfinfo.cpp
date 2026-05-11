@@ -3,6 +3,7 @@
 #include "editinfodialog.h"
 #include "restapi.h"
 #include "compat34.h"
+#include "LimeStyle.h"
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 12, 10);
@@ -82,7 +83,8 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     avatarLabel->setText(initial);
     
     if (!name.isEmpty()) {
-        avatarLabel->setPalette(QPalette(QColor("#1c3a5f")));
+        QPalette apal(currentPalette().accent, currentPalette().accentText);
+        avatarLabel->setPalette(apal);
     } else {
         avatarLabel->setPalette(QPalette());
     }
@@ -97,9 +99,11 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     statusBadge->setText(statusText);
     
     if (connStatus == "offline") {
-        statusBadge->setPalette(QPalette(QColor("#482121")));
+        QPalette opal(currentPalette().textMuted, currentPalette().textPrimary);
+        statusBadge->setPalette(opal);
     } else {
-        statusBadge->setPalette(QPalette(QColor("#1a4731")));
+        QPalette cpal(currentPalette().accent, currentPalette().accentText);
+        statusBadge->setPalette(cpal);
     }
 #ifndef QT3_BUILD
     statusBadge->setAutoFillBackground(true);

@@ -1,5 +1,13 @@
 #include "LimeStyle.h"
 #include "ThemeManager.h"
+#include <algorithm>
+
+#ifdef QT3_BUILD
+#include <qpushbutton.h>
+#include <qcheckbox.h>
+#include <qradiobutton.h>
+#include <qpopupmenu.h>
+#endif
 
 const StyleParams* g_activeParams = nullptr;
 
@@ -460,6 +468,7 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
         bool down = (flags & Style_Down);
         bool disabled = !(flags & Style_Enabled);
         QColor bg = buttonColor(pal, params, hover, down, disabled);
+        QColor fg = disabled ? pal.textDisabled : pal.textPrimary;
 
         p->save();
         p->setBrush(bg);
@@ -469,6 +478,10 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
             p->drawRoundRect(r, rad * 200 / r.width(), rad * 200 / r.height());
         else
             p->drawRect(r);
+        p->setPen(fg);
+        if (const QPushButton* btn = dynamic_cast<const QPushButton*>(widget)) {
+            p->drawText(r, Qt::AlignCenter, btn->text());
+        }
         p->restore();
         return;
     }
@@ -478,19 +491,50 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
             p->fillRect(r, pal.accent);
             p->restore();
         }
-        break;
+        if (const QMenuItem* mi = opt.menuItem()) {
+            p->save();
+            QRect textR(r.x() + 24, r.y(), r.width() - 28, r.height());
+            p->setPen((flags & Style_Selected) ? pal.accentText : pal.textPrimary);
+            p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, mi->text());
+            p->restore();
+        }
+        return;
     }
     case CE_CheckBox: {
+        int indW = pixelMetric(PM_IndicatorWidth, widget);
+        int indH = pixelMetric(PM_IndicatorHeight, widget);
+        QRect indR(r.x(), r.y() + (r.height() - indH) / 2, indW, indH);
         p->save();
-        p->fillRect(r, pal.surfaceBg);
+        p->setBrush(pal.baseBg);
+        p->setPen(pal.border);
+        p->drawRect(indR);
+        if (flags & Style_On) {
+            p->setPen(QPen(pal.textPrimary, 2));
+            int cx = indR.center().x(), cy = indR.center().y();
+            p->drawLine(cx - 3, cy, cx, cy + 3);
+            p->drawLine(cx, cy + 3, cx + 4, cy - 2);
+        }
         p->restore();
-        break;
+        if (const QCheckBox* cb = dynamic_cast<const QCheckBox*>(widget)) {
+            p->save();
+            p->setPen(pal.textPrimary);
+            QRect textR(r.x() + indW + 4, r.y(), r.width() - indW - 4, r.height());
+            p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, cb->text());
+            p->restore();
+        }
+        return;
     }
     case CE_MenuBarItem: {
         bool hover = (flags & Style_MouseOver);
         if (hover)
             p->fillRect(r, pal.hoverBg);
-        break;
+        p->save();
+        p->setPen(pal.textPrimary);
+        if (const QMenuItem* mi = opt.menuItem()) {
+            p->drawText(r, Qt::AlignCenter, mi->text());
+        }
+        p->restore();
+        return;
     }
     case CE_MenuBarEmptyArea: {
         p->fillRect(r, pal.windowBg);
@@ -498,9 +542,41 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
     }
     case CE_RadioButton:
     case CE_RadioButtonLabel: {
-        p->fillRect(r, pal.surfaceBg);
-        break;
+        int indW = pixelMetric(PM_ExclusiveIndicatorWidth, widget);
+        int indH = pixelMetric(PM_ExclusiveIndicatorHeight, widget);
+        QRect indR(r.x(), r.y() + (r.height() - indH) / 2, indW, indH);
+        p->save();
+        p->setBrush(pal.baseBg);
+        p->setPen(pal.border);
+        p->drawEllipse(indR);
+        if (flags & Style_On) {
+            p->setBrush(pal.accent);
+            p->setPen(Qt::NoPen);
+            int ds = std::min(indR.width(), indR.height()) / 3;
+            p->drawEllipse(indR.center().x() - ds/2, indR.center().y() - ds/2, ds, ds);
+        }
+        p->restore();
+        if (const QRadioButton* rb = dynamic_cast<const QRadioButton*>(widget)) {
+            p->save();
+            p->setPen(pal.textPrimary);
+            QRect textR(r.x() + indW + 4, r.y(), r.width() - indW - 4, r.height());
+            p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, rb->text());
+            p->restore();
+        }
+        return;
     }
+#ifndef QT3_BUILD
+    case CE_ComboBoxLabel: {
+        p->save();
+        p->setPen(pal.textPrimary);
+        if (const QComboBox* cb = dynamic_cast<const QComboBox*>(widget)) {
+            QRect textR(r.x() + 4, r.y(), r.width() - 24, r.height());
+            p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, cb->currentText());
+        }
+        p->restore();
+        return;
+    }
+#endif
     case CE_TabBarTab: {
         bool selected = (flags & Style_Selected);
         if (selected) {
@@ -992,7 +1068,7 @@ QRect LimeStyle::subControlRect(ComplexControl cc, const QStyleOptionComplex *op
     }
     case CC_Slider: {
         QRect r = opt->rect;
-        int handleSize = qMin(r.width(), r.height()) - 4;
+        int handleSize = std::min(r.width(), r.height()) - 4;
         switch (sc) {
         case SC_SliderGroove: return QRect(r.x()+4, r.y(), r.width()-8, r.height());
         case SC_SliderHandle:
