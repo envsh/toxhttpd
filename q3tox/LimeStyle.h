@@ -11,6 +11,7 @@
 #include <qscrollbar.h>
 #include <qcombobox.h>
 #include <qlineedit.h>
+#include <qprogressbar.h>
 #else
 #include <QApplication>
 #include <QPalette>

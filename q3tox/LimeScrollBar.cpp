@@ -25,7 +25,7 @@ static QColor blendScrollBarColor(const QColor& bg, const QColor& fg,
     return fg;
 }
 
-const float LimeScrollBar::kFadeStep = 0.05f;
+const float LimeScrollBar::kFadeStep = 30.0f / kFadeDuration; // 30ms * 10 = 300ms
 const float LimeScrollBar::kAlwaysFaintRatio = 0.4f;
 
 // ========== Constructor ==========
@@ -301,7 +301,12 @@ void LimeScrollBar::leaveEvent(QEvent* event) {
     QScrollBar::leaveEvent(event);
 }
 
-#ifndef QT3_BUILD
+#ifdef QT3_BUILD
+void LimeScrollBar::valueChange() {
+    QScrollBar::valueChange();
+    showTemporarily();
+}
+#else
 void LimeScrollBar::sliderChange(SliderChange change) {
     QScrollBar::sliderChange(change);
     if (change == SliderValueChange) {

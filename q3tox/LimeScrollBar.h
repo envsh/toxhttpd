@@ -26,12 +26,11 @@ public:
 
 protected:
     void paintEvent(QPaintEvent* event);
+    void enterEvent(QEvent* event);
+    void leaveEvent(QEvent* event);
 #ifdef QT3_BUILD
-    void enterEvent(QEvent* event);
-    void leaveEvent(QEvent* event);
+    void valueChange();
 #else
-    void enterEvent(QEvent* event);
-    void leaveEvent(QEvent* event);
     void sliderChange(SliderChange change);
 #endif
 

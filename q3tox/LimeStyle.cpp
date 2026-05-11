@@ -325,26 +325,6 @@ static int buttonRadiusFor(const StyleParams& params, const QRect& r) {
     return params.buttonRadius;
 }
 
-static QColor disabledBlend(const QColor& enabled, const QColor& disabled,
-                            CompositingMode mode) {
-    switch (mode) {
-        case AlphaBlend: {
-#ifdef QT3_BUILD
-            return lerpColor(disabled, enabled, 0.4f);
-#else
-            QColor c = enabled;
-            c.setAlphaF(0.4f);
-            return c;
-#endif
-        }
-        case ColorBlend:
-            return lerpColor(disabled, enabled, 0.4f);
-        case JumpCut:
-            return disabled;
-    }
-    return enabled;
-}
-
 // ========== Constructor ==========
 
 LimeStyle::LimeStyle() :
@@ -384,8 +364,14 @@ void LimeStyle::drawPrimitive(PrimitiveElement pe, QPainter *p, const QRect &r,
         p->restore();
         return;
     }
-    case PE_FocusRect:
+    case PE_FocusRect: {
+        p->save();
+        p->setPen(QPen(pal.borderFocus, 1, Qt::DotLine));
+        p->setBrush(Qt::NoBrush);
+        p->drawRect(r.x()+1, r.y()+1, r.width()-2, r.height()-2);
+        p->restore();
         return;
+    }
     default:
         break;
     }
@@ -421,8 +407,15 @@ void LimeStyle::drawPrimitive(PrimitiveElement pe, const QStyleOption *opt,
 #ifdef QT3_BUILD
     case PE_FocusRect:
 #endif
-    case PE_FrameFocusRect:
+    case PE_FrameFocusRect: {
+        p->save();
+        p->setPen(QPen(pal.borderFocus, 1, Qt::DotLine));
+        p->setBrush(Qt::NoBrush);
+        p->drawRect(QRect(opt->rect.x()+1, opt->rect.y()+1,
+                          opt->rect.width()-2, opt->rect.height()-2));
+        p->restore();
         return;
+    }
 #ifdef QT3_BUILD
     case PE_ButtonCommand:
 #endif
@@ -524,12 +517,22 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p, const QWidget *widge
         return;
     }
     case CE_ProgressBarContents: {
-        p->fillRect(r, pal.accent);
+        if (const QProgressBar* pb = dynamic_cast<const QProgressBar*>(widget)) {
+            int total = pb->totalSteps();
+            int cur = pb->progress();
+            if (total > 0) {
+                int fillW = r.width() * cur / total;
+                if (fillW > 0)
+                    p->fillRect(r.x(), r.y(), fillW, r.height(), pal.accent);
+            }
+        }
         return;
     }
     case CE_ProgressBarLabel: {
-        p->setPen(pal.textPrimary);
-        p->drawText(r, Qt::AlignCenter, QString());
+        if (const QProgressBar* pb = dynamic_cast<const QProgressBar*>(widget)) {
+            p->setPen(pal.textPrimary);
+            p->drawText(r, Qt::AlignCenter, pb->progressString());
+        }
         return;
     }
     default:
@@ -635,6 +638,32 @@ void LimeStyle::drawControl(ControlElement ce, const QStyleOption *opt,
             return;
         }
         break;
+    }
+    case CE_ProgressBarGroove: {
+        p->fillRect(opt->rect, pal.baseBg);
+        return;
+    }
+    case CE_ProgressBarContents: {
+        if (const QStyleOptionProgressBar* pb =
+            qstyleoption_cast<const QStyleOptionProgressBar*>(opt)) {
+            int total = pb->maximum - pb->minimum;
+            int cur = pb->progress - pb->minimum;
+            if (total > 0) {
+                int fillW = opt->rect.width() * cur / total;
+                if (fillW > 0)
+                    p->fillRect(opt->rect.x(), opt->rect.y(),
+                                fillW, opt->rect.height(), pal.accent);
+            }
+        }
+        return;
+    }
+    case CE_ProgressBarLabel: {
+        if (const QStyleOptionProgressBar* pb =
+            qstyleoption_cast<const QStyleOptionProgressBar*>(opt)) {
+            p->setPen(pal.textPrimary);
+            p->drawText(opt->rect, Qt::AlignCenter, pb->text);
+        }
+        return;
     }
     default:
         break;
