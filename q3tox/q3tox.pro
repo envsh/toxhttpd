@@ -5,24 +5,27 @@ CONFIG += moc
 
 SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
-             cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp ThemeManager.cpp \
-             friendinfodialog.cpp placeholderlineedit.cpp apilog.cpp memberlistdialog.cpp \
-             appsetup.cpp compat34.cpp emojiutil.cpp emojiwidgets.cpp emojiitems.cpp messageinput.cpp \
-             emoji_picker.cpp
+             cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
+             friendinfodialog.cpp memberlistdialog.cpp \
+             messageinput.cpp
 
 HEADERS = mainwindow.h restapi.h eventpoller.h \
             chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
-            editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h ThemeManager.h compat34.h \
-            friendinfodialog.h placeholderlineedit.h apilog.h memberlistdialog.h \
-            appsetup.h appsetup_c.h emojiutil.h emojiwidgets.h emojiitems.h messageinput.h \
-            emoji_picker.h
-
+            editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
+            friendinfodialog.h memberlistdialog.h \
+            messageinput.h
+            
 # LimeStyle theme system
 LIME_STYLE_H = StyleParams.h LimeStyle.h LimeScrollBar.h
 LIME_STYLE_CPP = StyleParams.cpp LimeStyle.cpp LimeScrollBar.cpp
 
-HEADERS += $$LIME_STYLE_H
-SOURCES += $$LIME_STYLE_CPP
+QTCOMP_CPP = apilog.cpp appsetup.cpp compat34.cpp emojiutil.cpp emojiwidgets.cpp emojiitems.cpp \
+			emoji_picker.cpp ThemeManager.cpp placeholderlineedit.cpp
+QTCOMP_HDR = apilog.h appsetup.h appsetup_c.h compat34.h emojiutil.h emojiwidgets.h emojiitems.h \
+			emoji_picker.h ThemeManager.h placeholderlineedit.h
+
+HEADERS += $$LIME_STYLE_H $$QTCOMP_HDR
+SOURCES += $$LIME_STYLE_CPP $$QTCOMP_CPP
 
 # moc 处理
 MOC_DIR = .
@@ -43,6 +46,23 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
     # Qt3: QT_VERSION 为空
     message("Building for Qt3 - adding QT3_BUILD")
     DEFINES += QT3_BUILD
+    # *nix/bsd/mac/wsl
+    QMAKE_EXE = $$system(ps -p $PPID -o args= | head -1 | awk '{print $1}')
+    QTDIR_AUTO = $$system(dirname $(dirname $$QMAKE_EXE))
+    # message("qmake path: $$QMAKE_QMAKE , $$QMAKE_EXE, $$QTDIR_AUTO")
+    isEmpty(QTDIR) {
+		message("Auto QTDIR ... $$QTDIR_AUTO")
+		# QMAKE_EXTRA_VARIABLES += QTDIR # not works
+		QTDIR = $$QTDIR_AUTO # var not env
+		# override Makefile prefixed with $(QTDIR)
+		INCLUDEPATH += $$QTDIR/include
+		QMAKE_INCDIR_QT    = $$QTDIR/include
+		QMAKE_LIBDIR_QT    = $$QTDIR/lib
+		QMAKE_MOC          = $$QTDIR/bin/moc
+		QMAKE_UIC          = $$QTDIR/bin/uic
+		QMAKE_QMAKE        = $$QMAKE_EXE
+		QMAKE_LRELEASE     = $$QTDIR/bin/lrelease # no works
+    }
 }
 
 # 包含路径
@@ -69,12 +89,6 @@ DEFINES += EMOJI_RENDER_QT34
 isEmpty(QT_VERSION) {
     # Qt3: 手动指定库
     # LIBS += $$(QMAKE_LIBS_QT_THREAD) -lqt-mt
-    # override Makefile prefixed with $(QTDIR)
-    INCLUDEPATH += $$(QTDIR)/include
-    QMAKE_INCDIR_QT    = $$(QTDIR)/include
-    QMAKE_LIBDIR_QT    = $$(QTDIR)/lib
-    QMAKE_MOC          = $$(QTDIR)/bin/moc
-    QMAKE_UIC          = $$(QTDIR)/bin/uic
 } else {
     # Qt4: Qt 库由 qmake 自动处理
     message("Linking with Qt4 libraries")
