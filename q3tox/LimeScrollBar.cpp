@@ -194,7 +194,7 @@ void LimeScrollBar::paintEvent(QPaintEvent* event) {
 #ifdef QT3_BUILD
     p.eraseRect(event->rect());
 #else
-    p.fillRect(event->rect(), QColor(0, 0, 0, 0));
+    p.fillRect(event->rect(), palette().color(backgroundRole()));
 #endif
 
     if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
