@@ -42,8 +42,8 @@ int main(int argc, char* argv[]) {
 
     QtappSetup::setup(app);
         
-    ThemeManager::setStyle("qtFusion", true);
     app.setStyle(new LimeStyle);
+    ThemeManager::setStyle("qtFusion", true);
     
     // 读取保存的语言设置
     QString savedLang = loadSavedLanguage();

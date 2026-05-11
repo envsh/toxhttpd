@@ -1209,12 +1209,24 @@ void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
         QColor fg = disabled ? pal.textDisabled : pal.textPrimary;
 
         p->save();
-        p->setBrush(bg);
-        p->setPen(pal.border);
         int rad = buttonRadiusFor(params, r);
+
+        p->setBrush(bg);
+        p->setPen(Qt::NoPen);
         p->drawRoundRect(r, rad * 200 / r.width(), rad * 200 / r.height());
 
-        QRect arrowRect(r.right() - 20, r.y(), 20, r.height());
+        QRect editRect = querySubControlMetrics(CC_ComboBox, ceData, elementFlags,
+                                                 SC_ComboBoxEditField, opt, widget);
+        p->setBrush(pal.baseBg);
+        p->setPen(Qt::NoPen);
+        p->drawRect(editRect);
+
+        p->setPen(pal.border);
+        p->setBrush(Qt::NoBrush);
+        p->drawRoundRect(r, rad * 200 / r.width(), rad * 200 / r.height());
+
+        QRect arrowRect = querySubControlMetrics(CC_ComboBox, ceData, elementFlags,
+                                                  SC_ComboBoxArrow, opt, widget);
         QString arrow = (active & SC_ComboBoxArrow)
                         ? QString(QChar(0x25B2)) : QString(QChar(0x25BC));
         p->setPen(fg);
