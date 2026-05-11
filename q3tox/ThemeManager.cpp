@@ -6,6 +6,7 @@
 #include <qpalette.h>
 #include <qcolor.h>
 #include <qwidgetlist.h>
+#include <qobjectlist.h>
 #else
 #include <QApplication>
 #include <QPalette>
@@ -14,6 +15,22 @@
 
 bool ThemeManager::m_darkMode = false;
 const char* ThemeManager::m_styleId = "qtFusion";
+
+#ifdef QT3_BUILD
+static void applyPaletteChildren(QWidget *parent, const QPalette &qpal) {
+    QObjectList *children = const_cast<QObjectList*>(parent->children());
+    if (!children) return;
+    QObject *obj = children->first();
+    while (obj) {
+        if (obj->isWidgetType()) {
+            QWidget *w = static_cast<QWidget*>(obj);
+            w->setPalette(qpal);
+            applyPaletteChildren(w, qpal);
+        }
+        obj = children->next();
+    }
+}
+#endif
 
 void ThemeManager::setDarkMode(bool dark) {
     m_darkMode = dark;
@@ -60,12 +77,16 @@ void ThemeManager::setStyle(const char* id, bool dark) {
     qpal.setColor(QPalette::Disabled, QColorGroup::ButtonText, pal.textDisabled);
 
     qApp->setPalette(qpal);
-    QWidgetList *list = QApplication::topLevelWidgets();
-    if (list) {
-        QWidget *w = list->first();
-        while (w) {
-            w->update();
-            w = list->next();
+    {
+        QWidgetList *list = QApplication::topLevelWidgets();
+        if (list) {
+            QWidget *w = list->first();
+            while (w) {
+                w->setPalette(qpal);
+                applyPaletteChildren(w, qpal);
+                w->update();
+                w = list->next();
+            }
         }
     }
 #else

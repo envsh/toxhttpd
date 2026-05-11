@@ -7,6 +7,7 @@
 #include <qapplication.h>
 #include <qpalette.h>
 #include <qstyle.h>
+#include <qcommonstyle.h>
 #include <qpainter.h>
 #include <qscrollbar.h>
 #include <qcombobox.h>
@@ -31,7 +32,7 @@ StyleParams makeCurrentParams();
 
 #ifdef QT3_BUILD
 
-class LimeStyle : public QStyle {
+class LimeStyle : public QCommonStyle {
     // no Q_OBJECT - Qt3 3.5.0 moc can't handle #ifdef inside class body
 public:
     LimeStyle();
