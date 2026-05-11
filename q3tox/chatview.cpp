@@ -1,4 +1,5 @@
 #include "chatview.h"
+#include "LimeScrollBar.h"
 #ifdef EMOJI_RENDER_QT34
 #include "emojiutil.h"
 #endif
@@ -6,10 +7,8 @@
 
 #ifdef QT3_BUILD
 #include <qpainter.h>
-#include <qscrollbar.h>
 #else
 #include <QPainter>
-#include <QScrollBar>
 #include <QWheelEvent>
 #include <QKeyEvent>
 #endif
@@ -28,7 +27,7 @@ ChatView::ChatView(QWidget* parent)
     m_totalHeight = 0;
     m_scrollPos = 0;
 
-    m_vScrollBar = new QScrollBar(Qt::Vertical, this);
+    m_vScrollBar = new LimeScrollBar(Qt::Vertical, this);
 #ifdef QT3_BUILD
     m_vScrollBar->setSteps(10, 50);
 #else
@@ -362,5 +361,6 @@ void ChatView::resizeEvent(QResizeEvent* event) {
 
 void ChatView::onScrollChanged(int value) {
     m_scrollPos = value;
+    m_vScrollBar->showTemporarily();
     update();
 }

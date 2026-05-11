@@ -16,7 +16,7 @@ struct ChatMessage {
     ChatMessage() : height(0) {}
 };
 
-class QScrollBar;
+class LimeScrollBar;
 
 class ChatView : public QWidget {
     Q_OBJECT
@@ -45,7 +45,7 @@ private:
     std::vector<ChatMessage> m_messages;
     int m_totalHeight;
     int m_scrollPos;
-    QScrollBar* m_vScrollBar;
+    LimeScrollBar* m_vScrollBar;
 
     static const int kAvatarSize = 48;
     static const int kPad = 8;

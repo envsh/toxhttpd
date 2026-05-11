@@ -6,6 +6,7 @@
 #include "messageinput.h"
 #include "emojiwidgets.h"
 #include "emoji_picker.h"
+#include "StyleParams.h"
 
 class ChatWidget : public QWidget {
     Q_OBJECT
@@ -28,6 +29,7 @@ private slots:
     void onSendClicked();
     void onLanguageChanged(int index);
     void onThemeToggled(bool checked);
+    void onStyleChanged(int index);
     void onEmojiClicked();
     void onEmojiInsert(const QString& emoji);
     void onFileClicked();
@@ -36,6 +38,7 @@ private slots:
 private:
     QLabel* headerText;
     QComboBox* langSelector;
+    QComboBox* m_styleSelector;
     QCheckBox* themeCheckBox;
     ChatView* messageArea;
     MessageInput* inputEdit;

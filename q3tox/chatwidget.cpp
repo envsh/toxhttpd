@@ -30,6 +30,29 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
     headerLayout->addWidget(langSelector);
 
+    // 风格选择器
+    m_styleSelector = new QComboBox(this);
+    {
+        const auto& styles = StyleParams::registeredStyles();
+#ifdef QT3_BUILD
+        for (int i = 0; i < (int)styles.size(); ++i)
+            m_styleSelector->insertItem(_(styles[i].displayKey), i);
+        int cur = 0;
+        for (int i = 0; i < (int)styles.size(); ++i)
+            if (QString(styles[i].id) == QString(ThemeManager::styleId())) { cur = i; break; }
+        m_styleSelector->setCurrentItem(cur);
+#else
+        for (int i = 0; i < (int)styles.size(); ++i)
+            m_styleSelector->insertItem(i, _(styles[i].displayKey));
+        int cur = 0;
+        for (int i = 0; i < (int)styles.size(); ++i)
+            if (QString(styles[i].id) == QString(ThemeManager::styleId())) { cur = i; break; }
+        m_styleSelector->setCurrentIndex(cur);
+#endif
+    }
+    connect(m_styleSelector, SIGNAL(activated(int)), this, SLOT(onStyleChanged(int)));
+    headerLayout->addWidget(m_styleSelector);
+
     // 主题切换复选框
     themeCheckBox = new QCheckBox(_("theme_dark"), this);
     connect(themeCheckBox, SIGNAL(toggled(bool)), this, SLOT(onThemeToggled(bool)));
@@ -143,6 +166,18 @@ void ChatWidget::retranslateUi() {
     // 更新主题复选框文本
     if (themeCheckBox) themeCheckBox->setText(_("theme_dark"));
     
+    // 更新风格选择器文字
+    if (m_styleSelector) {
+        const auto& styles = StyleParams::registeredStyles();
+        for (int i = 0; i < (int)styles.size(); ++i) {
+#ifdef QT3_BUILD
+            m_styleSelector->changeItem(_(styles[i].displayKey), i);
+#else
+            m_styleSelector->setItemText(i, _(styles[i].displayKey));
+#endif
+        }
+    }
+    
     // 更新输入框 placeholder
     if (inputEdit) {
     inputEdit->setPlaceholderText(_("placeholders.type_message"));
@@ -163,6 +198,12 @@ void ChatWidget::onThemeToggled(bool checked) {
     // TODO: 实现主题切换逻辑
     qWarning("Theme toggled: %d", checked);
     ThemeManager::applyTheme(checked);
+}
+
+void ChatWidget::onStyleChanged(int index) {
+    const auto& styles = StyleParams::registeredStyles();
+    if (index >= 0 && index < (int)styles.size())
+        ThemeManager::setStyle(styles[index].id, ThemeManager::isDarkMode());
 }
 
 void ChatWidget::onEmojiClicked() {
