@@ -841,12 +841,63 @@ void LimeStyle::drawComplexControl(ComplexControl cc,
 
 int LimeStyle::pixelMetric(PixelMetric m, const QWidget *w) const {
     const StyleParams& params = makeCurrentParams();
+    int sbw = params.scrollbarWidth;
 
     switch (m) {
-    case PM_ScrollBarExtent: return params.scrollbarWidth;
-    case PM_ButtonMargin:    return 6;
-    case PM_DefaultFrameWidth: return 1;
+    case PM_ScrollBarExtent:      return sbw;
+    case PM_ScrollBarSliderMin:   return 16;
+    case PM_ButtonMargin:         return 6;
+    case PM_DefaultFrameWidth:    return 1;
     case PM_DockWindowHandleExtent: return 14;
+    case PM_IndicatorWidth:
+    case PM_IndicatorHeight:      return 14;
+    case PM_ExclusiveIndicatorWidth:
+    case PM_ExclusiveIndicatorHeight: return 14;
+    case PM_ButtonDefaultIndicator: return 0;
+    case PM_MenuButtonIndicator:  return 0;
+    case PM_ButtonShiftHorizontal:
+    case PM_ButtonShiftVertical:  return 0;
+    case PM_SpinBoxFrameWidth:    return 2;
+    case PM_SliderThickness:      return 20;
+    case PM_SliderControlThickness: return 20;
+    case PM_SliderLength:         return 20;
+    case PM_TabBarTabOverlap:     return 2;
+    case PM_TabBarTabHSpace:      return 12;
+    case PM_TabBarTabVSpace:      return 4;
+    case PM_TabBarBaseHeight:     return 0;
+    case PM_TabBarBaseOverlap:    return 0;
+    case PM_ProgressBarChunkWidth: return 8;
+    case PM_SplitterWidth:        return 6;
+    case PM_TitleBarHeight:       return 20;
+    case PM_ArrowSize:            return 12;
+    case PM_MenuBarFrameWidth:    return 2;
+    case PM_MenuBarItemSpacing:   return 0;
+    case PM_HeaderMargin:         return 4;
+    case PM_HeaderMarkSize:       return 12;
+    case PM_HeaderGripMargin:     return 2;
+    case PM_DockWindowSeparatorExtent: return 6;
+    case PM_DockWindowFrameWidth: return 1;
+    case PM_MDIFrameWidth: return 2;
+    case PM_MDIMinimizedWidth: return 200;
+    case PM_MaximumDragDistance:  return -1;
+    case PM_ToolBarItemSpacing:   return 0;
+    case PM_SliderSpaceAvailable: return 0;
+    case PM_SliderTickmarkOffset: return 0;
+    case PM_PopupMenuScrollerHeight: return 20;
+    case PM_CheckListButtonSize:  return 16;
+    case PM_CheckListControllerSize: return 16;
+    case PM_MenuIconIndicatorFrameHBorder:
+    case PM_MenuIconIndicatorFrameVBorder:
+    case PM_MenuIndicatorFrameHBorder:
+    case PM_MenuIndicatorFrameVBorder: return 2;
+    case PM_PopupMenuFrameHorizontalExtra:
+    case PM_PopupMenuFrameVerticalExtra: return 0;
+    case PM_TabBarScrollButtonWidth: return 16;
+    case PM_TabBarTabShiftHorizontal:
+    case PM_TabBarTabShiftVertical: return 0;
+    case PM_DialogButtonsSeparator: return 6;
+    case PM_DialogButtonsButtonWidth: return 80;
+    case PM_DialogButtonsButtonHeight: return 30;
     default: return 0;
     }
 }
@@ -907,6 +958,32 @@ int LimeStyle::styleHint(StyleHint sh, const QStyleOption *opt,
 
 #endif
 
+// ========== Polish / UnPolish (Qt3 hover tracking) ==========
+
+#ifdef QT3_BUILD
+
+void LimeStyle::polish(QWidget *w) {
+    w->installEventFilter(this);
+    w->setMouseTracking(true);
+    QStyle::polish(w);
+}
+
+void LimeStyle::unPolish(QWidget *w) {
+    w->removeEventFilter(this);
+    QStyle::unPolish(w);
+}
+
+bool LimeStyle::eventFilter(QObject *o, QEvent *e) {
+    if (e->type() == QEvent::Enter || e->type() == QEvent::Leave) {
+        if (o->isWidgetType()) {
+            static_cast<QWidget*>(o)->update();
+        }
+    }
+    return QStyle::eventFilter(o, e);
+}
+
+#endif
+
 // ========== New API pure virtuals (forked Qt3 only) ==========
 // These forward to old API overloads to avoid passing potentially null
 // QStyleControlElementData references during early widget construction.
@@ -945,7 +1022,65 @@ void LimeStyle::drawControlMask(ControlElement ce, QPainter *p,
 QRect LimeStyle::subRect(SubRect r, const QStyleControlElementData &,
                          const ControlElementFlags,
                          const QWidget *widget) const {
-    return QRect();
+    if (!widget) return QRect();
+    QRect wr = widget->rect();
+    int margin = pixelMetric(PM_ButtonMargin, widget);
+    int indW = pixelMetric(PM_IndicatorWidth, widget);
+    int indH = pixelMetric(PM_IndicatorHeight, widget);
+    int exW = pixelMetric(PM_ExclusiveIndicatorWidth, widget);
+    int fw = pixelMetric(PM_DefaultFrameWidth, widget);
+
+    switch (r) {
+    case SR_PushButtonContents:
+    case SR_PushButtonFocusRect:
+        return QRect(wr.x() + margin, wr.y() + margin,
+                     wr.width() - 2*margin, wr.height() - 2*margin);
+    case SR_CheckBoxIndicator:
+    case SR_RadioButtonIndicator:
+        return QRect(wr.x(), wr.y() + (wr.height() - indH) / 2,
+                     indW, indH);
+    case SR_CheckBoxContents:
+    case SR_RadioButtonContents:
+        return QRect(wr.x() + indW + 4, wr.y(),
+                     wr.width() - indW - 4, wr.height());
+    case SR_CheckBoxFocusRect:
+    case SR_RadioButtonFocusRect:
+        return wr;
+    case SR_ComboBoxFocusRect:
+        return QRect(wr.x() + fw, wr.y() + fw,
+                     wr.width() - 2*fw - 20, wr.height() - 2*fw);
+    case SR_SliderFocusRect:
+        return wr;
+    case SR_ProgressBarGroove:
+        return wr;
+    case SR_ProgressBarContents:
+        return QRect(wr.x() + fw, wr.y() + fw,
+                     wr.width() - 2*fw, wr.height() - 2*fw);
+    case SR_ProgressBarLabel:
+        return wr;
+    case SR_ToolButtonContents:
+        return QRect(wr.x() + 2, wr.y() + 2,
+                     wr.width() - 4, wr.height() - 4);
+    case SR_ToolBoxTabContents:
+        return wr;
+    case SR_DockWindowHandleRect:
+        return QRect(wr.x(), wr.y(), 14, wr.height());
+    case SR_DialogButtonAbort:
+    case SR_DialogButtonAccept:
+    case SR_DialogButtonAll:
+    case SR_DialogButtonApply:
+    case SR_DialogButtonHelp:
+    case SR_DialogButtonIgnore:
+    case SR_DialogButtonReject:
+    case SR_DialogButtonRetry:
+    case SR_DialogButtonCustom: {
+        int bw = pixelMetric(PM_DialogButtonsButtonWidth, widget);
+        int bh = pixelMetric(PM_DialogButtonsButtonHeight, widget);
+        return QRect(0, 0, bw, bh);
+    }
+    default:
+        return QRect();
+    }
 }
 
 void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
@@ -970,7 +1105,95 @@ QRect LimeStyle::querySubControlMetrics(ComplexControl cc,
                                         ControlElementFlags,
                                         SubControl sc, const QStyleOption &opt,
                                         const QWidget *widget) const {
-    return QRect();
+    if (!widget) return QRect();
+    const StyleParams& params = makeCurrentParams();
+    int sbw = params.scrollbarWidth;
+
+    switch (cc) {
+    case CC_ScrollBar: {
+        QRect r = opt.rect();
+        const QScrollBar *sb = static_cast<const QScrollBar*>(widget);
+        int min = sb->minValue();
+        int max = sb->maxValue();
+        int val = sb->value();
+        int page = sb->pageStep();
+        bool horiz = sb->orientation() == Qt::Horizontal;
+        int viewSize = horiz ? r.width() : r.height();
+        int sliderSize = std::max(16, viewSize * viewSize / (viewSize + (max - min)));
+        int avail = viewSize - sliderSize;
+        int pos = (max > min) ? (val - min) * avail / (max - min) : 0;
+
+        switch (sc) {
+        case SC_ScrollBarSlider:
+            if (horiz)
+                return QRect(r.x() + pos, r.y(), sliderSize, r.height());
+            else
+                return QRect(r.x(), r.y() + pos, r.width(), sliderSize);
+        case SC_ScrollBarGroove:
+            return r;
+        case SC_ScrollBarAddLine: {
+            int sz = horiz ? r.height() : r.width();
+            if (horiz) return QRect(r.right() - sz, r.y(), sz, r.height());
+            else return QRect(r.x(), r.bottom() - sz, r.width(), sz);
+        }
+        case SC_ScrollBarSubLine: {
+            int sz = horiz ? r.height() : r.width();
+            if (horiz) return QRect(r.x(), r.y(), sz, r.height());
+            else return QRect(r.x(), r.y(), r.width(), sz);
+        }
+        case SC_ScrollBarAddPage:
+            if (horiz) return QRect(r.x() + pos + sliderSize, r.y(), viewSize - pos - sliderSize, r.height());
+            else return QRect(r.x(), r.y() + pos + sliderSize, r.width(), viewSize - pos - sliderSize);
+        case SC_ScrollBarSubPage:
+            if (horiz) return QRect(r.x(), r.y(), pos, r.height());
+            else return QRect(r.x(), r.y(), r.width(), pos);
+        default: return QRect();
+        }
+    }
+    case CC_ComboBox: {
+        QRect r = opt.rect();
+        int fw = pixelMetric(PM_DefaultFrameWidth, widget);
+        switch (sc) {
+        case SC_ComboBoxFrame: return r;
+        case SC_ComboBoxEditField:
+            return QRect(r.x() + fw, r.y() + fw,
+                         r.width() - 2*fw - 20, r.height() - 2*fw);
+        case SC_ComboBoxArrow:
+            return QRect(r.right() - 20, r.y(), 20, r.height());
+        default: return QRect();
+        }
+    }
+    case CC_Slider: {
+        QRect r = opt.rect();
+        int handleSize = (r.width() < r.height() ? r.width() : r.height()) - 4;
+        switch (sc) {
+        case SC_SliderGroove: return QRect(r.x()+4, r.y(), r.width()-8, r.height());
+        case SC_SliderHandle:
+            return QRect(r.center().x() - handleSize/2,
+                         r.center().y() - handleSize/2,
+                         handleSize, handleSize);
+        default: return QRect();
+        }
+    }
+    case CC_SpinWidget: {
+        QRect r = opt.rect();
+        int btnH = r.height() / 2;
+        switch (sc) {
+        case SC_SpinWidgetFrame: return r;
+        case SC_SpinWidgetEditField:
+            return QRect(r.x()+2, r.y()+2, r.width()-22, r.height()-4);
+        case SC_SpinWidgetUp:
+            return QRect(r.right()-20, r.y(), 20, btnH);
+        case SC_SpinWidgetDown:
+            return QRect(r.right()-20, r.y()+btnH, 20, r.height()-btnH);
+        case SC_SpinWidgetButtonField:
+            return QRect(r.right()-20, r.y(), 20, r.height());
+        default: return QRect();
+        }
+    }
+    default:
+        return QRect();
+    }
 }
 
 QStyle::SubControl LimeStyle::querySubControl(ComplexControl cc,
@@ -979,7 +1202,60 @@ QStyle::SubControl LimeStyle::querySubControl(ComplexControl cc,
                                       const QPoint &pos,
                                       const QStyleOption &opt,
                                       const QWidget *widget) const {
-    return SC_None;
+    if (!widget) return SC_None;
+
+    switch (cc) {
+    case CC_ScrollBar: {
+        QRect sliderR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                               ControlElementFlags(0),
+                                               SC_ScrollBarSlider, opt, widget);
+        if (sliderR.contains(pos)) return SC_ScrollBarSlider;
+        QRect addLineR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                                ControlElementFlags(0),
+                                                SC_ScrollBarAddLine, opt, widget);
+        if (addLineR.contains(pos)) return SC_ScrollBarAddLine;
+        QRect subLineR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                                ControlElementFlags(0),
+                                                SC_ScrollBarSubLine, opt, widget);
+        if (subLineR.contains(pos)) return SC_ScrollBarSubLine;
+        QRect addPageR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                                ControlElementFlags(0),
+                                                SC_ScrollBarAddPage, opt, widget);
+        if (addPageR.contains(pos)) return SC_ScrollBarAddPage;
+        QRect subPageR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                                ControlElementFlags(0),
+                                                SC_ScrollBarSubPage, opt, widget);
+        if (subPageR.contains(pos)) return SC_ScrollBarSubPage;
+        return SC_ScrollBarGroove;
+    }
+    case CC_ComboBox: {
+        QRect arrowR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                              ControlElementFlags(0),
+                                              SC_ComboBoxArrow, opt, widget);
+        if (arrowR.contains(pos)) return SC_ComboBoxArrow;
+        return SC_ComboBoxEditField;
+    }
+    case CC_Slider: {
+        QRect handleR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                               ControlElementFlags(0),
+                                               SC_SliderHandle, opt, widget);
+        if (handleR.contains(pos)) return SC_SliderHandle;
+        return SC_SliderGroove;
+    }
+    case CC_SpinWidget: {
+        QRect upR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                           ControlElementFlags(0),
+                                           SC_SpinWidgetUp, opt, widget);
+        if (upR.contains(pos)) return SC_SpinWidgetUp;
+        QRect downR = querySubControlMetrics(cc, QStyleControlElementData(),
+                                             ControlElementFlags(0),
+                                             SC_SpinWidgetDown, opt, widget);
+        if (downR.contains(pos)) return SC_SpinWidgetDown;
+        return SC_SpinWidgetEditField;
+    }
+    default:
+        return SC_None;
+    }
 }
 
 int LimeStyle::pixelMetric(PixelMetric m,
@@ -995,7 +1271,60 @@ QSize LimeStyle::sizeFromContents(ContentsType ct,
                                   const QSize &contentsSize,
                                   const QStyleOption &opt,
                                   const QWidget *widget) const {
-    return contentsSize;
+    int margin = pixelMetric(PM_ButtonMargin, widget);
+    int fw = pixelMetric(PM_DefaultFrameWidth, widget);
+    int indW = pixelMetric(PM_IndicatorWidth, widget);
+
+    switch (ct) {
+    case CT_PushButton:
+        return QSize(contentsSize.width() + 2*margin,
+                     contentsSize.height() + 2*margin);
+    case CT_CheckBox:
+        return QSize(contentsSize.width() + indW + 8,
+                     contentsSize.height() + 4);
+    case CT_RadioButton:
+        return QSize(contentsSize.width() + indW + 8,
+                     contentsSize.height() + 4);
+    case CT_ComboBox: {
+        int arrowW = 20;
+        return QSize(contentsSize.width() + 2*fw + arrowW + 4,
+                     contentsSize.height() + 2*fw + 4);
+    }
+    case CT_LineEdit:
+        return QSize(contentsSize.width() + 2*fw,
+                     contentsSize.height() + 2*fw);
+    case CT_MenuBar:
+        return QSize(contentsSize.width() + 2*fw,
+                     contentsSize.height() + 2*fw);
+    case CT_Slider:
+        return QSize(contentsSize.width() + pixelMetric(PM_SliderThickness, widget),
+                     contentsSize.height() + pixelMetric(PM_SliderThickness, widget));
+    case CT_TabBarTab:
+        return QSize(contentsSize.width() + pixelMetric(PM_TabBarTabHSpace, widget),
+                     contentsSize.height() + pixelMetric(PM_TabBarTabVSpace, widget));
+    case CT_ProgressBar:
+        return QSize(contentsSize.width() + 2*fw,
+                     contentsSize.height() + 2*fw);
+    case CT_Splitter:
+        return QSize(pixelMetric(PM_SplitterWidth, widget),
+                     pixelMetric(PM_SplitterWidth, widget));
+    case CT_SpinBox:
+        return QSize(contentsSize.width() + 2*20,
+                     contentsSize.height() + 2*fw);
+    case CT_PopupMenuItem: {
+        int h = contentsSize.height() + 4;
+        return QSize(contentsSize.width(), h < 20 ? 20 : h);
+    }
+    case CT_CustomBase:
+    case CT_DockWindow:
+    case CT_Header:
+    case CT_TabWidget:
+    case CT_ToolButton:
+    case CT_SizeGrip:
+    case CT_DialogButtons:
+    default:
+        return contentsSize;
+    }
 }
 
 int LimeStyle::styleHint(StyleHint sh,

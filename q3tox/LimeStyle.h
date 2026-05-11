@@ -54,6 +54,10 @@ public:
     int styleHint(StyleHint sh, const QStyleOption &opt = QStyleOption(),
                   const QWidget *w = 0, QStyleHintReturn *hret = 0) const;
 
+    void polish(QWidget *w);
+    void unPolish(QWidget *w);
+    bool eventFilter(QObject *o, QEvent *e);
+
     // New API pure virtuals (forked Qt3 with QStyleControlElementData)
     void polishPopupMenu(const QStyleControlElementData &ceData,
                          ControlElementFlags elementFlags, void *ptr);
