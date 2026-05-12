@@ -107,13 +107,13 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
 
     // Emoji picker
     emojiPicker = new EmojiPicker(this);
-    connect(emojiPicker, SIGNAL(emojiSelected(QString)), this, SLOT(onEmojiInsert(QString)));
+    connect(emojiPicker, SIGNAL(emojiSelected(const QString&)), this, SLOT(onEmojiInsert(const QString&)));
     
     connect(sendBtn, SIGNAL(clicked()), this, SLOT(onSendClicked()));
     connect(inputEdit, SIGNAL(sendRequested()), this, SLOT(onSendClicked()));
     connect(emojiBtn, SIGNAL(clicked()), this, SLOT(onEmojiClicked()));
     connect(fileBtn, SIGNAL(clicked()), this, SLOT(onFileClicked()));
-    connect(inputEdit, SIGNAL(filePasteRequested(QString)), this, SLOT(onFilePaste(QString)));
+    connect(inputEdit, SIGNAL(filePasteRequested(const QString&)), this, SLOT(onFilePaste(const QString&)));
     
     mainLayout->addLayout(inputGrid);
 }
@@ -218,6 +218,8 @@ void ChatWidget::onEmojiClicked() {
 }
 
 void ChatWidget::onEmojiInsert(const QString& emoji) {
+    qWarning("ChatWidget::onEmojiInsert: received emoji string of length %d: '%s'", emoji.length(), qToUtf8(emoji).data());
+    inputEdit->clearPlaceholder();
 #ifdef QT3_BUILD
     inputEdit->insert(emoji);
 #else

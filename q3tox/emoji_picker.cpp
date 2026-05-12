@@ -4,6 +4,7 @@
 #include "placeholderlineedit.h"
 #ifdef QT3_BUILD
 #include <qptrlist.h>
+#include <qtooltip.h>
 #endif
 #include <algorithm>
 

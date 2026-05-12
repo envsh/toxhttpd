@@ -55,6 +55,17 @@ QString MessageInput::placeholderText() const {
     return m_placeholder;
 }
 
+void MessageInput::clearPlaceholder() {
+    if (m_isPlaceholderActive) {
+        m_isPlaceholderActive = false;
+#ifdef QT3_BUILD
+        QTextEdit::setText(QString());
+#else
+        QTextEdit::setPlainText(QString());
+#endif
+    }
+}
+
 void MessageInput::focusInEvent(QFocusEvent* e) {
     if (m_isPlaceholderActive) {
         m_isPlaceholderActive = false;

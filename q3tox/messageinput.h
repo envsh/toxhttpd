@@ -10,6 +10,7 @@ public:
 
     void setPlaceholderText(const QString& t);
     QString placeholderText() const;
+    void clearPlaceholder();
 
 signals:
     void sendRequested();
