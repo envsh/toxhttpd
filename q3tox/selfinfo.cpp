@@ -42,8 +42,13 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     headerLayout->addLayout(infoLayout, 1);
     mainLayout->addLayout(headerLayout);
     
-    // 地址行
+    // 地址行（含切换账号按钮在最左侧）
     QBoxLayout* addrLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    switchBtn = new QPushButton(QString::fromUtf8("⇄"), this);
+    switchBtn->setFixedSize(30, 25);
+    connect(switchBtn, SIGNAL(clicked()), this, SLOT(onSwitchAccount()));
+    addrLayout->addWidget(switchBtn);
+    
     addressLabel = new QLabel("...", this);
     addressLabel->setFont(QFont("Monospace", 11));
     addrLayout->addWidget(addressLabel, 1);
@@ -56,9 +61,6 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     
     // 操作按钮
     QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
-    switchBtn = new QPushButton(_("buttons.switch_account"), this);
-    connect(switchBtn, SIGNAL(clicked()), this, SLOT(onSwitchAccount()));
-    btnLayout->addWidget(switchBtn);
     
     editBtn = new QPushButton(_("buttons.edit_info"), this);
     connect(editBtn, SIGNAL(clicked()), this, SLOT(onEditInfo()));
@@ -216,7 +218,7 @@ void SelfInfoWidget::onShowQRCode() {
 
 void SelfInfoWidget::retranslateUi() {
     // 更新按钮文字
-    if (switchBtn) switchBtn->setText(_("buttons.switch_account"));
+    if (switchBtn) switchBtn->setText(QString::fromUtf8("⇄"));
     if (editBtn) editBtn->setText(_("buttons.edit_info"));
     if (connectBtn) connectBtn->setText(_("buttons.connect_network"));
     if (qrBtn) qrBtn->setText(_("buttons.qrcode"));
