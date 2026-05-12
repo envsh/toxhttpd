@@ -1,4 +1,4 @@
-module github.com/anomalyco/toxhttpd-go
+module github.com/envsh/toxhttpd
 
 go 1.21
 
