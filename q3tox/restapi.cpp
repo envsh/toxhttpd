@@ -637,3 +637,46 @@ bool ToxAPI::getMessagesHistory(int contact_id, const std::string& contact_type,
     cJSON_Delete(root);
     return true;
 }
+
+std::string ToxAPI::getGroupSelfName(int groupId) {
+    std::string endpoint = "/api/groups/self-name?group_number=" + std::to_string(groupId);
+    std::string response = httpGet(endpoint);
+    if (response.empty()) return "";
+
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return "";
+
+    std::string name;
+    cJSON* nameItem = cJSON_GetObjectItem(root, "name");
+    if (nameItem && cJSON_IsString(nameItem)) {
+        name = std::string(cJSON_GetStringValue(nameItem));
+    }
+
+    cJSON_Delete(root);
+    return name;
+}
+
+bool ToxAPI::setGroupSelfName(int groupId, const std::string& name) {
+    std::string postData = "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name);
+    std::string response = httpPost("/api/groups/set-name", postData);
+    return !response.empty();
+}
+
+std::string ToxAPI::getRandomName() {
+    std::string response = httpGet("/api/random-name");
+    if (response.empty()) return "nonamed";
+
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return "nonamed";
+
+    std::string name;
+    cJSON* nameItem = cJSON_GetObjectItem(root, "name");
+    if (nameItem && cJSON_IsString(nameItem)) {
+        name = std::string(cJSON_GetStringValue(nameItem));
+    } else {
+        name = "nonamed";
+    }
+
+    cJSON_Delete(root);
+    return name;
+}

@@ -103,6 +103,11 @@ public:
     std::vector<PeerInfo> getConferenceMembers(int confId);
     std::vector<PeerInfo> getGroupMembers(int groupId);
     
+    // Group nickname
+    std::string getGroupSelfName(int groupId);
+    bool setGroupSelfName(int groupId, const std::string& name);
+    std::string getRandomName();
+    
 private:
     std::string baseUrl;
 

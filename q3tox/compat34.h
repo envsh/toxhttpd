@@ -24,6 +24,7 @@
 #include <qtooltip.h>
 #include <qcombobox.h>
 #include <qcheckbox.h>
+#include <qradiobutton.h>
 #include <qclipboard.h>
 #include <qfileinfo.h>
 #include <qdatetime.h>
@@ -53,6 +54,7 @@
 #include <QEvent>
 #include <QComboBox>
 #include <QCheckBox>
+#include <QRadioButton>
 #include <QClipboard>
 #include <QByteArray>
 #include <QCoreApplication>

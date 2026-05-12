@@ -118,6 +118,7 @@
     <div id="groupMenu" class="context-menu hidden">
         <div class="menu-item" data-action="info">查看信息</div>
         <div class="menu-item" data-action="members">查看成员</div>
+        <div class="menu-item" data-action="rename">修改昵称</div>
         <div class="menu-item danger" data-action="leave">离开群组</div>
     </div>
     
@@ -217,6 +218,32 @@
         </div>
     </div>
     
+    <!-- Group rename modal -->
+    <div id="groupRenameModal" class="modal hidden">
+        <div class="modal-content" style="width:420px;">
+            <h3 id="groupRenameTitle">修改群组昵称</h3>
+            <div class="rename-current" id="groupRenameCurrent">当前昵称: --</div>
+            <div class="rename-options">
+                <label><input type="radio" name="renameOpt" value="self" checked>
+                    <span id="renameOptSelf">使用全局昵称</span>
+                    <span id="renameSelfPreview" style="color:#8b949e;">(--)</span>
+                </label>
+                <label><input type="radio" name="renameOpt" value="custom">
+                    <span id="renameOptCustom">自定义昵称</span>
+                    <input type="text" id="groupNickInput" placeholder="输入昵称..." style="margin-top:4px;width:100%;padding:6px 10px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;outline:none;box-sizing:border-box;">
+                </label>
+                <label><input type="radio" name="renameOpt" value="random">
+                    <span id="renameOptRandom">随机昵称</span>
+                    <span id="renameRandomPreview" style="margin-left:8px;color:#00d4aa;cursor:pointer;">--</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button onclick="confirmGroupRename()" id="renameConfirmBtn">确认</button>
+                <button onclick="closeGroupRenameModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/web/app.js"></script>
 </body>
 </html>

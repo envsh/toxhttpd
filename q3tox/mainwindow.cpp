@@ -17,6 +17,7 @@ static QString getCurrentTime() {
 #include "groupinvitedialog.h"
 #include "cJSON.h"
 #include "appsetup.h"
+#include "placeholderlineedit.h"
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
@@ -105,6 +106,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
             this, SLOT(onDeleteOrLeaveRequested(int, const QString&)));
     connect(contactListWidget, SIGNAL(viewMembersRequested(int, const QString&)),
             this, SLOT(onViewMembersRequested(int, const QString&)));
+    connect(contactListWidget, SIGNAL(renameNickRequested(int)),
+            this, SLOT(onRenameNickRequested(int)));
     connect(contactListWidget, SIGNAL(inviteToConferenceRequested(int)),
             this, SLOT(onInviteToConferenceRequested(int)));
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
@@ -567,6 +570,83 @@ void MainWindow::onViewMembersRequested(int id, const QString& type) {
     dialog.setDialogTitle(title);
     dialog.setMembers(members);
     dialog.exec();
+}
+
+void MainWindow::onRenameNickRequested(int groupId) {
+    ToxAPI api;
+
+    std::string selfName, selfStatus, selfConn, selfAddr;
+    api.getSelf(selfName, selfStatus, selfConn, selfAddr);
+
+    QDialog dialog(this);
+    qSetWindowTitle(&dialog, _("rename.title"));
+    dialog.resize(380, 220);
+
+    QBoxLayout* layout = qNewBoxLayout(&dialog, QBoxLayout::TopToBottom, 10, 10);
+
+    // Current nickname (use cached self name as starting value)
+    std::string displayName = selfName.empty() ? "--" : selfName;
+    QLabel* currentLabel = new QLabel(
+        _("rename.current_nick") + QString(": ") + QString::fromUtf8(displayName.c_str()), &dialog);
+    layout->addWidget(currentLabel);
+
+    // Use global nick
+    QRadioButton* selfRadio = new QRadioButton(
+        _("rename.use_self_nick") + QString(" (%1)").arg(QString::fromUtf8(selfName.c_str())), &dialog);
+    selfRadio->setChecked(true);
+    layout->addWidget(selfRadio);
+
+    // Custom nick
+    QRadioButton* customRadio = new QRadioButton(_("rename.custom_nick"), &dialog);
+    layout->addWidget(customRadio);
+
+    PlaceholderLineEdit* nameEdit = new PlaceholderLineEdit(_("rename.enter_nick"), &dialog);
+    nameEdit->setText(QString::fromUtf8(selfName.c_str()));
+    nameEdit->setEnabled(false);
+    layout->addWidget(nameEdit);
+
+    // Random nick
+    QRadioButton* randomRadio = new QRadioButton(_("rename.random_nick"), &dialog);
+    layout->addWidget(randomRadio);
+
+    QLabel* randomLabel = new QLabel(
+        QString::fromUtf8(api.getRandomName().c_str()), &dialog);
+    layout->addWidget(randomLabel);
+
+    // Buttons
+    QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    btnLayout->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum));
+
+    QPushButton* confirmBtn = new QPushButton(_("rename.confirm"), &dialog);
+    QPushButton* cancelBtn = new QPushButton(_("buttons.cancel"), &dialog);
+    btnLayout->addWidget(confirmBtn);
+    btnLayout->addWidget(cancelBtn);
+    layout->addLayout(btnLayout);
+
+    QObject::connect(confirmBtn, SIGNAL(clicked()), &dialog, SLOT(accept()));
+    QObject::connect(cancelBtn, SIGNAL(clicked()), &dialog, SLOT(reject()));
+
+    if (dialog.exec() == QDialog::Accepted) {
+        std::string name;
+        if (selfRadio->isChecked()) {
+            name = selfName;
+        } else if (customRadio->isChecked()) {
+            name = qToUtf8(nameEdit->text()).data();
+            if (name.empty()) {
+                QMessageBox::warning(this, _("rename.failed"), _("rename.name_empty"));
+                return;
+            }
+        } else if (randomRadio->isChecked()) {
+            name = qToUtf8(randomLabel->text()).data();
+            if (name.empty()) {
+                QMessageBox::warning(this, _("rename.failed"), _("rename.name_empty"));
+                return;
+            }
+        }
+        if (!name.empty()) {
+            api.setGroupSelfName(groupId, name);
+        }
+    }
 }
 
 void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {

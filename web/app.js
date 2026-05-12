@@ -121,7 +121,8 @@ function applyLanguage() {
     const groupMenuItems = document.querySelectorAll('#groupMenu .menu-item');
     if (groupMenuItems[0]) groupMenuItems[0].textContent = t('context_menu.view_info');
     if (groupMenuItems[1]) groupMenuItems[1].textContent = t('context_menu.view_members');
-    if (groupMenuItems[2]) groupMenuItems[2].textContent = t('context_menu.leave_group');
+    if (groupMenuItems[2]) groupMenuItems[2].textContent = t('context_menu.rename_nick');
+    if (groupMenuItems[3]) groupMenuItems[3].textContent = t('context_menu.leave_group');
     
     console.log('Language applied:', currentLang);
 }
@@ -165,6 +166,22 @@ function updateModalTexts() {
     
     const friendBtns = document.querySelectorAll('#friendInfoModal .modal-actions button');
     if (friendBtns[0]) friendBtns[0].textContent = t('buttons.close');
+
+    // 群组重命名模态框
+    const renameTitle = document.getElementById('groupRenameTitle');
+    if (renameTitle) renameTitle.textContent = t('rename.title');
+    const renameCurrent = document.getElementById('groupRenameCurrent');
+    if (renameCurrent) renameCurrent.textContent = t('rename.current_nick') + ': --';
+    const renameOptSelf = document.getElementById('renameOptSelf');
+    if (renameOptSelf) renameOptSelf.textContent = t('rename.use_self_nick');
+    const renameOptCustom = document.getElementById('renameOptCustom');
+    if (renameOptCustom) renameOptCustom.textContent = t('rename.custom_nick');
+    const renameOptRandom = document.getElementById('renameOptRandom');
+    if (renameOptRandom) renameOptRandom.textContent = t('rename.random_nick');
+    const renameConfirmBtn = document.getElementById('renameConfirmBtn');
+    if (renameConfirmBtn) renameConfirmBtn.textContent = t('rename.confirm');
+    const renameCancelBtns = document.querySelectorAll('#groupRenameModal .modal-actions button');
+    if (renameCancelBtns[1]) renameCancelBtns[1].textContent = t('buttons.cancel');
 }
 
 // 初始化语言
@@ -721,6 +738,7 @@ let friendNameMap = {};
 
 // 会议/群组 peer name 缓存：键 "conference_{conference_number}_{peer_number}" / "group_{group_number}_{peer_number}"
 let peerNameMap = {};
+var selfPeerNumber = {};
 
 // ── VirtualScroller ──
 class VirtualScroller {
@@ -1464,6 +1482,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.showGroupInfo(selectedGroupId);
             } else if (action === 'members') {
                 window.showGroupMembers(selectedGroupId);
+            } else if (action === 'rename') {
+                window.showGroupRenameModal(selectedGroupId);
             } else if (action === 'leave') {
                 window.leaveGroup();
             }
@@ -2046,6 +2066,86 @@ function switchAccountStub() {
     alert(t('not_yet_implemented'));
 }
 
+// ── Group Rename ──
+var renameGroupId = null;
+
+function showGroupRenameModal(groupId) {
+    renameGroupId = groupId;
+    var modal = document.getElementById('groupRenameModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    // Backdrop click to close
+    modal.onclick = function(e) {
+        if (e.target === modal) modal.classList.add('hidden');
+    };
+
+    document.querySelector('input[name="renameOpt"][value="self"]').checked = true;
+
+    var selfName = (typeof selfInfo !== 'undefined' && selfInfo && selfInfo.name) ? selfInfo.name : '';
+    document.getElementById('renameSelfPreview').textContent = selfName ? '(' + selfName + ')' : '(--)';
+    document.getElementById('groupRenameCurrent').textContent = t('rename.current_nick') + ': ' + (selfName || '--');
+    document.getElementById('groupNickInput').value = selfName;
+    document.getElementById('groupNickInput').placeholder = t('rename.enter_nick');
+    document.getElementById('groupNickInput').disabled = true;
+    document.getElementById('renameRandomPreview').textContent = '--';
+}
+
+function closeGroupRenameModal() {
+    var modal = document.getElementById('groupRenameModal');
+    if (modal) modal.classList.add('hidden');
+    renameGroupId = null;
+}
+
+function confirmGroupRename() {
+    var opt = document.querySelector('input[name="renameOpt"]:checked');
+    if (!opt) return;
+    var name = '';
+    if (opt.value === 'self') {
+        name = (typeof selfInfo !== 'undefined' && selfInfo && selfInfo.name) ? selfInfo.name : '';
+    } else if (opt.value === 'custom') {
+        name = document.getElementById('groupNickInput').value.trim();
+        if (!name) { alert(t('rename.name_empty')); return; }
+    } else if (opt.value === 'random') {
+        name = document.getElementById('renameRandomPreview').textContent;
+        if (!name || name === '--') { alert(t('rename.generate_first')); return; }
+    }
+    doSetGroupName(renameGroupId, name);
+}
+
+function doSetGroupName(groupId, name) {
+    var params = new URLSearchParams();
+    params.append('group_number', groupId);
+    params.append('name', name);
+    fetch('/api/groups/set-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { alert(t('rename.failed') + ': ' + d.error); return; }
+        closeGroupRenameModal();
+        loadAllData();
+    });
+}
+
+function generateRandomName() {
+    fetch('/api/random-name').then(function(r) { return r.json(); }).then(function(d) {
+        var preview = document.getElementById('renameRandomPreview');
+        if (preview) preview.textContent = d.name;
+    });
+}
+
+// Radio click handler for rename options
+document.addEventListener('click', function(e) {
+    if (e.target.matches('input[name="renameOpt"]')) {
+        var val = e.target.value;
+        var inp = document.getElementById('groupNickInput');
+        inp.disabled = (val !== 'custom');
+        if (val === 'custom') inp.focus();
+        if (val === 'random') generateRandomName();
+    }
+});
+
 // Enter key sends message (Shift+Enter for newline)
 var _messageInputHandler = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -2064,6 +2164,7 @@ document.addEventListener('keydown', (e) => {
         hideGroupInfo();
         hideSelectConference();
         hideMemberList();
+        closeGroupRenameModal();
         hideEmojiPicker();
     }
 });
@@ -2100,3 +2201,6 @@ window.hideMemberList = hideMemberList;
 window.toggleEmojiPicker = toggleEmojiPicker;
 window.selectFile = selectFile;
 window.switchAccountStub = switchAccountStub;
+window.showGroupRenameModal = showGroupRenameModal;
+window.closeGroupRenameModal = closeGroupRenameModal;
+window.confirmGroupRename = confirmGroupRename;

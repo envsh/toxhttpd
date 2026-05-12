@@ -93,6 +93,7 @@
         "delete_friend": "刪除好友",
         "leave_conference": "離開會議",
         "leave_group": "離開群組",
+        "rename_nick": "修改暱稱",
         "invite_to_conference": "邀請進會議",
         "invite_to_group": "邀請進群組"
     },
@@ -119,5 +120,17 @@
         "ignore": "忽略",
         "joined": "已加入群組 {0}",
         "join_failed": "加入群組失敗"
+    },
+    "rename": {
+        "title": "修改群組暱稱",
+        "current_nick": "當前暱稱",
+        "use_self_nick": "使用全域暱稱",
+        "custom_nick": "自訂暱稱",
+        "random_nick": "隨機暱稱",
+        "enter_nick": "輸入暱稱...",
+        "confirm": "確認",
+        "failed": "修改失敗",
+        "name_empty": "暱稱不能為空",
+        "generate_first": "請先生成隨機暱稱"
     }
 }

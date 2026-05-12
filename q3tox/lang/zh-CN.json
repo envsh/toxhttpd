@@ -89,7 +89,8 @@
         "leave_group": "离开群组",
         "invite_to_conference": "邀请进会议",
         "invite_to_group": "邀请进群组",
-        "view_members": "查看成员"
+        "view_members": "查看成员",
+        "rename_nick": "修改昵称"
     },
     "emoji": {
         "search_placeholder": "搜索 emoji...",
@@ -145,5 +146,16 @@
     "style.macos": "macOS",
     "style.windows": "Windows 11",
     "style.material": "Material You",
-    "style.github": "GitHub"
+    "style.github": "GitHub",
+    "rename": {
+        "title": "修改群组昵称",
+        "current_nick": "当前昵称",
+        "use_self_nick": "使用全局昵称",
+        "custom_nick": "自定义昵称",
+        "random_nick": "随机昵称",
+        "enter_nick": "输入昵称...",
+        "confirm": "确认",
+        "failed": "修改失败",
+        "name_empty": "昵称不能为空"
+    }
 }

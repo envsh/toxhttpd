@@ -1408,6 +1408,9 @@ func (s *Server) Start(port string) error {
 	// 成员列表 API 路由
 	http.HandleFunc("/api/conference/members", loggingMiddleware(s.handleConferenceMembers))
 	http.HandleFunc("/api/group/members", loggingMiddleware(s.handleGroupMembers))
+	http.HandleFunc("/api/random-name", loggingMiddleware(s.handleRandomName))
+	http.HandleFunc("/api/groups/self-name", loggingMiddleware(s.handleGroupSelfName))
+	http.HandleFunc("/api/groups/set-name", loggingMiddleware(s.handleGroupSetName))
 
 	log.Printf("Server starting on :%s", port)
 	return http.ListenAndServe(":"+port, nil)
@@ -1628,12 +1631,85 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	selfPeerNumber, selfErr := s.tox.GroupSelfGetPeerId(groupNumber)
 	resp := map[string]interface{}{
-		"group_number": int(groupNumber),
-		"members":      members,
+		"group_number":     int(groupNumber),
+		"members":          members,
+		"self_peer_number": int(selfPeerNumber),
+	}
+	if selfErr != nil {
+		resp["self_peer_number"] = 0
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleRandomName(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	name := randomName()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"name": name})
+}
+
+func (s *Server) handleGroupSelfName(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	gnStr := r.URL.Query().Get("group_number")
+	if gnStr == "" {
+		http.Error(w, `{"error":"missing group_number"}`, http.StatusBadRequest)
+		return
+	}
+	var gn tox.GroupNumber
+	fmt.Sscanf(gnStr, "%d", &gn)
+	name, err := s.tox.GroupSelfGetName(gn)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	if name == "" {
+		name = s.tox.SelfGetName()
+	}
+	if name == "" {
+		pubkey := s.tox.SelfGetPublicKey()
+		if len(pubkey) >= 7 {
+			name = "nonamed." + pubkey[:7]
+		} else {
+			name = "nonamed"
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"name": name})
+}
+
+func (s *Server) handleGroupSetName(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	params, err := getRequestParams(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	gnStr := params.Get("group_number")
+	name := strings.TrimSpace(params.Get("name"))
+	if gnStr == "" || name == "" {
+		http.Error(w, `{"error":"missing group_number or name"}`, http.StatusBadRequest)
+		return
+	}
+	var gn tox.GroupNumber
+	fmt.Sscanf(gnStr, "%d", &gn)
+	if err := s.tox.GroupSelfSetName(gn, name); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "ok"})
 }
 
 func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {
