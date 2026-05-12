@@ -25,6 +25,11 @@ struct Event {
 struct PeerInfo {
     int peerNumber;
     std::string name;
+    int status = 0;
+    int connectionStatus = 0;
+    int role = 0;
+    std::string publicKey;
+    bool isSelf = false;
 };
 
 struct GroupInfo {
@@ -104,7 +109,6 @@ public:
     std::vector<PeerInfo> getGroupMembers(int groupId);
     
     // Group nickname
-    std::string getGroupSelfName(int groupId);
     bool setGroupSelfName(int groupId, const std::string& name);
     std::string getRandomName();
     

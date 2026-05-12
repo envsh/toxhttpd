@@ -40,7 +40,7 @@ public:
     void inviteToConferenceRequested(int friendId);
     void inviteToGroupRequested(int friendId);
     void viewMembersRequested(int id, const QString& type);
-    void renameNickRequested(int groupId);
+    void renameNickRequested(int groupId, const QString& groupName);
     
 private slots:
     void onTabClicked();
@@ -57,7 +57,7 @@ private:
 #ifdef QT3_BUILD
     bool eventFilter(QObject* obj, QEvent* event); // Qt3: handle right-click
 #endif
-    void showContextMenuAt(int id, const QString& type, const QPoint& globalPos);
+    void showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos);
     
 private:
     void updateView_v3();

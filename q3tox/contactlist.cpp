@@ -340,7 +340,7 @@ void ContactListWidget::showContextMenu(QPoint pos) {
     int id = item->data(Qt::UserRole).toInt();
     QString type = item->data(Qt::UserRole + 1).toString();
     QPoint globalPos = lw->mapToGlobal(pos);
-    showContextMenuAt(id, type, globalPos);
+    showContextMenuAt(id, type, item->text(), globalPos);
 }
 #else
 // Qt3: 事件过滤器处理右键
@@ -363,7 +363,7 @@ bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
                     contextItemId = c->id;
                     contextItemType = c->type;
                     QPoint globalPos = ((QListBox*)listWidget)->mapToGlobal(mouseEvent->pos());
-                    showContextMenuAt(c->id, c->type, globalPos);
+                    showContextMenuAt(c->id, c->type, c->name, globalPos);
                     return true;
                 }
                 ++count;
@@ -379,7 +379,7 @@ void ContactListWidget::showContextMenu(QPoint) {
 #endif
 
 // 共用：显示右键菜单
-void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPoint& globalPos) {
+void ContactListWidget::showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos) {
     contextItemId = id;
     contextItemType = type;
     
@@ -448,7 +448,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPo
         int choice = menu.exec(globalPos);
         if (choice == 0) emit viewInfoRequested(id, type);
         else if (choice == 1) emit viewMembersRequested(id, type);
-        else if (choice == 2) emit renameNickRequested(id);
+        else if (choice == 2) emit renameNickRequested(id, name);
         else if (choice == 3) emit deleteOrLeaveRequested(id, type);
 #else
         QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
@@ -458,7 +458,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QPo
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) emit viewInfoRequested(id, type);
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
-        else if (selected == renameAction) emit renameNickRequested(id);
+        else if (selected == renameAction) emit renameNickRequested(id, name);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
 #endif
     }

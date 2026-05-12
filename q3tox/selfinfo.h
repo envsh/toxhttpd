@@ -11,6 +11,7 @@ public:
     
     void updateInfo(const QString& name, const QString& statusMsg,
                     const QString& connStatus, const QString& address);
+    QString selfName() const { return nameLabel ? nameLabel->text() : QString(); }
     void retranslateUi();
     
 private slots:

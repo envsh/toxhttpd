@@ -1409,7 +1409,6 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/conference/members", loggingMiddleware(s.handleConferenceMembers))
 	http.HandleFunc("/api/group/members", loggingMiddleware(s.handleGroupMembers))
 	http.HandleFunc("/api/random-name", loggingMiddleware(s.handleRandomName))
-	http.HandleFunc("/api/groups/self-name", loggingMiddleware(s.handleGroupSelfName))
 	http.HandleFunc("/api/groups/set-name", loggingMiddleware(s.handleGroupSetName))
 
 	log.Printf("Server starting on :%s", port)
@@ -1620,18 +1619,35 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 	// Iterate peer numbers 0-255 (reasonable upper limit for group size)
 	members := make([]map[string]interface{}, 0)
 	for peerNumber := 0; peerNumber < 256; peerNumber++ {
-		name, err := s.tox.GroupPeerGetName(groupNumber, tox.GroupPeerNumber(peerNumber))
+		pn := tox.GroupPeerNumber(peerNumber)
+		name, err := s.tox.GroupPeerGetName(groupNumber, pn)
 		if err != nil {
 			// Peer doesn't exist, stop iterating
 			break
 		}
+		pubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, pn)
+		status, _ := s.tox.GroupPeerGetStatus(groupNumber, pn)
+		connStatus, _ := s.tox.GroupPeerGetConnectionStatus(groupNumber, pn)
+		role, _ := s.tox.GroupPeerGetRole(groupNumber, pn)
 		members = append(members, map[string]interface{}{
-			"peer_number": peerNumber,
-			"name":        name,
+			"peer_number":       peerNumber,
+			"name":              name,
+			"status":            status,
+			"connection_status": connStatus,
+			"role":              int(role),
+			"public_key":        pubKey,
+			"isSelf":            false,
+			"lastSeen":          nil,
+			"peerIp":            nil,
 		})
 	}
 
 	selfPeerNumber, selfErr := s.tox.GroupSelfGetPeerId(groupNumber)
+	for i := range members {
+		if members[i]["peer_number"].(int) == int(selfPeerNumber) {
+			members[i]["isSelf"] = true
+		}
+	}
 	resp := map[string]interface{}{
 		"group_number":     int(groupNumber),
 		"members":          members,
@@ -1650,38 +1666,6 @@ func (s *Server) handleRandomName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := randomName()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"name": name})
-}
-
-func (s *Server) handleGroupSelfName(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
-		return
-	}
-	gnStr := r.URL.Query().Get("group_number")
-	if gnStr == "" {
-		http.Error(w, `{"error":"missing group_number"}`, http.StatusBadRequest)
-		return
-	}
-	var gn tox.GroupNumber
-	fmt.Sscanf(gnStr, "%d", &gn)
-	name, err := s.tox.GroupSelfGetName(gn)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
-		return
-	}
-	if name == "" {
-		name = s.tox.SelfGetName()
-	}
-	if name == "" {
-		pubkey := s.tox.SelfGetPublicKey()
-		if len(pubkey) >= 7 {
-			name = "nonamed." + pubkey[:7]
-		} else {
-			name = "nonamed"
-		}
-	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"name": name})
 }

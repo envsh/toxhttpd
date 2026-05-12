@@ -552,6 +552,9 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
     cJSON* root = cJSON_Parse(response.c_str());
     if (!root) return members;
     
+    cJSON* selfPpItem = cJSON_GetObjectItem(root, "self_peer_number");
+    int selfPeerNumber = selfPpItem ? selfPpItem->valueint : -1;
+    
     cJSON* membersItem = cJSON_GetObjectItem(root, "members");
     if (membersItem && cJSON_IsArray(membersItem)) {
         int count = cJSON_GetArraySize(membersItem);
@@ -560,15 +563,32 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
             if (!memberItem) continue;
             
             PeerInfo info;
-            cJSON* peerNumberItem = cJSON_GetObjectItem(memberItem, "peer_number");
-            info.peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
             
-            cJSON* nameItem = cJSON_GetObjectItem(memberItem, "name");
-            if (nameItem && cJSON_IsString(nameItem)) {
-                info.name = std::string(cJSON_GetStringValue(nameItem));
+            cJSON* item = cJSON_GetObjectItem(memberItem, "peer_number");
+            info.peerNumber = item ? item->valueint : -1;
+            
+            item = cJSON_GetObjectItem(memberItem, "name");
+            if (item && cJSON_IsString(item)) {
+                info.name = std::string(cJSON_GetStringValue(item));
             } else {
                 info.name = "Unknown";
             }
+            
+            item = cJSON_GetObjectItem(memberItem, "status");
+            if (item) info.status = item->valueint;
+            
+            item = cJSON_GetObjectItem(memberItem, "connection_status");
+            if (item) info.connectionStatus = item->valueint;
+            
+            item = cJSON_GetObjectItem(memberItem, "role");
+            if (item) info.role = item->valueint;
+            
+            item = cJSON_GetObjectItem(memberItem, "public_key");
+            if (item && cJSON_IsString(item)) {
+                info.publicKey = std::string(cJSON_GetStringValue(item));
+            }
+            
+            info.isSelf = (info.peerNumber == selfPeerNumber);
             
             members.push_back(info);
         }
@@ -636,24 +656,6 @@ bool ToxAPI::getMessagesHistory(int contact_id, const std::string& contact_type,
     
     cJSON_Delete(root);
     return true;
-}
-
-std::string ToxAPI::getGroupSelfName(int groupId) {
-    std::string endpoint = "/api/groups/self-name?group_number=" + std::to_string(groupId);
-    std::string response = httpGet(endpoint);
-    if (response.empty()) return "";
-
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return "";
-
-    std::string name;
-    cJSON* nameItem = cJSON_GetObjectItem(root, "name");
-    if (nameItem && cJSON_IsString(nameItem)) {
-        name = std::string(cJSON_GetStringValue(nameItem));
-    }
-
-    cJSON_Delete(root);
-    return name;
 }
 
 bool ToxAPI::setGroupSelfName(int groupId, const std::string& name) {

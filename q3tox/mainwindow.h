@@ -32,14 +32,14 @@ public:
     void onInviteToGroupRequested(int friendId);
     void onGroupInviteReceived(int friendNumber, const QString& chatId);
     void onViewMembersRequested(int id, const QString& type);
-    void onRenameNickRequested(int groupId);
+    void onRenameNickRequested(int groupId, const QString& groupName);
     void onSwitchAccount();
     void loadMessageHistory();
     
 private:
     std::string selfPubkey;  // 自己的公钥（地址前64字符）
     std::map<int, std::string> friendNameMap;  // 好友昵称映射：friend_id → name
-    std::map<std::string, std::string> peerNameMap;  // 会议/群组 peer 名字缓存: "conf_N_M" / "group_N_M"
+    std::map<std::string, PeerInfo> peerInfoMap;  // 会议/群组 peer info 缓存: "conf_N_M" / "group_N_M"
     
     QSplitter* splitter;
     QWidget* sidebarWidget;  // 左侧边栏容器

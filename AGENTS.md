@@ -5,6 +5,7 @@
 - q3tox Qt4: `cd q3tox && bash buildqt4.sh` — generates `q4tox`
 - Run server: `./go-toxhttpd/toxhttpd-go 8181`
 - Run client: `./q3tox/q3tox`
+- Build q3tox cpp: `make -j1`
 
 # Architecture
 
@@ -21,7 +22,15 @@
 
 # Important constraints
 
+- **Never auto-commit to git.** Only commit when explicitly asked by the user.
+
 - Peer name cache key: `"conference_{id}_{peer}"` / `"group_{id}_{peer}"` — web (`app.js`) and q3tox (`mainwindow.cpp`) must stay in sync.
 - Event system: long-poll `/api/events`. q3tox uses `QThread` + libcurl, events delivered via `CustomEventBase` (compat wrapper).
 - Translation: nested JSON in `lang/*.json`, loaded by `Translator` class (`_("key")`), supports dot-path (e.g. `"statuses.online"`).
 - ChatView scroll multiplier: `wheelEvent` uses `step * N`, adjusted for feel (currently `*5`).
+
+# Minimize HTTP requests
+
+- Use cached data over extra HTTP calls. Available caches:
+  - Web: `contacts.groups[]` / `contacts.friends[]` / `contacts.conferences[]` (global), `peerInfoMap`, `selfInfo` (own profile), `friendNameMap`
+  - q3tox: `ContactListWidget` item text / `allContacts`, `peerInfoMap`, `friendNameMap`, `SelfInfoWidget::selfName()`

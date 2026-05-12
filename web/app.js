@@ -509,17 +509,25 @@ function selectContact(id, type) {
     // 只更新选中状态，不重新渲染整个列表
     updateSelection(id, type);
 
-    // 预加载成员列表到 peerNameMap 缓存
+    // 预加载成员列表到 peerInfoMap 缓存
     if (type === 'conference') {
         fetchConferenceMembers(id).then(members => {
             members.forEach(m => {
-                peerNameMap[`conference_${id}_${m.peer_number}`] = m.name;
+                peerInfoMap[`conference_${id}_${m.peer_number}`] = {
+                    name: m.name, peer_number: m.peer_number
+                };
             });
         }).catch(() => {});
     } else if (type === 'group') {
-        fetchGroupMembers(id).then(members => {
+        fetchGroupMembers(id).then(result => {
+            const members = result.members;
             members.forEach(m => {
-                peerNameMap[`group_${id}_${m.peer_number}`] = m.name;
+                const key = `group_${id}_${m.peer_number}`;
+                peerInfoMap[key] = {
+                    name: m.name, peer_number: m.peer_number,
+                    status: m.status, connection_status: m.connection_status,
+                    role: m.role, public_key: m.public_key, isSelf: m.isSelf
+                };
             });
         }).catch(() => {});
     }
@@ -604,7 +612,7 @@ function loadMessageHistory() {
                             ? displayName.charAt(0).toUpperCase() : '?';
                     } else {
                         const peerKey = `${contactType}_${contactId}_${msg.sender_number}`;
-                        displayName = peerNameMap[peerKey] || `Peer ${msg.sender_number}`;
+                        displayName = (peerInfoMap[peerKey] && peerInfoMap[peerKey].name) || `Peer ${msg.sender_number}`;
                         avatarText = displayName.charAt(0).toUpperCase();
                     }
                 }
@@ -688,32 +696,38 @@ function longPollEvents() {
                         showConferenceInviteDialog(data);
                     } else if (event.event_type === 'conference_message') {
                         const data = JSON.parse(event.data);
-                        // 更新 peer name 缓存
+                        // 更新 peer info 缓存
                         if (data.peer_name) {
-                            peerNameMap[`conference_${data.conference_number}_${data.peer_number}`] = data.peer_name;
+                            const key = `conference_${data.conference_number}_${data.peer_number}`;
+                            peerInfoMap[key] = { ...(peerInfoMap[key] || {}), name: data.peer_name, peer_number: data.peer_number };
                         }
                         if (data.conference_number == currentChatId && currentChatType === 'conference') {
-                            const peerName = peerNameMap[`conference_${data.conference_number}_${data.peer_number}`] || 'Peer ' + data.peer_number;
+                            const key = `conference_${data.conference_number}_${data.peer_number}`;
+                            const peerName = (peerInfoMap[key] && peerInfoMap[key].name) || 'Peer ' + data.peer_number;
                             const avatarText = peerName.charAt(0).toUpperCase();
                             appendMessage(data.message, 'other', peerName, avatarText);
                         }
                     } else if (event.event_type === 'group_message') {
                         const data = JSON.parse(event.data);
-                        // 更新 peer name 缓存
+                        // 更新 peer info 缓存
                         if (data.peer_name) {
-                            peerNameMap[`group_${data.group_number}_${data.peer_number}`] = data.peer_name;
+                            const key = `group_${data.group_number}_${data.peer_number}`;
+                            peerInfoMap[key] = { ...(peerInfoMap[key] || {}), name: data.peer_name, peer_number: data.peer_number };
                         }
                         if (data.group_number == currentChatId && currentChatType === 'group') {
-                            const peerName = peerNameMap[`group_${data.group_number}_${data.peer_number}`] || 'Peer ' + data.peer_number;
+                            const key = `group_${data.group_number}_${data.peer_number}`;
+                            const peerName = (peerInfoMap[key] && peerInfoMap[key].name) || 'Peer ' + data.peer_number;
                             const avatarText = peerName.charAt(0).toUpperCase();
                             appendMessage(data.message, 'other', peerName, avatarText);
                         }
                     } else if (event.event_type === 'conference_peer_name') {
                         const data = JSON.parse(event.data);
-                        peerNameMap[`conference_${data.conference_number}_${data.peer_number}`] = data.name;
+                        const key = `conference_${data.conference_number}_${data.peer_number}`;
+                        peerInfoMap[key] = { ...(peerInfoMap[key] || {}), name: data.name, peer_number: data.peer_number };
                     } else if (event.event_type === 'group_peer_name') {
                         const data = JSON.parse(event.data);
-                        peerNameMap[`group_${data.group_number}_${data.peer_number}`] = data.name;
+                        const key = `group_${data.group_number}_${data.peer_number}`;
+                        peerInfoMap[key] = { ...(peerInfoMap[key] || {}), name: data.name, peer_number: data.peer_number };
                     } else if (event.event_type === 'group_invite') {
                         const data = JSON.parse(event.data);
                         currentEventId = event.id; // Save event ID for deletion
@@ -736,9 +750,8 @@ function longPollEvents() {
 // 好友昵称映射：friend_id → name
 let friendNameMap = {};
 
-// 会议/群组 peer name 缓存：键 "conference_{conference_number}_{peer_number}" / "group_{group_number}_{peer_number}"
-let peerNameMap = {};
-var selfPeerNumber = {};
+// 会议/群组 peer info 缓存：键 "conference_{id}_{pn}" / "group_{id}_{pn}"，值 { name, peer_number, status, ... }
+let peerInfoMap = {};
 
 // ── VirtualScroller ──
 class VirtualScroller {
@@ -1634,10 +1647,10 @@ async function fetchGroupMembers(groupId) {
     try {
         const resp = await fetch(`/api/group/members?group_number=${groupId}`);
         const data = await resp.json();
-        return data.members || [];
+        return data;
     } catch (err) {
         console.error('Failed to fetch group members:', err);
-        return [];
+        return { members: [], self_peer_number: 0 };
     }
 }
 
@@ -1663,7 +1676,8 @@ async function showConferenceMembers(conferenceId) {
 }
 
 async function showGroupMembers(groupId) {
-    const members = await fetchGroupMembers(groupId);
+    const result = await fetchGroupMembers(groupId);
+    const members = result.members;
     const title = t('member_list.title.group').replace('{0}', groupId);
     document.getElementById('memberListTitle').textContent = title;
     
@@ -2082,10 +2096,28 @@ function showGroupRenameModal(groupId) {
 
     document.querySelector('input[name="renameOpt"][value="self"]').checked = true;
 
-    var selfName = (typeof selfInfo !== 'undefined' && selfInfo && selfInfo.name) ? selfInfo.name : '';
-    document.getElementById('renameSelfPreview').textContent = selfName ? '(' + selfName + ')' : '(--)';
-    document.getElementById('groupRenameCurrent').textContent = t('rename.current_nick') + ': ' + (selfName || '--');
-    document.getElementById('groupNickInput').value = selfName;
+    // Get global profile name
+    var globalName = (typeof selfInfo !== 'undefined' && selfInfo && selfInfo.name) ? selfInfo.name : '';
+
+    // Scan peerInfoMap for group-specific self nick
+    var groupNick = '';
+    var prefix = 'group_' + groupId + '_';
+    for (var key in peerInfoMap) {
+        if (key.indexOf(prefix) === 0 && peerInfoMap[key].isSelf) {
+            groupNick = peerInfoMap[key].name;
+            break;
+        }
+    }
+    if (!groupNick) groupNick = globalName;
+
+    // Get group name from DOM
+    var item = document.querySelector('.list-item[data-group-id="' + groupId + '"]');
+    var groupName = item ? item.querySelector('.item-text').textContent : ('群组 ' + groupId);
+    document.getElementById('groupRenameTitle').textContent = t('rename.title') + ' - ' + groupName;
+
+    document.getElementById('renameSelfPreview').textContent = globalName ? '(' + globalName + ')' : '(--)';
+    document.getElementById('groupRenameCurrent').textContent = t('rename.current_nick') + ': ' + (groupNick || '--');
+    document.getElementById('groupNickInput').value = groupNick;
     document.getElementById('groupNickInput').placeholder = t('rename.enter_nick');
     document.getElementById('groupNickInput').disabled = true;
     document.getElementById('renameRandomPreview').textContent = '--';
