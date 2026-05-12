@@ -139,5 +139,9 @@
     "style.macos": "macOS",
     "style.windows": "Windows 11",
     "style.material": "Material You",
-    "style.github": "GitHub"
+    "style.github": "GitHub",
+    "context": {
+        "copy_message": "Copy Message",
+        "select_all": "Select All"
+    }
 }

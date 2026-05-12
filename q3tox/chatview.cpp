@@ -280,7 +280,7 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
     localX -= areaX;
     localY -= areaY;
     if (localX < 0) localX = 0;
-    if (localY < 0) return 0;
+    if (localY < 0) return -1;
 
     // Compute line breaks
     std::vector<int> lineStarts;
@@ -362,7 +362,7 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
         int contentW = viewW - kPad - contentX;
         int bubbleW = (contentW * 80) / 100;
         if (bubbleW < 100) bubbleW = contentW;
-        textRect = QRect(contentX + kBubbleHPad, kPad + headerH + kBubbleHPad + kPad,
+        textRect = QRect(contentX + kBubbleHPad, kPad + headerH + kPad + kBubbleVPad,
                          bubbleW - 2 * kBubbleHPad, msg.height - (2*kPad + headerH + kMsgSpacing) - 2*kBubbleVPad);
     }
 
@@ -550,9 +550,13 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
         auto& selMsg = m_messages[m_selMsgIndex];
         if (&msg == &selMsg) {
             std::vector<QRect> selRects = selectionRects(m_selMsgIndex);
+            QColor selColor = lerpColor(currentPalette().baseBg, currentPalette().accent, 0.25f);
             p.setPen(Qt::NoPen);
+            p.setBrush(selColor);
             for (size_t ri = 0; ri < selRects.size(); ++ri) {
-                p.fillRect(selRects[ri], QColor(173, 216, 230));
+                QRect r = selRects[ri];
+                r.moveBy(0, y);
+                p.drawRect(r);
             }
         }
     }
@@ -658,14 +662,14 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     if (m_selecting && m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_messages.size()) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex == m_selMsgIndex) {
-            int curY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) curY += m_messages[i].height;
-            int localY = event->y() - curY;
+            int msgY = kPad - m_scrollPos;
+            for (int i = 0; i < msgIndex; i++) msgY += m_messages[i].height;
+            int localY = event->y() - msgY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
             if (charPos >= 0) {
                 m_selEnd = charPos;
-                update();
+                update(0, msgY, width(), m_messages[m_selMsgIndex].height);
             }
         }
     }
