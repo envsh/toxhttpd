@@ -111,6 +111,11 @@ void MessageInput::keyPressEvent(QKeyEvent* e) {
         return;
     }
 
+    if (e->key() == Qt::Key_A && (mod & ctrl) && !(mod & shift)) {
+        selectAll();
+        return;
+    }
+
 #ifdef QT3_BUILD
     if (e->key() == Qt::Key_V && (mod & ctrl)) {
         QMimeSource* src = QApplication::clipboard()->data();
