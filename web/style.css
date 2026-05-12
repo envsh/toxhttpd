@@ -752,14 +752,17 @@ select option {
 }
 
 .input-area {
-    padding: 12px;
+    padding: 8px 12px;
     border-top: 1px solid #30363d;
     background: #161b22;
-    display: flex;
-    gap: 8px;
+    position: relative;
 }
-
-.input-area input {
+.input-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+}
+.input-row textarea {
     flex: 1;
     padding: 8px 12px;
     background: #0d1117;
@@ -767,16 +770,31 @@ select option {
     color: #c9d1d9;
     border-radius: 6px;
     font-size: 14px;
+    font-family: inherit;
     outline: none;
+    resize: none;
+    min-height: 56px;
+    max-height: 84px;
+    line-height: 1.4;
     transition: border-color 0.2s;
+    box-sizing: border-box;
 }
-
-.input-area input:focus {
+.input-row textarea:focus {
     border-color: #00d4aa;
 }
-
-.input-area button {
-    padding: 8px 20px;
+.input-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+    position: relative;
+}
+.input-actions .tool-btn {
+    flex: 1;
+    min-height: 0;
+}
+.send-btn {
+    padding: 4px 16px;
     background: #00d4aa;
     border: none;
     border-radius: 6px;
@@ -785,15 +803,30 @@ select option {
     font-weight: 600;
     font-size: 14px;
     transition: opacity 0.2s;
+    flex-shrink: 0;
+    height: 56px;
+    box-sizing: border-box;
 }
-
-.input-area button:hover {
-    opacity: 0.9;
+.send-btn:hover { opacity: 0.9; }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.tool-btn {
+    padding: 4px 8px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.2s;
+    width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
 }
-
-.input-area button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.tool-btn:hover {
+    background: #30363d;
+    border-color: #00d4aa;
 }
 
 ::-webkit-scrollbar {
@@ -870,4 +903,159 @@ select option {
     font-family: monospace;
     font-size: 12px;
     word-break: break-all;
+}
+
+/* ── Link detection ── */
+.message-bubble a {
+    color: #58a6ff;
+    text-decoration: underline;
+}
+.message-bubble a:hover {
+    color: #79c0ff;
+}
+
+/* ── Chat header contact info ── */
+.chat-header-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.type-badge {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.header-contact-name {
+    font-weight: 600;
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#headerStatusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+#headerStatusDot.online {
+    background: #00d4aa;
+}
+#headerStatusDot.offline {
+    background: #484f58;
+}
+
+/* ── Input area row ── */
+.switch-account-btn {
+    padding: 2px 6px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.switch-account-btn:hover {
+    background: #30363d;
+    color: #c9d1d9;
+    border-color: #00d4aa;
+}
+
+/* ── Emoji picker ── */
+.emoji-picker {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    width: 450px;
+    height: 300px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.emoji-picker.hidden {
+    display: none;
+}
+.emoji-picker .emoji-search {
+    padding: 8px;
+    border-bottom: 1px solid #30363d;
+}
+.emoji-picker .emoji-search input {
+    width: 100%;
+    padding: 6px 10px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    font-size: 13px;
+    outline: none;
+}
+.emoji-picker .emoji-search input:focus {
+    border-color: #00d4aa;
+}
+.emoji-picker .emoji-tabs {
+    display: flex;
+    border-bottom: 1px solid #30363d;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+.emoji-picker .emoji-tab {
+    flex: 1;
+    padding: 6px 2px;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: center;
+    transition: all 0.2s;
+    min-width: 30px;
+}
+.emoji-picker .emoji-tab:hover {
+    background: #21262d;
+    color: #c9d1d9;
+}
+.emoji-picker .emoji-tab.active {
+    color: #00d4aa;
+    border-bottom: 2px solid #00d4aa;
+}
+.emoji-picker .emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    padding: 8px;
+    overflow-y: auto;
+    flex: 1;
+}
+.emoji-picker .emoji-item {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 22px;
+    border-radius: 4px;
+    transition: background 0.1s;
+}
+.emoji-picker .emoji-item:hover {
+    background: #30363d;
+}
+.emoji-picker .emoji-label {
+    padding: 6px 8px 2px;
+    font-size: 11px;
+    color: #6e7681;
+    flex-shrink: 0;
+    grid-column: 1 / -1;
 }

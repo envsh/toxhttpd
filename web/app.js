@@ -95,26 +95,12 @@ function applyLanguage() {
     if (createBtns[1]) createBtns[1].textContent = '👥 ' + t('buttons.create_group');
     
     // 更新发送按钮
-    const sendBtn = document.querySelector('.input-area button');
+    const sendBtn = document.querySelector('.send-btn');
     if (sendBtn) sendBtn.textContent = t('buttons.send');
     
-    // 更新聊天头部
-    const chatHeaderText = document.getElementById('chatHeaderText');
-    if (chatHeaderText) {
-        if (currentChatId === null || currentChatId === undefined) {
-            chatHeaderText.textContent = t('select_chat_object');
-        } else {
-            // 重新生成当前聊天对象的头部文本（语言切换时更新）
-            let headerText = '';
-            if (currentChatType === 'friend') {
-                headerText = t('chat_with_friend', currentChatId);
-            } else if (currentChatType === 'group') {
-                headerText = t('group') + ' ' + currentChatId;
-            } else if (currentChatType === 'conference') {
-                headerText = t('conference_item') + ' ' + currentChatId;
-            }
-            chatHeaderText.textContent = headerText;
-        }
+    // 更新聊天头部（使用 updateChatHeader）
+    if (currentChatId && currentChatType) {
+        updateChatHeader(currentChatId, currentChatType);
     }
     
     // 更新模态框
@@ -497,7 +483,7 @@ function selectContact(id, type) {
         headerText = t('conference_item') + ' ' + id;
     }
     
-    document.getElementById('chatHeaderText').textContent = headerText;
+    updateChatHeader(id, type);
     vsc.clear();
 
     // 加载历史消息
@@ -520,6 +506,52 @@ function selectContact(id, type) {
             });
         }).catch(() => {});
     }
+}
+
+// ── Link detection ──
+function linkifyText(text) {
+    if (!text) return '';
+    var escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return escaped.replace(/(https?:\/\/[^\s<>&"']+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+
+// ── Chat header update ──
+function updateChatHeader(id, type) {
+    var badge = document.getElementById('chatTypeBadge');
+    var nameEl = document.getElementById('chatContactName');
+    var dot = document.getElementById('headerStatusDot');
+    if (!id) {
+        badge.textContent = '';
+        nameEl.textContent = '';
+        dot.className = 'online-dot hidden';
+        return;
+    }
+    var displayName = '';
+    var isOnline = false;
+    if (type === 'friend') {
+        badge.textContent = '👤';
+        var found = contacts.friends.find(function(f) { return f.friend_id == id; });
+        if (found) {
+            displayName = found.name || found.public_key || id;
+            isOnline = found.connection_status && found.connection_status !== 'offline' && found.connection_status !== 'unknown';
+        } else {
+            displayName = id;
+        }
+    } else if (type === 'group') {
+        badge.textContent = '👥';
+        var found = contacts.groups.find(function(g) { return g.group_number == id; });
+        displayName = found ? (found.group_name || id) : id;
+        isOnline = found ? found.is_connected : false;
+    } else if (type === 'conference') {
+        badge.textContent = '🎙';
+        var found = contacts.conferences.find(function(c) { return c.conference_number == id; });
+        displayName = found ? (found.conference_name || id) : id;
+        isOnline = found ? found.is_connected : false;
+    }
+    nameEl.textContent = displayName;
+    var dotClass = 'online-dot';
+    if (!isOnline) dotClass = 'online-dot offline';
+    dot.className = dotClass;
 }
 
 // Load message history for current chat
@@ -781,7 +813,7 @@ class VirtualScroller {
         el._ap.textContent = (msg.avatarText || '').toUpperCase();
         el._ss.textContent = msg.sender || '';
         el._ts.textContent = msg.timestamp;
-        el._bb.textContent = msg.text;
+        el._bb.innerHTML = linkifyText(msg.text);
         el._bb.className = 'message-bubble ' + (msg.type === 'self' ? 'self-bubble' : 'other-bubble');
 
         if (msg.type === 'self') {
@@ -1187,6 +1219,7 @@ function sendMessage() {
             // 自己消息：传递 Me 和 M 作为头像文本
             appendMessage(msg, 'self', 'Me', 'M');
             input.value = '';
+            autoResizeTextarea();
         }).catch(err => {
         console.error('Send error:', err);
         alert(t('send_failed') + ': ' + (err.error || JSON.stringify(err)));
@@ -1350,7 +1383,7 @@ function leaveGroup() {
               if (currentChatId == selectedGroupId && currentChatType === 'group') {
                   currentChatId = null;
                   currentChatType = null;
-                  document.getElementById('chatHeaderText').textContent = t('select_chat_object');
+                  updateChatHeader(null, null);
                   vsc.clear();
               }
               loadContacts('groups');
@@ -1806,6 +1839,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSelfInfo();
     loadContacts('all');
     longPollEvents();
+    initEmojiPicker();
+    document.getElementById('messageInput').addEventListener('keydown', _messageInputHandler);
 });
 
 // Periodically refresh self info
@@ -1813,12 +1848,213 @@ setInterval(() => {
     loadSelfInfo();
 }, 5000);
 
-// Enter key sends message
-document.getElementById('messageInput').addEventListener('keypress', e => {
-    if (e.key === 'Enter') sendMessage();
+// ── Input helpers ──
+function autoResizeTextarea() {
+    var ta = document.getElementById('messageInput');
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 84) + 'px';
+}
+
+function selectFile() {
+    alert(t('not_yet_implemented'));
+}
+
+// ── Emoji picker (built-in character array) ──
+var EMOJI_GROUP_ICONS = {
+    'Smileys & Emotion': '😀',
+    'People & Body': '👋',
+    'Symbols': '💎',
+    'Activities': '⚽',
+};
+var EMOJI_GROUP_ORDER = ['Smileys & Emotion', 'People & Body', 'Symbols', 'Activities'];
+var EMOJI_BY_GROUP = {
+    'Smileys & Emotion': ['😀','😃','😄','😁','😅','😂','🤣','😊','😇','🙂','😉','😌','😍','🥰','😘','😗','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','😐','😑','😶','😏','😒','🙄','😬','🤥','😴','😷','🤒','🤕','🤢','🤮','🥴','😵','🤯','🤠','🥳','🥺','😢','😭','😤','😡','🤬'],
+    'People & Body': ['💩','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤞'],
+    'Symbols': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','💕','💞','💗','💖','💘','✅','❌','⭕️','‼️','⁉️','❓','❔','❕','❗️','⚠️','🚫','🔞','📵','🚭','💢','♨️','💤','🌀','🔴','🟠','🟡','🟢','🔵','🟣','⚫️','⚪️','🟤','🔶','🔷','🔸','🔹','🔺','🔻','💬','🗯','💭'],
+    'Activities': ['⭐️','🌟','✨','🔥','💯','🎉','🎊','🎈','🎁','🎀'],
+};
+var EMOJI_GROUPS = [];
+for (var _egi = 0; _egi < EMOJI_GROUP_ORDER.length; _egi++) {
+    if (EMOJI_BY_GROUP[EMOJI_GROUP_ORDER[_egi]]) EMOJI_GROUPS.push(EMOJI_GROUP_ORDER[_egi]);
+}
+var EMOJI_DATA = [];
+for (var _edi = 0; _edi < EMOJI_GROUPS.length; _edi++) {
+    var _g = EMOJI_GROUPS[_edi];
+    for (var _ej = 0; _ej < EMOJI_BY_GROUP[_g].length; _ej++) {
+        EMOJI_DATA.push(EMOJI_BY_GROUP[_g][_ej]);
+    }
+}
+var _emojiPickerInit = false;
+var _emojiActiveTab = EMOJI_GROUPS.length > 0 ? EMOJI_GROUPS[0] : null;
+
+function getRecentEmoji() {
+    try { return JSON.parse(localStorage.getItem('emoji_recent') || '[]'); }
+    catch(e) { return []; }
+}
+
+function saveRecentEmoji(ch) {
+    var recent = getRecentEmoji();
+    recent = [ch].concat(recent.filter(function(c) { return c !== ch; }));
+    if (recent.length > 20) recent = recent.slice(0, 20);
+    localStorage.setItem('emoji_recent', JSON.stringify(recent));
+}
+
+function initEmojiPicker() {
+    if (_emojiPickerInit) return;
+    _emojiPickerInit = true;
+    var root = document.getElementById('emojiPicker');
+    if (!root) return;
+
+    var searchDiv = document.createElement('div');
+    searchDiv.className = 'emoji-search';
+    var searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search emoji...';
+    searchInput.addEventListener('input', function() { renderEmojiGrid(root, searchInput.value); });
+    searchDiv.appendChild(searchInput);
+    root.appendChild(searchDiv);
+
+    var tabsDiv = document.createElement('div');
+    tabsDiv.className = 'emoji-tabs';
+    for (var i = 0; i < EMOJI_GROUPS.length; i++) {
+        var g = EMOJI_GROUPS[i];
+        var tab = document.createElement('button');
+        tab.className = 'emoji-tab' + (_emojiActiveTab === g ? ' active' : '');
+        tab.textContent = EMOJI_GROUP_ICONS[g] || '?';
+        tab.title = g;
+        tab.addEventListener('click', (function(grp) { return function() { switchEmojiTab(root, grp, searchInput); }; })(g));
+        tabsDiv.appendChild(tab);
+    }
+    root.appendChild(tabsDiv);
+
+    var grid = document.createElement('div');
+    grid.className = 'emoji-grid';
+    root.appendChild(grid);
+
+    renderEmojiGrid(root, '');
+}
+
+function switchEmojiTab(root, tab, searchInput) {
+    _emojiActiveTab = tab;
+    var tabButtons = root.querySelectorAll('.emoji-tab');
+    for (var i = 0; i < tabButtons.length; i++) {
+        tabButtons[i].className = 'emoji-tab';
+    }
+    var idx = EMOJI_GROUPS.indexOf(tab);
+    if (idx >= 0 && tabButtons[idx]) tabButtons[idx].className = 'emoji-tab active';
+    if (searchInput) searchInput.value = '';
+    renderEmojiGrid(root, '');
+}
+
+function renderEmojiGrid(root, search) {
+    var grid = root.querySelector('.emoji-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    if (search) {
+        var lower = search.toLowerCase();
+        for (var i = 0; i < EMOJI_DATA.length; i++) {
+            if (EMOJI_DATA[i].toLowerCase().indexOf(lower) >= 0) {
+                var btn = document.createElement('button');
+                btn.className = 'emoji-item';
+                btn.textContent = EMOJI_DATA[i];
+                btn.addEventListener('click', (function(c) { return function() { insertEmoji(c); }; })(EMOJI_DATA[i]));
+                grid.appendChild(btn);
+            }
+        }
+        if (grid.children.length === 0) {
+            grid.innerHTML = '<div class="emoji-label" style="text-align:center;padding:20px 0;">No results</div>';
+        }
+        return;
+    }
+
+    var hasContent = false;
+
+    var recent = getRecentEmoji();
+    if (recent.length > 0) {
+        hasContent = true;
+        var label = document.createElement('div');
+        label.className = 'emoji-label';
+        label.textContent = '🕓 Recently used';
+        grid.appendChild(label);
+        for (var i = 0; i < recent.length; i++) {
+            var btn = document.createElement('button');
+            btn.className = 'emoji-item';
+            btn.textContent = recent[i];
+            btn.addEventListener('click', (function(c) { return function() { insertEmoji(c); }; })(recent[i]));
+            grid.appendChild(btn);
+        }
+    }
+
+    var items = EMOJI_BY_GROUP[_emojiActiveTab] || [];
+    if (items.length > 0) {
+        hasContent = true;
+        for (var i = 0; i < items.length; i++) {
+            var btn = document.createElement('button');
+            btn.className = 'emoji-item';
+            btn.textContent = items[i];
+            btn.addEventListener('click', (function(c) { return function() { insertEmoji(c); }; })(items[i]));
+            grid.appendChild(btn);
+        }
+    }
+
+    if (!hasContent) {
+        grid.innerHTML = '<div class="emoji-label" style="text-align:center;padding:20px 0;">No emoji</div>';
+    }
+}
+
+function insertEmoji(ch) {
+    var input = document.getElementById('messageInput');
+    if (!input) return;
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    var val = input.value;
+    input.value = val.substring(0, start) + ch + val.substring(end);
+    input.selectionStart = input.selectionEnd = start + ch.length;
+    input.focus();
+    autoResizeTextarea();
+    saveRecentEmoji(ch);
+    hideEmojiPicker();
+}
+
+function toggleEmojiPicker() {
+    var root = document.getElementById('emojiPicker');
+    if (!root) return;
+    if (root.classList.contains('hidden')) {
+        initEmojiPicker();
+        root.classList.remove('hidden');
+    } else {
+        root.classList.add('hidden');
+    }
+}
+
+function hideEmojiPicker() {
+    var root = document.getElementById('emojiPicker');
+    if (root) root.classList.add('hidden');
+}
+
+// Close emoji picker on outside click
+document.addEventListener('click', function(e) {
+    var picker = document.getElementById('emojiPicker');
+    if (!picker || picker.classList.contains('hidden')) return;
+    if (!e.target.closest('.input-area')) hideEmojiPicker();
 });
 
-// ESC key closes modals
+// ── Switch account stub ──
+function switchAccountStub() {
+    alert(t('not_yet_implemented'));
+}
+
+// Enter key sends message (Shift+Enter for newline)
+var _messageInputHandler = function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+};
+
+// ESC key closes modals and emoji picker
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         hideFriendInfo();
@@ -1828,6 +2064,7 @@ document.addEventListener('keydown', (e) => {
         hideGroupInfo();
         hideSelectConference();
         hideMemberList();
+        hideEmojiPicker();
     }
 });
 
@@ -1860,3 +2097,6 @@ window.inviteToGroup = inviteToGroup;
 window.showConferenceMembers = showConferenceMembers;
 window.showGroupMembers = showGroupMembers;
 window.hideMemberList = hideMemberList;
+window.toggleEmojiPicker = toggleEmojiPicker;
+window.selectFile = selectFile;
+window.switchAccountStub = switchAccountStub;

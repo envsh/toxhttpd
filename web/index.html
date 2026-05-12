@@ -20,6 +20,7 @@
                     </div>
                 </div>
                 <div class="self-address-row">
+                    <button class="switch-account-btn" onclick="switchAccountStub()" title="切换账号">⇄</button>
                     <span class="self-address" id="selfAddress" title="点击复制完整地址">...</span>
                     <button class="copy-btn" id="copyBtn" onclick="copyAddress()">复制</button>
                 </div>
@@ -53,7 +54,11 @@
         </div>
         <div class="chat-area">
             <div class="chat-header" id="chatHeader">
-                <span id="chatHeaderText">选择聊天对象</span>
+                <div class="chat-header-info" id="chatHeaderInfo">
+                    <span id="chatTypeBadge" class="type-badge"></span>
+                    <span class="online-dot hidden" id="headerStatusDot"></span>
+                    <span id="chatContactName" class="header-contact-name"></span>
+                </div>
                 <select class="lang-selector" id="langSelector" onchange="switchLanguage(this.value)">
                     <option value="zh-CN">简体中文</option>
                     <option value="zh-TW">繁體中文</option>
@@ -62,8 +67,15 @@
             </div>
             <div class="messages" id="messageArea"></div>
             <div class="input-area">
-                <input type="text" id="messageInput" placeholder="输入消息...">
-                <button onclick="sendMessage()">发送</button>
+                <div class="input-row">
+                    <textarea id="messageInput" rows="1" placeholder="输入消息..." oninput="autoResizeTextarea()"></textarea>
+                    <div class="input-actions">
+                        <button class="tool-btn emoji-tool-btn" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+                        <button class="tool-btn file-tool-btn" onclick="selectFile()" title="Attach file">📎</button>
+                    </div>
+                    <button class="send-btn" onclick="sendMessage()">发送</button>
+                </div>
+                <div class="emoji-picker hidden" id="emojiPicker"></div>
             </div>
         </div>
     </div>
