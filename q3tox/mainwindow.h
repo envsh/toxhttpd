@@ -21,7 +21,7 @@ public:
     void customEvent(CustomEventBase* event);
     
     public slots:
-    void onContactSelected(int id, const QString& type);
+    void onContactSelected(int id, const QString& type, const QString& name);
     void onMessageSent(const QString& message);
     void onLanguageChanged(const QString& langCode);
     void retranslateUi();

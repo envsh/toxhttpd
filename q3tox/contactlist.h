@@ -4,6 +4,11 @@
 #include "compat34.h"
 #include "placeholderlineedit.h"
 
+// Emoji constants defined in contactlist.cpp
+extern const char* EMOJI_FRIEND;
+extern const char* EMOJI_GROUP;
+extern const char* EMOJI_CONFERENCE;
+
 struct Contact {
     int id;
     QString name;
@@ -29,7 +34,7 @@ public:
     void retranslateUi();
     
     signals:
-    void contactSelected(int id, const QString& type);
+    void contactSelected(int id, const QString& type, const QString& name);
     void viewInfoRequested(int id, const QString& type);
     void deleteOrLeaveRequested(int id, const QString& type);
     void inviteToConferenceRequested(int friendId);

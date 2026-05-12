@@ -16,6 +16,12 @@ struct ChatMessage {
     ChatMessage() : height(0) {}
 };
 
+struct LinkSpan {
+    int start;
+    int end;
+    QString url;
+};
+
 class LimeScrollBar;
 
 class ChatView : public QWidget {
@@ -32,6 +38,10 @@ protected:
     void resizeEvent(QResizeEvent* event);
     void wheelEvent(QWheelEvent* event);
     void keyPressEvent(QKeyEvent* event);
+    void mousePressEvent(QMouseEvent* event);
+    void mouseMoveEvent(QMouseEvent* event);
+    void mouseReleaseEvent(QMouseEvent* event);
+    void contextMenuEvent(QContextMenuEvent* event);
 
 private slots:
     void onScrollChanged(int value);
@@ -41,6 +51,21 @@ private:
     int contentWidth() const;
     void drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewWidth);
     int calcMessageHeight(const ChatMessage& msg, int viewWidth) const;
+
+    // Selection and link helpers
+    int findMessageAtY(int y) const;
+    int charPosAt(int msgIndex, int localX, int localY);
+    std::vector<QRect> selectionRects(int msgIndex);
+    QString selectedText() const;
+    std::vector<LinkSpan> extractLinks(const QString& text);
+    void copySelectedText();
+    void copyFullMessage(int msgIndex);
+
+    // Selection state
+    int m_selMsgIndex;
+    int m_selStart;
+    int m_selEnd;
+    bool m_selecting;
 
     std::vector<ChatMessage> m_messages;
     int m_totalHeight;

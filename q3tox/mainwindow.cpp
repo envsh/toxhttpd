@@ -97,8 +97,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     // 连接信号槽
     connect(selfInfoWidget, SIGNAL(switchAccountRequested()),
             this, SLOT(onSwitchAccount()));
-    connect(contactListWidget, SIGNAL(contactSelected(int, const QString&)), 
-            this, SLOT(onContactSelected(int, const QString&)));
+    connect(contactListWidget, SIGNAL(contactSelected(int, const QString&, const QString&)), 
+            this, SLOT(onContactSelected(int, const QString&, const QString&)));
     connect(contactListWidget, SIGNAL(viewInfoRequested(int, const QString&)),
             this, SLOT(onViewInfoRequested(int, const QString&)));
     connect(contactListWidget, SIGNAL(deleteOrLeaveRequested(int, const QString&)),
@@ -202,7 +202,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
     }
 }
 
-void MainWindow::onContactSelected(int id, const QString& type) {
+void MainWindow::onContactSelected(int id, const QString& type, const QString& name) {
     // 如果已经是当前选中的聊天对象，不重新加载（避免清空消息）
     if (id == currentChatId && type == currentChatType) {
         qWarning("onContactSelected: same contact, ignoring");
@@ -214,12 +214,16 @@ void MainWindow::onContactSelected(int id, const QString& type) {
     currentChatType = type;
     
     QString headerText;
+    QString emoji;
     if (type == "friend") {
-        headerText = _("chat_with_friend").arg(QString::number(id));
+        emoji = EMOJI_FRIEND;
+        headerText = emoji + " " + name;
     } else if (type == "group") {
-        headerText = _("group") + " " + QString::number(id);
+        emoji = EMOJI_GROUP;
+        headerText = emoji + " " + name;
     } else if (type == "conference") {
-        headerText = _("conference_item") + " " + QString::number(id);
+        emoji = EMOJI_CONFERENCE;
+        headerText = emoji + " " + name;
     }
     
     chatWidget->setHeaderText(headerText);

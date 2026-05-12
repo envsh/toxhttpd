@@ -150,7 +150,7 @@ void ContactListWidget::onSelectionChanged() {
             if (currentFilter == "conference" && c->type != "conference") continue;
         }
         if (count == index) {
-            emit contactSelected(c->id, c->type);
+            emit contactSelected(c->id, c->type, c->name);
             return;
         }
         ++count;
@@ -168,7 +168,16 @@ void ContactListWidget::onItemClicked() {
     if (!item) return;
     int id = item->data(Qt::UserRole).toInt();
     QString type = item->data(Qt::UserRole + 1).toString();
-    emit contactSelected(id, type);
+    // find name
+    QString name;
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == id && c->type == type) {
+            name = c->name;
+            break;
+        }
+    }
+    emit contactSelected(id, type, name);
 #endif
 }
 
