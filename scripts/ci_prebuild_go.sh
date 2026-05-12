@@ -24,7 +24,7 @@ cd go-toxhttpd && ln -sv go.work.impl go.work
 # cd go-toxhttpd && go build -v ./...
 go build -v
 
-pwd && ls -lh && ldd toxhttpd-go
+pwd && ls -lh && ldd toxhttpd
 
 # it should be in $PROJDIR/go-toxhttpd/
 exit 0

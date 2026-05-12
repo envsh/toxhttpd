@@ -29,12 +29,40 @@ jobs:
       - name: Prepare backend artifact
         run: |
           mkdir -p bin
-          cp go-toxhttpd/toxhttpd-go bin/toxhttpd-go
-          chmod +x bin/toxhttpd-go
+          cp go-toxhttpd/toxhttpd bin/toxhttpd
+          chmod +x bin/toxhttpd
       - name: Upload backend binary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: toxhttpd-go-backend
+          name: toxhttpd-linux-backend
+          path: bin/
+          retention-days: 30
+
+  build-backend-mac:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Install toxcore dependencies
+        run: |
+          brew install toxcore opus libsodium
+      - name: Build backend
+        run: |
+          git clone -b group-ngc https://github.com/envsh/go-toxcore-c.git go-toxhttpd/go-toxcore-c
+          cd go-toxhttpd && ln -sv go.work.impl go.work
+          CGO_ENABLED=1 go build -o toxhttpd .
+      - name: Prepare backend artifact
+        run: |
+          mkdir -p bin
+          cp go-toxhttpd/toxhttpd bin/toxhttpd
+          chmod +x bin/toxhttpd
+      - name: Upload backend binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: toxhttpd-macos-backend
           path: bin/
           retention-days: 30
 
@@ -111,59 +139,128 @@ jobs:
           path: bin/
           retention-days: 30
 
-  package-release:
+  build-qltox-qt4-mac:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt4 and dependencies
+        run: |
+          brew tap cartr/qt4
+          brew install qt@4
+          brew install pkg-config freetype
+      - name: Build q3tox
+        run: |
+          cd q3tox
+          qmake q3tox.pro
+          make -j$(sysctl -n hw.logicalcpu)
+      - name: Prepare frontend artifact
+        run: |
+          mkdir -p bin
+          cp q3tox/q3tox bin/q3tox
+          chmod +x bin/q3tox
+      - name: Upload q3tox binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: q3tox-macos-frontend
+          path: bin/
+          retention-days: 30
+
+  package-release-linux:
     runs-on: ubuntu-22.04
     needs: [build-backend, build-qltox-qt4]
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Download backend artifact
         uses: actions/download-artifact@v4
         with:
-          name: toxhttpd-go-backend
+          name: toxhttpd-linux-backend
           path: release/
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
         with:
           name: q3tox-qt4-frontend
           path: release/
-      - name: Debug release structure
-        run: |
-          echo "Release directory structure:"
-          find release/ -type f | sort
-          ls -lhR release/
       - name: Organize files for packaging
         run: |
           mkdir -p release/bin release/web
-          if [ -f release/toxhttpd-go ]; then
-            mv release/toxhttpd-go release/bin/
-            echo "Moved toxhttpd-go to bin/"
-          fi
-          if [ -f release/q3tox ]; then
-            mv release/q3tox release/bin/
-            echo "Moved q3tox to bin/"
-          fi
+          mv release/toxhttpd release/bin/
+          mv release/q3tox release/bin/
           cp -r web/* release/web/
-          echo "Release directory structure after organizing:"
           ls -lhR release/
-      - name: Create unified release tarball
+      - name: Create tarball
         run: |
           cd release
-          tar czvf ../toxhttpd-release-${{ github.sha }}.tar.gz bin/ web/
+          tar czvf ../toxhttpd-linux-x86_64-${{ github.sha }}.tar.gz bin/ web/
           cd ..
-          ls -lh toxhttpd-release-*.tar.gz
-      - name: Upload unified release package
+      - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: toxhttpd-release-${{ github.sha }}
-          path: toxhttpd-release-*.tar.gz
+          name: toxhttpd-linux-release
+          path: toxhttpd-linux-x86_64-*.tar.gz
           retention-days: 90
+
+  package-release-macos:
+    runs-on: ubuntu-22.04
+    needs: [build-backend-mac, build-qltox-qt4-mac]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: toxhttpd-macos-backend
+          path: release/
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: q3tox-macos-frontend
+          path: release/
+      - name: Organize files for packaging
+        run: |
+          mkdir -p release/bin release/web
+          mv release/toxhttpd release/bin/
+          mv release/q3tox release/bin/
+          cp -r web/* release/web/
+          ls -lhR release/
+      - name: Create tarball
+        run: |
+          cd release
+          tar czvf ../toxhttpd-macos-x86_64-${{ github.sha }}.tar.gz bin/ web/
+          cd ..
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: toxhttpd-macos-release
+          path: toxhttpd-macos-x86_64-*.tar.gz
+          retention-days: 90
+
+  upload-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-22.04
+    needs: [package-release-linux, package-release-macos]
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux release
+        uses: actions/download-artifact@v4
+        with:
+          name: toxhttpd-linux-release
+          path: release/
+      - name: Download macOS release
+        uses: actions/download-artifact@v4
+        with:
+          name: toxhttpd-macos-release
+          path: release/
+      - name: Prepare files for upload
+        run: |
+          ls -lhR release/
+          mv release/*.tar.gz .
+          ls -lh *.tar.gz
       - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: toxhttpd-release-${{ github.sha }}.tar.gz
+          files: |
+            toxhttpd-linux-x86_64-*.tar.gz
+            toxhttpd-macos-x86_64-*.tar.gz
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
