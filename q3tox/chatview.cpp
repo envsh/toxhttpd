@@ -42,6 +42,7 @@ static void qOpenUrl(const QString& url) {
 
 ChatView::ChatView(QWidget* parent)
     : QWidget(parent)
+    , m_clickCount(0), m_clickMsgIndex(-1)
     , m_selMsgIndex(-1), m_selStart(0), m_selEnd(0), m_selecting(false)
 {
     m_totalHeight = 0;
@@ -226,6 +227,39 @@ std::vector<LinkSpan> ChatView::extractLinks(const QString& text) {
         pos += len;
     }
     return spans;
+}
+
+// Find word boundaries around a character position
+static void wordBoundaries(const QString& text, int pos, int& start, int& end) {
+    int len = text.length();
+    if (len == 0) { start = end = 0; return; }
+    start = pos;
+    end = pos;
+    if (pos < 0) pos = 0;
+    if (pos >= len) pos = len - 1;
+    // If at whitespace, move to nearest non-space
+    while (start >= 0 && text[start].isSpace()) start--;
+    while (end < len && text[end].isSpace()) end++;
+    if (start < 0) { start = end = 0; return; }
+    if (end >= len) { end = len; }
+    // Expand left
+    while (start > 0 && !text[start - 1].isSpace()) start--;
+    // Expand right
+    while (end < len && !text[end].isSpace()) end++;
+}
+
+// Find line boundaries around a character position
+static void lineBoundaries(const QString& text, int pos, int& start, int& end) {
+    int len = text.length();
+    if (len == 0) { start = end = 0; return; }
+    start = pos;
+    end = pos;
+    if (pos < 0) pos = 0;
+    if (pos >= len) pos = len - 1;
+    // Expand left to line start
+    while (start > 0 && text[start - 1] != '\n') start--;
+    // Expand right to line end
+    while (end < len && text[end] != '\n') end++;
 }
 
 // Find which message is at given y coordinate (relative to widget top)
@@ -428,6 +462,30 @@ QString ChatView::selectedText() const {
     return m_messages[m_selMsgIndex].messageText.mid(start, end - start);
 }
 
+void ChatView::selectWordAt(int msgIndex, int charPos) {
+    if (msgIndex < 0 || msgIndex >= (int)m_messages.size()) return;
+    const QString& text = m_messages[msgIndex].messageText;
+    int start, end;
+    wordBoundaries(text, charPos, start, end);
+    m_selMsgIndex = msgIndex;
+    m_selStart = start;
+    m_selEnd = end;
+    m_selecting = false;
+    update();
+}
+
+void ChatView::selectLineAt(int msgIndex, int charPos) {
+    if (msgIndex < 0 || msgIndex >= (int)m_messages.size()) return;
+    const QString& text = m_messages[msgIndex].messageText;
+    int start, end;
+    lineBoundaries(text, charPos, start, end);
+    m_selMsgIndex = msgIndex;
+    m_selStart = start;
+    m_selEnd = end;
+    m_selecting = false;
+    update();
+}
+
 void ChatView::copySelectedText() {
     QString text = selectedText();
     if (!text.isEmpty()) {
@@ -555,7 +613,11 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
             p.setBrush(selColor);
             for (size_t ri = 0; ri < selRects.size(); ++ri) {
                 QRect r = selRects[ri];
+#ifdef QT3_BUILD
                 r.moveBy(0, y);
+#else
+                r.translate(0, y);
+#endif
                 p.drawRect(r);
             }
         }
@@ -632,6 +694,18 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
             if (charPos >= 0) {
+                // Triple-click detection
+                QTime now = QTime::currentTime();
+                if (msgIndex == m_clickMsgIndex && m_clickCount == 2 &&
+                    m_clickTime.msecsTo(now) <= QApplication::doubleClickInterval()) {
+                    selectLineAt(msgIndex, charPos);
+                    m_clickCount = 0;
+                    return;
+                }
+                m_clickCount = 1;
+                m_clickMsgIndex = msgIndex;
+                m_clickTime = now;
+
                 // Check if clicked on a URL
                 auto links = extractLinks(m_messages[msgIndex].messageText);
                 for (const LinkSpan& link : links) {
@@ -653,6 +727,7 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 m_selMsgIndex = -1;
                 update();
             }
+            m_clickCount = 0;
         }
     }
     QWidget::mousePressEvent(event);
@@ -720,6 +795,27 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
         }
     }
     QWidget::mouseReleaseEvent(event);
+}
+
+void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        int msgIndex = findMessageAtY(event->y());
+        if (msgIndex >= 0) {
+            int msgY = kPad - m_scrollPos;
+            for (int i = 0; i < msgIndex; i++) msgY += m_messages[i].height;
+            int localY = event->y() - msgY;
+            int localX = event->x();
+            int charPos = charPosAt(msgIndex, localX, localY);
+            if (charPos >= 0) {
+                selectWordAt(msgIndex, charPos);
+                m_clickCount = 2;
+                m_clickMsgIndex = msgIndex;
+                m_clickTime = QTime::currentTime();
+                return;
+            }
+        }
+    }
+    QWidget::mouseDoubleClickEvent(event);
 }
 
 void ChatView::contextMenuEvent(QContextMenuEvent* event) {

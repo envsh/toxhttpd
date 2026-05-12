@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include <string>
 #include <vector>
+#include <qdatetime.h>
 
 struct ChatMessage {
     QString messageText;
@@ -39,6 +40,7 @@ protected:
     void wheelEvent(QWheelEvent* event);
     void keyPressEvent(QKeyEvent* event);
     void mousePressEvent(QMouseEvent* event);
+    void mouseDoubleClickEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
     void contextMenuEvent(QContextMenuEvent* event);
@@ -55,11 +57,18 @@ private:
     // Selection and link helpers
     int findMessageAtY(int y) const;
     int charPosAt(int msgIndex, int localX, int localY);
+    void selectWordAt(int msgIndex, int charPos);
+    void selectLineAt(int msgIndex, int charPos);
     std::vector<QRect> selectionRects(int msgIndex);
     QString selectedText() const;
     std::vector<LinkSpan> extractLinks(const QString& text);
     void copySelectedText();
     void copyFullMessage(int msgIndex);
+
+    // Click tracking for double/triple click
+    int m_clickCount;
+    int m_clickMsgIndex;
+    QTime m_clickTime;
 
     // Selection state
     int m_selMsgIndex;
