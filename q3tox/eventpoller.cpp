@@ -2,7 +2,12 @@
 #include "compat34.h"
 #include <queue>
 
-EventPoller::EventPoller(QObject* parent) : QThread((unsigned int)0), 
+EventPoller::EventPoller(QObject* parent) :
+#ifdef QT3_BUILD
+    QThread((unsigned int)0),
+#else
+    QThread(parent),
+#endif
     running(false), lastEventId(0), receiver(nullptr) {
     api = new ToxAPI();
 }
