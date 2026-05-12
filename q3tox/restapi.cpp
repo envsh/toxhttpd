@@ -182,29 +182,26 @@ bool ToxAPI::getFriendInfo(int friendId, FriendInfo& info) {
     cJSON* nameItem = cJSON_GetObjectItem(root, "name");
     if (nameItem && cJSON_IsString(nameItem)) {
         info.name = std::string(cJSON_GetStringValue(nameItem));
-    } else {
-        info.name = "";
     }
     
-    cJSON* statusItem = cJSON_GetObjectItem(root, "status_message");
-    if (statusItem && cJSON_IsString(statusItem)) {
-        info.status = std::string(cJSON_GetStringValue(statusItem));
-    } else {
-        info.status = "";
+    cJSON* ssItem = cJSON_GetObjectItem(root, "statusStr");
+    if (ssItem && cJSON_IsString(ssItem)) {
+        info.statusStr = std::string(cJSON_GetStringValue(ssItem));
     }
     
-    cJSON* connItem = cJSON_GetObjectItem(root, "connection_status");
-    if (connItem && cJSON_IsString(connItem)) {
-        info.connection_status = std::string(cJSON_GetStringValue(connItem));
-    } else {
-        info.connection_status = "offline";
+    cJSON* stItem = cJSON_GetObjectItem(root, "statusText");
+    if (stItem && cJSON_IsString(stItem)) {
+        info.statusText = std::string(cJSON_GetStringValue(stItem));
     }
     
-    cJSON* pkItem = cJSON_GetObjectItem(root, "public_key");
+    cJSON* iconItem = cJSON_GetObjectItem(root, "iconUrl");
+    if (iconItem && cJSON_IsString(iconItem)) {
+        info.iconUrl = std::string(cJSON_GetStringValue(iconItem));
+    }
+    
+    cJSON* pkItem = cJSON_GetObjectItem(root, "publicKey");
     if (pkItem && cJSON_IsString(pkItem)) {
-        info.public_key = std::string(cJSON_GetStringValue(pkItem));
-    } else {
-        info.public_key = "";
+        info.publicKey = std::string(cJSON_GetStringValue(pkItem));
     }
     
     cJSON_Delete(root);
@@ -285,17 +282,27 @@ std::vector<ConferenceInfo> ToxAPI::getConferences() {
             if (!item) continue;
             
             ConferenceInfo info;
-            cJSON* numItem = cJSON_GetObjectItem(item, "conference_number");
-            if (numItem) info.conference_number = numItem->valueint;
+            cJSON* numItem = cJSON_GetObjectItem(item, "conferenceNumber");
+            if (numItem) info.conferenceNumber = numItem->valueint;
             
-            cJSON* nameItem = cJSON_GetObjectItem(item, "conference_name");
+            cJSON* nameItem = cJSON_GetObjectItem(item, "conferenceName");
             if (nameItem && cJSON_IsString(nameItem)) {
-                info.conference_name = std::string(cJSON_GetStringValue(nameItem));
+                info.conferenceName = std::string(cJSON_GetStringValue(nameItem));
             }
             
-            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chat_id");
+            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chatId");
             if (chatIdItem && cJSON_IsString(chatIdItem)) {
-                info.chat_id = std::string(cJSON_GetStringValue(chatIdItem));
+                info.chatId = std::string(cJSON_GetStringValue(chatIdItem));
+            }
+
+            cJSON* connectedItem = cJSON_GetObjectItem(item, "isConnected");
+            if (connectedItem) {
+                info.isConnected = (connectedItem->valueint == 1);
+            }
+
+            cJSON* statusTextItem = cJSON_GetObjectItem(item, "statusText");
+            if (statusTextItem && cJSON_IsString(statusTextItem)) {
+                info.statusText = std::string(cJSON_GetStringValue(statusTextItem));
             }
             
             conferences.push_back(info);
@@ -396,25 +403,29 @@ std::vector<GroupInfo> ToxAPI::getGroups() {
             if (!item) continue;
             
             GroupInfo info;
-            cJSON* numItem = cJSON_GetObjectItem(item, "group_number");
-            if (numItem) info.group_number = numItem->valueint;
+            cJSON* numItem = cJSON_GetObjectItem(item, "groupNumber");
+            if (numItem) info.groupNumber = numItem->valueint;
             
-            cJSON* nameItem = cJSON_GetObjectItem(item, "group_name");
+            cJSON* nameItem = cJSON_GetObjectItem(item, "groupName");
             if (nameItem && cJSON_IsString(nameItem)) {
-                info.group_name = std::string(cJSON_GetStringValue(nameItem));
+                info.groupName = std::string(cJSON_GetStringValue(nameItem));
             }
             
-            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chat_id");
+            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chatId");
             if (chatIdItem && cJSON_IsString(chatIdItem)) {
-                info.chat_id = std::string(cJSON_GetStringValue(chatIdItem));
+                info.chatId = std::string(cJSON_GetStringValue(chatIdItem));
             }
             
-            // 解析 is_connected 字段
-            cJSON* connectedItem = cJSON_GetObjectItem(item, "is_connected");
+            cJSON* connectedItem = cJSON_GetObjectItem(item, "isConnected");
             if (connectedItem) {
-                info.is_connected = (connectedItem->valueint == 1);
+                info.isConnected = (connectedItem->valueint == 1);
             } else {
-                info.is_connected = false;
+                info.isConnected = false;
+            }
+
+            cJSON* statusTextItem = cJSON_GetObjectItem(item, "statusText");
+            if (statusTextItem && cJSON_IsString(statusTextItem)) {
+                info.statusText = std::string(cJSON_GetStringValue(statusTextItem));
             }
             
             groups.push_back(info);
@@ -552,7 +563,7 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
     cJSON* root = cJSON_Parse(response.c_str());
     if (!root) return members;
     
-    cJSON* selfPpItem = cJSON_GetObjectItem(root, "self_peer_number");
+    cJSON* selfPpItem = cJSON_GetObjectItem(root, "selfPeerNumber");
     int selfPeerNumber = selfPpItem ? selfPpItem->valueint : -1;
     
     cJSON* membersItem = cJSON_GetObjectItem(root, "members");
@@ -564,7 +575,7 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
             
             PeerInfo info;
             
-            cJSON* item = cJSON_GetObjectItem(memberItem, "peer_number");
+            cJSON* item = cJSON_GetObjectItem(memberItem, "peerNumber");
             info.peerNumber = item ? item->valueint : -1;
             
             item = cJSON_GetObjectItem(memberItem, "name");
@@ -577,13 +588,25 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
             item = cJSON_GetObjectItem(memberItem, "status");
             if (item) info.status = item->valueint;
             
-            item = cJSON_GetObjectItem(memberItem, "connection_status");
-            if (item) info.connectionStatus = item->valueint;
+            item = cJSON_GetObjectItem(memberItem, "statusStr");
+            if (item && cJSON_IsString(item)) {
+                info.statusStr = std::string(cJSON_GetStringValue(item));
+            }
+            
+            item = cJSON_GetObjectItem(memberItem, "statusText");
+            if (item && cJSON_IsString(item)) {
+                info.statusText = std::string(cJSON_GetStringValue(item));
+            }
+            
+            item = cJSON_GetObjectItem(memberItem, "iconUrl");
+            if (item && cJSON_IsString(item)) {
+                info.iconUrl = std::string(cJSON_GetStringValue(item));
+            }
             
             item = cJSON_GetObjectItem(memberItem, "role");
             if (item) info.role = item->valueint;
             
-            item = cJSON_GetObjectItem(memberItem, "public_key");
+            item = cJSON_GetObjectItem(memberItem, "publicKey");
             if (item && cJSON_IsString(item)) {
                 info.publicKey = std::string(cJSON_GetStringValue(item));
             }

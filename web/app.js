@@ -331,9 +331,18 @@ function loadContacts(filter = 'all') {
         .then(friendDetails => {
             console.log('Friend details loaded:', friendDetails);
             contacts.friends = friendDetails;
-            // 填充 friendNameMap
+            // 填充 peerInfoMap 好友条目
             friendDetails.forEach(f => {
-                friendNameMap[f.friend_id] = f.name || '';
+                peerInfoMap["friend_" + f.friendId] = {
+                    name: f.name || '',
+                    peerNumber: f.friendId,
+                    status: f.status || 0,
+                    statusStr: f.statusStr || 'none',
+                    statusText: f.statusText || '',
+                    iconUrl: f.iconUrl || '',
+                    publicKey: f.publicKey || '',
+                    isSelf: false
+                };
             });
             // Load groups
             return fetch('/api/groups').then(r => r.json());
@@ -373,19 +382,16 @@ function renderContactList(filter) {
     // Add friends
     if (filter === 'all' || filter === 'friends') {
         contacts.friends.forEach(f => {
-            const isSelected = f.friend_id == currentChatId && currentChatType === 'friend';
-            const dotClass = (f.connection_status && 
-                             f.connection_status !== 'offline' && 
-                             f.connection_status !== 'unknown') 
-                             ? 'online-dot' : 'offline-dot';
+            const isSelected = f.friendId == currentChatId && currentChatType === 'friend';
+            const dotClass = f.status ? 'online-dot' : 'offline-dot';
             const emoji = '👤';
             // Show name, or public key first 7 chars if name empty
             let displayName = f.name;
             if (!displayName || displayName === '') {
-                displayName = (f.public_key || '').substring(0, 7) + '...';
+                displayName = (f.publicKey || '').substring(0, 7) + '...';
             }
             html += `
-                <div class="list-item ${isSelected ? 'selected' : ''}" data-friend-id="${f.friend_id}" onclick="selectContact(${f.friend_id}, 'friend')">
+                <div class="list-item ${isSelected ? 'selected' : ''}" data-friend-id="${f.friendId}" onclick="selectContact(${f.friendId}, 'friend')">
                     <span class="${dotClass}"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${displayName}</span>
@@ -397,19 +403,18 @@ function renderContactList(filter) {
     // Add groups
     if (filter === 'all' || filter === 'groups') {
         contacts.groups.forEach(g => {
-            // g is object: {group_number, group_name, chat_id, ...}
-            const groupId = g.group_number;
-            // 名称为空时：显示 "number - chat_id前7位"
-            let groupName = g.group_name;
+            const groupId = g.groupNumber;
+            // 名称为空时：显示 "number - chatId前7位"
+            let groupName = g.groupName;
             if (!groupName) {
-                const shortId = (g.chat_id || '').substring(0, 7);
+                const shortId = (g.chatId || '').substring(0, 7);
                 groupName = shortId ? `${groupId} - ${shortId}` : `${t('group')} ${groupId}`;
             }
             const isSelected = groupId == currentChatId && currentChatType === 'group';
             const emoji = '👥';
             html += `
                 <div class="list-item ${isSelected ? 'selected' : ''}" data-group-id="${groupId}" onclick="selectContact(${groupId}, 'group')">
-                    <span class="${g.is_connected ? 'online-dot' : 'offline-dot'}"></span>
+                    <span class="${g.isConnected ? 'online-dot' : 'offline-dot'}"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${groupName}</span>
                 </div>
@@ -420,19 +425,18 @@ function renderContactList(filter) {
     // Add conferences
     if (filter === 'all' || filter === 'conferences') {
         contacts.conferences.forEach(c => {
-            // c is object: {conference_number, conference_name, chat_id, ...}
-            const confId = c.conference_number;
-            // 名称为空时：显示 "number - chat_id前7位"
-            let confName = c.conference_name;
+            const confId = c.conferenceNumber;
+            // 名称为空时：显示 "number - chatId前7位"
+            let confName = c.conferenceName;
             if (!confName) {
-                const shortId = (c.chat_id || '').substring(0, 7);
+                const shortId = (c.chatId || '').substring(0, 7);
                 confName = shortId ? `${confId} - ${shortId}` : `${t('conference_item')} ${confId}`;
             }
             const isSelected = confId == currentChatId && currentChatType === 'conference';
             const emoji = '🎙';
             html += `
                 <div class="list-item ${isSelected ? 'selected' : ''}" data-conference-id="${confId}" onclick="selectContact(${confId}, 'conference')">
-                    <span class="${c.is_connected ? 'online-dot' : 'offline-dot'}"></span>
+                    <span class="${c.isConnected ? 'online-dot' : 'offline-dot'}"></span>
                     <span class="item-emoji">${emoji}</span>
                     <span class="item-text">${confName}</span>
                 </div>
@@ -514,7 +518,7 @@ function selectContact(id, type) {
         fetchConferenceMembers(id).then(members => {
             members.forEach(m => {
                 peerInfoMap[`conference_${id}_${m.peer_number}`] = {
-                    name: m.name, peer_number: m.peer_number
+                    name: m.name, peerNumber: m.peer_number
                 };
             });
         }).catch(() => {});
@@ -522,11 +526,14 @@ function selectContact(id, type) {
         fetchGroupMembers(id).then(result => {
             const members = result.members;
             members.forEach(m => {
-                const key = `group_${id}_${m.peer_number}`;
+                const key = `group_${id}_${m.peerNumber}`;
                 peerInfoMap[key] = {
-                    name: m.name, peer_number: m.peer_number,
-                    status: m.status, connection_status: m.connection_status,
-                    role: m.role, public_key: m.public_key, isSelf: m.isSelf
+                    name: m.name, peerNumber: m.peerNumber,
+                    status: m.status,
+                    statusStr: m.statusStr || '',
+                    statusText: m.statusText || '',
+                    iconUrl: m.iconUrl || '',
+                    role: m.role, publicKey: m.publicKey, isSelf: m.isSelf
                 };
             });
         }).catch(() => {});
@@ -555,23 +562,23 @@ function updateChatHeader(id, type) {
     var isOnline = false;
     if (type === 'friend') {
         badge.textContent = '👤';
-        var found = contacts.friends.find(function(f) { return f.friend_id == id; });
+        var found = contacts.friends.find(function(f) { return f.friendId == id; });
         if (found) {
-            displayName = found.name || found.public_key || id;
-            isOnline = found.connection_status && found.connection_status !== 'offline' && found.connection_status !== 'unknown';
+            displayName = found.name || found.publicKey || id;
+            isOnline = found.status && found.status !== 0;
         } else {
             displayName = id;
         }
     } else if (type === 'group') {
         badge.textContent = '👥';
-        var found = contacts.groups.find(function(g) { return g.group_number == id; });
-        displayName = found ? (found.group_name || id) : id;
-        isOnline = found ? found.is_connected : false;
+        var found = contacts.groups.find(function(g) { return g.groupNumber == id; });
+        displayName = found ? (found.groupName || id) : id;
+        isOnline = found ? found.isConnected : false;
     } else if (type === 'conference') {
         badge.textContent = '🎙';
-        var found = contacts.conferences.find(function(c) { return c.conference_number == id; });
-        displayName = found ? (found.conference_name || id) : id;
-        isOnline = found ? found.is_connected : false;
+        var found = contacts.conferences.find(function(c) { return c.conferenceNumber == id; });
+        displayName = found ? (found.conferenceName || id) : id;
+        isOnline = found ? found.isConnected : false;
     }
     nameEl.textContent = displayName;
     var dotClass = 'online-dot';
@@ -606,10 +613,9 @@ function loadMessageHistory() {
                 let avatarText = 'M';
                 if (!isSelf) {
                     if (contactType === 'friend') {
-                        const friendId = String(contactId);
-                        displayName = friendNameMap[friendId] || `Peer ${msg.sender_number}`;
-                        avatarText = (displayName !== 'Me' && displayName !== `Peer ${msg.sender_number}`)
-                            ? displayName.charAt(0).toUpperCase() : '?';
+                        var fe = peerInfoMap["friend_" + contactId];
+                        displayName = (fe && fe.name) || `Friend ${contactId}`;
+                        avatarText = displayName.charAt(0).toUpperCase();
                     } else {
                         const peerKey = `${contactType}_${contactId}_${msg.sender_number}`;
                         displayName = (peerInfoMap[peerKey] && peerInfoMap[peerKey].name) || `Peer ${msg.sender_number}`;
@@ -682,7 +688,8 @@ function longPollEvents() {
                         const data = JSON.parse(event.data);
                         if (data.friend_id == currentChatId && currentChatType === 'friend') {
                             // 对方消息：获取昵称首字母作为头像文本
-                            const friendName = friendNameMap[data.friend_id] || '?';
+                            var fe = peerInfoMap["friend_" + data.friend_id];
+                            const friendName = (fe && fe.name) || '?';
                             const avatarText = friendName.charAt(0).toUpperCase();
                             appendMessage(data.message, 'other', friendName, avatarText);
                         }
@@ -747,10 +754,7 @@ function longPollEvents() {
         });
 }
 
-// 好友昵称映射：friend_id → name
-let friendNameMap = {};
-
-// 会议/群组 peer info 缓存：键 "conference_{id}_{pn}" / "group_{id}_{pn}"，值 { name, peer_number, status, ... }
+// 联系人信息缓存：键 "friend_{id}" / "group_{g}_{p}" / "conference_{c}_{p}"，值 { name, peerNumber, status, statusStr, ... }
 let peerInfoMap = {};
 
 // ── VirtualScroller ──
@@ -1541,10 +1545,10 @@ function showFriendInfo(friendId) {
     }).then(r => r.json())
       .then(data => {
           document.getElementById('infoFriendName').textContent = data.name || t('no_name_label');
-          document.getElementById('infoFriendId').textContent = data.friend_id;
-          document.getElementById('infoFriendStatus').textContent = data.status || t('unknown');
-          document.getElementById('infoFriendConn').textContent = data.connection_status || t('unknown');
-          document.getElementById('infoFriendPk').textContent = data.public_key || t('unknown');
+          document.getElementById('infoFriendId').textContent = data.friendId;
+          document.getElementById('infoFriendStatus').textContent = data.statusText || t('unknown');
+          document.getElementById('infoFriendConn').textContent = data.statusStr || t('unknown');
+          document.getElementById('infoFriendPk').textContent = data.publicKey || t('unknown');
           
           document.getElementById('friendInfoModal').classList.remove('hidden');
       });
@@ -1580,11 +1584,11 @@ function deleteFriend() {
 // Conference functions
 function showConferenceInfo(conferenceId) {
     // 从contacts.conferences中找到对应的会议数据
-    const conf = contacts.conferences ? contacts.conferences.find(c => c.conference_number == conferenceId) : null;
+    const conf = contacts.conferences ? contacts.conferences.find(c => c.conferenceNumber == conferenceId) : null;
     document.getElementById('infoConferenceId').textContent = conferenceId;
     document.getElementById('infoConferenceType').textContent = 'Tox Conference';
     document.getElementById('infoConferenceConn').textContent = conf ? 
-        (conf.is_connected ? '在线' : '离线') : 'N/A';
+        (conf.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('conferenceInfoModal').classList.remove('hidden');
     hideAllContextMenus();
 }
@@ -1618,11 +1622,11 @@ function leaveConference() {
 // Group functions
 function showGroupInfo(groupId) {
     // 从contacts.groups中找到对应的群组数据
-    const group = contacts.groups ? contacts.groups.find(g => g.group_number == groupId) : null;
+    const group = contacts.groups ? contacts.groups.find(g => g.groupNumber == groupId) : null;
     document.getElementById('infoGroupId').textContent = groupId;
-    document.getElementById('infoGroupName').textContent = group ? (group.group_name || 'N/A') : 'N/A';
+    document.getElementById('infoGroupName').textContent = group ? (group.groupName || 'N/A') : 'N/A';
     document.getElementById('infoGroupConn').textContent = group ? 
-        (group.is_connected ? '在线' : '离线') : 'N/A';
+        (group.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('groupInfoModal').classList.remove('hidden');
     hideAllContextMenus();
 }
@@ -1650,7 +1654,7 @@ async function fetchGroupMembers(groupId) {
         return data;
     } catch (err) {
         console.error('Failed to fetch group members:', err);
-        return { members: [], self_peer_number: 0 };
+        return { members: [], selfPeerNumber: 0 };
     }
 }
 
@@ -1687,7 +1691,7 @@ async function showGroupMembers(groupId) {
     } else {
         members.forEach(m => {
             html += `<div style="padding: 8px; border-bottom: 1px solid #30363d;">
-                        <span style="color: #00d4aa;">Peer ${m.peer_number}</span>: 
+                        <span style="color: #00d4aa;">Peer ${m.peerNumber}</span>: 
                         <span style="color: #c9d1d9;">${m.name}</span>
                       </div>`;
         });

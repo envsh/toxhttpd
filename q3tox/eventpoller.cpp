@@ -74,7 +74,9 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
                     cd.id = id;
                     cd.name = info.name;
                     cd.type = "friend";
-                    cd.status = info.connection_status;
+                    cd.status = info.statusStr;
+                    cd.chatId = info.publicKey;
+                    cd.iconUrl = info.iconUrl;
                     result->contacts.push_back(cd);
                 }
             }
@@ -83,23 +85,24 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
             std::vector<GroupInfo> groups = api->getGroups();
             for (const auto& grp : groups) {
                 ContactData cd;
-                cd.id = grp.group_number;
-                cd.chat_id = grp.chat_id;  // 传递chat_id
-                cd.is_connected = grp.is_connected;  // 新增：群组连接状态
+                cd.id = grp.groupNumber;
+                cd.chatId = grp.chatId;
+                cd.isConnected = grp.isConnected;
                 // 使用群组名称，为空时使用降级策略
-                if (!grp.group_name.empty()) {
-                    cd.name = grp.group_name;
+                if (!grp.groupName.empty()) {
+                    cd.name = grp.groupName;
                 } else {
                     // 名称为空：显示 "number - chat_id前7位"
-                    std::string displayName = std::to_string(grp.group_number);
-                    if (!grp.chat_id.empty()) {
-                        displayName += " - " + grp.chat_id.substr(0, 7);
+                    std::string displayName = std::to_string(grp.groupNumber);
+                    if (!grp.chatId.empty()) {
+                        displayName += " - " + grp.chatId.substr(0, 7);
                     }
                     cd.name = displayName;
                 }
                 cd.type = "group";
                 // 根据真实连接状态设置 status
-                cd.status = cd.is_connected ? "online" : "offline";
+                cd.status = cd.isConnected ? "online" : "offline";
+                cd.statusText = grp.statusText;
                 result->contacts.push_back(cd);
             }
             
@@ -107,23 +110,24 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
             std::vector<ConferenceInfo> conferences = api->getConferences();
             for (const auto& conf : conferences) {
                 ContactData cd;
-                cd.id = conf.conference_number;
-                cd.chat_id = conf.chat_id;  // 传递chat_id
-                cd.is_connected = conf.is_connected;  // 新增：会议连接状态
+                cd.id = conf.conferenceNumber;
+                cd.chatId = conf.chatId;
+                cd.isConnected = conf.isConnected;
                 // 使用会议名称，为空时使用降级策略
-                if (!conf.conference_name.empty()) {
-                    cd.name = conf.conference_name;
+                if (!conf.conferenceName.empty()) {
+                    cd.name = conf.conferenceName;
                 } else {
                     // 名称为空：显示 "number - chat_id前7位"
-                    std::string displayName = std::to_string(conf.conference_number);
-                    if (!conf.chat_id.empty()) {
-                        displayName += " - " + conf.chat_id.substr(0, 7);
+                    std::string displayName = std::to_string(conf.conferenceNumber);
+                    if (!conf.chatId.empty()) {
+                        displayName += " - " + conf.chatId.substr(0, 7);
                     }
                     cd.name = displayName;
                 }
                 cd.type = "conference";
                 // 会议使用真实连接状态
-                cd.status = cd.is_connected ? "online" : "offline";
+                cd.status = cd.isConnected ? "online" : "offline";
+                cd.statusText = conf.statusText;
                 result->contacts.push_back(cd);
             }
             

@@ -38,7 +38,6 @@ public:
     
 private:
     std::string selfPubkey;  // 自己的公钥（地址前64字符）
-    std::map<int, std::string> friendNameMap;  // 好友昵称映射：friend_id → name
     std::map<std::string, PeerInfo> peerInfoMap;  // 会议/群组 peer info 缓存: "conf_N_M" / "group_N_M"
     
     QSplitter* splitter;

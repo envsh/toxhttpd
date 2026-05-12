@@ -9,10 +9,10 @@
 struct FriendInfo {
     int id;
     std::string name;
-    std::string status_message;
-    std::string status;
-    std::string connection_status;
-    std::string public_key;
+    std::string statusStr;
+    std::string statusText;
+    std::string iconUrl;
+    std::string publicKey;
 };
 
 struct Event {
@@ -25,25 +25,29 @@ struct Event {
 struct PeerInfo {
     int peerNumber;
     std::string name;
-    int status = 0;
-    int connectionStatus = 0;
+    int status = 0;           // connection status: 0=none, 1=tcp, 2=udp
+    std::string statusStr;    // "none"/"tcp"/"udp"
+    std::string statusText;
+    std::string iconUrl;
     int role = 0;
     std::string publicKey;
     bool isSelf = false;
 };
 
 struct GroupInfo {
-    int group_number;
-    std::string group_name;
-    std::string chat_id;
-    bool is_connected; // 新增：群组连接状态
+    int groupNumber = 0;
+    std::string groupName;
+    std::string chatId;
+    bool isConnected = false;
+    std::string statusText;
 };
 
 struct ConferenceInfo {
-    int conference_number;
-    std::string conference_name;
-    std::string chat_id;
-    bool is_connected; // 新增：会议连接状态
+    int conferenceNumber = 0;
+    std::string conferenceName;
+    std::string chatId;
+    bool isConnected = false;
+    std::string statusText;
 };
 
 struct HistoryMessage {

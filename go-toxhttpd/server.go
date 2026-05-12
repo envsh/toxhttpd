@@ -716,6 +716,17 @@ func (s *Server) handleFriends(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func statusToStr(s int) string {
+	switch s {
+	case 1:
+		return "tcp"
+	case 2:
+		return "udp"
+	default:
+		return "none"
+	}
+}
+
 func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -733,20 +744,31 @@ func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 
 	name, _ := s.tox.FriendGetName(friendID)
 	pk, _ := s.tox.FriendGetPublicKey(friendID)
+	statusText, _ := s.tox.FriendGetStatusMessage(friendID)
+	lastSeen, _ := s.tox.FriendGetLastOnline(friendID)
 
 	s.mu.RLock()
 	connStatus := s.friendStatuses[friendID]
 	s.mu.RUnlock()
 
+	var statusInt int
+	switch connStatus {
+	case "tcp":
+		statusInt = 1
+	case "udp":
+		statusInt = 2
+	}
+
 	resp := map[string]interface{}{
-		"friend_id":              friendID,
-		"name":                   name,
-		"status":                 "",
-		"status_enum":            0,
-		"public_key":             pk,
-		"connection_status":      connStatus,
-		"self_connection_status": "offline",
-		"self_address":           "",
+		"friendId":   friendID,
+		"name":       name,
+		"iconUrl":    "",
+		"status":     statusInt,
+		"statusStr":  statusToStr(statusInt),
+		"statusText": statusText,
+		"publicKey":  pk,
+		"lastSeen":   lastSeen,
+		"peerIp":     nil,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -806,22 +828,27 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 		for i := uint32(0); i < numGroups; i++ {
 			gn := tox.GroupNumber(i) // 类型转换
 			group := map[string]interface{}{
-				"group_number": gn,
-				"group_name":   "",
-				"chat_id":      "",
-				"is_connected": false, // 新增
+				"groupNumber":  gn,
+				"groupName":    "",
+				"chatId":       "",
+				"isConnected":  false,
+				"statusText":   "",
 			}
 			// 获取群组名称
 			if name, err := s.tox.GroupGetName(gn); err == nil {
-				group["group_name"] = name
+				group["groupName"] = name
 			}
 			// 获取群组 chat_id (public key)
 			if chatId, err := s.tox.GroupGetChatId(gn); err == nil {
-				group["chat_id"] = chatId
+				group["chatId"] = chatId
 			}
 			// 获取群组连接状态
 			if connected, err := s.tox.GroupIsConnected(gn); err == nil {
-				group["is_connected"] = connected
+				group["isConnected"] = connected
+			}
+			// 获取群组 topic 作为 statusText
+			if topic, err := s.tox.GroupGetTopic(gn); err == nil {
+				group["statusText"] = topic
 			}
 			groups = append(groups, group)
 		}
@@ -887,23 +914,25 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 		conferences := make([]map[string]interface{}, 0, len(confIDs))
 		for _, confID := range confIDs {
 			conf := map[string]interface{}{
-				"conference_number": confID,
-				"conference_name":   "",
-				"chat_id":           "",
-				"is_connected":      false,
+				"conferenceNumber": confID,
+				"conferenceName":   "",
+				"chatId":           "",
+				"isConnected":      false,
+				"statusText":       "",
 			}
 			// Try to get conference title
 			if title, err := s.tox.ConferenceGetTitle(confID); err == nil {
-				conf["conference_name"] = title
+				conf["conferenceName"] = title
+				conf["statusText"] = title
 			}
 			// Get conference identifier (public key)
 			if chatId, err := s.tox.ConferenceGetIdentifier(confID); err == nil {
-				conf["chat_id"] = chatId
+				conf["chatId"] = chatId
 			}
 			// Get connected state from map
 			s.mu.RLock()
 			if connected, ok := s.conferenceConnected[confID]; ok {
-				conf["is_connected"] = connected
+				conf["isConnected"] = connected
 			}
 			s.mu.RUnlock()
 			conferences = append(conferences, conf)
@@ -1626,35 +1655,36 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		pubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, pn)
-		status, _ := s.tox.GroupPeerGetStatus(groupNumber, pn)
 		connStatus, _ := s.tox.GroupPeerGetConnectionStatus(groupNumber, pn)
 		role, _ := s.tox.GroupPeerGetRole(groupNumber, pn)
 		members = append(members, map[string]interface{}{
-			"peer_number":       peerNumber,
-			"name":              name,
-			"status":            status,
-			"connection_status": connStatus,
-			"role":              int(role),
-			"public_key":        pubKey,
-			"isSelf":            false,
-			"lastSeen":          nil,
-			"peerIp":            nil,
+			"peerNumber": peerNumber,
+			"name":       name,
+			"iconUrl":    "",
+			"status":     connStatus,
+			"statusStr":  statusToStr(connStatus),
+			"statusText": "",
+			"role":       int(role),
+			"publicKey":  pubKey,
+			"isSelf":     false,
+			"lastSeen":   nil,
+			"peerIp":     nil,
 		})
 	}
 
 	selfPeerNumber, selfErr := s.tox.GroupSelfGetPeerId(groupNumber)
 	for i := range members {
-		if members[i]["peer_number"].(int) == int(selfPeerNumber) {
+		if members[i]["peerNumber"].(int) == int(selfPeerNumber) {
 			members[i]["isSelf"] = true
 		}
 	}
 	resp := map[string]interface{}{
-		"group_number":     int(groupNumber),
-		"members":          members,
-		"self_peer_number": int(selfPeerNumber),
+		"groupNumber":     int(groupNumber),
+		"members":         members,
+		"selfPeerNumber": int(selfPeerNumber),
 	}
 	if selfErr != nil {
-		resp["self_peer_number"] = 0
+		resp["selfPeerNumber"] = 0
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)

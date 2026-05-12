@@ -170,12 +170,32 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 c->name = QString::fromUtf8(cd.name.c_str());
                 c->type = QString::fromUtf8(cd.type.c_str());
                 c->status = QString::fromUtf8(cd.status.c_str());
-                c->chat_id = QString::fromUtf8(cd.chat_id.c_str());  // 传递chat_id
-                c->is_connected = cd.is_connected;  // 新增：传递连接状态
+                c->chat_id = QString::fromUtf8(cd.chatId.c_str());
+                c->is_connected = cd.isConnected;
                 contacts.append(c);
                 qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%s",
-                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chat_id.c_str(), 
-                          cd.is_connected ? "true" : "false");
+                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chatId.c_str(), 
+                          cd.isConnected ? "true" : "false");
+                
+                // 写入 peerInfoMap
+                if (cd.type == "friend") {
+                    std::string key = "friend_" + std::to_string(cd.id);
+                    peerInfoMap[key].name = cd.name;
+                    peerInfoMap[key].peerNumber = cd.id;
+                    peerInfoMap[key].publicKey = cd.chatId;
+                    peerInfoMap[key].iconUrl = cd.iconUrl;
+                    peerInfoMap[key].isSelf = false;
+                    if (cd.status == "tcp") {
+                        peerInfoMap[key].status = 1;
+                        peerInfoMap[key].statusStr = "tcp";
+                    } else if (cd.status == "udp") {
+                        peerInfoMap[key].status = 2;
+                        peerInfoMap[key].statusStr = "udp";
+                    } else {
+                        peerInfoMap[key].status = 0;
+                        peerInfoMap[key].statusStr = "none";
+                    }
+                }
             }
             contactListWidget->setContacts(contacts);
             
@@ -505,10 +525,10 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         FriendInfo info;
         if (api.getFriendInfo(id, info)) {
             dialog.setInfo(id, QString::fromUtf8(info.name.c_str()), type,
-                          QString::fromUtf8(info.status.c_str()),
-                          QString::fromUtf8(info.connection_status.c_str()),
+                          QString::fromUtf8(info.statusText.c_str()),
+                          QString::fromUtf8(info.statusStr.c_str()),
                           false,
-                          QString::fromUtf8(info.public_key.c_str()));
+                          QString::fromUtf8(info.publicKey.c_str()));
         } else {
             dialog.setInfo(id, _("no_name"), type);
         }
@@ -522,9 +542,9 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         bool isConnected = false;
         QString chatId = "";
         for (const auto& c : conferences) {
-            if (c.conference_number == (uint32_t)id) {
-                isConnected = c.is_connected;
-                chatId = QString::fromUtf8(c.chat_id.c_str());
+            if (c.conferenceNumber == (uint32_t)id) {
+                isConnected = c.isConnected;
+                chatId = QString::fromUtf8(c.chatId.c_str());
                 break;
             }
         }
@@ -541,9 +561,9 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         bool isConnected = false;
         QString chatId = "";
         for (const auto& g : groups) {
-            if (g.group_number == (uint32_t)id) {
-                isConnected = g.is_connected;
-                chatId = QString::fromUtf8(g.chat_id.c_str());
+            if (g.groupNumber == (uint32_t)id) {
+                isConnected = g.isConnected;
+                chatId = QString::fromUtf8(g.chatId.c_str());
                 break;
             }
         }
@@ -739,16 +759,16 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
     for (uint i = 0; i < conferences.size(); ++i) {
         const auto& conf = conferences[i];
         QString displayName;
-        if (!conf.conference_name.empty()) {
-            displayName = QString::fromUtf8(conf.conference_name.c_str());
+        if (!conf.conferenceName.empty()) {
+            displayName = QString::fromUtf8(conf.conferenceName.c_str());
         } else {
-            displayName = QString(_("conference_item")) + " " + QString::number(conf.conference_number);
+            displayName = QString(_("conference_item")) + " " + QString::number(conf.conferenceNumber);
         }
 #ifdef QT3_BUILD
         confCombo->insertItem(displayName);
-        confIds.push_back(conf.conference_number);
+        confIds.push_back(conf.conferenceNumber);
 #else
-        confCombo->addItem(displayName, QVariant(conf.conference_number));
+        confCombo->addItem(displayName, QVariant(conf.conferenceNumber));
 #endif
     }
     layout->addWidget(confCombo);
@@ -815,16 +835,16 @@ void MainWindow::onInviteToGroupRequested(int friendId) {
     for (uint i = 0; i < groups.size(); ++i) {
         const auto& grp = groups[i];
         QString displayName;
-        if (!grp.group_name.empty()) {
-            displayName = QString::fromUtf8(grp.group_name.c_str());
+        if (!grp.groupName.empty()) {
+            displayName = QString::fromUtf8(grp.groupName.c_str());
         } else {
-            displayName = QString(_("group_item")) + " " + QString::number(grp.group_number);
+            displayName = QString(_("group_item")) + " " + QString::number(grp.groupNumber);
         }
 #ifdef QT3_BUILD
         groupCombo->insertItem(displayName);
-        groupIds.push_back(grp.group_number);
+        groupIds.push_back(grp.groupNumber);
 #else
-        groupCombo->addItem(displayName, QVariant(grp.group_number));
+        groupCombo->addItem(displayName, QVariant(grp.groupNumber));
 #endif
     }
     layout->addWidget(groupCombo);
@@ -914,11 +934,12 @@ void MainWindow::loadMessageHistory() {
                 avatarText = "M";  // Me 的首字母
             } else {
                 if (currentChatType == "friend") {
-                    // 好友消息：尝试获取昵称
-                    auto it = friendNameMap.find(currentChatId);
-                    if (it != friendNameMap.end() && !it->second.empty()) {
-                        senderLabel = QString::fromUtf8(it->second.c_str());
-                        avatarText = qToUpper(senderLabel.left(1));  // 昵称首字母
+                    // 好友消息：从 peerInfoMap 获取昵称
+                    std::string key = "friend_" + std::to_string(currentChatId);
+                    auto it = peerInfoMap.find(key);
+                    if (it != peerInfoMap.end() && !it->second.name.empty()) {
+                        senderLabel = QString::fromUtf8(it->second.name.c_str());
+                        avatarText = qToUpper(senderLabel.left(1));
                     } else {
                         senderLabel = QString("Friend %1").arg(currentChatId);
                         avatarText = "F";
