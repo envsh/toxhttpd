@@ -980,3 +980,57 @@ void keyPressEvent(QKeyEvent* event);
 
 #### Web 修改
 - `web/app.js` - `"conf_"` → `"conference_"`（4处）
+
+---
+
+## 2026-05-13 会话更新 — 消息翻译功能
+
+### Goal
+实现 q3tox + Web 端消息翻译功能，通过 Go 服务器代理 Microsoft Translator API。
+
+### 架构
+- **Go server**: `POST /api/translate` → 结构化 JSON `{"translated_text":"..."}` 或 `{"error":"...", "code":"..."}`
+- **q3tox**: `ToxAPI::translate()` → `TranslateApiResult{success, translatedText, errorMessage}`，通过 `EventPoller` 线程异步发出 HTTP 请求，结果通过 `CustomEvent` 回传 `MainWindow` → `ChatWidget`
+- **Web**: `translateMessage()` → `fetch POST /api/translate` → `updateMessageNode()` 更新 DOM
+
+### 错误机制设计
+- **Go server**: 所有响应统一 `Content-Type: application/json`。错误含机器可读的 `code` 字段：`INVALID_METHOD`/`INVALID_JSON`/`MISSING_FIELDS`/`TRANSLATE_FAILED`/`EMPTY_RESULT`
+- **q3tox**:
+  - `TranslateApiResult` 结构体传递 `errorMessage`
+  - 翻译失败时 🌐 按钮绘制为红色圆圈（`QPen(QColor(200,60,60), 2)`）
+  - 鼠标悬浮时通过 `QToolTip::showText()` 显示错误详情
+  - 再次点击按钮会清除错误并重试
+- **Web**:
+  - `fetch` 后先检查 `r.ok`，再解析 JSON
+  - 错误时 🌐 按钮添加 `.error` class（灰色 + 半透明 + `cursor:help`）
+  - `title` 属性显示错误详情（浏览器 tooltip）
+
+### 完成的修改
+
+| 文件 | 改动 |
+|------|------|
+| `go-toxhttpd/server.go` | 重写 `handleTranslate`：统一结构化 JSON 响应 + 错误码 |
+| `q3tox/restapi.h` | 新增 `TranslateApiResult` 结构体 |
+| `q3tox/restapi.cpp` | 重写 `translate()`：解析错误 JSON，区分网络/解析/服务器错误 |
+| `q3tox/eventpoller.h` | `TranslateResultEvent` 加 `errorMessage` 字段 |
+| `q3tox/eventpoller.cpp` | 适配新 `TranslateApiResult` 返回值 |
+| `q3tox/chatwidget.h` | `onTranslateResult` 加 `QString errorMessage` 参数 |
+| `q3tox/chatwidget.cpp` | 重试时清除 `translateError`；失败时设置错误信息 |
+| `q3tox/chatview.h` | `ChatMessage` 加 `QString translateError` 字段 |
+| `q3tox/chatview.cpp` | 错误态红色按钮 + `QToolTip::showText` tooltip；`#include <QToolTip>` |
+| `q3tox/mainwindow.cpp` | 传递 `tev->errorMessage`；修复 Qt3 `SIGNAL`/`SLOT` `const&` 不匹配 |
+| `web/app.js` | `translateMessage` 检查 `r.ok` + 解析错误 JSON + `.error` class + `title` |
+| `web/style.css` | `.translate-btn.error { opacity:0.5; filter:grayscale(1); cursor:help }` |
+
+### Qt3 兼容修复
+- `mainwindow.cpp:116-117`：`SIGNAL(translateRequested(int,QString,QString))` → 改为 `SIGNAL(translateRequested(int, const QString&, const QString&))`。Qt3 的 `connect()` 不做类型归一化，要求 `SIGNAL`/`SLOT` 字符串精确匹配 moc 存储的签名（带 `const` 和 `&`）；Qt4 内部会 `normalizedSignature()` 自动归一化，不受影响。
+
+### Bug 修复
+1. **Web dataIdx closure 问题**：Node recycle 后 `translateMessage` 中闭包捕获了旧的 `dataIdx`，导致翻译结果显示在错误的节点上。修复：每次调用 `translateMessage` 时基于当前节点确定 `dataIdx`。
+2. **q3tox translated 文字负高度**：`transRect` 的 y 坐标使用了 `textRect.bottom()`（气泡底部），实际应该用原文最后一行末尾。修复：改为 `textRect.y() + origLineCount * fm.lineSpacing()`。
+3. **q3tox emoji 不在 translated 文本渲染**：`drawTranslatedText` 缺少 `#ifdef EMOJI_RENDER_QT34` 分支。修复：添加该分支，使用 `EmojiRenderer::drawText()` 渲染。
+
+### 文件修改清单
+- Go: `go-toxhttpd/server.go`
+- q3tox: `restapi.h`, `restapi.cpp`, `eventpoller.h`, `eventpoller.cpp`, `mainwindow.cpp`, `chatwidget.h`, `chatwidget.cpp`, `chatview.h`, `chatview.cpp`
+- Web: `app.js`, `style.css`

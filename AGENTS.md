@@ -28,6 +28,7 @@
 - Event system: long-poll `/api/events`. q3tox uses `QThread` + libcurl, events delivered via `CustomEventBase` (compat wrapper).
 - Translation: nested JSON in `lang/*.json`, loaded by `Translator` class (`_("key")`), supports dot-path (e.g. `"statuses.online"`).
 - ChatView scroll multiplier: `wheelEvent` uses `step * N`, adjusted for feel (currently `*5`).
+- **C++ 代码不要抛出异常，也不要 try-catch**。Qt3 编译环境可能未启用异常支持，且项目风格不依赖异常处理。所有错误通过返回值或结构体（如 `TranslateApiResult`）传递。
 
 # Minimize HTTP requests
 
