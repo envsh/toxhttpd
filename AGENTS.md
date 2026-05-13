@@ -1,16 +1,16 @@
 # Build commands
 
 - Go server: `bash build.sh` (from repo root) — uses old glibc 2.17 toolchain, **do not modify** `build.sh`
-- q3tox Qt3: `cd q3tox && bash buildqt3.sh` — generates `q3tox`
-- q3tox Qt4: `cd q3tox && bash buildqt4.sh` — generates `q4tox`
+- qltox Qt3: `cd qltox && bash buildqt3.sh` — generates `qltox`
+- qltox Qt4: `cd qltox && bash buildqt4.sh` — generates `q4tox`
 - Run server: `./go-toxhttpd/toxhttpd-go 8181`
-- Run client: `./q3tox/q3tox`
-- Build q3tox cpp: `make -j1`
+- Run client: `./qltox/qltox`
+- Build qltox cpp: `cd qltox && make -j1`
 
 # Architecture
 
 - **Go server** (`go-toxhttpd/`): `server.go` is the real entrypoint (1848 lines, all logic). `main.go` is just `package main` (2 lines). Web static files live in `web/` at repo root.
-- **q3tox client** (`q3tox/`): `mainwindow.cpp` is the hub. `chatview.cpp` replaced QTextEdit with a virtualized `QWidget+QScrollBar` (see ChatView class). `api.cpp` wraps REST calls via libcurl.
+- **qltox client** (`qltox/`): `mainwindow.cpp` is the hub. `chatview.cpp` replaced QTextEdit with a virtualized `QWidget+QScrollBar` (see ChatView class). `api.cpp` wraps REST calls via libcurl.
 - **go-toxcore-c** is a local fork with NGC support (`groupchat.go` = NGC Group*, `group.go` = legacy Conference*). `go.mod` replaces `github.com/TokTok/go-toxcore-c`.
 
 # Qt3/Qt4 compatibility
@@ -24,8 +24,8 @@
 
 - **Never auto-commit to git.** Only commit when explicitly asked by the user.
 
-- Peer name cache key: `"conference_{id}_{peer}"` / `"group_{id}_{peer}"` — web (`app.js`) and q3tox (`mainwindow.cpp`) must stay in sync.
-- Event system: long-poll `/api/events`. q3tox uses `QThread` + libcurl, events delivered via `CustomEventBase` (compat wrapper).
+- Peer name cache key: `"conference_{id}_{peer}"` / `"group_{id}_{peer}"` — web (`app.js`) and qltox (`mainwindow.cpp`) must stay in sync.
+- Event system: long-poll `/api/events`. qltox uses `QThread` + libcurl, events delivered via `CustomEventBase` (compat wrapper).
 - Translation: nested JSON in `lang/*.json`, loaded by `Translator` class (`_("key")`), supports dot-path (e.g. `"statuses.online"`).
 - ChatView scroll multiplier: `wheelEvent` uses `step * N`, adjusted for feel (currently `*5`).
 - **C++ 代码不要抛出异常，也不要 try-catch**。Qt3 编译环境可能未启用异常支持，且项目风格不依赖异常处理。所有错误通过返回值或结构体（如 `TranslateApiResult`）传递。
@@ -35,4 +35,4 @@
 
 - Use cached data over extra HTTP calls. Available caches:
   - Web: `contacts.groups[]` / `contacts.friends[]` / `contacts.conferences[]` (global), `peerInfoMap`, `selfInfo` (own profile), `friendNameMap`
-  - q3tox: `ContactListWidget` item text / `allContacts`, `peerInfoMap`, `friendNameMap`, `SelfInfoWidget::selfName()`
+  - qltox: `ContactListWidget` item text / `allContacts`, `peerInfoMap`, `friendNameMap`, `SelfInfoWidget::selfName()`
