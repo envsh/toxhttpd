@@ -183,9 +183,10 @@ void EmojiRenderer::drawText(QPainter& p, const QRect& textRect, const QString& 
         int emojiCount = 0;
         for (size_t i = 0; i < cps.size(); i++)
             if (isEmojiChar(cps[i])) emojiCount++;
-        if (emojiCount > 0)
-            fprintf(stderr, "EmojiRenderer: msg has %d emoji / %zu cps | font: %s | ok=%d\n",
-                    emojiCount, cps.size(), m_fontPath.c_str(), (int)m_ok);
+        if (emojiCount > 0) {
+         //   fprintf(stderr, "EmojiRenderer: msg has %d emoji / %zu cps | font: %s | ok=%d\n",
+           //         emojiCount, cps.size(), m_fontPath.c_str(), (int)m_ok);
+	}
     }
     QFontMetrics fm = p.fontMetrics();
     int lh = fm.lineSpacing();

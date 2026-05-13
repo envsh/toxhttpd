@@ -696,7 +696,7 @@ function longPollEvents() {
                     } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
                         // Friend info updated, refresh contacts with current filter
                         loadContacts(currentFilter);
-                    } else if (event.event_type === 'connection_status') {
+                    } else if (event.event_type === 'self_connection_status') {
                         loadSelfInfo();
                     } else if (event.event_type === 'conference_invite') {
                         const data = JSON.parse(event.data);
@@ -1880,11 +1880,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initEmojiPicker();
     document.getElementById('messageInput').addEventListener('keydown', _messageInputHandler);
 });
-
-// Periodically refresh self info
-setInterval(() => {
-    loadSelfInfo();
-}, 5000);
 
 // ── Input helpers ──
 function autoResizeTextarea() {
