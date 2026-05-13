@@ -4,6 +4,7 @@
 #include "restapi.h"
 #include "compat34.h"
 #include "LimeStyle.h"
+#include "toastwidget.h"
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 12, 10);
@@ -241,6 +242,6 @@ void SelfInfoWidget::onSwitchAccount() {
 void SelfInfoWidget::onCopyAddress() {
     if (!selfAddress.isEmpty()) {
         QApplication::clipboard()->setText(selfAddress);
-        QMessageBox::information(this, "Copy", _("tox_id_copied"));
+        ToastWidget::show(this, _("tox_id_copied"));
     }
 }
