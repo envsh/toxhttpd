@@ -3,5 +3,5 @@ go 1.21
 use (
 	.
 	./go-toxcore-c
-    /home/me/aprog/touse/oai
+//    /home/me/aprog/touse/oai
 )

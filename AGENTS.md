@@ -29,6 +29,7 @@
 - Translation: nested JSON in `lang/*.json`, loaded by `Translator` class (`_("key")`), supports dot-path (e.g. `"statuses.online"`).
 - ChatView scroll multiplier: `wheelEvent` uses `step * N`, adjusted for feel (currently `*5`).
 - **C++ 代码不要抛出异常，也不要 try-catch**。Qt3 编译环境可能未启用异常支持，且项目风格不依赖异常处理。所有错误通过返回值或结构体（如 `TranslateApiResult`）传递。
+- **emoji 不要使用 `\x` 转义格式**（如 `"\xF0\x9F\x93\x8B"`），直接用原始 UTF-8 字符（如 `"📋"`）。源代码文件本身是 UTF-8 编码，字符串字面量中的 emoji 自然包含正确字节序列。
 
 # Minimize HTTP requests
 

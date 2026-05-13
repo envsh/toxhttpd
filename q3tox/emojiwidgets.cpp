@@ -43,6 +43,7 @@ void EmojiLabel::paintEvent(QPaintEvent* event) {
 // ============ EmojiPushButton ============
 
 #ifdef QT3_BUILD
+#include <qstyle.h>
 
 EmojiPushButton::EmojiPushButton(QWidget* parent, const char* name)
     : QPushButton(parent, name) {}
@@ -52,8 +53,8 @@ EmojiPushButton::EmojiPushButton(const QString& text, QWidget* parent, const cha
 void EmojiPushButton::drawButtonLabel(QPainter* p) {
     QString t = text();
     if (!textHasEmoji(t)) { QPushButton::drawButtonLabel(p); return; }
-    QRect r = rect();
-    EmojiRenderer::instance().drawText(*p, r, t);
+    QRect cr = style().subRect(QStyle::SR_PushButtonContents, this);
+    EmojiRenderer::instance().drawText(*p, cr, t);
 }
 
 #else

@@ -2,6 +2,7 @@
 #define SELFINFO_H
 
 #include "compat34.h"
+#include "emojiwidgets.h"
 #include <qstring.h>
 
 class SelfInfoWidget : public QWidget {
@@ -30,7 +31,7 @@ private:
     QLabel* statusBadge;
     QLabel* statusMsgLabel;
     QLabel* addressLabel;
-    QPushButton* copyBtn;
+    EmojiPushButton* copyBtn;
     QPushButton* switchBtn;
     QPushButton* editBtn;
     QPushButton* connectBtn;
