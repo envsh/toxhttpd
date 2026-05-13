@@ -123,6 +123,12 @@ func (q *EventQueue) PopAfter(after uint64) []Event {
 	return result
 }
 
+func (q *EventQueue) GetNextID() uint64 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.nextID
+}
+
 // RequestParams provides a unified way to access request parameters
 // regardless of content type (JSON or form-urlencoded)
 type RequestParams struct {
@@ -1372,19 +1378,26 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	fmt.Sscanf(after, "%d", &afterID)
 
 	// Long polling: wait for new events or timeout
-	timeout := time.After(30 * time.Second)
+	// 如果客户端的 lastEventId ≥ 服务端 nextID，可能重启 → 短超时 3s
+	var timeoutDuration = 30 * time.Second
+	if afterID > 0 && afterID >= s.eventQueue.GetNextID() {
+		timeoutDuration = 3 * time.Second
+	}
+	timeout := time.After(timeoutDuration)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-timeout:
+			w.Header().Set("X-Server-Next-Id", strconv.FormatUint(s.eventQueue.GetNextID(), 10))
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte("[]"))
 			return
 		case <-ticker.C:
 			events := s.eventQueue.PopAfter(afterID)
 			if len(events) > 0 {
+				w.Header().Set("X-Server-Next-Id", strconv.FormatUint(s.eventQueue.GetNextID(), 10))
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(events)
 				return

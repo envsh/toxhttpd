@@ -3,6 +3,8 @@
 #include "cJSON.h"
 #include <curl/curl.h>
 #include <sstream>
+#include <cstdlib>
+#include <cctype>
 
 // cURL 回调函数
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -12,28 +14,93 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* use
     return realsize;
 }
 
+// cURL header 回调函数（实时捕获 header）
+static size_t HeaderCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    auto* headers = static_cast<std::map<std::string, std::string>*>(userp);
+    if (!headers || realsize == 0) return realsize;
+    std::string line(static_cast<char*>(contents), realsize);
+    size_t colon = line.find(':');
+    if (colon == std::string::npos || colon == 0) return realsize;
+    std::string name = line.substr(0, colon);
+    size_t vStart = colon + 1;
+    while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) vStart++;
+    size_t vEnd = line.size();
+    while (vEnd > vStart && (line[vEnd - 1] == '\r' || line[vEnd - 1] == '\n')) vEnd--;
+    if (vEnd <= vStart) return realsize;
+    for (char& c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    (*headers)[name] = line.substr(vStart, vEnd - vStart);
+    return realsize;
+}
+
+// 从原始 HTTP 响应字符串中解析 header 到 map
+// response 格式: "HTTP/1.1 200 OK\r\nName: Value\r\n\r\nbody"
+// headerSize 是 header 部分（含空行分隔）的字节数
+static void parseHeadersFromRaw(const std::string& raw, size_t headerSize, std::map<std::string, std::string>& headers) {
+    if (headerSize == 0 || headerSize > raw.size()) return;
+    std::string hdrPart = raw.substr(0, headerSize);
+    size_t pos = 0;
+    while (pos < hdrPart.size()) {
+        size_t end = hdrPart.find('\n', pos);
+        if (end == std::string::npos) end = hdrPart.size();
+        std::string line = hdrPart.substr(pos, end - pos);
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        pos = end + 1;
+        
+        size_t colon = line.find(':');
+        if (colon == std::string::npos || colon == 0) continue;
+        
+        std::string name = line.substr(0, colon);
+        size_t vStart = colon + 1;
+        while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) vStart++;
+        std::string value = line.substr(vStart);
+        
+        for (char& c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        headers[name] = value;
+    }
+}
+
 // 执行 HTTP GET 请求
-std::string ToxAPI::httpGet(const std::string& endpoint) {
+std::string ToxAPI::httpGet(const std::string& endpoint, std::map<std::string, std::string>* headers) {
     CURL* curl = curl_easy_init();
     std::string response;
     std::string url = baseUrl + endpoint;
+    
+    if (headers) {
+        headers->clear();
+    }
     
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L); // 30秒超时
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 35L);
         curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
+        
+        if (headers) {
+            curl_easy_setopt(curl, CURLOPT_HEADER, 1L);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, headers);
+        }
         
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
             ALOG_ERROR("cURL GET error:", curl_easy_strerror(res));
-            response.clear();
         } else {
             long httpCode = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
             ALOG_INFO("HTTP GET response, code:", httpCode, "body length:", response.length());
         }
+        
+        if (headers && !response.empty()) {
+            long headerSize = 0;
+            curl_easy_getinfo(curl, CURLINFO_HEADER_SIZE, &headerSize);
+            parseHeadersFromRaw(response, headerSize > 0 ? (size_t)headerSize : 0, *headers);
+            if (headerSize > 0 && (size_t)headerSize <= response.size()) {
+                response = response.substr(headerSize);
+            }
+        }
+        
         curl_easy_cleanup(curl);
     }
     return response;
@@ -347,10 +414,38 @@ bool ToxAPI::ignoreConference(int friendNumber) {
 
 std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
     std::vector<Event> events;
+    std::map<std::string, std::string> headers;
     std::string endpoint = "/api/events?after=" + std::to_string(after);
     
-    std::string response = httpGet(endpoint);
+    std::string response = httpGet(endpoint, &headers);
     if (response.empty()) return events;
+    
+    // 检查 x-server-next-id header（用小写 key 查找）
+    auto it = headers.find("x-server-next-id");
+    if (it != headers.end()) {
+        char* endptr = nullptr;
+        unsigned long long val = std::strtoull(it->second.c_str(), &endptr, 10);
+        
+        if (endptr == it->second.c_str()) {
+            // 没有解析到任何数字
+            ALOG_ERROR("pollEvents: X-Server-Next-Id header is not a number:", it->second);
+        } else {
+            // 解析成功，检查是否服务端重启
+            uint64_t serverNextId = static_cast<uint64_t>(val);
+            if (serverNextId <= after) {
+                ALOG_WARN("pollEvents: Server restart detected, server_next_id=", 
+                          serverNextId, " <= after=", after);
+                
+                // 插入特殊事件
+                Event restartEvent;
+                restartEvent.id = 0;
+                restartEvent.type = "_server_restart";
+                restartEvent.data = "";
+                restartEvent.timestamp = "";
+                events.push_back(restartEvent);
+            }
+        }
+    }
     
     cJSON* root = cJSON_Parse(response.c_str());
     if (!root) return events;

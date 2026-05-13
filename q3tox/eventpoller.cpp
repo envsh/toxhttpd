@@ -1,5 +1,6 @@
 #include "eventpoller.h"
 #include "compat34.h"
+#include "apilog.h"
 #include <queue>
 
 EventPoller::EventPoller(QObject* parent) :
@@ -26,19 +27,38 @@ void EventPoller::run() {
         // 事件轮询
         std::vector<Event> events = api->pollEvents(lastEventId);
         
-        if (!events.empty()) {
+        // 检查是否有特殊重启事件
+        std::vector<Event> normalEvents;
+        bool restartDetected = false;
+        
+        for (const auto& e : events) {
+            if (e.type == "_server_restart") {
+                restartDetected = true;
+            } else {
+                normalEvents.push_back(e);
+            }
+        }
+        
+        // 处理重启检测
+        if (restartDetected) {
+            ALOG_WARN("EventPoller: Server restart detected, resetting lastEventId from", lastEventId, "to 0");
+            lastEventId = 0;
+            // 只重置不刷新
+        }
+        
+        if (!normalEvents.empty()) {
             if (receiver) {
-                EventListEvent* event = new EventListEvent(events);
+                EventListEvent* event = new EventListEvent(normalEvents);
                 QApplication::postEvent(receiver, event);
             }
             // 更新lastEventId
-            for (const auto& e : events) {
+            for (const auto& e : normalEvents) {
                 if (e.id > lastEventId) {
                     lastEventId = e.id;
                 }
             }
-        } else {
-            // 无事件：等待2秒后重试
+        } else if (!restartDetected) {
+            // 无事件且无重启：等待2秒后重试
             QThread::sleep(2);
         }
     }

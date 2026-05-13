@@ -677,7 +677,18 @@ function updateSelection(id, type) {
 // Long polling for events
 function longPollEvents() {
     fetch(`/api/events?after=${lastEventId}`)
-        .then(r => r.json())
+        .then(r => {
+            // 读取 X-Server-Next-Id header，检测服务端重启
+            const serverNextId = r.headers.get('X-Server-Next-Id');
+            if (serverNextId) {
+                const id = parseInt(serverNextId, 10);
+                if (!isNaN(id) && id <= lastEventId) {
+                    console.warn('[longPollEvents] Server restart detected, resetting lastEventId from', lastEventId, 'to 0');
+                    lastEventId = 0;
+                }
+            }
+            return r.json();
+        })
         .then(events => {
             if (events && events.length > 0) {
                 events.forEach(event => {
