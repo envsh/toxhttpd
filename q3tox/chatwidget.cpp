@@ -1,10 +1,11 @@
 #include "chatwidget.h"
 #include "translator.h"
 #include "compat34.h"
+#include "restapi.h"
 
 #include "ThemeManager.h"
 
-ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
+ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN") {
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 0, 0);
     mainLayout->setSpacing(0);
     qSetMargins(mainLayout, 0, 0, 0, 0);
@@ -64,6 +65,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     // 消息区域（虚拟化列表）
     messageArea = new ChatView(this);
     mainLayout->addWidget(messageArea, 1);
+    connect(messageArea, SIGNAL(translateClicked(int)), this, SLOT(onTranslateClicked(int)));
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD
@@ -191,8 +193,37 @@ void ChatWidget::onLanguageChanged(int index) {
     else if (index == 1) langCode = "zh-TW";
     else if (index == 2) langCode = "en-US";
     else langCode = "zh-CN"; // 默认
+    m_targetLang = std::string(qToUtf8(langCode).data());
     qWarning("ChatWidget: language changed to %s", qToUtf8(langCode).data());
     emit languageChanged(langCode);
+}
+
+void ChatWidget::onTranslateClicked(int msgIndex) {
+    ChatMessage& msg = messageArea->messageAt(msgIndex);
+    if (msg.translationInProgress) return;
+
+    // Toggle: if already translated, just toggle display
+    if (!msg.translatedText.isEmpty()) {
+        msg.showTranslation = !msg.showTranslation;
+        messageArea->triggerRelayout();
+        return;
+    }
+
+    msg.translationInProgress = true;
+    messageArea->triggerRelayout();
+    emit translateRequested(msgIndex, msg.messageText,
+                            QString::fromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
+}
+
+void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText) {
+    if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) return;
+    ChatMessage& msg = messageArea->messageAt(msgIndex);
+    msg.translationInProgress = false;
+    if (success) {
+        msg.translatedText = translatedText;
+        msg.showTranslation = true;
+    }
+    messageArea->triggerRelayout();
 }
 
 void ChatWidget::onThemeToggled(bool checked) {

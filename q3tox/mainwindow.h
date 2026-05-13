@@ -35,6 +35,7 @@ public:
     void onRenameNickRequested(int groupId, const QString& groupName);
     void onSwitchAccount();
     void loadMessageHistory();
+    void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
     
 private:
     std::string selfPubkey;  // 自己的公钥（地址前64字符）

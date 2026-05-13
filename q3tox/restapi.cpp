@@ -800,3 +800,47 @@ std::string ToxAPI::getRandomName() {
     cJSON_Delete(root);
     return name;
 }
+
+static std::string jsonEscape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (size_t i = 0; i < s.size(); i++) {
+        char c = s[i];
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if ((unsigned char)c < 0x20) {
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", (unsigned char)c);
+                    out += buf;
+                } else {
+                    out += c;
+                }
+        }
+    }
+    return out;
+}
+
+std::string ToxAPI::translate(const std::string& text, const std::string& toLang) {
+    std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
+    std::string response = httpPost("/api/translate", postData);
+    if (response.empty()) return "";
+    
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) return "";
+    
+    std::string result;
+    cJSON* item = cJSON_GetObjectItem(root, "translated_text");
+    if (item && cJSON_IsString(item)) {
+        result = std::string(cJSON_GetStringValue(item));
+    }
+    
+    cJSON_Delete(root);
+    return result;
+}

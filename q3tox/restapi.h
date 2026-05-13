@@ -116,6 +116,9 @@ public:
     bool setGroupSelfName(int groupId, const std::string& name);
     std::string getRandomName();
     
+    // Translation
+    std::string translate(const std::string& text, const std::string& toLang);
+    
 private:
     std::string baseUrl;
 

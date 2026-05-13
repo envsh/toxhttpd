@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <qdatetime.h>
+#include <qrect.h>
 
 struct ChatMessage {
     QString messageText;
@@ -14,7 +15,13 @@ struct ChatMessage {
     QString time;
     int height;
 
-    ChatMessage() : height(0) {}
+    // Translation support
+    QString translatedText;
+    bool showTranslation;
+    bool translationInProgress;
+    QRect translateBtnRect;
+
+    ChatMessage() : height(0), showTranslation(false), translationInProgress(false) {}
 };
 
 struct LinkSpan {
@@ -33,6 +40,9 @@ public:
     void appendMessage(const ChatMessage& msg);
     void clearMessages();
     void scrollToBottom();
+    ChatMessage& messageAt(int index);
+    int messageCount() const;
+    void triggerRelayout();
 
 protected:
     void paintEvent(QPaintEvent* event);
@@ -45,13 +55,16 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event);
     void contextMenuEvent(QContextMenuEvent* event);
 
+signals:
+    void translateClicked(int msgIndex);
+
 private slots:
     void onScrollChanged(int value);
 
 private:
     void relayout();
     int contentWidth() const;
-    void drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewWidth);
+    void drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth);
     int calcMessageHeight(const ChatMessage& msg, int viewWidth) const;
 
     // Selection and link helpers

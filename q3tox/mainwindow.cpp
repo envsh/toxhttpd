@@ -113,6 +113,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
     connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
             this, SLOT(onLanguageChanged(const QString&)));
+    connect(chatWidget, SIGNAL(translateRequested(int, const QString&, const QString&)),
+            this, SLOT(onTranslateRequested(int, const QString&, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 事件轮询器
@@ -220,6 +222,14 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
                 eventPoller->postApiRequest(req);
             }
+            return;
+        }
+        
+        // 翻译结果
+        if (e->type == ApiTranslate) {
+            TranslateResultEvent* tev = static_cast<TranslateResultEvent*>(event);
+            chatWidget->onTranslateResult(tev->msgIndex, tev->success,
+                QString::fromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()));
             return;
         }
     }
@@ -977,4 +987,12 @@ void MainWindow::loadMessageHistory() {
     } else {
         qWarning("loadMessageHistory: failed to load history");
     }
+}
+
+void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
+    TranslateRequestEvent* req = new TranslateRequestEvent();
+    req->msgIndex = msgIndex;
+    req->text = std::string(qToUtf8(text));
+    req->targetLang = std::string(qToUtf8(targetLang));
+    eventPoller->postApiRequest(req);
 }

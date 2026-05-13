@@ -195,6 +195,18 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
             QApplication::postEvent(receiver, result);
             break;
         }
+        case ApiTranslate: {
+            TranslateRequestEvent* treq = static_cast<TranslateRequestEvent*>(req);
+            TranslateResultEvent* result = new TranslateResultEvent();
+            result->msgIndex = treq->msgIndex;
+            std::string t = api->translate(treq->text, treq->targetLang);
+            if (!t.empty()) {
+                result->success = true;
+                result->translatedText = t;
+            }
+            QApplication::postEvent(receiver, result);
+            break;
+        }
         // ... 处理其他请求类型
     }
 }

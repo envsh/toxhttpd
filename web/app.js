@@ -547,6 +547,51 @@ function linkifyText(text) {
     return escaped.replace(/(https?:\/\/[^\s<>&"']+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
+// ── Translation ──
+const TARGET_LANG = 'zh-CN';
+
+function translateMessage(dataIdx) {
+    const msg = vsc.data[dataIdx];
+    if (!msg) return;
+    if (msg.translationInProgress) return;
+
+    // Toggle if already translated
+    if (msg.translatedText && msg.translatedText.length > 0) {
+        msg.showTranslation = !msg.showTranslation;
+        updateMessageNode(dataIdx);
+        return;
+    }
+
+    msg.translationInProgress = true;
+    updateMessageNode(dataIdx);
+
+    fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: msg.text, to: TARGET_LANG })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.translated_text) {
+            msg.translatedText = data.translated_text;
+            msg.showTranslation = true;
+        }
+        msg.translationInProgress = false;
+        updateMessageNode(dataIdx);
+    })
+    .catch(() => {
+        msg.translationInProgress = false;
+        updateMessageNode(dataIdx);
+    });
+}
+
+function updateMessageNode(dataIdx) {
+    const pi = vsc.usedSlots.get(dataIdx);
+    if (pi === undefined) return;
+    const node = vsc.pool[pi].node;
+    vsc._updateNode(node, vsc.data[dataIdx], vsc.cumulative[dataIdx], dataIdx);
+}
+
 // ── Chat header update ──
 function updateChatHeader(id, type) {
     var badge = document.getElementById('chatTypeBadge');
@@ -838,6 +883,16 @@ class VirtualScroller {
         contentCol.appendChild(header);
         contentCol.appendChild(bubble);
 
+        // Translate button and text
+        const transBtn = document.createElement('span');
+        transBtn.className = 'translate-btn';
+        transBtn.textContent = '\u{1F310}';
+        bubble.appendChild(transBtn);
+
+        const transText = document.createElement('div');
+        transText.className = 'translated-text';
+        contentCol.appendChild(transText);
+
         el.appendChild(avatarCol);
         el.appendChild(contentCol);
 
@@ -845,6 +900,8 @@ class VirtualScroller {
         el._ss = header.firstChild;
         el._ts = header.lastChild;
         el._bb = bubble;
+        el._tb = transBtn;
+        el._tr = transText;
         el._ac = avatarCol;
         el._cc = contentCol;
 
@@ -859,8 +916,37 @@ class VirtualScroller {
         el._ap.textContent = (msg.avatarText || '').toUpperCase();
         el._ss.textContent = msg.sender || '';
         el._ts.textContent = msg.timestamp;
+
+        // Render bubble content: text + translate button
         el._bb.innerHTML = linkifyText(msg.text);
         el._bb.className = 'message-bubble ' + (msg.type === 'self' ? 'self-bubble' : 'other-bubble');
+        el._bb.appendChild(el._tb);
+
+        // Translate button
+        const isTranslated = msg.translatedText && msg.translatedText.length > 0;
+        el._tb.style.display = 'inline';
+        if (msg.translationInProgress) {
+            el._tb.textContent = '\u23F3';
+        } else {
+            el._tb.textContent = '\u{1F310}';
+        }
+        el._tb._dataIdx = dataIdx;
+        if (!el._tb._clickHandlerBound) {
+            el._tb._clickHandlerBound = true;
+            el._tb.addEventListener('click', (e) => {
+                e.stopPropagation();
+                translateMessage(el._tb._dataIdx);
+            });
+        }
+
+        // Translated text
+        if (msg.showTranslation && isTranslated) {
+            el._tr.textContent = msg.translatedText;
+            el._tr.style.display = 'block';
+        } else {
+            el._tr.textContent = '';
+            el._tr.style.display = 'none';
+        }
 
         if (msg.type === 'self') {
             if (el.dataset.layout !== 'self') {

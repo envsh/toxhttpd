@@ -7,6 +7,7 @@
 #include "emojiwidgets.h"
 #include "emoji_picker.h"
 #include "StyleParams.h"
+#include <string>
 
 class ChatWidget : public QWidget {
     Q_OBJECT
@@ -24,6 +25,7 @@ signals:
     void messageSent(const QString& message);
     void languageChanged(const QString& langCode);
     void fileSendRequested(const QString& filePath);
+    void translateRequested(int msgIndex, const QString& text, const QString& targetLang);
 
 private slots:
     void onSendClicked();
@@ -34,6 +36,10 @@ private slots:
     void onEmojiInsert(const QString& emoji);
     void onFileClicked();
     void onFilePaste(const QString& filePath);
+    void onTranslateClicked(int msgIndex);
+
+public slots:
+    void onTranslateResult(int msgIndex, bool success, const QString& translatedText);
 
 private:
     QLabel* headerText;
@@ -46,6 +52,7 @@ private:
     EmojiPushButton* fileBtn;
     QPushButton* sendBtn;
     EmojiPicker* emojiPicker;
+    std::string m_targetLang;
 };
 
 #endif // CHATWIDGET_H

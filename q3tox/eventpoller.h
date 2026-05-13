@@ -22,7 +22,8 @@ enum ApiRequestType {
     ApiSendGroupMessage,    // 新增：发送群组消息
     ApiJoinConference,
     ApiRejectConference,
-    ApiAddFriend
+    ApiAddFriend,
+    ApiTranslate
 };
 
 // 事件轮询结果
@@ -116,6 +117,24 @@ public:
 #endif
     bool success;
     int conferenceId;
+};
+
+// 翻译请求事件
+class TranslateRequestEvent : public ApiRequestEvent {
+public:
+    TranslateRequestEvent() : ApiRequestEvent(ApiTranslate) {}
+    int msgIndex = 0;
+    std::string text;
+    std::string targetLang;
+};
+
+// 翻译结果事件
+class TranslateResultEvent : public ApiResultEvent {
+public:
+    TranslateResultEvent() : ApiResultEvent(ApiTranslate) {}
+    int msgIndex = 0;
+    bool success = false;
+    std::string translatedText;
 };
 
 class EventPoller : public QThread {

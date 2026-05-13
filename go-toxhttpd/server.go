@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/kitech/touse/oai"
 	"net/url"
 	"os"
 	"os/signal"
@@ -1452,6 +1454,7 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/group/members", loggingMiddleware(s.handleGroupMembers))
 	http.HandleFunc("/api/random-name", loggingMiddleware(s.handleRandomName))
 	http.HandleFunc("/api/groups/set-name", loggingMiddleware(s.handleGroupSetName))
+	http.HandleFunc("/api/translate", loggingMiddleware(s.handleTranslate))
 
 	log.Printf("Server starting on :%s", port)
 	return http.ListenAndServe(":"+port, nil)
@@ -1737,6 +1740,32 @@ func (s *Server) handleGroupSetName(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "ok"})
+}
+
+func (s *Server) handleTranslate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+		To   string `json:"to"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"invalid json: %s"}`, err), http.StatusBadRequest)
+		return
+	}
+	if req.Text == "" || req.To == "" {
+		http.Error(w, `{"error":"text and to required"}`, http.StatusBadRequest)
+		return
+	}
+	results, err := oai.MsetTranFull(req.To, "", req.Text)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"translated_text": results[0]})
 }
 
 func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {

@@ -89,6 +89,18 @@ void ChatView::scrollToBottom() {
     m_vScrollBar->setValue(maxScroll);
 }
 
+ChatMessage& ChatView::messageAt(int index) {
+    return m_messages[index];
+}
+
+int ChatView::messageCount() const {
+    return (int)m_messages.size();
+}
+
+void ChatView::triggerRelayout() {
+    relayout();
+}
+
 int ChatView::contentWidth() const {
     int sbw = m_vScrollBar->sizeHint().width();
     return width() - sbw;
@@ -186,7 +198,38 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
     if (lineCount < 1) lineCount = 1;
 
     int textHeight = lineCount * fm.lineSpacing();
+    int minBubbleH = 2 * kBubbleVPad + 22; // ensure button fits
     int bubbleHeight = 2 * kBubbleVPad + std::max(textHeight, fm.lineSpacing());
+    if (bubbleHeight < minBubbleH) bubbleHeight = minBubbleH;
+
+    // Account for translated text
+    if (msg.showTranslation && !msg.translatedText.isEmpty()) {
+        int transLineCount = 0;
+        int tLen = msg.translatedText.length();
+        int tPos = 0;
+        while (tPos < tLen) {
+            if (msg.translatedText[tPos] == '\n') { transLineCount++; tPos++; continue; }
+            int lineWidth = 0;
+            int lastSpace = -1;
+            int end = tPos;
+            while (end < tLen && msg.translatedText[end] != '\n') {
+                lineWidth += fm.width(msg.translatedText[end]);
+                if (msg.translatedText[end].isSpace()) lastSpace = end;
+                if (lineWidth >= bubbleTextWidth) {
+                    if (lastSpace > tPos && end - tPos > 10) {
+                        end = lastSpace + 1;
+                    }
+                    break;
+                }
+                end++;
+            }
+            transLineCount++;
+            tPos = end;
+        }
+        if (transLineCount < 1) transLineCount = 1;
+        bubbleHeight += kBubbleVPad / 2 + transLineCount * fm.lineSpacing() + kBubbleVPad;
+    }
+
     int headerHeight = fm.lineSpacing() + kPad;
     int contentHeight = kPad + headerHeight + bubbleHeight;
     int avatarTotal = kPad + kAvatarSize;
@@ -499,13 +542,13 @@ void ChatView::copyFullMessage(int msgIndex) {
     }
 }
 
-void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewWidth) {
+void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) {
     QFont f = font();
     QFontMetrics fm(f);
     int headerH = fm.lineSpacing();
     QRect textRect;
+    QRect bubbleRect;
 
-    // Calculate text rectangle first
     if (msg.type == "self") {
         int ax = viewWidth - kPad - kAvatarSize;
         p.setBrush(currentPalette().surfaceBg);
@@ -543,7 +586,7 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
         int bubbleX = contentRight - bubbleW;
         int bubbleY = y + kPad + headerH + kPad;
         int bubbleH = msg.height - (kPad + headerH + kPad) - kMsgSpacing;
-        QRect bubbleRect(bubbleX, bubbleY, bubbleW, bubbleH);
+        bubbleRect = QRect(bubbleX, bubbleY, bubbleW, bubbleH);
         textRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                          bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
 
@@ -590,7 +633,7 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
         int bubbleY = y + kPad + headerH + kPad;
         int bubbleH = msg.height - (kPad + headerH + kPad) - kMsgSpacing;
         if (bubbleH < 30) bubbleH = 30;
-        QRect bubbleRect(contentX, bubbleY, bubbleW, bubbleH);
+        bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
         textRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                          bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
 
@@ -635,6 +678,93 @@ void ChatView::drawMessage(QPainter& p, const ChatMessage& msg, int y, int viewW
     p.drawText(textRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
 #endif
 #endif
+
+    // Translate button: top-right of bubble, inside padding
+    const int btnSize = 22;
+    msg.translateBtnRect = QRect(
+        bubbleRect.right() - kBubbleHPad - btnSize,
+        bubbleRect.top() + kBubbleVPad,
+        btnSize, btnSize);
+
+    p.setPen(currentPalette().textMuted);
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(msg.translateBtnRect);
+    f.setPointSize(11);
+    p.setFont(f);
+    p.drawText(msg.translateBtnRect, Qt::AlignCenter, QString::fromUtf8("\xF0\x9F\x8C\x90"));
+    p.setFont(font());
+
+    // Translated text
+    if (msg.showTranslation && !msg.translatedText.isEmpty()) {
+        // Calculate original text line count to find where text ends
+        int origLineCount = 0;
+        int textW = textRect.width();
+        if (textW < 20) textW = 20;
+#ifdef EMOJI_RENDER_QT34
+        auto cps = toCodepoints(msg.messageText);
+        int tLen = (int)cps.size();
+        int pos = 0;
+        while (pos < tLen) {
+            if (cps[pos] == '\n') { origLineCount++; pos++; continue; }
+            int lineWidth = 0, lastSpace = -1, end = pos;
+            while (end < tLen && cps[end] != '\n') {
+                int cw = isEmojiChar(cps[end]) ? emojiCharWidth(fm) : fm.width(QChar((ushort)cps[end]));
+                lineWidth += cw;
+                if (cps[end] == ' ') lastSpace = end;
+                if (lineWidth >= textW) {
+                    if (lastSpace > pos && end - pos > 10) {
+                        end = lastSpace + 1;
+                    }
+                    break;
+                }
+                end++;
+            }
+            origLineCount++;
+            pos = end;
+        }
+#else
+        int tLen = msg.messageText.length();
+        int pos = 0;
+        while (pos < tLen) {
+            if (msg.messageText[pos] == '\n') { origLineCount++; pos++; continue; }
+            int lineWidth = 0, lastSpace = -1, end = pos;
+            while (end < tLen && msg.messageText[end] != '\n') {
+                lineWidth += fm.width(msg.messageText[end]);
+                if (msg.messageText[end].isSpace()) lastSpace = end;
+                if (lineWidth >= textW) {
+                    if (lastSpace > pos && end - pos > 10) {
+                        end = lastSpace + 1;
+                    }
+                    break;
+                }
+                end++;
+            }
+            origLineCount++;
+            pos = end;
+        }
+#endif
+        if (origLineCount < 1) origLineCount = 1;
+
+        int origTextEndY = textRect.y() + origLineCount * fm.lineSpacing();
+        int transY = origTextEndY + kBubbleVPad / 2;
+        QRect transRect(textRect.x(), transY,
+                        textRect.width(), bubbleRect.bottom() - kBubbleVPad - transY);
+        if (transRect.height() > 0) {
+            p.setPen(currentPalette().textMuted);
+            f.setItalic(true);
+            p.setFont(f);
+#ifdef EMOJI_RENDER_QT34
+            EmojiRenderer::instance().drawText(p, transRect, msg.translatedText);
+#else
+#  ifdef QT3_BUILD
+            p.drawText(transRect, Qt::WordBreak | Qt::AlignLeft | Qt::AlignTop, msg.translatedText);
+#  else
+            p.drawText(transRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, msg.translatedText);
+#  endif
+#endif
+            p.setFont(font());
+        }
+    }
 }
 
 void ChatView::wheelEvent(QWheelEvent* event) {
@@ -686,7 +816,15 @@ void ChatView::keyPressEvent(QKeyEvent* event) {
 void ChatView::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
-        if (msgIndex >= 0) {
+        if (msgIndex >= 0 && msgIndex < (int)m_messages.size()) {
+            // Check translate button click
+            if (m_messages[msgIndex].translateBtnRect.contains(event->pos())) {
+                if (!m_messages[msgIndex].translationInProgress) {
+                    emit translateClicked(msgIndex);
+                }
+                return;
+            }
+
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
             for (int i = 0; i < msgIndex; i++) curY += m_messages[i].height;
