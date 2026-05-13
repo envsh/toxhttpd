@@ -543,7 +543,7 @@ void EmojiPicker::onTabClicked() {
 }
 
 void EmojiPicker::onEmojiButtonClicked() {
-    QPushButton* btn = (QPushButton*)sender();
+    EmojiPushButton* btn = (EmojiPushButton*)sender();
     QString emoji = btn->text();
     addToRecent(emoji);
     rebuildRecentSection();

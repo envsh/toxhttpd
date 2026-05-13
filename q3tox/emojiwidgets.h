@@ -42,6 +42,7 @@ public:
     EmojiPushButton(const QString& text, QWidget* parent = 0);
 #endif
     void setText(const QString& text);
+    QString text() const;
 protected:
 #ifdef QT3_BUILD
     void drawButtonLabel(QPainter* p);
