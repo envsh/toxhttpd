@@ -122,20 +122,20 @@ jobs:
           g++ --version | head -1
           pkg-config --modversion libcurl || true
           dpkg -l | grep -E "libcurl|build-essential"
-      - name: Build q3tox with Qt4
+      - name: Build qltox with Qt4
         run: |
-          cd q3tox
-          qmake q3tox.pro
+          cd qltox
+          qmake qltox.pro
           make -j$(nproc)
       - name: Prepare frontend artifact
         run: |
           mkdir -p bin
-          cp q3tox/q3tox bin/q3tox
-          chmod +x bin/q3tox
-      - name: Upload q3tox binary as artifact
+          cp qltox/qltox bin/qltox
+          chmod +x bin/qltox
+      - name: Upload qltox binary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: q3tox-qt4-frontend
+          name: qltox-qt4-frontend
           path: bin/
           retention-days: 30
 
@@ -151,20 +151,20 @@ jobs:
         run: |
           qmake -v
           which qmake
-      - name: Build q3tox with Qt5
+      - name: Build qltox with Qt5
         run: |
-          cd q3tox
-          qmake q3tox.pro CONFIG-=app_bundle
+          cd qltox
+          qmake qltox.pro CONFIG-=app_bundle
           make -j$(sysctl -n hw.logicalcpu)
       - name: Prepare artifact
         run: |
           mkdir -p bin
-          cp q3tox/q3tox bin/q3tox
-          chmod +x bin/q3tox
-      - name: Upload q3tox binary
+          cp qltox/qltox bin/qltox
+          chmod +x bin/qltox
+      - name: Upload qltox binary
         uses: actions/upload-artifact@v4
         with:
-          name: q3tox-qt5-macos-frontend
+          name: qltox-qt5-macos-frontend
           path: bin/
           retention-days: 30
 
@@ -181,13 +181,13 @@ jobs:
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
         with:
-          name: q3tox-qt4-frontend
+          name: qltox-qt4-frontend
           path: release/
       - name: Organize files for packaging
         run: |
           mkdir -p release/bin release/web
           mv release/toxhttpd release/bin/
-          mv release/q3tox release/bin/
+          mv release/qltox release/bin/
           cp -r web/* release/web/
           ls -lhR release/
       - name: Create tarball
@@ -215,13 +215,13 @@ jobs:
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
         with:
-          name: q3tox-qt5-macos-frontend
+          name: qltox-qt5-macos-frontend
           path: release/
       - name: Organize files for packaging
         run: |
           mkdir -p release/bin release/web
           mv release/toxhttpd release/bin/
-          mv release/q3tox release/bin/
+          mv release/qltox release/bin/
           cp -r web/* release/web/
           ls -lhR release/
       - name: Create tarball
