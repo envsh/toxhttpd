@@ -2,6 +2,7 @@
 #define EMOJIWIDGETS_H
 
 #include "compat34.h"
+#include "emojiutil.h"
 
 #ifdef QT3_BUILD
 #include <qtoolbutton.h>
@@ -40,12 +41,15 @@ public:
     EmojiPushButton(QWidget* parent = 0);
     EmojiPushButton(const QString& text, QWidget* parent = 0);
 #endif
+    void setText(const QString& text);
 protected:
 #ifdef QT3_BUILD
     void drawButtonLabel(QPainter* p);
 #else
     void paintEvent(QPaintEvent* event);
 #endif
+private:
+    QString m_emojiText;
 };
 
 class EmojiToolButton : public QToolButton {

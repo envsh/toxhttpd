@@ -42,36 +42,48 @@ void EmojiLabel::paintEvent(QPaintEvent* event) {
 
 // ============ EmojiPushButton ============
 
+void EmojiPushButton::setText(const QString& text) {
+    if (textHasEmoji(text)) {
+        m_emojiText = text;
+        QPushButton::setText(QString());
+    } else {
+        m_emojiText = QString();
+        QPushButton::setText(text);
+    }
+}
+
 #ifdef QT3_BUILD
 #include <qstyle.h>
 
 EmojiPushButton::EmojiPushButton(QWidget* parent, const char* name)
-    : QPushButton(parent, name) {}
+    : QPushButton(parent, name) { setText(QString()); }
 EmojiPushButton::EmojiPushButton(const QString& text, QWidget* parent, const char* name)
-    : QPushButton(text, parent, name) {}
+    : QPushButton(parent, name) { setText(text); }
 
 void EmojiPushButton::drawButtonLabel(QPainter* p) {
-    QString t = text();
-    if (!textHasEmoji(t)) { QPushButton::drawButtonLabel(p); return; }
-    QRect cr = style().subRect(QStyle::SR_PushButtonContents, this);
-    EmojiRenderer::instance().drawText(*p, cr, t);
+    if (!m_emojiText.isEmpty()) {
+        QRect cr = style().subRect(QStyle::SR_PushButtonContents, this);
+        EmojiRenderer::instance().drawText(*p, cr, m_emojiText);
+        return;
+    }
+    QPushButton::drawButtonLabel(p);
 }
 
 #else
 
-EmojiPushButton::EmojiPushButton(QWidget* parent) : QPushButton(parent) {}
+EmojiPushButton::EmojiPushButton(QWidget* parent) : QPushButton(parent) { setText(QString()); }
 EmojiPushButton::EmojiPushButton(const QString& text, QWidget* parent)
-    : QPushButton(text, parent) {}
+    : QPushButton(parent) { setText(text); }
 
 void EmojiPushButton::paintEvent(QPaintEvent* event) {
-    if (!textHasEmoji(text())) { QPushButton::paintEvent(event); return; }
+    if (m_emojiText.isEmpty()) { QPushButton::paintEvent(event); return; }
     QPainter p(this);
     QStyleOptionButton opt;
     opt.initFrom(this);
     opt.text = QString();
     style()->drawControl(QStyle::CE_PushButton, &opt, &p, this);
     QRect cr = style()->subElementRect(QStyle::SE_PushButtonContents, &opt, this);
-    EmojiRenderer::instance().drawText(p, cr, text());
+    EmojiRenderer::instance().drawText(p, cr, m_emojiText);
 }
 
 #endif
