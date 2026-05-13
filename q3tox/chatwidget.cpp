@@ -209,19 +209,23 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
         return;
     }
 
+    msg.translateError = QString();
     msg.translationInProgress = true;
     messageArea->triggerRelayout();
     emit translateRequested(msgIndex, msg.messageText,
                             QString::fromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
 }
 
-void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText) {
+void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage) {
     if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) return;
     ChatMessage& msg = messageArea->messageAt(msgIndex);
     msg.translationInProgress = false;
     if (success) {
         msg.translatedText = translatedText;
         msg.showTranslation = true;
+        msg.translateError = QString();
+    } else {
+        msg.translateError = errorMessage;
     }
     messageArea->triggerRelayout();
 }

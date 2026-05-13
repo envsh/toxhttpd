@@ -934,6 +934,11 @@ select option {
     opacity: 1;
     background: rgba(255,255,255,0.1);
 }
+.translate-btn.error {
+    opacity: 0.5;
+    filter: grayscale(1);
+    cursor: help;
+}
 
 /* ── Translated text ── */
 .translated-text {

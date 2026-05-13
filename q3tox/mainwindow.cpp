@@ -229,7 +229,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
         if (e->type == ApiTranslate) {
             TranslateResultEvent* tev = static_cast<TranslateResultEvent*>(event);
             chatWidget->onTranslateResult(tev->msgIndex, tev->success,
-                QString::fromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()));
+                QString::fromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()),
+                QString::fromUtf8(tev->errorMessage.data(), (int)tev->errorMessage.size()));
             return;
         }
     }

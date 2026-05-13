@@ -17,6 +17,7 @@ struct ChatMessage {
 
     // Translation support
     QString translatedText;
+    QString translateError;
     bool showTranslation;
     bool translationInProgress;
     QRect translateBtnRect;

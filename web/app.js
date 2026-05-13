@@ -562,6 +562,7 @@ function translateMessage(dataIdx) {
         return;
     }
 
+    msg.translateError = '';
     msg.translationInProgress = true;
     updateMessageNode(dataIdx);
 
@@ -570,16 +571,20 @@ function translateMessage(dataIdx) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: msg.text, to: TARGET_LANG })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.translated_text) {
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        if (ok && data.translated_text) {
             msg.translatedText = data.translated_text;
             msg.showTranslation = true;
+            msg.translateError = '';
+        } else {
+            msg.translateError = data.error || '翻译失败';
         }
         msg.translationInProgress = false;
         updateMessageNode(dataIdx);
     })
     .catch(() => {
+        msg.translateError = '网络连接失败';
         msg.translationInProgress = false;
         updateMessageNode(dataIdx);
     });
@@ -925,6 +930,8 @@ class VirtualScroller {
         // Translate button
         const isTranslated = msg.translatedText && msg.translatedText.length > 0;
         el._tb.style.display = 'inline';
+        el._tb.title = msg.translateError || '翻译';
+        el._tb.classList.toggle('error', !!msg.translateError);
         if (msg.translationInProgress) {
             el._tb.textContent = '\u23F3';
         } else {

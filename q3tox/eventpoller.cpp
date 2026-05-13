@@ -199,11 +199,10 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
             TranslateRequestEvent* treq = static_cast<TranslateRequestEvent*>(req);
             TranslateResultEvent* result = new TranslateResultEvent();
             result->msgIndex = treq->msgIndex;
-            std::string t = api->translate(treq->text, treq->targetLang);
-            if (!t.empty()) {
-                result->success = true;
-                result->translatedText = t;
-            }
+            TranslateApiResult tr = api->translate(treq->text, treq->targetLang);
+            result->success = tr.success;
+            result->translatedText = tr.translatedText;
+            result->errorMessage = tr.errorMessage;
             QApplication::postEvent(receiver, result);
             break;
         }

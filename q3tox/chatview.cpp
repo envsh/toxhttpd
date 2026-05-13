@@ -25,6 +25,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QRegExp>
+#include <QToolTip>
 #endif
 
 
@@ -686,9 +687,17 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
         bubbleRect.top() + kBubbleVPad,
         btnSize, btnSize);
 
-    p.setPen(currentPalette().textMuted);
-    p.setBrush(Qt::NoBrush);
-    p.drawEllipse(msg.translateBtnRect);
+    if (!msg.translateError.isEmpty()) {
+        p.setPen(QPen(QColor(200, 60, 60), 2));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(msg.translateBtnRect);
+        p.setPen(QColor(200, 60, 60));
+    } else {
+        p.setPen(currentPalette().textMuted);
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(msg.translateBtnRect);
+        p.setPen(currentPalette().textMuted);
+    }
     f.setPointSize(11);
     p.setFont(f);
     p.drawText(msg.translateBtnRect, Qt::AlignCenter, QString::fromUtf8("\xF0\x9F\x8C\x90"));
@@ -918,6 +927,16 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     } else {
         setCursor(QCursor(Qt::ArrowCursor));
     }
+
+    // Translate error tooltip
+    if (msgIndex >= 0 && msgIndex < (int)m_messages.size() &&
+        m_messages[msgIndex].translateBtnRect.contains(event->pos()) &&
+        !m_messages[msgIndex].translateError.isEmpty()) {
+#ifndef QT3_BUILD
+        QToolTip::showText(event->globalPos(), m_messages[msgIndex].translateError, this);
+#endif
+    }
+
     QWidget::mouseMoveEvent(event);
 }
 

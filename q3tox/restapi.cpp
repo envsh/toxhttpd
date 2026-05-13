@@ -827,20 +827,33 @@ static std::string jsonEscape(const std::string& s) {
     return out;
 }
 
-std::string ToxAPI::translate(const std::string& text, const std::string& toLang) {
+TranslateApiResult ToxAPI::translate(const std::string& text, const std::string& toLang) {
+    TranslateApiResult result;
     std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
     std::string response = httpPost("/api/translate", postData);
-    if (response.empty()) return "";
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return "";
-    
-    std::string result;
-    cJSON* item = cJSON_GetObjectItem(root, "translated_text");
-    if (item && cJSON_IsString(item)) {
-        result = std::string(cJSON_GetStringValue(item));
+    if (response.empty()) {
+        result.errorMessage = "NETWORK_ERROR: 无法连接到服务器";
+        return result;
     }
-    
+
+    cJSON* root = cJSON_Parse(response.c_str());
+    if (!root) {
+        result.errorMessage = "PARSE_ERROR: 服务器响应格式异常";
+        return result;
+    }
+
+    cJSON* transItem = cJSON_GetObjectItem(root, "translated_text");
+    if (transItem && cJSON_IsString(transItem)) {
+        result.success = true;
+        result.translatedText = std::string(cJSON_GetStringValue(transItem));
+    } else {
+        cJSON* errItem = cJSON_GetObjectItem(root, "error");
+        cJSON* codeItem = cJSON_GetObjectItem(root, "code");
+        std::string code = codeItem && cJSON_IsString(codeItem) ? cJSON_GetStringValue(codeItem) : "UNKNOWN";
+        std::string errMsg = errItem && cJSON_IsString(errItem) ? cJSON_GetStringValue(errItem) : "翻译失败";
+        result.errorMessage = code + ": " + errMsg;
+    }
+
     cJSON_Delete(root);
     return result;
 }

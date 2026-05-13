@@ -1743,8 +1743,18 @@ func (s *Server) handleGroupSetName(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTranslate(w http.ResponseWriter, r *http.Request) {
+	type translateResponse struct {
+		TranslatedText string `json:"translated_text,omitempty"`
+		Error          string `json:"error,omitempty"`
+		Code           string `json:"code,omitempty"`
+	}
+	writeErr := func(code, msg string, status int) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(translateResponse{Error: msg, Code: code})
+	}
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		writeErr("INVALID_METHOD", "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {
@@ -1752,20 +1762,24 @@ func (s *Server) handleTranslate(w http.ResponseWriter, r *http.Request) {
 		To   string `json:"to"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"invalid json: %s"}`, err), http.StatusBadRequest)
+		writeErr("INVALID_JSON", fmt.Sprintf("invalid json: %s", err), http.StatusBadRequest)
 		return
 	}
 	if req.Text == "" || req.To == "" {
-		http.Error(w, `{"error":"text and to required"}`, http.StatusBadRequest)
+		writeErr("MISSING_FIELDS", "text and to required", http.StatusBadRequest)
 		return
 	}
 	results, err := oai.MsetTranFull(req.To, "", req.Text)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)
+		writeErr("TRANSLATE_FAILED", err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(results) == 0 {
+		writeErr("EMPTY_RESULT", "translation returned empty result", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"translated_text": results[0]})
+	json.NewEncoder(w).Encode(translateResponse{TranslatedText: results[0]})
 }
 
 func (s *Server) handleFriendDelete(w http.ResponseWriter, r *http.Request) {

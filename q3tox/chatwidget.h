@@ -39,7 +39,7 @@ private slots:
     void onTranslateClicked(int msgIndex);
 
 public slots:
-    void onTranslateResult(int msgIndex, bool success, const QString& translatedText);
+    void onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage);
 
 private:
     QLabel* headerText;

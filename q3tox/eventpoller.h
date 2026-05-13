@@ -135,6 +135,7 @@ public:
     int msgIndex = 0;
     bool success = false;
     std::string translatedText;
+    std::string errorMessage;
 };
 
 class EventPoller : public QThread {

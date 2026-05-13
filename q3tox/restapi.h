@@ -59,6 +59,13 @@ struct HistoryMessage {
     std::string created_at;
 };
 
+// Translation API result
+struct TranslateApiResult {
+    bool success = false;
+    std::string translatedText;
+    std::string errorMessage;
+};
+
 class ToxAPI {
 public:
     ToxAPI(const std::string& baseUrl = "http://localhost:8181");
@@ -117,7 +124,7 @@ public:
     std::string getRandomName();
     
     // Translation
-    std::string translate(const std::string& text, const std::string& toLang);
+    TranslateApiResult translate(const std::string& text, const std::string& toLang);
     
 private:
     std::string baseUrl;
