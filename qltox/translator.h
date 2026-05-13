@@ -10,6 +10,7 @@ class Translator : public QObject {
     Q_OBJECT
 public:
     static Translator& instance();
+    void addTranslationPath(const QString& path);
     bool loadLanguage(const QString& langCode); // "zh-CN", "zh-TW", "en-US"
     QString t(const QString& key, const QStringList& args = QStringList()) const;
     QString currentLang() const { return m_currentLang; }
@@ -25,6 +26,7 @@ private:
     
     QString m_currentLang;
     void* m_root; // cJSON root object
+    QStringList m_searchPaths;
 };
 
 // 便捷宏：避免与 QObject::tr() 冲突

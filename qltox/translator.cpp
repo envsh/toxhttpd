@@ -1,7 +1,6 @@
 #include "translator.h"
 #include "cJSON.h"
 #include "compat34.h"
-#include <unistd.h>
 
 Translator& Translator::instance() {
     static Translator instance;
@@ -9,8 +8,33 @@ Translator& Translator::instance() {
 }
 
 Translator::Translator() : m_root(nullptr), m_currentLang("zh-CN") {
-    // 默认加载简体中文
+    // 1. 可执行文件目录下的 lang/
+    QString appPath;
+#ifdef QT3_BUILD
+    appPath = qApp->applicationFilePath();
+#else
+    appPath = QCoreApplication::applicationFilePath();
+#endif
+    int lastSlash = qLastIndexOf(appPath, "/");
+    if (lastSlash >= 0)
+        m_searchPaths.append(appPath.left(lastSlash + 1) + "lang");
+
+    // 2. 当前工作目录
+    m_searchPaths.append("lang");
+
+    // 3. 可执行文件上级目录的 qltox/lang/（如 exe=build3/qltox → ../../qltox/lang/）
+    if (lastSlash >= 0) {
+        int secondLastSlash = qLastIndexOf(appPath.left(lastSlash), "/");
+        if (secondLastSlash >= 0)
+            m_searchPaths.append(appPath.left(secondLastSlash + 1) + "qltox/lang");
+    }
+
     loadLanguage("zh-CN");
+}
+
+void Translator::addTranslationPath(const QString& path) {
+    if (!m_searchPaths.contains(path))
+        m_searchPaths.append(path);
 }
 
 Translator::~Translator() {
@@ -18,47 +42,27 @@ Translator::~Translator() {
 }
 
 bool Translator::loadLanguage(const QString& langCode) {
-    // 尝试多个路径加载 lang 目录下的 JSON 文件
-    QStringList paths;
-    
-    // 1. 使用当前可执行文件的路径
-    char exePath[1024];
-    int len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
-    if (len != -1) {
-        exePath[len] = '\0';
-        QString exeStr(exePath);
-        int lastSlash = qLastIndexOf(exeStr, "/");
-        if (lastSlash >= 0) {
-            paths.append(exeStr.left(lastSlash + 1) + "lang/" + langCode + ".json");
-        }
-    }
-    
-    // 2. 当前工作目录
-    paths.append("lang/" + langCode + ".json");
-    
-    // 3. 绝对路径（可执行文件所在目录的上级目录）
-    paths.append("/home/gzleo/aprog/toxhttpd/q3tox/lang/" + langCode + ".json");
-    
     QString filepath;
-    for (const QString& p : paths) {
+    for (const QString& dir : m_searchPaths) {
+        QString p = dir + "/" + langCode + ".json";
         QFile file(p);
         if (file.exists()) {
             filepath = p;
             break;
         }
     }
-    
+
     if (filepath.isEmpty()) {
         qWarning("Language file not found for: %s (tried %d paths)", 
-                 qToUtf8(langCode).data(), paths.size());
-        for (int i = 0; i < (int)paths.size(); ++i) {
-            qWarning("  Path %d: %s", i, qToUtf8(paths[i]).data());
+                 qToUtf8(langCode).data(), m_searchPaths.size());
+        for (int i = 0; i < (int)m_searchPaths.size(); ++i) {
+            qWarning("  Path %d: %s", i, qToUtf8(m_searchPaths[i] + "/" + langCode + ".json").data());
         }
         return false;
     }
     
     QFile file(filepath);
-    file.close(); // 确保文件处于关闭状态
+    file.close();
     if (!qOpenReadOnly(file)) {
         qWarning("Cannot open language file: %s", qToUtf8(filepath).data());
         return false;
@@ -70,20 +74,15 @@ bool Translator::loadLanguage(const QString& langCode) {
     while (!stream.atEnd()) {
         jsonStr += stream.readLine();
     }
-    file.close(); // 显式关闭文件
+    file.close();
     qWarning("Language file loaded: %s", qToUtf8(filepath).data());
     
-    // 解析 JSON
     cJSON* newRoot = cJSON_Parse(qToUtf8(jsonStr).data());
     if (!newRoot) {
         qWarning("Failed to parse JSON: %s", qToUtf8(filepath).data());
         return false;
     }
     
-    // 调试：打印加载信息
-    qWarning("DEBUG loadLanguage: file=%s, newRoot=%p", qToUtf8(filepath).data(), newRoot);
-    
-    // 替换旧数据
     if (m_root) cJSON_Delete((cJSON*)m_root);
     m_root = newRoot;
     m_currentLang = langCode;
