@@ -1,254 +1,111 @@
 #include "eventpoller.h"
-#include "compat34.h"
 #include "apilog.h"
-#include <queue>
+#include <unistd.h>
 
-// ===== ApiWorker 线程：仅处理 API 请求，不阻塞事件轮询 =====
-class ApiWorkerThread : public QThread {
-    EventPoller* poller;
-public:
-#ifdef QT3_BUILD
-    ApiWorkerThread(EventPoller* p) : QThread((unsigned int)0), poller(p) {}
-#else
-    ApiWorkerThread(EventPoller* p) : QThread(p), poller(p) {}
-#endif
-    void run() override {
-        while (poller->running) {
-            poller->mutex.lock();
-            if (poller->pendingRequests.empty())
-                poller->wakeCondition.wait(&poller->mutex);
-            while (!poller->pendingRequests.empty()) {
-                ApiRequestEvent* req = poller->pendingRequests.front();
-                poller->pendingRequests.pop();
-                poller->mutex.unlock();
-                poller->processApiRequest(req);
-                delete req;
-                poller->mutex.lock();
-            }
-            poller->mutex.unlock();
-        }
-    }
-};
+EventPoller* EventPoller::s_instance = nullptr;
 
-EventPoller::EventPoller(QObject* parent) :
-#ifdef QT3_BUILD
-    QThread((unsigned int)0),
-#else
-    QThread(parent),
-#endif
-    running(true), lastEventId(0), receiver(nullptr), apiWorker(nullptr) {
-    api = new ToxAPI();
-    apiWorker = new ApiWorkerThread(this);
-    apiWorker->start();
+static size_t writeCb(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t total = size * nmemb;
+    static_cast<std::string*>(userp)->append(static_cast<char*>(contents), total);
+    return total;
 }
 
-void EventPoller::run() {
-    while (running) {
-        // 事件轮询
-        std::vector<Event> events = api->pollEvents(lastEventId);
-        
-        // 检查是否有特殊重启事件
-        std::vector<Event> normalEvents;
-        bool restartDetected = false;
-        
-        for (const auto& e : events) {
-            if (e.type == "_server_restart") {
-                restartDetected = true;
-            } else {
-                normalEvents.push_back(e);
-            }
-        }
-        
-        // 处理重启检测
-        if (restartDetected) {
-            ALOG_WARN("EventPoller: Server restart detected, resetting lastEventId from", lastEventId, "to 0");
-            lastEventId = 0;
-            // 只重置不刷新
-        }
-        
-        if (!normalEvents.empty()) {
-            if (receiver) {
-                EventListEvent* event = new EventListEvent(normalEvents);
-                QApplication::postEvent(receiver, event);
-            }
-            // 更新lastEventId
-            for (const auto& e : normalEvents) {
-                if (e.id > lastEventId) {
-                    lastEventId = e.id;
-                }
-            }
-        } else if (!restartDetected) {
-            // 无事件且无重启：等待2秒后重试
-            QThread::sleep(2);
-        }
+static size_t headerCb(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t total = size * nmemb;
+    auto* headers = static_cast<std::map<std::string, std::string>*>(userp);
+    std::string line(static_cast<char*>(contents), total);
+    size_t colon = line.find(':');
+    if (colon == std::string::npos || colon == 0) return total;
+    std::string name = line.substr(0, colon);
+    size_t vStart = colon + 1;
+    while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) vStart++;
+    size_t vEnd = line.size();
+    while (vEnd > vStart && (line[vEnd - 1] == '\r' || line[vEnd - 1] == '\n')) vEnd--;
+    if (vEnd <= vStart) return total;
+    for (char& c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    (*headers)[name] = line.substr(vStart, vEnd - vStart);
+    return total;
+}
+
+EventPoller::EventPoller()
+    : QThread(), running(true), multi(nullptr) {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    multi = curl_multi_init();
+    s_instance = this;
+}
+
+void EventPoller::start() {
+    if (!s_instance) {
+        auto* ep = new EventPoller();
+        ep->QThread::start();
     }
 }
 
 void EventPoller::stop() {
-    running = false;
-    wakeCondition.wakeOne();
-    wait();
-    if (apiWorker) {
-        apiWorker->wait();
-        delete apiWorker;
+    if (!s_instance) return;
+    s_instance->running = false;
+    s_instance->wait();
+    if (s_instance->multi) {
+        curl_multi_cleanup(s_instance->multi);
+        s_instance->multi = nullptr;
     }
+    delete s_instance;
+    s_instance = nullptr;
 }
 
-void EventPoller::setLastEventId(uint64_t id) {
-    lastEventId = id;
+void EventPoller::addRequest(const std::string& url,
+                              const std::string& method,
+                              const std::string& data,
+                              void (*done)(int, const std::string&,
+                                          const std::map<std::string, std::string>*,
+                                          void*),
+                              void* udata, int timeoutSec) {
+    if (!s_instance || !s_instance->multi) return;
+
+    CURL* easy = curl_easy_init();
+    if (!easy) return;
+
+    auto* ctx = new HttpCtx{std::string(), std::map<std::string, std::string>(), done, udata};
+
+    curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(easy, CURLOPT_PRIVATE, ctx);
+    curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, writeCb);
+    curl_easy_setopt(easy, CURLOPT_WRITEDATA, &ctx->body);
+    curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, headerCb);
+    curl_easy_setopt(easy, CURLOPT_HEADERDATA, &ctx->headers);
+    curl_easy_setopt(easy, CURLOPT_TIMEOUT, (long)timeoutSec);
+    curl_easy_setopt(easy, CURLOPT_TCP_KEEPALIVE, 1L);
+
+    if (method == "POST") {
+        curl_easy_setopt(easy, CURLOPT_POSTFIELDS, data.c_str());
+        curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long)data.size());
+    }
+
+    s_instance->multiMutex.lock();
+    curl_multi_add_handle(s_instance->multi, easy);
+    s_instance->multiMutex.unlock();
 }
 
-void EventPoller::postApiRequest(ApiRequestEvent* req) {
-    mutex.lock();
-    pendingRequests.push(req);
-    mutex.unlock();
-    wakeCondition.wakeOne();
-}
+void EventPoller::run() {
+    while (running) {
+        int numfds;
+        curl_multi_wait(multi, NULL, 0, 50, &numfds);
+        int r;
+        while (curl_multi_perform(multi, &r) == CURLM_CALL_MULTI_PERFORM);
 
-void EventPoller::processApiRequest(ApiRequestEvent* req) {
-    if (!req || !receiver) return;
-    
-    switch (req->type) {
-        case ApiLoadAllData: {
-            AllDataLoadedEvent* result = new AllDataLoadedEvent();
-            
-            // 1. 加载self info
-            result->success = api->getSelf(result->selfName, 
-                                            result->selfStatusMsg,
-                                            result->selfConnStatus,
-                                            result->selfAddress);
-            
-            // 2. 加载好友列表和详情
-            std::vector<int> friends = api->getFriends();
-            for (int id : friends) {
-                FriendInfo info;
-                if (api->getFriendInfo(id, info)) {
-                    ContactData cd;
-                    cd.id = id;
-                    cd.name = info.name;
-                    cd.type = "friend";
-                    cd.status = info.statusStr;
-                    cd.chatId = info.publicKey;
-                    cd.iconUrl = info.iconUrl;
-                    result->contacts.push_back(cd);
-                }
+        CURLMsg* msg;
+        int left;
+        while ((msg = curl_multi_info_read(multi, &left))) {
+            if (msg->msg == CURLMSG_DONE) {
+                HttpCtx* ctx;
+                curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &ctx);
+                long httpCode = 0;
+                curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
+                ctx->done(httpCode, ctx->body, &ctx->headers, ctx->udata);
+                delete ctx;
+                curl_multi_remove_handle(multi, msg->easy_handle);
+                curl_easy_cleanup(msg->easy_handle);
             }
-            
-            // 3. 加载群组列表（使用新的API返回结构）
-            std::vector<GroupInfo> groups = api->getGroups();
-            for (const auto& grp : groups) {
-                ContactData cd;
-                cd.id = grp.groupNumber;
-                cd.chatId = grp.chatId;
-                cd.isConnected = grp.isConnected;
-                // 使用群组名称，为空时使用降级策略
-                if (!grp.groupName.empty()) {
-                    cd.name = grp.groupName;
-                } else {
-                    // 名称为空：显示 "number - chat_id前7位"
-                    std::string displayName = std::to_string(grp.groupNumber);
-                    if (!grp.chatId.empty()) {
-                        displayName += " - " + grp.chatId.substr(0, 7);
-                    }
-                    cd.name = displayName;
-                }
-                cd.type = "group";
-                // 根据真实连接状态设置 status
-                cd.status = cd.isConnected ? "online" : "offline";
-                cd.statusText = grp.statusText;
-                result->contacts.push_back(cd);
-            }
-            
-            // 4. 加载会议列表（使用新的API返回结构）
-            std::vector<ConferenceInfo> conferences = api->getConferences();
-            for (const auto& conf : conferences) {
-                ContactData cd;
-                cd.id = conf.conferenceNumber;
-                cd.chatId = conf.chatId;
-                cd.isConnected = conf.isConnected;
-                // 使用会议名称，为空时使用降级策略
-                if (!conf.conferenceName.empty()) {
-                    cd.name = conf.conferenceName;
-                } else {
-                    // 名称为空：显示 "number - chat_id前7位"
-                    std::string displayName = std::to_string(conf.conferenceNumber);
-                    if (!conf.chatId.empty()) {
-                        displayName += " - " + conf.chatId.substr(0, 7);
-                    }
-                    cd.name = displayName;
-                }
-                cd.type = "conference";
-                // 会议使用真实连接状态
-                cd.status = cd.isConnected ? "online" : "offline";
-                cd.statusText = conf.statusText;
-                result->contacts.push_back(cd);
-            }
-            
-            // 一次性发送所有结果
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiSendFriendMessage: {
-            MessageSentResultEvent* result = new MessageSentResultEvent();
-            result->chatId = req->id;
-            result->chatType = "friend";
-            result->success = api->sendFriendMessage(req->id, req->message);
-            result->message = req->message;
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiSendConferenceMessage: {
-            MessageSentResultEvent* result = new MessageSentResultEvent();
-            result->chatId = req->id;
-            result->chatType = "conference";
-            result->success = api->sendConferenceMessage(req->id, req->message);
-            result->message = req->message;
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiSendGroupMessage: {
-            MessageSentResultEvent* result = new MessageSentResultEvent();
-            result->chatId = req->id;
-            result->chatType = "group";
-            result->success = api->sendGroupMessage(req->id, req->message);
-            result->message = req->message;
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiJoinConference: {
-            ConferenceResultEvent* result = new ConferenceResultEvent();
-            // 需要从请求中获取friendNumber和cookie
-            // 简化：假设req中有这些字段
-            result->success = api->joinConference(req->id, req->message);
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiTranslate: {
-            TranslateRequestEvent* treq = static_cast<TranslateRequestEvent*>(req);
-            TranslateResultEvent* result = new TranslateResultEvent();
-            result->msgIndex = treq->msgIndex;
-            TranslateApiResult tr = api->translate(treq->text, treq->targetLang);
-            result->success = tr.success;
-            result->translatedText = tr.translatedText;
-            result->errorMessage = tr.errorMessage;
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiLoadGroupMembers: {
-            MembersLoadedEvent* result = new MembersLoadedEvent();
-            result->contactId = req->id;
-            result->contactType = req->contactType;
-            result->members = api->getGroupMembers(req->id);
-            QApplication::postEvent(receiver, result);
-            break;
-        }
-        case ApiLoadMessageHistory: {
-            MessageHistoryLoadedEvent* result = new MessageHistoryLoadedEvent();
-            result->contactId = req->id;
-            result->contactType = req->contactType;
-            api->getMessagesHistory(req->id, req->contactType, result->messages);
-            QApplication::postEvent(receiver, result);
-            break;
         }
     }
 }

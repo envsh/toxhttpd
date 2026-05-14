@@ -142,20 +142,17 @@ void SelfInfoWidget::onEditInfo() {
     
     EditInfoDialog dialog(currentName, currentStatus, this);
     if (dialog.exec() == QDialog::Accepted) {
-        ToxAPI api;
         QString name = dialog.getName();
         QString status = dialog.getStatusMessage();
         
-        // 合并为一次调用
-        bool success = api.setSelfInfo(
+        bool success = ToxAPI::setSelfInfoSync(
             std::string(qToUtf8(name).data()),
             std::string(qToUtf8(status).data())
         );
         
         if (success) {
-            // 重新加载信息
             std::string name2, statusMsg, connStatus, address;
-            if (api.getSelf(name2, statusMsg, connStatus, address)) {
+            if (ToxAPI::getSelfSync(name2, statusMsg, connStatus, address)) {
                 updateInfo(QString::fromUtf8(name2.c_str()), 
                           QString::fromUtf8(statusMsg.c_str()), 
                           QString::fromUtf8(connStatus.c_str()),
@@ -168,12 +165,10 @@ void SelfInfoWidget::onEditInfo() {
 }
 
 void SelfInfoWidget::onBootstrap() {
-    ToxAPI api;
     QMessageBox::information(this, "Bootstrap", _("connecting_network"));
     
-    // 重新加载信息以更新状态
     std::string name, statusMsg, connStatus, address;
-    if (api.getSelf(name, statusMsg, connStatus, address)) {
+    if (ToxAPI::getSelfSync(name, statusMsg, connStatus, address)) {
         updateInfo(QString::fromUtf8(name.c_str()), 
                   QString::fromUtf8(statusMsg.c_str()), 
                   QString::fromUtf8(connStatus.c_str()),

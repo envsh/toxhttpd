@@ -6,7 +6,6 @@
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
-#include "eventpoller.h"
 #include "restapi.h"
 #include "translator.h"
 #include "friendinfodialog.h"
@@ -47,7 +46,6 @@ private:
     SelfInfoWidget* selfInfoWidget;
     ContactListWidget* contactListWidget;
     ChatWidget* chatWidget;
-    EventPoller* eventPoller;
     
     int currentChatId;
     QString currentChatType;

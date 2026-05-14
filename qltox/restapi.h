@@ -3,8 +3,8 @@
 
 #include <string>
 #include <vector>
-#include <map>
 #include <cstdint>
+#include "eventpoller.h"
 
 struct FriendInfo {
     int id;
@@ -13,27 +13,6 @@ struct FriendInfo {
     std::string statusText;
     std::string iconUrl;
     std::string publicKey;
-};
-
-struct Event {
-    uint64_t id;
-    std::string type;
-    std::string data;
-    std::string timestamp;  // ISO8601 format from server
-};
-
-struct PeerInfo {
-    int peerNumber;
-    std::string name;
-    int status = 0;           // connection status: 0=none, 1=tcp, 2=udp
-    std::string statusStr;    // "none"/"tcp"/"udp"
-    std::string statusText;
-    std::string iconUrl;
-    int role = 0;
-    std::string roleStr;      // "member"/"moderator"/"founder"
-    std::string publicKey;
-    bool isSelf = false;
-    std::string peerIp;       // IP address string from toxpriv
 };
 
 struct GroupInfo {
@@ -52,88 +31,104 @@ struct ConferenceInfo {
     std::string statusText;
 };
 
-struct HistoryMessage {
-    int64_t rowid;
-    std::string message;
-    std::string sender_pubkey;
-    uint32_t sender_number;
-    std::string direction;
-    std::string created_at;
-};
-
-// Translation API result
-struct TranslateApiResult {
-    bool success = false;
-    std::string translatedText;
-    std::string errorMessage;
-};
-
 class ToxAPI {
 public:
-    ToxAPI(const std::string& baseUrl = "http://localhost:8181");
-    
-    // Self
-    bool getSelf(std::string& name, std::string& statusMsg, std::string& connStatus, std::string& address);
-    bool setSelfInfo(const std::string& name, const std::string& status_message);
-    // Keep old functions for compatibility (call setSelfInfo internally)
-    bool setSelfName(const std::string& name);
-    bool setSelfStatus(const std::string& status);
-    
-    // Friends
-    std::vector<int> getFriends();
-    bool getFriendInfo(int friendId, FriendInfo& info);
-    int addFriend(const std::string& publicKey);
-    bool deleteFriend(int friendId);
-    
-    // Messages
-    bool sendFriendMessage(int friendId, const std::string& message);
-    bool sendConferenceMessage(int conferenceId, const std::string& message);
-    bool sendGroupMessage(int groupId, const std::string& message);
-    
-    // Conferences
-    std::vector<ConferenceInfo> getConferences();
-    int createConference();
-    bool leaveConference(int confId);
-    bool inviteToConference(int friendId, int confId);
-    bool joinConference(int friendNumber, const std::string& cookie);
-    bool rejectConference(int friendNumber);
-    bool ignoreConference(int friendNumber);
-    
-    // Groups (NGC)
-    std::vector<GroupInfo> getGroups();
-    int createGroup(const std::string& groupName, const std::string& creatorName, 
-                   const std::string& password = "", bool isPrivate = false);
-    bool leaveGroup(int groupId);
-    bool inviteToGroup(int friendId, int groupId);
-    bool joinGroup(int friendNumber, const std::string& chatId, 
-                  const std::string& name = "", const std::string& password = "");
-    bool joinGroupByChatId(const std::string& chatId,
-                          const std::string& name = "", const std::string& password = "");
-    
-    // Events (long polling, 30s timeout)
-    std::vector<Event> pollEvents(uint64_t after);
-    
-    // Message history
-    bool getMessagesHistory(int contact_id, const std::string& contact_type,
-                            std::vector<HistoryMessage>& messages);
-    
-    // Member lists
-    std::vector<PeerInfo> getConferenceMembers(int confId);
-    std::vector<PeerInfo> getGroupMembers(int groupId);
-    
-    // Group nickname
-    bool setGroupSelfName(int groupId, const std::string& name);
-    std::string getRandomName();
-    
-    // Translation
-    TranslateApiResult translate(const std::string& text, const std::string& toLang);
-    
-private:
-    std::string baseUrl;
+    static void setEventTarget(QObject* target);
+    static void setBaseUrl(const std::string& url);
 
-    std::string urlEncode(const std::string& str);
-    std::string httpGet(const std::string& endpoint, std::map<std::string, std::string>* headers = nullptr);
-    std::string httpPost(const std::string& endpoint, const std::string& postData);
+    static void startPollEvent();
+    static void stopPollEvent();
+    static void loadAllData();
+
+    static void getSelf();
+    static void getFriends();
+    static void sendFriendMessage(int friendId, const std::string& message);
+    static void sendConferenceMessage(int conferenceId, const std::string& message);
+    static void sendGroupMessage(int groupId, const std::string& message);
+    static void addFriend(const std::string& publicKey);
+    static void deleteFriend(int friendId);
+    static void getGroupMembers(int groupId);
+    static void getConferenceMembers(int confId);
+    static void getMessagesHistory(int contactId, const std::string& contactType);
+    static void joinConference(int friendNumber, const std::string& cookie);
+    static void rejectConference(int friendNumber);
+    static void ignoreConference(int friendNumber);
+    static void createConference();
+    static void leaveConference(int confId);
+    static void inviteToConference(int friendId, int confId);
+    static void createGroup(const std::string& groupName, const std::string& creatorName,
+                           const std::string& password = "", bool isPrivate = false);
+    static void leaveGroup(int groupId);
+    static void inviteToGroup(int friendId, int groupId);
+    static void joinGroup(int friendNumber, const std::string& chatId,
+                         const std::string& name = "", const std::string& password = "");
+    static void joinGroupByChatId(const std::string& chatId,
+                                  const std::string& name = "", const std::string& password = "");
+    static void setGroupSelfName(int groupId, const std::string& name);
+    static void getRandomName();
+    static void setSelfInfo(const std::string& name, const std::string& statusMessage);
+    static void translate(const std::string& text, const std::string& toLang, int msgIndex);
+    static std::string urlEncode(const std::string& str);
+
+    // Sync helper methods for dialog contexts
+    static bool getFriendInfo(int id, FriendInfo& info);
+    static std::vector<GroupInfo> getGroupsSync();
+    static std::vector<ConferenceInfo> getConferencesSync();
+    static std::vector<PeerInfo> getConferenceMembersSync(int confId);
+    static std::vector<PeerInfo> getGroupMembersSync(int groupId);
+    static std::string getRandomNameSync();
+    static int addFriendSync(const std::string& publicKey);
+    static int createConferenceSync();
+    static int createGroupSync(const std::string& groupName, const std::string& creatorName,
+                               const std::string& password = "", bool isPrivate = false);
+    static bool deleteFriendSync(int friendId);
+    static bool leaveConferenceSync(int confId);
+    static bool setSelfInfoSync(const std::string& name, const std::string& statusMessage);
+    static bool getSelfSync(std::string& name, std::string& statusMsg,
+                            std::string& connStatus, std::string& address);
+    static bool joinGroupSync(int friendNumber, const std::string& chatId,
+                              const std::string& name = "", const std::string& password = "");
+    static bool inviteToConferenceSync(int friendId, int confId);
+    static bool inviteToGroupSync(int friendId, int groupId);
+    static bool setGroupSelfNameSync(int groupId, const std::string& name);
+    static bool joinGroupByChatIdSync(const std::string& chatId,
+                                      const std::string& name = "", const std::string& password = "");
+
+private:
+    struct ApiCtx {
+        int type;
+        int id = 0;
+        std::string str1;
+        std::string str2;
+        int n1 = 0;
+        ApiCtx() {}
+        ApiCtx(int t) : type(t) {}
+        ApiCtx(int t, int i) : type(t), id(i) {}
+        ApiCtx(int t, int i, const std::string& s) : type(t), id(i), str1(s) {}
+        ApiCtx(int t, int i, const std::string& s1, const std::string& s2) : type(t), id(i), str1(s1), str2(s2) {}
+        ApiCtx(int t, int i, const std::string& s1, const std::string& s2, int n) : type(t), id(i), str1(s1), str2(s2), n1(n) {}
+        void* ptr = nullptr;
+    };
+    static void onHttpDone(int httpCode, const std::string& body,
+                           const std::map<std::string, std::string>* headers,
+                           void* udata);
+    static void dispatchResult(ApiCtx* ctx, int httpCode, const std::string& body,
+                               const std::map<std::string, std::string>* headers);
+    static std::string buildUrl(const std::string& endpoint);
+    static void pollEvents();
+    static void request(ApiRequestType type, const std::string& endpoint,
+                        const std::string& method, const std::string& data = "",
+                        ApiCtx* ctx = nullptr, int timeoutSec = 35);
+    static bool syncRequest(const std::string& endpoint,
+                            const std::string& method,
+                            std::string& outBody,
+                            const std::string& data = "",
+                            int timeoutSec = 35);
+
+    static QObject* s_target;
+    static std::string s_baseUrl;
+    static uint64_t s_lastEventId;
+    static bool s_pollRunning;
 };
 
-#endif // API_H
+#endif

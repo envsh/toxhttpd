@@ -3,32 +3,99 @@
 
 #include "compat34.h"
 #include <vector>
-#include <queue>
 #include <string>
-#include "restapi.h"
+#include <map>
+#include <cstdint>
+#include <curl/curl.h>
 
-typedef std::vector<Event> EventList;
-
-// 事件类型常量
+// ── 事件类型常量 ──
 const int EventListReadyType = QEvent::User + 100;
-const int ApiRequestEventType = QEvent::User + 101;
 const int ApiResultReadyType = QEvent::User + 102;
 
-// API请求类型
+// ── API 请求类型 ──
 enum ApiRequestType {
-    ApiLoadAllData,        // 加载所有初始数据（self + contacts）
+    ApiPollEvents,
+    ApiGetSelf,
+    ApiGetFriends,
+    ApiLoadGroupMembers,
+    ApiLoadMessageHistory,
     ApiSendFriendMessage,
     ApiSendConferenceMessage,
     ApiSendGroupMessage,
-    ApiJoinConference,
-    ApiRejectConference,
     ApiAddFriend,
+    ApiJoinConference,
     ApiTranslate,
-    ApiLoadMessageHistory,
-    ApiLoadGroupMembers
+    ApiSetSelfInfo,
+    ApiDeleteFriend,
+    ApiCreateConference,
+    ApiLeaveConference,
+    ApiInviteToConference,
+    ApiRejectConference,
+    ApiIgnoreConference,
+    ApiCreateGroup,
+    ApiLeaveGroup,
+    ApiInviteToGroup,
+    ApiJoinGroup,
+    ApiJoinGroupByChatId,
+    ApiSetGroupSelfName,
+    ApiGetRandomName,
+    ApiLoadAllData,
 };
 
-// 事件轮询结果
+// ── 数据类型（事件契约）──
+
+struct Event {
+    uint64_t id;
+    std::string type;
+    std::string data;
+    std::string timestamp;
+};
+
+struct PeerInfo {
+    int peerNumber;
+    std::string name;
+    int status = 0;
+    std::string statusStr;
+    std::string statusText;
+    std::string iconUrl;
+    int role = 0;
+    std::string roleStr;
+    std::string publicKey;
+    bool isSelf = false;
+    std::string peerIp;
+};
+
+struct HistoryMessage {
+    int64_t rowid;
+    std::string message;
+    std::string sender_pubkey;
+    uint32_t sender_number;
+    std::string direction;
+    std::string created_at;
+};
+
+struct TranslateApiResult {
+    bool success = false;
+    std::string translatedText;
+    std::string errorMessage;
+};
+
+struct ContactData {
+    int id;
+    std::string name;
+    std::string type;
+    std::string status;
+    std::string chatId;
+    bool isConnected;
+    std::string iconUrl;
+    std::string statusText;
+    ContactData() : id(-1), isConnected(false) {}
+};
+
+typedef std::vector<Event> EventList;
+
+// ── CustomEvent 基类 ──
+
 class EventListEvent : public CustomEventBase {
 public:
 #ifdef QT3_BUILD
@@ -39,23 +106,6 @@ public:
     EventList events;
 };
 
-// API请求事件
-class ApiRequestEvent : public CustomEventBase {
-public:
-#ifdef QT3_BUILD
-    ApiRequestEvent(ApiRequestType t) : QCustomEvent(ApiRequestEventType), type(t) {}
-#else
-    ApiRequestEvent(ApiRequestType t) : QEvent((QEvent::Type)ApiRequestEventType), type(t) {}
-#endif
-    ApiRequestType type;
-    // 请求参数
-    int id;
-    std::string message;
-    std::string publicKey;
-    std::string contactType;
-};
-
-// API结果事件基类
 class ApiResultEvent : public CustomEventBase {
 public:
 #ifdef QT3_BUILD
@@ -66,72 +116,44 @@ public:
     ApiRequestType type;
 };
 
-// 可跨线程传递的联系人数据
-struct ContactData {
-    int id;
-    std::string name;
-    std::string type;
-    std::string status;
-    std::string chatId;      // public key
-    bool isConnected;        // 群组/会议连接状态
-    std::string iconUrl;
-    std::string statusText;  // 好友状态消息/群组会议topic
-    
-    ContactData() : id(-1), isConnected(false) {}
-};
-
-// 所有数据加载完成事件
-class AllDataLoadedEvent : public ApiResultEvent {
+class SelfInfoResultEvent : public ApiResultEvent {
 public:
-#ifdef QT3_BUILD
-    AllDataLoadedEvent() : ApiResultEvent(ApiLoadAllData), success(true) {}
-#else
-    AllDataLoadedEvent() : ApiResultEvent(ApiLoadAllData), success(true) {}
-#endif
-    bool success;
-    // Self info
-    std::string selfName, selfStatusMsg, selfConnStatus, selfAddress;
-    
-    // Contacts
-    std::vector<ContactData> contacts;
+    SelfInfoResultEvent() : ApiResultEvent(ApiGetSelf) {}
+    bool success = false;
+    std::string name, statusMsg, connStatus, address;
 };
 
-// 消息发送结果事件
+class FriendsResultEvent : public ApiResultEvent {
+public:
+    FriendsResultEvent() : ApiResultEvent(ApiGetFriends) {}
+    std::vector<int> friendIds;
+};
+
 class MessageSentResultEvent : public ApiResultEvent {
 public:
-#ifdef QT3_BUILD
-    MessageSentResultEvent() : ApiResultEvent(ApiSendFriendMessage), success(false) {}
-#else
-    MessageSentResultEvent() : ApiResultEvent(ApiSendFriendMessage), success(false) {}
-#endif
+    MessageSentResultEvent(ApiRequestType t) : ApiResultEvent(t), success(false) {}
     bool success;
-    std::string message;  // 用于乐观更新
+    std::string message;
     int chatId;
     std::string chatType;
 };
 
-// 会议操作结果事件
-class ConferenceResultEvent : public ApiResultEvent {
+class MembersLoadedEvent : public ApiResultEvent {
 public:
-#ifdef QT3_BUILD
-    ConferenceResultEvent() : ApiResultEvent(ApiJoinConference), success(false) {}
-#else
-    ConferenceResultEvent() : ApiResultEvent(ApiJoinConference), success(false) {}
-#endif
-    bool success;
-    int conferenceId;
+    MembersLoadedEvent() : ApiResultEvent(ApiLoadGroupMembers) {}
+    int contactId = 0;
+    std::string contactType;
+    std::vector<PeerInfo> members;
 };
 
-// 翻译请求事件
-class TranslateRequestEvent : public ApiRequestEvent {
+class MessageHistoryLoadedEvent : public ApiResultEvent {
 public:
-    TranslateRequestEvent() : ApiRequestEvent(ApiTranslate) {}
-    int msgIndex = 0;
-    std::string text;
-    std::string targetLang;
+    MessageHistoryLoadedEvent() : ApiResultEvent(ApiLoadMessageHistory) {}
+    int contactId = 0;
+    std::string contactType;
+    std::vector<HistoryMessage> messages;
 };
 
-// 翻译结果事件
 class TranslateResultEvent : public ApiResultEvent {
 public:
     TranslateResultEvent() : ApiResultEvent(ApiTranslate) {}
@@ -141,48 +163,45 @@ public:
     std::string errorMessage;
 };
 
-// 成员列表加载完成事件
-class MembersLoadedEvent : public ApiResultEvent {
+class AllDataLoadedEvent : public ApiResultEvent {
 public:
-    MembersLoadedEvent() : ApiResultEvent(ApiLoadGroupMembers) {}
-    int contactId = 0;
-    std::string contactType;
-    std::vector<PeerInfo> members;
+    AllDataLoadedEvent() : ApiResultEvent(ApiLoadAllData) {}
+    bool success = false;
+    std::string selfName, selfStatusMsg, selfConnStatus, selfAddress;
+    std::vector<ContactData> contacts;
 };
 
-// 历史消息加载完成事件
-class MessageHistoryLoadedEvent : public ApiResultEvent {
-public:
-    MessageHistoryLoadedEvent() : ApiResultEvent(ApiLoadMessageHistory) {}
-    int contactId = 0;
-    std::string contactType;
-    std::vector<HistoryMessage> messages;
+// ── curl_multi HTTP 引擎 ──
+
+struct HttpCtx {
+    std::string body;
+    std::map<std::string, std::string> headers;
+    void (*done)(int httpCode, const std::string& body,
+                 const std::map<std::string, std::string>* headers,
+                 void* udata);
+    void* udata;
 };
 
 class EventPoller : public QThread {
 public:
-    explicit EventPoller(QObject* parent = nullptr);
-    void run();
-    void stop();
-    
-    void setLastEventId(uint64_t id);
-    void setReceiver(QObject* recv) { receiver = recv; }
-    
-    // API请求接口（主线程调用）
-    void postApiRequest(ApiRequestEvent* req);
-    
+    static void start();
+    static void stop();
+    static void addRequest(const std::string& url,
+                           const std::string& method,
+                           const std::string& data,
+                           void (*done)(int httpCode, const std::string& body,
+                                       const std::map<std::string, std::string>* headers,
+                                       void* udata),
+                           void* udata = nullptr,
+                           int timeoutSec = 35);
+
 private:
-    friend class ApiWorkerThread;
-    void processApiRequest(ApiRequestEvent* req);
-    
+    EventPoller();
+    void run();
+    static EventPoller* s_instance;
     bool running;
-    uint64_t lastEventId;
-    ToxAPI* api;
-    QObject* receiver;
-    std::queue<ApiRequestEvent*> pendingRequests;
-    QMutex mutex;
-    QWaitCondition wakeCondition;
-    QThread* apiWorker;
+    CURLM* multi;
+    QMutex multiMutex;
 };
 
-#endif // EVENTPOLLER_H
+#endif

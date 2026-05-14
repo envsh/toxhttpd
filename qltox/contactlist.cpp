@@ -471,8 +471,7 @@ void ContactListWidget::onJoinGroupClicked() {
         return;
     }
 
-    ToxAPI api;
-    bool success = api.joinGroupByChatId(qToUtf8(chatId).data(), "", "");
+    bool success = ToxAPI::joinGroupByChatIdSync(qToUtf8(chatId).data(), "", "");
 
     if (success) {
         QMessageBox::information(this, _("group.joined"),
@@ -497,8 +496,7 @@ void ContactListWidget::onAddFriendClicked() {
         return;
     }
 
-    ToxAPI api;
-    int friendId = api.addFriend(qToUtf8(pubkey).data());
+    int friendId = ToxAPI::addFriendSync(qToUtf8(pubkey).data());
     if (friendId >= 0) {
         QMessageBox::information(this, _("add_friend_success"),
                                   _("add_friend_success"));
@@ -510,8 +508,7 @@ void ContactListWidget::onAddFriendClicked() {
 }
 
 void ContactListWidget::onCreateConferenceClicked() {
-    ToxAPI api;
-    int confId = api.createConference();
+    int confId = ToxAPI::createConferenceSync();
     if (confId >= 0) {
         QMessageBox::information(this, _("conference_created"),
                                   _("conference_created"));
@@ -522,8 +519,7 @@ void ContactListWidget::onCreateConferenceClicked() {
 }
 
 void ContactListWidget::onCreateGroupClicked() {
-    ToxAPI api;
-    int groupId = api.createGroup("NewGroup", "me", "", false);
+    int groupId = ToxAPI::createGroupSync("NewGroup", "me", "", false);
     if (groupId >= 0) {
         QMessageBox::information(this, _("group_created"),
                                   _("group_created"));

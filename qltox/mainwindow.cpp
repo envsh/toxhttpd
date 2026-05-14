@@ -10,7 +10,6 @@ static QString getCurrentTime() {
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
-#include "eventpoller.h"
 #include "restapi.h"
 #include "translator.h"
 #include "conferenceinvitedialog.h"
@@ -117,22 +116,19 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
             this, SLOT(onTranslateRequested(int, const QString&, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
-    // 事件轮询器
-    eventPoller = new EventPoller(this);
-    eventPoller->setReceiver(this);
-    eventPoller->start();
+    // 启动事件轮询引擎
+    EventPoller::start();
+    ToxAPI::setEventTarget(this);
+    ToxAPI::startPollEvent();
     
-    // ✅ 异步加载：发送请求事件，不阻塞
+    // 异步加载初始数据
     qWarning("MainWindow: requesting initial data load (async)");
-    ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
-    eventPoller->postApiRequest(req);
+    ToxAPI::loadAllData();
 }
 
 MainWindow::~MainWindow() {
-    if (eventPoller) {
-        eventPoller->stop();
-        delete eventPoller;
-    }
+    ToxAPI::stopPollEvent();
+    EventPoller::stop();
 }
 
 void MainWindow::customEvent(CustomEventBase* event) {
@@ -214,14 +210,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
             return;
         }
         
-        // 会议操作结果
+        // 会议加入结果 → 重新加载联系人
         if (e->type == ApiJoinConference) {
-            ConferenceResultEvent* evt = static_cast<ConferenceResultEvent*>(event);
-            if (evt->success) {
-                // 重新加载联系人
-                ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
-                eventPoller->postApiRequest(req);
-            }
+            ToxAPI::loadAllData();
             return;
         }
         
@@ -287,19 +278,13 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     chatWidget->clearMessages();
     
     // 异步加载历史消息
-    {
-        ApiRequestEvent* req = new ApiRequestEvent(ApiLoadMessageHistory);
-        req->id = id;
-        req->contactType = std::string(qToUtf8(type).data());
-        eventPoller->postApiRequest(req);
-    }
+    ToxAPI::getMessagesHistory(id, std::string(qToUtf8(type).data()));
     
     // 异步预加载成员列表到 peerInfoMap 缓存
-    if (type == "group" || type == "conference") {
-        ApiRequestEvent* req = new ApiRequestEvent(ApiLoadGroupMembers);
-        req->id = id;
-        req->contactType = std::string(qToUtf8(type).data());
-        eventPoller->postApiRequest(req);
+    if (type == "group") {
+        ToxAPI::getGroupMembers(id);
+    } else if (type == "conference") {
+        ToxAPI::getConferenceMembers(id);
     }
 }
 
@@ -322,10 +307,13 @@ void MainWindow::onMessageSent(const QString& message) {
         return;
     }
     
-    ApiRequestEvent* req = new ApiRequestEvent(reqType);
-    req->id = currentChatId;
-    req->message = std::string(qToUtf8(message));
-    eventPoller->postApiRequest(req);
+    if (reqType == ApiSendFriendMessage) {
+        ToxAPI::sendFriendMessage(currentChatId, std::string(qToUtf8(message)));
+    } else if (reqType == ApiSendConferenceMessage) {
+        ToxAPI::sendConferenceMessage(currentChatId, std::string(qToUtf8(message)));
+    } else if (reqType == ApiSendGroupMessage) {
+        ToxAPI::sendGroupMessage(currentChatId, std::string(qToUtf8(message)));
+    }
     
     // 乐观更新：先显示在界面
     chatWidget->appendMessage(message, "self", "Me", -1, getCurrentTime());
@@ -361,24 +349,17 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString friendNumber = QString::number(friendNumberItem->valueint);
                     QString cookie = QString::fromUtf8(cJSON_GetStringValue(cookieItem));
                     
-                    ConferenceInviteDialog dialog(friendNumber, cookie, this);
-                     dialog.exec();
-                     
-                     if (dialog.getResult() == ConferenceInviteDialog::Accept) {
-                        // ✅ 改为异步请求
-                        ApiRequestEvent* req = new ApiRequestEvent(ApiJoinConference);
-                        req->id = friendNumber.toInt();
-                        req->message = std::string(qToUtf8(cookie));
-                        eventPoller->postApiRequest(req);
-                        
-                        QMessageBox::information(this, _("conference_joined"), 
-                                                        _("conference_joined").arg(dialog.getCookie()));
-                    } else if (dialog.getResult() == ConferenceInviteDialog::Reject) {
-                        // ✅ 改为异步请求
-                        ApiRequestEvent* req = new ApiRequestEvent(ApiRejectConference);
-                        req->id = friendNumber.toInt();
-                        eventPoller->postApiRequest(req);
-                    }
+                     ConferenceInviteDialog dialog(friendNumber, cookie, this);
+                      dialog.exec();
+                      
+                      if (dialog.getResult() == ConferenceInviteDialog::Accept) {
+                         ToxAPI::joinConference(friendNumber.toInt(), std::string(qToUtf8(cookie)));
+                         
+                         QMessageBox::information(this, _("conference_joined"), 
+                                                         _("conference_joined").arg(dialog.getCookie()));
+                     } else if (dialog.getResult() == ConferenceInviteDialog::Reject) {
+                         ToxAPI::rejectConference(friendNumber.toInt());
+                     }
                 }
                 cJSON_Delete(root);
             }
@@ -426,9 +407,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("conference_message: failed to parse JSON: %s", e.data.c_str());
             }
         } else if (e.type == "self_connection_status") {
-            // ✅ 改为异步请求
-            ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
-            eventPoller->postApiRequest(req);
+            ToxAPI::loadAllData();
         } else if (e.type == "group_invite") {
             cJSON* root = cJSON_Parse(e.data.c_str());
             if (root) {
@@ -508,9 +487,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 cJSON_Delete(root);
             }
         } else if (e.type == "friend_name" || e.type == "friend_status") {
-            // ✅ 异步重新加载（直接发送请求，避免SLOT问题）
-            ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
-            eventPoller->postApiRequest(req);
+            ToxAPI::loadAllData();
         }
     }
 }
@@ -548,9 +525,8 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
     FriendInfoDialog dialog(this);
     
     if (type == "friend") {
-        ToxAPI api;
         FriendInfo info;
-        if (api.getFriendInfo(id, info)) {
+        if (ToxAPI::getFriendInfo(id, info)) {
             dialog.setInfo(id, QString::fromUtf8(info.name.c_str()), type,
                           QString::fromUtf8(info.statusText.c_str()),
                           QString::fromUtf8(info.statusStr.c_str()),
@@ -560,41 +536,31 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
             dialog.setInfo(id, _("no_name"), type);
         }
     } else if (type == "conference") {
-        // 设置正确的标题
         dialog.setTitle(_("modals.conference_info_title"));
-        
-        // 获取会议连接状态和chat_id (public key)
-        ToxAPI api;
-        std::vector<ConferenceInfo> conferences = api.getConferences();
+        std::vector<ConferenceInfo> conferences = ToxAPI::getConferencesSync();
         bool isConnected = false;
         QString chatId = "";
-        for (const auto& c : conferences) {
-            if (c.conferenceNumber == (uint32_t)id) {
-                isConnected = c.isConnected;
-                chatId = QString::fromUtf8(c.chatId.c_str());
+        for (size_t i = 0; i < conferences.size(); ++i) {
+            if (conferences[i].conferenceNumber == (uint32_t)id) {
+                isConnected = conferences[i].isConnected;
+                chatId = QString::fromUtf8(conferences[i].chatId.c_str());
                 break;
             }
         }
-        
         dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type,
                        "", "", isConnected, chatId);
     } else if (type == "group") {
-        // 设置正确的标题
         dialog.setTitle(_("modals.group_info_title"));
-        
-        // 获取群组连接状态和chat_id (public key)
-        ToxAPI api;
-        std::vector<GroupInfo> groups = api.getGroups();
+        std::vector<GroupInfo> groups = ToxAPI::getGroupsSync();
         bool isConnected = false;
         QString chatId = "";
-        for (const auto& g : groups) {
-            if (g.groupNumber == (uint32_t)id) {
-                isConnected = g.isConnected;
-                chatId = QString::fromUtf8(g.chatId.c_str());
+        for (size_t i = 0; i < groups.size(); ++i) {
+            if (groups[i].groupNumber == (uint32_t)id) {
+                isConnected = groups[i].isConnected;
+                chatId = QString::fromUtf8(groups[i].chatId.c_str());
                 break;
             }
         }
-        
         dialog.setInfo(id, _("group_item") + " " + QString::number(id), type,
                        "", "", isConnected, chatId);
     }
@@ -603,15 +569,14 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
 }
 
 void MainWindow::onViewMembersRequested(int id, const QString& type) {
-    ToxAPI api;
     std::vector<PeerInfo> members;
     QString title;
     
     if (type == "conference") {
-        members = api.getConferenceMembers(id);
+        members = ToxAPI::getConferenceMembersSync(id);
         title = _("member_list.title.conference").arg(QString::number(id));
     } else if (type == "group") {
-        members = api.getGroupMembers(id);
+        members = ToxAPI::getGroupMembersSync(id);
         title = _("member_list.title.group").arg(QString::number(id));
     } else {
         return;
@@ -624,8 +589,6 @@ void MainWindow::onViewMembersRequested(int id, const QString& type) {
 }
 
 void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
-    ToxAPI api;
-
     std::string globalName = qToUtf8(selfInfoWidget->selfName()).data();
 
     // Scan peerInfoMap for own peer in this group
@@ -673,7 +636,7 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
     layout->addWidget(randomRadio);
 
     QLabel* randomLabel = new QLabel(
-        QString::fromUtf8(api.getRandomName().c_str()), &dialog);
+        QString::fromUtf8(ToxAPI::getRandomNameSync().c_str()), &dialog);
     layout->addWidget(randomLabel);
 
     // Buttons
@@ -707,7 +670,7 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
             }
         }
         if (!name.empty()) {
-            api.setGroupSelfName(groupId, name);
+            ToxAPI::setGroupSelfNameSync(groupId, name);
         }
     }
 }
@@ -730,16 +693,15 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
     if (QMessageBox::question(this, _("confirm"), confirmMsg,
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
 #endif
-        ToxAPI api;
         bool success = false;
         
         if (type == "friend") {
-            success = api.deleteFriend(id);
+            success = ToxAPI::deleteFriendSync(id);
             if (success) {
                 QMessageBox::information(this, _("friend_deleted"), _("friend_deleted"));
             }
         } else if (type == "conference") {
-            success = api.leaveConference(id);
+            success = ToxAPI::leaveConferenceSync(id);
             if (success) {
                 QMessageBox::information(this, _("conference_leave_success"), _("conference_leave_success"));
             }
@@ -754,16 +716,14 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
                 chatWidget->clearMessages();
             }
             // 重新加载联系人列表
-            ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
-            eventPoller->postApiRequest(req);
+            ToxAPI::loadAllData();
         }
     }
 }
 
 void MainWindow::onInviteToConferenceRequested(int friendId) {
     // 获取会议列表
-    ToxAPI api;
-    std::vector<ConferenceInfo> conferences = api.getConferences();
+    std::vector<ConferenceInfo> conferences = ToxAPI::getConferencesSync();
     
     if (conferences.empty()) {
         QMessageBox::warning(this, _("no_conference"), _("no_conference"));
@@ -827,7 +787,7 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
         confId = data.toInt();
 #endif
         if (confId == -1) return;
-        bool success = api.inviteToConference(friendId, confId);
+        bool success = ToxAPI::inviteToConferenceSync(friendId, confId);
         if (success) {
             QMessageBox::information(this, _("invite_success"), _("invite_success"));
         } else {
@@ -838,8 +798,7 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
 
 void MainWindow::onInviteToGroupRequested(int friendId) {
     // 获取群组列表
-    ToxAPI api;
-    std::vector<GroupInfo> groups = api.getGroups();
+    std::vector<GroupInfo> groups = ToxAPI::getGroupsSync();
     
     if (groups.empty()) {
         QMessageBox::warning(this, _("no_group"), _("no_group"));
@@ -902,7 +861,7 @@ void MainWindow::onInviteToGroupRequested(int friendId) {
         QVariant data = groupCombo->itemData(groupCombo->currentIndex());
         groupId = data.toInt();
 #endif
-        bool success = api.inviteToGroup(friendId, groupId);
+        bool success = ToxAPI::inviteToGroupSync(friendId, groupId);
         if (success) {
             QMessageBox::information(this, _("invite_success"), _("invite_success"));
         } else {
@@ -915,21 +874,16 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
     GroupInviteDialog dialog(QString::number(friendNumber), chatId, this);
     if (dialog.exec() == QDialog::Accepted) {
         if (dialog.getResult() == GroupInviteDialog::Accept) {
-            // 接受群组邀请
-            ToxAPI api;
-            bool success = api.joinGroup(friendNumber, qToUtf8(chatId).data(), 
-                                         "", qToUtf8(dialog.getPassword()).data());
+            bool success = ToxAPI::joinGroupSync(friendNumber, qToUtf8(chatId).data(),
+                                                  "", qToUtf8(dialog.getPassword()).data());
             if (success) {
                 QMessageBox::information(this, _("group.joined"),
                                         _A("group.joined", QStringList() << chatId));
-                // 重新加载联系人
-                ApiRequestEvent* req = new ApiRequestEvent(ApiLoadAllData);
-                eventPoller->postApiRequest(req);
+                ToxAPI::loadAllData();
             } else {
                 QMessageBox::warning(this, _("group.join_failed"), _("group.join_failed"));
             }
         } else if (dialog.getResult() == GroupInviteDialog::Reject) {
-            // 拒绝群组邀请（直接忽略，无后端API）
             QMessageBox::information(this, _("group_rejected"), _("group_rejected"));
         }
     }
@@ -1001,17 +955,9 @@ void MainWindow::loadMessageHistory() {
         return;
     }
     
-    // 异步加载：post 请求到 EventPoller 线程
-    ApiRequestEvent* req = new ApiRequestEvent(ApiLoadMessageHistory);
-    req->id = currentChatId;
-    req->contactType = std::string(qToUtf8(currentChatType).data());
-    eventPoller->postApiRequest(req);
+    ToxAPI::getMessagesHistory(currentChatId, std::string(qToUtf8(currentChatType).data()));
 }
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
-    TranslateRequestEvent* req = new TranslateRequestEvent();
-    req->msgIndex = msgIndex;
-    req->text = std::string(qToUtf8(text));
-    req->targetLang = std::string(qToUtf8(targetLang));
-    eventPoller->postApiRequest(req);
+    ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)), msgIndex);
 }

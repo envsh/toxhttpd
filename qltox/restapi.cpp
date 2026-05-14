@@ -2,813 +2,19 @@
 #include "apilog.h"
 #include "cJSON.h"
 #include <curl/curl.h>
-#include <sstream>
 #include <cstdlib>
 #include <cctype>
 
-// cURL 回调函数
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t realsize = size * nmemb;
-    std::string* response = static_cast<std::string*>(userp);
-    response->append(static_cast<char*>(contents), realsize);
-    return realsize;
-}
+// ── Static members ──
+QObject* ToxAPI::s_target = nullptr;
+std::string ToxAPI::s_baseUrl = "http://localhost:8181";
+uint64_t ToxAPI::s_lastEventId = 0;
+bool ToxAPI::s_pollRunning = false;
 
-// cURL header 回调函数（实时捕获 header）
-static size_t HeaderCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t realsize = size * nmemb;
-    auto* headers = static_cast<std::map<std::string, std::string>*>(userp);
-    if (!headers || realsize == 0) return realsize;
-    std::string line(static_cast<char*>(contents), realsize);
-    size_t colon = line.find(':');
-    if (colon == std::string::npos || colon == 0) return realsize;
-    std::string name = line.substr(0, colon);
-    size_t vStart = colon + 1;
-    while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) vStart++;
-    size_t vEnd = line.size();
-    while (vEnd > vStart && (line[vEnd - 1] == '\r' || line[vEnd - 1] == '\n')) vEnd--;
-    if (vEnd <= vStart) return realsize;
-    for (char& c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-    (*headers)[name] = line.substr(vStart, vEnd - vStart);
-    return realsize;
-}
+// ── Helpers ──
 
-// 从原始 HTTP 响应字符串中解析 header 到 map
-// response 格式: "HTTP/1.1 200 OK\r\nName: Value\r\n\r\nbody"
-// headerSize 是 header 部分（含空行分隔）的字节数
-static void parseHeadersFromRaw(const std::string& raw, size_t headerSize, std::map<std::string, std::string>& headers) {
-    if (headerSize == 0 || headerSize > raw.size()) return;
-    std::string hdrPart = raw.substr(0, headerSize);
-    size_t pos = 0;
-    while (pos < hdrPart.size()) {
-        size_t end = hdrPart.find('\n', pos);
-        if (end == std::string::npos) end = hdrPart.size();
-        std::string line = hdrPart.substr(pos, end - pos);
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        pos = end + 1;
-        
-        size_t colon = line.find(':');
-        if (colon == std::string::npos || colon == 0) continue;
-        
-        std::string name = line.substr(0, colon);
-        size_t vStart = colon + 1;
-        while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) vStart++;
-        std::string value = line.substr(vStart);
-        
-        for (char& c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-        headers[name] = value;
-    }
-}
-
-// 执行 HTTP GET 请求
-std::string ToxAPI::httpGet(const std::string& endpoint, std::map<std::string, std::string>* headers) {
-    CURL* curl = curl_easy_init();
-    std::string response;
-    std::string url = baseUrl + endpoint;
-    
-    if (headers) {
-        headers->clear();
-    }
-    
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 35L);
-        curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
-        
-        if (headers) {
-            curl_easy_setopt(curl, CURLOPT_HEADER, 1L);
-            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
-            curl_easy_setopt(curl, CURLOPT_HEADERDATA, headers);
-        }
-        
-        CURLcode res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            ALOG_ERROR("cURL GET error:", curl_easy_strerror(res));
-        } else {
-            long httpCode = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
-            ALOG_INFO("HTTP GET response, code:", httpCode, "body length:", response.length());
-        }
-        
-        if (headers && !response.empty()) {
-            long headerSize = 0;
-            curl_easy_getinfo(curl, CURLINFO_HEADER_SIZE, &headerSize);
-            parseHeadersFromRaw(response, headerSize > 0 ? (size_t)headerSize : 0, *headers);
-            if (headerSize > 0 && (size_t)headerSize <= response.size()) {
-                response = response.substr(headerSize);
-            }
-        }
-        
-        curl_easy_cleanup(curl);
-    }
-    return response;
-}
-
-// 执行 HTTP POST 请求
-std::string ToxAPI::httpPost(const std::string& endpoint, const std::string& postData) {
-    CURL* curl = curl_easy_init();
-    std::string response;
-    std::string url = baseUrl + endpoint;
-    
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-        
-        CURLcode res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            ALOG_ERROR("cURL POST error:", curl_easy_strerror(res));
-            response.clear();
-        } else {
-            long httpCode = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
-            ALOG_INFO("HTTP POST response, code:", httpCode, "body length:", response.length());
-        }
-        curl_easy_cleanup(curl);
-    }
-    return response;
-}
-
-// URL encode string using curl_easy_escape
-std::string ToxAPI::urlEncode(const std::string& str) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return str;
-    char* encoded = curl_easy_escape(curl, str.c_str(), (int)str.length());
-    std::string result = encoded ? encoded : str;
-    if (encoded) curl_free(encoded);
-    curl_easy_cleanup(curl);
-    return result;
-}
-
-ToxAPI::ToxAPI(const std::string& baseUrl) : baseUrl(baseUrl) {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-}
-
-bool ToxAPI::getSelf(std::string& name, std::string& statusMsg, std::string& connStatus, std::string& address) {
-    std::string response = httpGet("/api/self");
-    if (response.empty()) return false;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return false;
-    
-    cJSON* nameItem = cJSON_GetObjectItem(root, "name");
-    if (nameItem && cJSON_IsString(nameItem)) {
-        name = std::string(cJSON_GetStringValue(nameItem));
-    } else {
-        name = "";
-    }
-    
-    cJSON* statusItem = cJSON_GetObjectItem(root, "status_message");
-    if (statusItem && cJSON_IsString(statusItem)) {
-        statusMsg = std::string(cJSON_GetStringValue(statusItem));
-    } else {
-        statusMsg = "";
-    }
-    
-    cJSON* connItem = cJSON_GetObjectItem(root, "connection_status");
-    if (connItem && cJSON_IsString(connItem)) {
-        connStatus = std::string(cJSON_GetStringValue(connItem));
-    } else {
-        connStatus = "offline";
-    }
-    
-    cJSON* addrItem = cJSON_GetObjectItem(root, "address");
-    if (addrItem && cJSON_IsString(addrItem)) {
-        address = std::string(cJSON_GetStringValue(addrItem));
-    } else {
-        address = "";
-    }
-    
-    cJSON_Delete(root);
-    return true;
-}
-
-bool ToxAPI::setSelfInfo(const std::string& name, const std::string& status_message) {
-    std::string postData;
-    bool hasParams = false;
-    
-    if (!name.empty()) {
-        postData += "name=" + urlEncode(name);
-        hasParams = true;
-    }
-    if (!status_message.empty()) {
-        if (hasParams) postData += "&";
-        postData += "status_message=" + urlEncode(status_message);
-        hasParams = true;
-    }
-    
-    if (!hasParams) return true; // No params, return directly
-    
-    std::string response = httpPost("/api/self", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::setSelfName(const std::string& name) {
-    return setSelfInfo(name, "");
-}
-
-bool ToxAPI::setSelfStatus(const std::string& status) {
-    return setSelfInfo("", status);
-}
-
-std::vector<int> ToxAPI::getFriends() {
-    std::vector<int> friends;
-    std::string response = httpGet("/api/friends");
-    if (response.empty()) return friends;
-
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return friends;
-
-    cJSON* friendsItem = cJSON_GetObjectItem(root, "friends");
-    if (friendsItem && cJSON_IsArray(friendsItem)) {
-        int count = cJSON_GetArraySize(friendsItem);
-        for (int i = 0; i < count; ++i) {
-            cJSON* item = cJSON_GetArrayItem(friendsItem, i);
-            if (item) friends.push_back(item->valueint);
-        }
-    }
-
-    cJSON_Delete(root);
-    return friends;
-}
-
-bool ToxAPI::getFriendInfo(int friendId, FriendInfo& info) {
-    std::string postData = "friend_id=" + std::to_string(friendId);
-    std::string response = httpPost("/api/friend", postData);
-    if (response.empty()) return false;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return false;
-    
-    info.id = friendId;
-    
-    cJSON* nameItem = cJSON_GetObjectItem(root, "name");
-    if (nameItem && cJSON_IsString(nameItem)) {
-        info.name = std::string(cJSON_GetStringValue(nameItem));
-    }
-    
-    cJSON* ssItem = cJSON_GetObjectItem(root, "statusStr");
-    if (ssItem && cJSON_IsString(ssItem)) {
-        info.statusStr = std::string(cJSON_GetStringValue(ssItem));
-    }
-    
-    cJSON* stItem = cJSON_GetObjectItem(root, "statusText");
-    if (stItem && cJSON_IsString(stItem)) {
-        info.statusText = std::string(cJSON_GetStringValue(stItem));
-    }
-    
-    cJSON* iconItem = cJSON_GetObjectItem(root, "iconUrl");
-    if (iconItem && cJSON_IsString(iconItem)) {
-        info.iconUrl = std::string(cJSON_GetStringValue(iconItem));
-    }
-    
-    cJSON* pkItem = cJSON_GetObjectItem(root, "publicKey");
-    if (pkItem && cJSON_IsString(pkItem)) {
-        info.publicKey = std::string(cJSON_GetStringValue(pkItem));
-    }
-    
-    cJSON_Delete(root);
-    return true;
-}
-
-int ToxAPI::addFriend(const std::string& publicKey) {
-    std::string postData = "public_key=" + publicKey;
-    std::string response = httpPost("/api/friends", postData);
-    if (response.empty()) return -1;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return -1;
-    
-    // 检查是否有 error 字段
-    cJSON* errorItem = cJSON_GetObjectItem(root, "error");
-    if (errorItem && cJSON_IsString(errorItem)) {
-        cJSON_Delete(root);
-        return -1;
-    }
-    
-    cJSON* idItem = cJSON_GetObjectItem(root, "friend_id");
-    int id = idItem ? idItem->valueint : -1;
-    
-    cJSON_Delete(root);
-    return id;
-}
-
-bool ToxAPI::deleteFriend(int friendId) {
-    std::string postData = "friend_id=" + std::to_string(friendId);
-    std::string response = httpPost("/api/friend_delete", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::leaveConference(int confId) {
-    std::string postData = "conference_id=" + std::to_string(confId);
-    std::string response = httpPost("/api/conference_delete", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::inviteToConference(int friendId, int confId) {
-    std::string postData = "friend_id=" + std::to_string(friendId) + "&conference_id=" + std::to_string(confId);
-    std::string response = httpPost("/api/conference_invite", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
-    std::string postData = "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message);
-    std::string response = httpPost("/api/messages", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
-    std::string postData = "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message);
-    std::string response = httpPost("/api/conference_messages", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
-    std::string postData = "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message);
-    std::string response = httpPost("/api/group_messages", postData);
-    return !response.empty();
-}
-
-std::vector<ConferenceInfo> ToxAPI::getConferences() {
-    std::vector<ConferenceInfo> conferences;
-    std::string response = httpGet("/api/conferences");
-    if (response.empty()) return conferences;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return conferences;
-    
-    cJSON* conferencesItem = cJSON_GetObjectItem(root, "conferences");
-    if (conferencesItem && cJSON_IsArray(conferencesItem)) {
-        int count = cJSON_GetArraySize(conferencesItem);
-        for (int i = 0; i < count; ++i) {
-            cJSON* item = cJSON_GetArrayItem(conferencesItem, i);
-            if (!item) continue;
-            
-            ConferenceInfo info;
-            cJSON* numItem = cJSON_GetObjectItem(item, "conferenceNumber");
-            if (numItem) info.conferenceNumber = numItem->valueint;
-            
-            cJSON* nameItem = cJSON_GetObjectItem(item, "conferenceName");
-            if (nameItem && cJSON_IsString(nameItem)) {
-                info.conferenceName = std::string(cJSON_GetStringValue(nameItem));
-            }
-            
-            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chatId");
-            if (chatIdItem && cJSON_IsString(chatIdItem)) {
-                info.chatId = std::string(cJSON_GetStringValue(chatIdItem));
-            }
-
-            cJSON* connectedItem = cJSON_GetObjectItem(item, "isConnected");
-            if (connectedItem) {
-                info.isConnected = (connectedItem->valueint == 1);
-            }
-
-            cJSON* statusTextItem = cJSON_GetObjectItem(item, "statusText");
-            if (statusTextItem && cJSON_IsString(statusTextItem)) {
-                info.statusText = std::string(cJSON_GetStringValue(statusTextItem));
-            }
-            
-            conferences.push_back(info);
-        }
-    }
-    
-    cJSON_Delete(root);
-    return conferences;
-}
-
-int ToxAPI::createConference() {
-    std::string response = httpPost("/api/conferences", "");
-    if (response.empty()) return -1;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return -1;
-    
-    cJSON* idItem = cJSON_GetObjectItem(root, "conference_id");
-    int id = idItem ? idItem->valueint : -1;
-    
-    cJSON_Delete(root);
-    return id;
-}
-
-bool ToxAPI::joinConference(int friendNumber, const std::string& cookie) {
-    std::string postData = "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie;
-    std::string response = httpPost("/api/conferences/join", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::rejectConference(int friendNumber) {
-    std::string postData = "friend_number=" + std::to_string(friendNumber);
-    std::string response = httpPost("/api/conferences/reject", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::ignoreConference(int friendNumber) {
-    std::string postData = "friend_number=" + std::to_string(friendNumber);
-    std::string response = httpPost("/api/conferences/ignore", postData);
-    return !response.empty();
-}
-
-std::vector<Event> ToxAPI::pollEvents(uint64_t after) {
-    std::vector<Event> events;
-    std::map<std::string, std::string> headers;
-    std::string endpoint = "/api/events?after=" + std::to_string(after);
-    
-    std::string response = httpGet(endpoint, &headers);
-    if (response.empty()) return events;
-    
-    // 检查 x-server-next-id header（用小写 key 查找）
-    auto it = headers.find("x-server-next-id");
-    if (it != headers.end()) {
-        char* endptr = nullptr;
-        unsigned long long val = std::strtoull(it->second.c_str(), &endptr, 10);
-        
-        if (endptr == it->second.c_str()) {
-            // 没有解析到任何数字
-            ALOG_ERROR("pollEvents: X-Server-Next-Id header is not a number:", it->second);
-        } else {
-            // 解析成功，检查是否服务端重启
-            uint64_t serverNextId = static_cast<uint64_t>(val);
-            if (serverNextId <= after) {
-                ALOG_WARN("pollEvents: Server restart detected, server_next_id=", 
-                          serverNextId, " <= after=", after);
-                
-                // 插入特殊事件
-                Event restartEvent;
-                restartEvent.id = 0;
-                restartEvent.type = "_server_restart";
-                restartEvent.data = "";
-                restartEvent.timestamp = "";
-                events.push_back(restartEvent);
-            }
-        }
-    }
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return events;
-    
-    if (cJSON_IsArray(root)) {
-        int count = cJSON_GetArraySize(root);
-        for (int i = 0; i < count; ++i) {
-            cJSON* item = cJSON_GetArrayItem(root, i);
-            if (!item) continue;
-            
-            Event event;
-            cJSON* idItem = cJSON_GetObjectItem(item, "event_id");
-            event.id = idItem ? idItem->valueint : 0;
-            
-            cJSON* typeItem = cJSON_GetObjectItem(item, "event_type");
-            const char* typeStr = typeItem ? cJSON_GetStringValue(typeItem) : "";
-            event.type = typeStr ? typeStr : "";
-            
-            cJSON* dataItem = cJSON_GetObjectItem(item, "data");
-            const char* dataStr = dataItem ? cJSON_GetStringValue(dataItem) : "";
-            event.data = dataStr ? dataStr : "";
-            
-            cJSON* timestampItem = cJSON_GetObjectItem(item, "timestamp");
-            const char* timestampStr = timestampItem ? cJSON_GetStringValue(timestampItem) : "";
-            event.timestamp = timestampStr ? timestampStr : "";
-            
-            events.push_back(event);
-        }
-    }
-    
-    cJSON_Delete(root);
-    return events;
-}
-
-// ===== Groups (NGC) =====
-
-std::vector<GroupInfo> ToxAPI::getGroups() {
-    std::vector<GroupInfo> groups;
-    std::string response = httpGet("/api/groups");
-    if (response.empty()) return groups;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return groups;
-    
-    cJSON* groupsItem = cJSON_GetObjectItem(root, "groups");
-    if (groupsItem && cJSON_IsArray(groupsItem)) {
-        int count = cJSON_GetArraySize(groupsItem);
-        for (int i = 0; i < count; ++i) {
-            cJSON* item = cJSON_GetArrayItem(groupsItem, i);
-            if (!item) continue;
-            
-            GroupInfo info;
-            cJSON* numItem = cJSON_GetObjectItem(item, "groupNumber");
-            if (numItem) info.groupNumber = numItem->valueint;
-            
-            cJSON* nameItem = cJSON_GetObjectItem(item, "groupName");
-            if (nameItem && cJSON_IsString(nameItem)) {
-                info.groupName = std::string(cJSON_GetStringValue(nameItem));
-            }
-            
-            cJSON* chatIdItem = cJSON_GetObjectItem(item, "chatId");
-            if (chatIdItem && cJSON_IsString(chatIdItem)) {
-                info.chatId = std::string(cJSON_GetStringValue(chatIdItem));
-            }
-            
-            cJSON* connectedItem = cJSON_GetObjectItem(item, "isConnected");
-            if (connectedItem) {
-                info.isConnected = (connectedItem->valueint == 1);
-            } else {
-                info.isConnected = false;
-            }
-
-            cJSON* statusTextItem = cJSON_GetObjectItem(item, "statusText");
-            if (statusTextItem && cJSON_IsString(statusTextItem)) {
-                info.statusText = std::string(cJSON_GetStringValue(statusTextItem));
-            }
-            
-            groups.push_back(info);
-        }
-    }
-    
-    cJSON_Delete(root);
-    return groups;
-}
-
-int ToxAPI::createGroup(const std::string& groupName, const std::string& creatorName, 
-                       const std::string& password, bool isPrivate) {
-    std::string postData = "group_name=" + groupName + "&name=" + creatorName;
-    if (!password.empty()) {
-        postData += "&password=" + password;
-    }
-    if (isPrivate) {
-        postData += "&privacy_state=private";
-    }
-    
-    std::string response = httpPost("/api/groups", postData);
-    if (response.empty()) return -1;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return -1;
-    
-    // 检查是否有 error 字段
-    cJSON* errorItem = cJSON_GetObjectItem(root, "error");
-    if (errorItem && cJSON_IsString(errorItem)) {
-        cJSON_Delete(root);
-        return -1;
-    }
-    
-    cJSON* idItem = cJSON_GetObjectItem(root, "group_number");
-    int id = idItem ? idItem->valueint : -1;
-    
-    cJSON_Delete(root);
-    return id;
-}
-
-bool ToxAPI::leaveGroup(int groupId) {
-    std::string postData = "group_id=" + std::to_string(groupId);
-    std::string response = httpPost("/api/groups/leave", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::inviteToGroup(int friendId, int groupId) {
-    std::string postData = "friend_id=" + std::to_string(friendId) + "&group_id=" + std::to_string(groupId);
-    std::string response = httpPost("/api/groups/invite", postData);
-    return !response.empty();
-}
-
-bool ToxAPI::joinGroup(int friendNumber, const std::string& chatId, 
-                       const std::string& name, const std::string& password) {
-    std::string postData = "friend_number=" + std::to_string(friendNumber) + "&chat_id=" + chatId;
-    if (!name.empty()) {
-        postData += "&name=" + name;
-    }
-    if (!password.empty()) {
-        postData += "&password=" + password;
-    }
-    std::string response = httpPost("/api/groups/join", postData);
-
-    // 解析 JSON 确认服务器没有返回错误
-    if (response.empty()) return false;
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return false;
-    cJSON* error = cJSON_GetObjectItem(root, "error");
-    bool success = (error == NULL || !cJSON_IsString(error));
-    cJSON_Delete(root);
-    return success;
-}
-
-bool ToxAPI::joinGroupByChatId(const std::string& chatId,
-                               const std::string& name, const std::string& password) {
-    std::string postData = "chat_id=" + chatId;
-    if (!name.empty()) {
-        postData += "&name=" + name;
-    }
-    if (!password.empty()) {
-        postData += "&password=" + password;
-    }
-    std::string response = httpPost("/api/groups/join", postData);
-
-    if (response.empty()) return false;
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return false;
-    cJSON* error = cJSON_GetObjectItem(root, "error");
-    bool success = (error == NULL || !cJSON_IsString(error));
-    cJSON_Delete(root);
-    return success;
-}
-
-std::vector<PeerInfo> ToxAPI::getConferenceMembers(int confId) {
-    std::vector<PeerInfo> members;
-    std::string endpoint = "/api/conference/members?conference_id=" + std::to_string(confId);
-    std::string response = httpGet(endpoint);
-    if (response.empty()) return members;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return members;
-    
-    cJSON* membersItem = cJSON_GetObjectItem(root, "members");
-    if (membersItem && cJSON_IsArray(membersItem)) {
-        int count = cJSON_GetArraySize(membersItem);
-        for (int i = 0; i < count; ++i) {
-            cJSON* memberItem = cJSON_GetArrayItem(membersItem, i);
-            if (!memberItem) continue;
-            
-            PeerInfo info;
-            cJSON* peerNumberItem = cJSON_GetObjectItem(memberItem, "peer_number");
-            info.peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
-            
-            cJSON* nameItem = cJSON_GetObjectItem(memberItem, "name");
-            if (nameItem && cJSON_IsString(nameItem)) {
-                info.name = std::string(cJSON_GetStringValue(nameItem));
-            } else {
-                info.name = "Unknown";
-            }
-            
-            members.push_back(info);
-        }
-    }
-    
-    cJSON_Delete(root);
-    return members;
-}
-
-std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
-    std::vector<PeerInfo> members;
-    std::string endpoint = "/api/group/members?group_number=" + std::to_string(groupId);
-    std::string response = httpGet(endpoint);
-    if (response.empty()) return members;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return members;
-    
-    cJSON* selfPpItem = cJSON_GetObjectItem(root, "selfPeerNumber");
-    int selfPeerNumber = selfPpItem ? selfPpItem->valueint : -1;
-    
-    cJSON* membersItem = cJSON_GetObjectItem(root, "members");
-    if (membersItem && cJSON_IsArray(membersItem)) {
-        int count = cJSON_GetArraySize(membersItem);
-        for (int i = 0; i < count; ++i) {
-            cJSON* memberItem = cJSON_GetArrayItem(membersItem, i);
-            if (!memberItem) continue;
-            
-            PeerInfo info;
-            
-            cJSON* item = cJSON_GetObjectItem(memberItem, "peerNumber");
-            info.peerNumber = item ? item->valueint : -1;
-            
-            item = cJSON_GetObjectItem(memberItem, "name");
-            if (item && cJSON_IsString(item)) {
-                info.name = std::string(cJSON_GetStringValue(item));
-            } else {
-                info.name = "Unknown";
-            }
-            
-            item = cJSON_GetObjectItem(memberItem, "status");
-            if (item) info.status = item->valueint;
-            
-            item = cJSON_GetObjectItem(memberItem, "statusStr");
-            if (item && cJSON_IsString(item)) {
-                info.statusStr = std::string(cJSON_GetStringValue(item));
-            }
-            
-            item = cJSON_GetObjectItem(memberItem, "statusText");
-            if (item && cJSON_IsString(item)) {
-                info.statusText = std::string(cJSON_GetStringValue(item));
-            }
-            
-            item = cJSON_GetObjectItem(memberItem, "iconUrl");
-            if (item && cJSON_IsString(item)) {
-                info.iconUrl = std::string(cJSON_GetStringValue(item));
-            }
-            
-            item = cJSON_GetObjectItem(memberItem, "role");
-            if (item) info.role = item->valueint;
-            
-            item = cJSON_GetObjectItem(memberItem, "roleStr");
-            if (item && cJSON_IsString(item)) {
-                info.roleStr = std::string(cJSON_GetStringValue(item));
-            }
-
-            item = cJSON_GetObjectItem(memberItem, "publicKey");
-            if (item && cJSON_IsString(item)) {
-                info.publicKey = std::string(cJSON_GetStringValue(item));
-            }
-
-            item = cJSON_GetObjectItem(memberItem, "peerIp");
-            if (item && cJSON_IsString(item)) {
-                info.peerIp = std::string(cJSON_GetStringValue(item));
-            }
-            
-            info.isSelf = (info.peerNumber == selfPeerNumber);
-            
-            members.push_back(info);
-        }
-    }
-    
-    cJSON_Delete(root);
-    return members;
-}
-
-// ===== Message History =====
-
-bool ToxAPI::getMessagesHistory(int contact_id, const std::string& contact_type,
-                                 std::vector<HistoryMessage>& messages) {
-    messages.clear();
-    
-    std::string url = "/api/messages/history?contact_id=" + std::to_string(contact_id)
-                   + "&contact_type=" + contact_type;
-    std::string response = httpGet(url);
-    if (response.empty()) return false;
-    
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return false;
-    
-    cJSON* msgsItem = cJSON_GetObjectItem(root, "messages");
-    if (!msgsItem || !cJSON_IsArray(msgsItem)) {
-        cJSON_Delete(root);
-        return false;
-    }
-    
-    int msgCount = cJSON_GetArraySize(msgsItem);
-    for (int i = 0; i < msgCount; ++i) {
-        cJSON* msg = cJSON_GetArrayItem(msgsItem, i);
-        if (!msg) continue;
-        
-        HistoryMessage hm;
-        
-        cJSON* item = cJSON_GetObjectItem(msg, "rowid");
-        if (item) hm.rowid = (int64_t)(item->valuedouble);
-        
-        item = cJSON_GetObjectItem(msg, "message");
-        if (item && cJSON_IsString(item)) {
-            hm.message = cJSON_GetStringValue(item) ?: "";
-        }
-        
-        item = cJSON_GetObjectItem(msg, "sender_pubkey");
-        if (item && cJSON_IsString(item)) {
-            hm.sender_pubkey = cJSON_GetStringValue(item) ?: "";
-        }
-        
-        item = cJSON_GetObjectItem(msg, "sender_number");
-        if (item) hm.sender_number = (uint32_t)(item->valuedouble);
-        
-        item = cJSON_GetObjectItem(msg, "direction");
-        if (item && cJSON_IsString(item)) {
-            hm.direction = cJSON_GetStringValue(item) ?: "";
-        }
-        
-        item = cJSON_GetObjectItem(msg, "created_at");
-        if (item && cJSON_IsString(item)) {
-            hm.created_at = cJSON_GetStringValue(item) ?: "";
-        }
-        
-        messages.push_back(hm);
-    }
-    
-    cJSON_Delete(root);
-    return true;
-}
-
-bool ToxAPI::setGroupSelfName(int groupId, const std::string& name) {
-    std::string postData = "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name);
-    std::string response = httpPost("/api/groups/set-name", postData);
-    return !response.empty();
-}
-
-std::string ToxAPI::getRandomName() {
-    std::string response = httpGet("/api/random-name");
-    if (response.empty()) return "nonamed";
-
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) return "nonamed";
-
-    std::string name;
-    cJSON* nameItem = cJSON_GetObjectItem(root, "name");
-    if (nameItem && cJSON_IsString(nameItem)) {
-        name = std::string(cJSON_GetStringValue(nameItem));
-    } else {
-        name = "nonamed";
-    }
-
-    cJSON_Delete(root);
-    return name;
+static std::string jsonStr(cJSON* item) {
+    return (item && cJSON_IsString(item)) ? std::string(cJSON_GetStringValue(item)) : "";
 }
 
 static std::string jsonEscape(const std::string& s) {
@@ -837,33 +43,902 @@ static std::string jsonEscape(const std::string& s) {
     return out;
 }
 
-TranslateApiResult ToxAPI::translate(const std::string& text, const std::string& toLang) {
-    TranslateApiResult result;
+// ── Sync helper write callback ──
+static size_t syncWriteCb(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t total = size * nmemb;
+    static_cast<std::string*>(userp)->append(static_cast<char*>(contents), total);
+    return total;
+}
+
+// ── LoadAllData chain ──
+struct LoadChain {
+    AllDataLoadedEvent* result;
+    int step = 0;
+    std::vector<int> friendIds;
+    int friendIdx = 0;
+    LoadChain() : result(new AllDataLoadedEvent()) {}
+};
+
+// ── Private ──
+
+void ToxAPI::request(ApiRequestType type, const std::string& endpoint,
+                      const std::string& method, const std::string& data,
+                      ApiCtx* ctx, int timeoutSec) {
+    std::string url = buildUrl(endpoint);
+    if (!ctx) ctx = new ApiCtx(type);
+    EventPoller::addRequest(url, method, data, onHttpDone, ctx, timeoutSec);
+}
+
+void ToxAPI::onHttpDone(int httpCode, const std::string& body,
+                         const std::map<std::string, std::string>* headers,
+                         void* udata) {
+    auto* ctx = static_cast<ApiCtx*>(udata);
+    dispatchResult(ctx, httpCode, body, headers);
+    delete ctx;
+}
+
+// ── Public API ──
+
+void ToxAPI::setEventTarget(QObject* target) { s_target = target; }
+void ToxAPI::setBaseUrl(const std::string& url) { s_baseUrl = url; }
+
+void ToxAPI::startPollEvent() {
+    s_pollRunning = true;
+    s_lastEventId = 0;
+    pollEvents();
+}
+
+void ToxAPI::stopPollEvent() {
+    s_pollRunning = false;
+}
+
+void ToxAPI::pollEvents() {
+    EventPoller::addRequest(
+        buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+        "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+}
+
+void ToxAPI::loadAllData() {
+    auto* chain = new LoadChain();
+    auto* ctx = new ApiCtx(ApiLoadAllData);
+    ctx->ptr = chain;
+    EventPoller::addRequest(buildUrl("/api/self"), "GET", "", onHttpDone, ctx, 35);
+}
+
+void ToxAPI::getSelf() {
+    request(ApiGetSelf, "/api/self", "GET");
+}
+
+void ToxAPI::getFriends() {
+    request(ApiGetFriends, "/api/friends", "GET");
+}
+
+void ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
+    auto* ctx = new ApiCtx(ApiSendFriendMessage, friendId, message);
+    request(ApiSendFriendMessage, "/api/messages", "POST",
+            "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message), ctx);
+}
+
+void ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
+    auto* ctx = new ApiCtx(ApiSendConferenceMessage, conferenceId, message);
+    request(ApiSendConferenceMessage, "/api/conference_messages", "POST",
+            "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message), ctx);
+}
+
+void ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
+    auto* ctx = new ApiCtx(ApiSendGroupMessage, groupId, message);
+    request(ApiSendGroupMessage, "/api/group_messages", "POST",
+            "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message), ctx);
+}
+
+void ToxAPI::addFriend(const std::string& publicKey) {
+    request(ApiAddFriend, "/api/friends", "POST",
+            "public_key=" + urlEncode(publicKey));
+}
+
+void ToxAPI::deleteFriend(int friendId) {
+    request(ApiDeleteFriend, "/api/friend_delete", "POST",
+            "friend_id=" + std::to_string(friendId));
+}
+
+void ToxAPI::getGroupMembers(int groupId) {
+    auto* ctx = new ApiCtx(ApiLoadGroupMembers, groupId, "group");
+    request(ApiLoadGroupMembers, "/api/group/members?group_number="
+            + std::to_string(groupId), "GET", "", ctx);
+}
+
+void ToxAPI::getConferenceMembers(int confId) {
+    auto* ctx = new ApiCtx(ApiLoadGroupMembers, confId, "conference");
+    request(ApiLoadGroupMembers, "/api/conference/members?conference_id="
+            + std::to_string(confId), "GET", "", ctx);
+}
+
+void ToxAPI::getMessagesHistory(int contactId, const std::string& contactType) {
+    auto* ctx = new ApiCtx(ApiLoadMessageHistory, contactId, contactType);
+    request(ApiLoadMessageHistory,
+            "/api/messages/history?contact_id=" + std::to_string(contactId)
+            + "&contact_type=" + contactType, "GET", "", ctx);
+}
+
+void ToxAPI::joinConference(int friendNumber, const std::string& cookie) {
+    request(ApiJoinConference, "/api/conferences/join", "POST",
+            "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie);
+}
+
+void ToxAPI::rejectConference(int friendNumber) {
+    request(ApiRejectConference, "/api/conferences/reject", "POST",
+            "friend_number=" + std::to_string(friendNumber));
+}
+
+void ToxAPI::ignoreConference(int friendNumber) {
+    request(ApiIgnoreConference, "/api/conferences/ignore", "POST",
+            "friend_number=" + std::to_string(friendNumber));
+}
+
+void ToxAPI::createConference() {
+    request(ApiCreateConference, "/api/conferences", "POST");
+}
+
+void ToxAPI::leaveConference(int confId) {
+    request(ApiLeaveConference, "/api/conference_delete", "POST",
+            "conference_id=" + std::to_string(confId));
+}
+
+void ToxAPI::inviteToConference(int friendId, int confId) {
+    request(ApiInviteToConference, "/api/conference_invite", "POST",
+            "friend_id=" + std::to_string(friendId) + "&conference_id=" + std::to_string(confId));
+}
+
+void ToxAPI::createGroup(const std::string& groupName, const std::string& creatorName,
+                          const std::string& password, bool isPrivate) {
+    std::string data = "group_name=" + urlEncode(groupName) + "&name=" + urlEncode(creatorName);
+    if (!password.empty()) data += "&password=" + urlEncode(password);
+    if (isPrivate) data += "&privacy_state=private";
+    request(ApiCreateGroup, "/api/groups", "POST", data);
+}
+
+void ToxAPI::leaveGroup(int groupId) {
+    request(ApiLeaveGroup, "/api/groups/leave", "POST",
+            "group_id=" + std::to_string(groupId));
+}
+
+void ToxAPI::inviteToGroup(int friendId, int groupId) {
+    request(ApiInviteToGroup, "/api/groups/invite", "POST",
+            "friend_id=" + std::to_string(friendId) + "&group_id=" + std::to_string(groupId));
+}
+
+void ToxAPI::joinGroup(int friendNumber, const std::string& chatId,
+                        const std::string& name, const std::string& password) {
+    std::string data = "friend_number=" + std::to_string(friendNumber) + "&chat_id=" + chatId;
+    if (!name.empty()) data += "&name=" + urlEncode(name);
+    if (!password.empty()) data += "&password=" + urlEncode(password);
+    request(ApiJoinGroup, "/api/groups/join", "POST", data);
+}
+
+void ToxAPI::joinGroupByChatId(const std::string& chatId,
+                                const std::string& name, const std::string& password) {
+    std::string data = "chat_id=" + chatId;
+    if (!name.empty()) data += "&name=" + urlEncode(name);
+    if (!password.empty()) data += "&password=" + urlEncode(password);
+    request(ApiJoinGroupByChatId, "/api/groups/join", "POST", data);
+}
+
+void ToxAPI::setGroupSelfName(int groupId, const std::string& name) {
+    request(ApiSetGroupSelfName, "/api/groups/set-name", "POST",
+            "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name));
+}
+
+void ToxAPI::getRandomName() {
+    request(ApiGetRandomName, "/api/random-name", "GET");
+}
+
+void ToxAPI::setSelfInfo(const std::string& name, const std::string& statusMessage) {
+    std::string data;
+    bool hasParams = false;
+    if (!name.empty()) {
+        data += "name=" + urlEncode(name);
+        hasParams = true;
+    }
+    if (!statusMessage.empty()) {
+        if (hasParams) data += "&";
+        data += "status_message=" + urlEncode(statusMessage);
+        hasParams = true;
+    }
+    if (!hasParams) return;
+    request(ApiSetSelfInfo, "/api/self", "POST", data);
+}
+
+void ToxAPI::translate(const std::string& text, const std::string& toLang, int msgIndex) {
+    auto* ctx = new ApiCtx(ApiTranslate, msgIndex, text, toLang);
     std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
-    std::string response = httpPost("/api/translate", postData);
-    if (response.empty()) {
-        result.errorMessage = "NETWORK_ERROR: 无法连接到服务器";
-        return result;
-    }
+    request(ApiTranslate, "/api/translate", "POST", postData, ctx);
+}
 
-    cJSON* root = cJSON_Parse(response.c_str());
-    if (!root) {
-        result.errorMessage = "PARSE_ERROR: 服务器响应格式异常";
-        return result;
-    }
-
-    cJSON* transItem = cJSON_GetObjectItem(root, "translated_text");
-    if (transItem && cJSON_IsString(transItem)) {
-        result.success = true;
-        result.translatedText = std::string(cJSON_GetStringValue(transItem));
-    } else {
-        cJSON* errItem = cJSON_GetObjectItem(root, "error");
-        cJSON* codeItem = cJSON_GetObjectItem(root, "code");
-        std::string code = codeItem && cJSON_IsString(codeItem) ? cJSON_GetStringValue(codeItem) : "UNKNOWN";
-        std::string errMsg = errItem && cJSON_IsString(errItem) ? cJSON_GetStringValue(errItem) : "翻译失败";
-        result.errorMessage = code + ": " + errMsg;
-    }
-
-    cJSON_Delete(root);
+std::string ToxAPI::urlEncode(const std::string& str) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return str;
+    char* encoded = curl_easy_escape(curl, str.c_str(), (int)str.length());
+    std::string result = encoded ? encoded : str;
+    if (encoded) curl_free(encoded);
+    curl_easy_cleanup(curl);
     return result;
+}
+
+std::string ToxAPI::buildUrl(const std::string& endpoint) {
+    return s_baseUrl + endpoint;
+}
+
+// ── Sync helpers ──
+
+bool ToxAPI::syncRequest(const std::string& endpoint,
+                          const std::string& method,
+                          std::string& outBody,
+                          const std::string& data,
+                          int timeoutSec) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return false;
+    std::string url = buildUrl(endpoint);
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, syncWriteCb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outBody);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)timeoutSec);
+    if (method == "POST") {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)data.size());
+    }
+    CURLcode res = curl_easy_perform(curl);
+    long httpCode = 0;
+    if (res == CURLE_OK)
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    curl_easy_cleanup(curl);
+    return (httpCode == 200 && !outBody.empty());
+}
+
+bool ToxAPI::getFriendInfo(int id, FriendInfo& info) {
+    std::string body;
+    if (!syncRequest("/api/friend", "POST", body,
+                     "friend_id=" + std::to_string(id)))
+        return false;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return false;
+    info.id = id;
+    info.name = jsonStr(cJSON_GetObjectItem(root, "name"));
+    info.publicKey = jsonStr(cJSON_GetObjectItem(root, "publicKey"));
+    info.statusStr = jsonStr(cJSON_GetObjectItem(root, "statusStr"));
+    info.statusText = jsonStr(cJSON_GetObjectItem(root, "statusText"));
+    info.iconUrl = jsonStr(cJSON_GetObjectItem(root, "iconUrl"));
+    cJSON_Delete(root);
+    return true;
+}
+
+std::vector<GroupInfo> ToxAPI::getGroupsSync() {
+    std::vector<GroupInfo> groups;
+    std::string body;
+    if (!syncRequest("/api/groups", "GET", body))
+        return groups;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return groups;
+    cJSON* arr = cJSON_GetObjectItem(root, "groups");
+    if (arr && cJSON_IsArray(arr)) {
+        int n = cJSON_GetArraySize(arr);
+        for (int i = 0; i < n; ++i) {
+            cJSON* item = cJSON_GetArrayItem(arr, i);
+            if (!item) continue;
+            GroupInfo g;
+            cJSON* v = cJSON_GetObjectItem(item, "groupNumber");
+            if (v) g.groupNumber = v->valueint;
+            g.groupName = jsonStr(cJSON_GetObjectItem(item, "groupName"));
+            g.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
+            v = cJSON_GetObjectItem(item, "isConnected");
+            g.isConnected = v ? (v->valueint == 1) : false;
+            g.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+            groups.push_back(g);
+        }
+    }
+    cJSON_Delete(root);
+    return groups;
+}
+
+std::vector<ConferenceInfo> ToxAPI::getConferencesSync() {
+    std::vector<ConferenceInfo> conferences;
+    std::string body;
+    if (!syncRequest("/api/conferences", "GET", body))
+        return conferences;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return conferences;
+    cJSON* arr = cJSON_GetObjectItem(root, "conferences");
+    if (arr && cJSON_IsArray(arr)) {
+        int n = cJSON_GetArraySize(arr);
+        for (int i = 0; i < n; ++i) {
+            cJSON* item = cJSON_GetArrayItem(arr, i);
+            if (!item) continue;
+            ConferenceInfo c;
+            cJSON* v = cJSON_GetObjectItem(item, "conferenceNumber");
+            if (v) c.conferenceNumber = v->valueint;
+            c.conferenceName = jsonStr(cJSON_GetObjectItem(item, "conferenceName"));
+            c.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
+            v = cJSON_GetObjectItem(item, "isConnected");
+            c.isConnected = v ? (v->valueint == 1) : false;
+            c.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+            conferences.push_back(c);
+        }
+    }
+    cJSON_Delete(root);
+    return conferences;
+}
+
+static std::vector<PeerInfo> parseMembersResponse(const std::string& body) {
+    std::vector<PeerInfo> members;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return members;
+    cJSON* selfPpItem = cJSON_GetObjectItem(root, "selfPeerNumber");
+    int selfPeerNumber = selfPpItem ? selfPpItem->valueint : -1;
+    cJSON* membersItem = cJSON_GetObjectItem(root, "members");
+    if (membersItem && cJSON_IsArray(membersItem)) {
+        int n = cJSON_GetArraySize(membersItem);
+        for (int i = 0; i < n; ++i) {
+            cJSON* item = cJSON_GetArrayItem(membersItem, i);
+            if (!item) continue;
+            PeerInfo info;
+            cJSON* v;
+            v = cJSON_GetObjectItem(item, "peerNumber");
+            if (v) info.peerNumber = v->valueint;
+            info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
+            v = cJSON_GetObjectItem(item, "status");
+            if (v) info.status = v->valueint;
+            info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+            info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+            info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
+            v = cJSON_GetObjectItem(item, "role");
+            if (v) info.role = v->valueint;
+            info.roleStr = jsonStr(cJSON_GetObjectItem(item, "roleStr"));
+            info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
+            info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
+            info.isSelf = (info.peerNumber == selfPeerNumber);
+            members.push_back(info);
+        }
+    }
+    cJSON_Delete(root);
+    return members;
+}
+
+std::vector<PeerInfo> ToxAPI::getConferenceMembersSync(int confId) {
+    std::string body;
+    if (!syncRequest("/api/conference/members?conference_id=" + std::to_string(confId), "GET", body))
+        return std::vector<PeerInfo>();
+    return parseMembersResponse(body);
+}
+
+std::vector<PeerInfo> ToxAPI::getGroupMembersSync(int groupId) {
+    std::string body;
+    if (!syncRequest("/api/group/members?group_number=" + std::to_string(groupId), "GET", body))
+        return std::vector<PeerInfo>();
+    return parseMembersResponse(body);
+}
+
+std::string ToxAPI::getRandomNameSync() {
+    std::string body;
+    if (!syncRequest("/api/random-name", "GET", body))
+        return "";
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return "";
+    std::string name = jsonStr(cJSON_GetObjectItem(root, "name"));
+    cJSON_Delete(root);
+    return name;
+}
+
+int ToxAPI::addFriendSync(const std::string& publicKey) {
+    std::string body;
+    if (!syncRequest("/api/friends", "POST", body,
+                     "public_key=" + urlEncode(publicKey)))
+        return -1;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return -1;
+    cJSON* v = cJSON_GetObjectItem(root, "friend_id");
+    int id = v ? v->valueint : -1;
+    cJSON_Delete(root);
+    return id;
+}
+
+int ToxAPI::createConferenceSync() {
+    std::string body;
+    if (!syncRequest("/api/conferences", "POST", body))
+        return -1;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return -1;
+    cJSON* v = cJSON_GetObjectItem(root, "conference_id");
+    int id = v ? v->valueint : -1;
+    cJSON_Delete(root);
+    return id;
+}
+
+int ToxAPI::createGroupSync(const std::string& groupName, const std::string& creatorName,
+                             const std::string& password, bool isPrivate) {
+    std::string data = "group_name=" + urlEncode(groupName) + "&name=" + urlEncode(creatorName);
+    if (!password.empty()) data += "&password=" + urlEncode(password);
+    if (isPrivate) data += "&privacy_state=private";
+    std::string body;
+    if (!syncRequest("/api/groups", "POST", body, data))
+        return -1;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return -1;
+    cJSON* v = cJSON_GetObjectItem(root, "group_number");
+    int id = v ? v->valueint : -1;
+    cJSON_Delete(root);
+    return id;
+}
+
+bool ToxAPI::deleteFriendSync(int friendId) {
+    std::string body;
+    return syncRequest("/api/friend_delete", "POST", body,
+                       "friend_id=" + std::to_string(friendId));
+}
+
+bool ToxAPI::leaveConferenceSync(int confId) {
+    std::string body;
+    return syncRequest("/api/conference_delete", "POST", body,
+                       "conference_id=" + std::to_string(confId));
+}
+
+bool ToxAPI::setSelfInfoSync(const std::string& name, const std::string& statusMessage) {
+    std::string data;
+    bool hasParams = false;
+    if (!name.empty()) {
+        data += "name=" + urlEncode(name);
+        hasParams = true;
+    }
+    if (!statusMessage.empty()) {
+        if (hasParams) data += "&";
+        data += "status_message=" + urlEncode(statusMessage);
+        hasParams = true;
+    }
+    if (!hasParams) return true;
+    std::string body;
+    return syncRequest("/api/self", "POST", body, data);
+}
+
+bool ToxAPI::getSelfSync(std::string& name, std::string& statusMsg,
+                          std::string& connStatus, std::string& address) {
+    std::string body;
+    if (!syncRequest("/api/self", "GET", body))
+        return false;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) return false;
+    name = jsonStr(cJSON_GetObjectItem(root, "name"));
+    statusMsg = jsonStr(cJSON_GetObjectItem(root, "status_message"));
+    connStatus = jsonStr(cJSON_GetObjectItem(root, "connection_status"));
+    address = jsonStr(cJSON_GetObjectItem(root, "address"));
+    cJSON_Delete(root);
+    return true;
+}
+
+bool ToxAPI::joinGroupSync(int friendNumber, const std::string& chatId,
+                            const std::string& name, const std::string& password) {
+    std::string data = "friend_number=" + std::to_string(friendNumber) + "&chat_id=" + chatId;
+    if (!name.empty()) data += "&name=" + urlEncode(name);
+    if (!password.empty()) data += "&password=" + urlEncode(password);
+    std::string body;
+    return syncRequest("/api/groups/join", "POST", body, data);
+}
+
+bool ToxAPI::inviteToConferenceSync(int friendId, int confId) {
+    std::string body;
+    return syncRequest("/api/conference_invite", "POST", body,
+                       "friend_id=" + std::to_string(friendId)
+                       + "&conference_id=" + std::to_string(confId));
+}
+
+bool ToxAPI::inviteToGroupSync(int friendId, int groupId) {
+    std::string body;
+    return syncRequest("/api/groups/invite", "POST", body,
+                       "friend_id=" + std::to_string(friendId)
+                       + "&group_id=" + std::to_string(groupId));
+}
+
+bool ToxAPI::setGroupSelfNameSync(int groupId, const std::string& name) {
+    std::string body;
+    return syncRequest("/api/groups/set-name", "POST", body,
+                       "group_number=" + std::to_string(groupId)
+                       + "&name=" + urlEncode(name));
+}
+
+bool ToxAPI::joinGroupByChatIdSync(const std::string& chatId,
+                                    const std::string& name, const std::string& password) {
+    std::string data = "chat_id=" + chatId;
+    if (!name.empty()) data += "&name=" + urlEncode(name);
+    if (!password.empty()) data += "&password=" + urlEncode(password);
+    std::string body;
+    return syncRequest("/api/groups/join", "POST", body, data);
+}
+
+// ── dispatchResult ──
+
+void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode, const std::string& body,
+                             const std::map<std::string, std::string>* headers) {
+    if (!s_target) return;
+    int type = ctx->type;
+
+    switch (type) {
+
+    case ApiPollEvents: {
+        bool restartDetected = false;
+        auto it = headers->find("x-server-next-id");
+        if (it != headers->end()) {
+            char* endptr = nullptr;
+            uint64_t serverNextId = std::strtoull(it->second.c_str(), &endptr, 10);
+            if (endptr != it->second.c_str() && serverNextId <= s_lastEventId) {
+                restartDetected = true;
+                s_lastEventId = 0;
+            }
+        }
+
+        if (httpCode != 200 || body.empty()) {
+            if (s_pollRunning)
+                EventPoller::addRequest(
+                    buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+            break;
+        }
+
+        std::vector<Event> events;
+        if (restartDetected) {
+            Event e;
+            e.id = 0; e.type = "_server_restart"; e.data = ""; e.timestamp = "";
+            events.push_back(e);
+        }
+
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (root && cJSON_IsArray(root)) {
+            int count = cJSON_GetArraySize(root);
+            for (int i = 0; i < count; ++i) {
+                cJSON* item = cJSON_GetArrayItem(root, i);
+                if (!item) continue;
+                Event e;
+                cJSON* v = cJSON_GetObjectItem(item, "event_id");
+                e.id = v ? (uint64_t)v->valuedouble : 0;
+                e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
+                e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
+                e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
+                events.push_back(e);
+                if (e.id > s_lastEventId) s_lastEventId = e.id;
+            }
+        }
+        cJSON_Delete(root);
+
+        QApplication::postEvent(s_target, new EventListEvent(events));
+
+        if (s_pollRunning)
+            EventPoller::addRequest(
+                buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+        break;
+    }
+
+    case ApiGetSelf: {
+        auto* ev = new SelfInfoResultEvent();
+        if (httpCode != 200 || body.empty()) {
+            ev->success = false;
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (!root) { ev->success = false; QApplication::postEvent(s_target, ev); break; }
+        ev->success = true;
+        ev->name = jsonStr(cJSON_GetObjectItem(root, "name"));
+        ev->statusMsg = jsonStr(cJSON_GetObjectItem(root, "status_message"));
+        ev->connStatus = jsonStr(cJSON_GetObjectItem(root, "connection_status"));
+        ev->address = jsonStr(cJSON_GetObjectItem(root, "address"));
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiGetFriends: {
+        auto* ev = new FriendsResultEvent();
+        if (httpCode != 200 || body.empty()) {
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (!root) { QApplication::postEvent(s_target, ev); break; }
+        cJSON* arr = cJSON_GetObjectItem(root, "friends");
+        if (arr && cJSON_IsArray(arr)) {
+            int n = cJSON_GetArraySize(arr);
+            for (int i = 0; i < n; ++i) {
+                cJSON* item = cJSON_GetArrayItem(arr, i);
+                if (item) ev->friendIds.push_back(item->valueint);
+            }
+        }
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiSendFriendMessage:
+    case ApiSendConferenceMessage:
+    case ApiSendGroupMessage: {
+        auto* ev = new MessageSentResultEvent((ApiRequestType)type);
+        ev->success = (httpCode == 200 && !body.empty());
+        ev->chatId = ctx->id;
+        ev->message = ctx->str1;
+        switch (ctx->type) {
+            case ApiSendFriendMessage: ev->chatType = "friend"; break;
+            case ApiSendConferenceMessage: ev->chatType = "conference"; break;
+            case ApiSendGroupMessage: ev->chatType = "group"; break;
+        }
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiAddFriend:
+    case ApiDeleteFriend:
+    case ApiCreateConference:
+    case ApiLeaveConference:
+    case ApiInviteToConference:
+    case ApiRejectConference:
+    case ApiIgnoreConference:
+    case ApiCreateGroup:
+    case ApiLeaveGroup:
+    case ApiInviteToGroup:
+    case ApiJoinGroup:
+    case ApiJoinGroupByChatId:
+    case ApiSetGroupSelfName:
+    case ApiSetSelfInfo:
+        break; // fire-and-forget
+
+    case ApiJoinConference: {
+        auto* ev = new ApiResultEvent(ApiJoinConference);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiGetRandomName: {
+        auto* ev = new ApiResultEvent(ApiGetRandomName);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiLoadGroupMembers: {
+        auto* ev = new MembersLoadedEvent();
+        ev->contactId = ctx->id;
+        ev->contactType = ctx->str1;
+        if (httpCode != 200 || body.empty()) {
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (!root) { QApplication::postEvent(s_target, ev); break; }
+
+        cJSON* selfPpItem = cJSON_GetObjectItem(root, "selfPeerNumber");
+        int selfPeerNumber = selfPpItem ? selfPpItem->valueint : -1;
+
+        cJSON* membersItem = cJSON_GetObjectItem(root, "members");
+        if (membersItem && cJSON_IsArray(membersItem)) {
+            int n = cJSON_GetArraySize(membersItem);
+            for (int i = 0; i < n; ++i) {
+                cJSON* item = cJSON_GetArrayItem(membersItem, i);
+                if (!item) continue;
+                PeerInfo info;
+                cJSON* v;
+                v = cJSON_GetObjectItem(item, "peerNumber");
+                if (v) info.peerNumber = v->valueint;
+                info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
+                v = cJSON_GetObjectItem(item, "status");
+                if (v) info.status = v->valueint;
+                info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+                info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+                info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
+                v = cJSON_GetObjectItem(item, "role");
+                if (v) info.role = v->valueint;
+                info.roleStr = jsonStr(cJSON_GetObjectItem(item, "roleStr"));
+                info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
+                info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
+                info.isSelf = (info.peerNumber == selfPeerNumber);
+                ev->members.push_back(info);
+            }
+        }
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiLoadMessageHistory: {
+        auto* ev = new MessageHistoryLoadedEvent();
+        ev->contactId = ctx->id;
+        ev->contactType = ctx->str1;
+        if (httpCode != 200 || body.empty()) {
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (!root) { QApplication::postEvent(s_target, ev); break; }
+        cJSON* msgsItem = cJSON_GetObjectItem(root, "messages");
+        if (msgsItem && cJSON_IsArray(msgsItem)) {
+            int n = cJSON_GetArraySize(msgsItem);
+            for (int i = 0; i < n; ++i) {
+                cJSON* msg = cJSON_GetArrayItem(msgsItem, i);
+                if (!msg) continue;
+                HistoryMessage hm;
+                cJSON* v = cJSON_GetObjectItem(msg, "rowid");
+                if (v) hm.rowid = (int64_t)v->valuedouble;
+                hm.message = jsonStr(cJSON_GetObjectItem(msg, "message"));
+                hm.sender_pubkey = jsonStr(cJSON_GetObjectItem(msg, "sender_pubkey"));
+                v = cJSON_GetObjectItem(msg, "sender_number");
+                if (v) hm.sender_number = (uint32_t)v->valuedouble;
+                hm.direction = jsonStr(cJSON_GetObjectItem(msg, "direction"));
+                hm.created_at = jsonStr(cJSON_GetObjectItem(msg, "created_at"));
+                ev->messages.push_back(hm);
+            }
+        }
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiTranslate: {
+        auto* ev = new TranslateResultEvent();
+        ev->msgIndex = ctx->id;
+        if (httpCode != 200 || body.empty()) {
+            ev->errorMessage = "NETWORK_ERROR: cannot connect to server";
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (!root) {
+            ev->errorMessage = "PARSE_ERROR: invalid server response";
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* t = cJSON_GetObjectItem(root, "translated_text");
+        if (t && cJSON_IsString(t)) {
+            ev->success = true;
+            ev->translatedText = cJSON_GetStringValue(t);
+        } else {
+            std::string err = jsonStr(cJSON_GetObjectItem(root, "error"));
+            std::string code = jsonStr(cJSON_GetObjectItem(root, "code"));
+            ev->errorMessage = (code.empty() ? "UNKNOWN" : code) + ": " + (err.empty() ? "translate failed" : err);
+        }
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiLoadAllData: {
+        auto* chain = static_cast<LoadChain*>(ctx->ptr);
+        if (!chain) break;
+
+        switch (chain->step) {
+        case 0: { // self
+            if (httpCode == 200 && !body.empty()) {
+                cJSON* root = cJSON_Parse(body.c_str());
+                if (root) {
+                    chain->result->selfName = jsonStr(cJSON_GetObjectItem(root, "name"));
+                    chain->result->selfStatusMsg = jsonStr(cJSON_GetObjectItem(root, "status_message"));
+                    chain->result->selfConnStatus = jsonStr(cJSON_GetObjectItem(root, "connection_status"));
+                    chain->result->selfAddress = jsonStr(cJSON_GetObjectItem(root, "address"));
+                    cJSON_Delete(root);
+                }
+            }
+            chain->step = 1;
+            auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+            EventPoller::addRequest(buildUrl("/api/friends"), "GET", "", onHttpDone, next, 35);
+            break;
+        }
+        case 1: { // friend ids
+            if (httpCode == 200 && !body.empty()) {
+                cJSON* root = cJSON_Parse(body.c_str());
+                if (root) {
+                    cJSON* arr = cJSON_GetObjectItem(root, "friends");
+                    if (arr && cJSON_IsArray(arr)) {
+                        int n = cJSON_GetArraySize(arr);
+                        for (int i = 0; i < n; ++i)
+                            chain->friendIds.push_back(cJSON_GetArrayItem(arr, i)->valueint);
+                    }
+                    cJSON_Delete(root);
+                }
+            }
+            chain->step = 2;
+            chain->friendIdx = 0;
+            if (chain->friendIds.empty()) chain->step = 3; // skip to groups
+            auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+            if (chain->step == 3)
+                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
+            else
+                EventPoller::addRequest(buildUrl("/api/friend"), "POST",
+                    "friend_id=" + std::to_string(chain->friendIds[0]), onHttpDone, next, 35);
+            break;
+        }
+        case 2: { // friend info
+            if (httpCode == 200 && !body.empty()) {
+                cJSON* root = cJSON_Parse(body.c_str());
+                if (root) {
+                    ContactData cd;
+                    cd.id = chain->friendIds[chain->friendIdx];
+                    cd.type = "friend";
+                    cd.name = jsonStr(cJSON_GetObjectItem(root, "name"));
+                    cd.status = jsonStr(cJSON_GetObjectItem(root, "statusStr"));
+                    cd.chatId = jsonStr(cJSON_GetObjectItem(root, "publicKey"));
+                    cd.iconUrl = jsonStr(cJSON_GetObjectItem(root, "iconUrl"));
+                    cd.statusText = jsonStr(cJSON_GetObjectItem(root, "statusText"));
+                    chain->result->contacts.push_back(cd);
+                    cJSON_Delete(root);
+                }
+            }
+            chain->friendIdx++;
+            auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+            if ((size_t)chain->friendIdx >= chain->friendIds.size()) {
+                chain->step = 3;
+                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
+            } else {
+                EventPoller::addRequest(buildUrl("/api/friend"), "POST",
+                    "friend_id=" + std::to_string(chain->friendIds[chain->friendIdx]),
+                    onHttpDone, next, 35);
+            }
+            break;
+        }
+        case 3: { // groups
+            if (httpCode == 200 && !body.empty()) {
+                cJSON* root = cJSON_Parse(body.c_str());
+                if (root) {
+                    cJSON* arr = cJSON_GetObjectItem(root, "groups");
+                    if (arr && cJSON_IsArray(arr)) {
+                        int n = cJSON_GetArraySize(arr);
+                        for (int i = 0; i < n; ++i) {
+                            cJSON* item = cJSON_GetArrayItem(arr, i);
+                            if (!item) continue;
+                            ContactData cd;
+                            cJSON* v = cJSON_GetObjectItem(item, "groupNumber");
+                            if (v) cd.id = v->valueint;
+                            cd.name = jsonStr(cJSON_GetObjectItem(item, "groupName"));
+                            cd.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
+                            v = cJSON_GetObjectItem(item, "isConnected");
+                            cd.isConnected = v ? (v->valueint == 1) : false;
+                            cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+                            cd.type = "group";
+                            chain->result->contacts.push_back(cd);
+                        }
+                    }
+                    cJSON_Delete(root);
+                }
+            }
+            chain->step = 4;
+            auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+            EventPoller::addRequest(buildUrl("/api/conferences"), "GET", "", onHttpDone, next, 35);
+            break;
+        }
+        case 4: { // conferences → done
+            if (httpCode == 200 && !body.empty()) {
+                cJSON* root = cJSON_Parse(body.c_str());
+                if (root) {
+                    cJSON* arr = cJSON_GetObjectItem(root, "conferences");
+                    if (arr && cJSON_IsArray(arr)) {
+                        int n = cJSON_GetArraySize(arr);
+                        for (int i = 0; i < n; ++i) {
+                            cJSON* item = cJSON_GetArrayItem(arr, i);
+                            if (!item) continue;
+                            ContactData cd;
+                            cJSON* v = cJSON_GetObjectItem(item, "conferenceNumber");
+                            if (v) cd.id = v->valueint;
+                            cd.name = jsonStr(cJSON_GetObjectItem(item, "conferenceName"));
+                            cd.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
+                            v = cJSON_GetObjectItem(item, "isConnected");
+                            cd.isConnected = v ? (v->valueint == 1) : false;
+                            cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+                            cd.type = "conference";
+                            chain->result->contacts.push_back(cd);
+                        }
+                    }
+                    cJSON_Delete(root);
+                }
+            }
+            chain->result->success = true;
+            QApplication::postEvent(s_target, chain->result);
+            delete chain;
+            break;
+        }
+        }
+        break;
+    }
+
+    }
 }
