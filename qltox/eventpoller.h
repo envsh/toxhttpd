@@ -174,6 +174,8 @@ public:
 // ── curl_multi HTTP 引擎 ──
 
 struct HttpCtx {
+    std::string urlStr;
+    std::string postData;
     std::string body;
     std::map<std::string, std::string> headers;
     void (*done)(int httpCode, const std::string& body,

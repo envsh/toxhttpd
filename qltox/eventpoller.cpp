@@ -65,9 +65,11 @@ void EventPoller::addRequest(const std::string& url,
     CURL* easy = curl_easy_init();
     if (!easy) return;
 
-    auto* ctx = new HttpCtx{std::string(), std::map<std::string, std::string>(), done, udata};
+    auto* ctx = new HttpCtx{std::string(url), std::string(data),
+                             std::string(), std::map<std::string, std::string>(),
+                             done, udata};
 
-    curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(easy, CURLOPT_URL, ctx->urlStr.c_str());
     curl_easy_setopt(easy, CURLOPT_PRIVATE, ctx);
     curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, writeCb);
     curl_easy_setopt(easy, CURLOPT_WRITEDATA, &ctx->body);
@@ -77,8 +79,8 @@ void EventPoller::addRequest(const std::string& url,
     curl_easy_setopt(easy, CURLOPT_TCP_KEEPALIVE, 1L);
 
     if (method == "POST") {
-        curl_easy_setopt(easy, CURLOPT_POSTFIELDS, data.c_str());
-        curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long)data.size());
+        curl_easy_setopt(easy, CURLOPT_POSTFIELDS, ctx->postData.c_str());
+        curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long)ctx->postData.size());
     }
 
     s_instance->multiMutex.lock();

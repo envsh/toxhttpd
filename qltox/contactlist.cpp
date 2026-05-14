@@ -227,7 +227,7 @@ void ContactListWidget::updateView_v3() {
         if (c->type == "group") {
             statusDot = c->is_connected ? STATUS_ONLINE : STATUS_OFFLINE;
         } else {
-            statusDot = (c->status == "online" || c->status == "tcp") ? STATUS_ONLINE : STATUS_OFFLINE;
+            statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
         }
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
@@ -276,7 +276,7 @@ void ContactListWidget::updateView_v4() {
         
         QString emoji = (c->type == "friend") ? EMOJI_FRIEND :
                        (c->type == "group") ? EMOJI_GROUP : EMOJI_CONFERENCE;
-        QString statusDot = (c->status == "online" || c->status == "tcp") ? STATUS_ONLINE : STATUS_OFFLINE;
+        QString statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
         
         QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
         // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）
