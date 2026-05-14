@@ -134,6 +134,26 @@
     "invite_failed": "邀請失敗",
     "not_yet_implemented": "尚未實現",
     "no_conference": "沒有可用的會議",
+    "member_list": {
+        "title": "成員列表",
+        "title.conference": "會議成員 - {0}",
+        "title.group": "群組成員 - {0}",
+        "table": {
+            "peer": "編號",
+            "name": "名稱",
+            "role": "角色",
+            "connection": "連線",
+            "ip": "IP 位址",
+            "public_key": "公鑰"
+        }
+    },
+    "roles": {
+        "member": "成員",
+        "moderator": "管理員",
+        "founder": "建立者",
+        "unknown": "未知"
+    },
+    "no_members": "暫無成員",
     "emoji": {
         "search_placeholder": "搜尋 emoji...",
         "recently_used": "最近使用",

@@ -127,8 +127,23 @@
     "member_list": {
         "title": "成员列表",
         "title.conference": "会议成员 - {0}",
-        "title.group": "群组成员 - {0}"
+        "title.group": "群组成员 - {0}",
+        "table": {
+            "peer": "编号",
+            "name": "名称",
+            "role": "角色",
+            "connection": "连接",
+            "ip": "IP 地址",
+            "public_key": "公钥"
+        }
     },
+    "roles": {
+        "member": "成员",
+        "moderator": "管理员",
+        "founder": "创建者",
+        "unknown": "未知"
+    },
+    "no_members": "暂无成员",
     "select_chat_object": "选择聊天对象",
     "please_enter_chat_id": "请输入群组chat_id",
     "theme_dark": "深色主题",

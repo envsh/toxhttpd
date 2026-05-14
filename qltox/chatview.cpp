@@ -583,10 +583,20 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
         int nameW = fm.width(displayName) + fm.width("  ");
         p.drawText(contentRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
 
+        int ipW = 0;
+        if (!msg.ipAddress.isEmpty()) {
+            f.setPointSize(10);
+            p.setFont(f);
+            p.setPen(QColor(130, 140, 150));
+            ipW = fm.width(msg.ipAddress);
+            p.drawText(contentRight - nameW - ipW - kPad/2, y + kPad,
+                       ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.ipAddress);
+        }
+
         f.setPointSize(10);
         p.setFont(f);
         p.setPen(currentPalette().textMuted);
-        p.drawText(contentRight - nameW - fm.width(msg.time) - kPad, y + kPad,
+        p.drawText(contentRight - nameW - ipW - kPad/2 - fm.width(msg.time) - kPad/2, y + kPad,
                    fm.width(msg.time), headerH, Qt::AlignRight | Qt::AlignVCenter, msg.time);
 
         p.setFont(font());
@@ -637,8 +647,16 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
 
         f.setPointSize(10);
         p.setFont(f);
+        int ipEnd = contentX + fm.width(displayName) + kPad;
+        if (!msg.ipAddress.isEmpty()) {
+            p.setPen(QColor(130, 140, 150));
+            p.drawText(ipEnd, y + kPad, fm.width(msg.ipAddress), headerH,
+                       Qt::AlignLeft | Qt::AlignVCenter, msg.ipAddress);
+            ipEnd += fm.width(msg.ipAddress) + kPad/2;
+        }
+
         p.setPen(currentPalette().textMuted);
-        int timeX = contentX + fm.width(displayName) + kPad;
+        int timeX = ipEnd;
         p.drawText(timeX, y + kPad, contentW - (timeX - contentX), headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.time);
 
         p.setFont(font());

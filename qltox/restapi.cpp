@@ -701,9 +701,19 @@ std::vector<PeerInfo> ToxAPI::getGroupMembers(int groupId) {
             item = cJSON_GetObjectItem(memberItem, "role");
             if (item) info.role = item->valueint;
             
+            item = cJSON_GetObjectItem(memberItem, "roleStr");
+            if (item && cJSON_IsString(item)) {
+                info.roleStr = std::string(cJSON_GetStringValue(item));
+            }
+
             item = cJSON_GetObjectItem(memberItem, "publicKey");
             if (item && cJSON_IsString(item)) {
                 info.publicKey = std::string(cJSON_GetStringValue(item));
+            }
+
+            item = cJSON_GetObjectItem(memberItem, "peerIp");
+            if (item && cJSON_IsString(item)) {
+                info.peerIp = std::string(cJSON_GetStringValue(item));
             }
             
             info.isSelf = (info.peerNumber == selfPeerNumber);

@@ -533,7 +533,9 @@ function selectContact(id, type) {
                     statusStr: m.statusStr || '',
                     statusText: m.statusText || '',
                     iconUrl: m.iconUrl || '',
-                    role: m.role, publicKey: m.publicKey, isSelf: m.isSelf
+                    role: m.role, roleStr: m.roleStr || '',
+                    publicKey: m.publicKey, isSelf: m.isSelf,
+                    peerIp: m.peerIp || ''
                 };
             });
         }).catch(() => {});
@@ -662,6 +664,7 @@ function loadMessageHistory() {
                 let senderName = 'Me';
                 let peerNumber = -1;
                 let avatarText = 'M';
+                let ipAddress = '';
                 if (!isSelf) {
                     if (contactType === 'friend') {
                         var fe = peerInfoMap["friend_" + contactId];
@@ -670,9 +673,11 @@ function loadMessageHistory() {
                         avatarText = senderName ? senderName.charAt(0).toUpperCase() : 'F';
                     } else {
                         const peerKey = `${contactType}_${contactId}_${msg.sender_number}`;
-                        senderName = (peerInfoMap[peerKey] && peerInfoMap[peerKey].name) || '';
+                        const cached = peerInfoMap[peerKey];
+                        senderName = (cached && cached.name) || '';
                         peerNumber = msg.sender_number;
                         avatarText = senderName ? senderName.charAt(0).toUpperCase() : 'P';
+                        ipAddress = (cached && cached.peerIp) || '';
                     }
                 }
 
@@ -687,7 +692,8 @@ function loadMessageHistory() {
                     senderName,
                     peerNumber,
                     avatarText,
-                    timestamp
+                    timestamp,
+                    ipAddress
                 });
             });
 
@@ -792,7 +798,8 @@ function longPollEvents() {
                             const cached = peerInfoMap[key];
                             const senderName = (cached && cached.name) || '';
                             const avatarText = (senderName || 'P').charAt(0).toUpperCase();
-                            appendMessage(data.message, 'other', senderName, data.peer_number, avatarText);
+                            const peerIp = (cached && cached.peerIp) || '';
+                            appendMessage(data.message, 'other', senderName, data.peer_number, avatarText, "", peerIp);
                         }
                     } else if (event.event_type === 'conference_peer_name') {
                         const data = JSON.parse(event.data);
@@ -888,7 +895,7 @@ class VirtualScroller {
         contentCol.className = 'content-col';
         const header = document.createElement('div');
         header.className = 'message-header';
-        header.innerHTML = '<span class="message-sender"></span><span class="message-time"></span>';
+        header.innerHTML = '<span class="message-sender"></span><span class="message-ip"></span><span class="message-time"></span>';
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
         contentCol.appendChild(header);
@@ -909,6 +916,7 @@ class VirtualScroller {
 
         el._ap = avatarCol.firstChild;
         el._ss = header.firstChild;
+        el._ip = header.children[1];
         el._ts = header.lastChild;
         el._bb = bubble;
         el._tb = transBtn;
@@ -933,6 +941,13 @@ class VirtualScroller {
         else
             displayText = '?';
         el._ss.textContent = displayText;
+        if (msg.ipAddress && msg.type !== 'self') {
+            el._ip.textContent = msg.ipAddress;
+            el._ip.style.display = '';
+        } else {
+            el._ip.textContent = '';
+            el._ip.style.display = 'none';
+        }
         el._ts.textContent = msg.timestamp;
 
         // Render bubble content: text + translate button
@@ -1176,11 +1191,11 @@ const messageArea = document.getElementById('messageArea');
 const vsc = new VirtualScroller(messageArea);
 
 // Append message to chat area (VirtualScroller)
-function appendMessage(text, type, senderName = "", peerNumber = -1, avatarText = "", timestamp = "") {
+function appendMessage(text, type, senderName = "", peerNumber = -1, avatarText = "", timestamp = "", ipAddress = "") {
     const now = new Date();
     if (!timestamp)
         timestamp = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    vsc.append({ text, type, senderName, peerNumber, avatarText, timestamp });
+    vsc.append({ text, type, senderName, peerNumber, avatarText, timestamp, ipAddress });
     vsc.scrollToBottom();
 }
 
@@ -1783,17 +1798,21 @@ async function showConferenceMembers(conferenceId) {
     
     let html = '';
     if (members.length === 0) {
-        html = '<div style="text-align: center; color: #8b949e;">暂无成员</div>';
+        html = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">' + t('no_members') + '</td></tr>';
     } else {
         members.forEach(m => {
-            html += `<div style="padding: 8px; border-bottom: 1px solid #30363d;">
-                        <span style="color: #00d4aa;">Peer ${m.peer_number}</span>: 
-                        <span style="color: #c9d1d9;">${m.name}</span>
-                      </div>`;
+            html += `<tr>
+                <td>${m.peer_number}</td>
+                <td>${m.name || '?'}</td>
+                <td>--</td>
+                <td>--</td>
+                <td>--</td>
+                <td style="font-family:monospace;font-size:11px;">--</td>
+            </tr>`;
         });
     }
     
-    document.getElementById('memberListContent').innerHTML = html;
+    document.getElementById('memberListBody').innerHTML = html;
     document.getElementById('memberListModal').classList.remove('hidden');
 }
 
@@ -1805,17 +1824,25 @@ async function showGroupMembers(groupId) {
     
     let html = '';
     if (members.length === 0) {
-        html = '<div style="text-align: center; color: #8b949e;">暂无成员</div>';
+        html = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">' + t('no_members') + '</td></tr>';
     } else {
         members.forEach(m => {
-            html += `<div style="padding: 8px; border-bottom: 1px solid #30363d;">
-                        <span style="color: #00d4aa;">Peer ${m.peerNumber}</span>: 
-                        <span style="color: #c9d1d9;">${m.name}</span>
-                      </div>`;
+            const roleStr = m.roleStr ? t('roles.' + m.roleStr) : '--';
+            const connStr = m.statusStr || '--';
+            const ipStr = m.peerIp || '--';
+            const pkStr = (m.publicKey || '').substring(0, 16);
+            html += `<tr>
+                <td>${m.peerNumber}</td>
+                <td>${m.name || '?'}</td>
+                <td>${roleStr}</td>
+                <td>${connStr}</td>
+                <td>${ipStr}</td>
+                <td style="font-family:monospace;font-size:11px;">${pkStr}</td>
+            </tr>`;
         });
     }
     
-    document.getElementById('memberListContent').innerHTML = html;
+    document.getElementById('memberListBody').innerHTML = html;
     document.getElementById('memberListModal').classList.remove('hidden');
 }
 

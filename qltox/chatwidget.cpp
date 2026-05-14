@@ -127,7 +127,8 @@ void ChatWidget::setHeaderText(const QString& text) {
 void ChatWidget::appendMessage(const QString& message, const QString& type, 
                               const QString& senderName, int peerNumber,
                               const QString& time, const QString& avatarText,
-                              const QString& avatarUrl) {
+                              const QString& avatarUrl,
+                              const QString& ipAddress) {
     ChatMessage msg;
     msg.messageText = message;
     msg.type = type;
@@ -136,6 +137,7 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
     msg.time = time;
     msg.avatarText = avatarText;
     msg.avatarUrl = avatarUrl;
+    msg.ipAddress = ipAddress;
     messageArea->appendMessage(msg);
 }
 

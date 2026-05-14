@@ -443,13 +443,17 @@ void MainWindow::handleEvents(const EventList& events) {
                     }
                     
                     if (groupNumber == currentChatId && currentChatType == "group") {
-                        // 查询缓存获取 peer 名字
+                        // 查询缓存获取 peer 名字和 IP
                         std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
                         auto it = peerInfoMap.find(key);
                         QString senderName;
-                        if (it != peerInfoMap.end() && !it->second.name.empty())
-                            senderName = QString::fromUtf8(it->second.name.c_str());
-                        chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
+                        QString ipAddress;
+                        if (it != peerInfoMap.end()) {
+                            if (!it->second.name.empty())
+                                senderName = QString::fromUtf8(it->second.name.c_str());
+                            ipAddress = QString::fromUtf8(it->second.peerIp.c_str());
+                        }
+                        chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime(), "", "", ipAddress);
                     }
                     playNotifySound();
                 }
@@ -931,6 +935,7 @@ void MainWindow::loadMessageHistory() {
             bool isSelf = (msg.sender_pubkey == selfPubkey);
             QString senderLabel;
             QString avatarText;
+            QString ipAddress;
             
             if (isSelf) {
                 senderLabel = "Me";
@@ -951,9 +956,12 @@ void MainWindow::loadMessageHistory() {
                         + "_" + std::to_string(currentChatId)
                         + "_" + std::to_string(msg.sender_number);
                     auto it = peerInfoMap.find(key);
-                    if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                        senderLabel = QString::fromUtf8(it->second.name.c_str());
-                        avatarText = qToUpper(senderLabel.left(1));
+                    if (it != peerInfoMap.end()) {
+                        if (!it->second.name.empty()) {
+                            senderLabel = QString::fromUtf8(it->second.name.c_str());
+                            avatarText = qToUpper(senderLabel.left(1));
+                        }
+                        ipAddress = QString::fromUtf8(it->second.peerIp.c_str());
                     } else {
                         senderLabel = QString();
                         avatarText = "P";
@@ -969,7 +977,9 @@ void MainWindow::loadMessageHistory() {
                 senderLabel,
                 isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
                 timeStr,
-                avatarText
+                avatarText,
+                "",
+                ipAddress
             );
         }
         

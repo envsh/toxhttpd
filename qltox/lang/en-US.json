@@ -168,8 +168,25 @@
     "group_info_title": "Group Info",
     "group_leave_success": "Left group",
     "member_list": {
-        "title": "Member List"
+        "title": "Member List",
+        "title.conference": "Conference Members - {0}",
+        "title.group": "Group Members - {0}",
+        "table": {
+            "peer": "#",
+            "name": "Name",
+            "role": "Role",
+            "connection": "Conn.",
+            "ip": "IP Address",
+            "public_key": "PubKey"
+        }
     },
+    "roles": {
+        "member": "Member",
+        "moderator": "Mod.",
+        "founder": "Founder",
+        "unknown": "Unknown"
+    },
+    "no_members": "No members",
     "conference_leave_failed": "Leave failed",
     "group_leave_failed": "Leave failed",
     "confirm_leave_group": "Leave group {0}?"

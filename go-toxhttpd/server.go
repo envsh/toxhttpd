@@ -739,6 +739,19 @@ func statusToStr(s int) string {
 	}
 }
 
+func roleToStr(role int) string {
+	switch role {
+	case 0:
+		return "member"
+	case 1:
+		return "moderator"
+	case 2:
+		return "founder"
+	default:
+		return "unknown"
+	}
+}
+
 func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -1677,6 +1690,7 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 		pubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, pn)
 		connStatus, _ := s.tox.GroupPeerGetConnectionStatus(groupNumber, pn)
 		role, _ := s.tox.GroupPeerGetRole(groupNumber, pn)
+		peerIp, _ := s.toxp.GroupPeerGetIPAddress(uint32(groupNumber), uint32(pn))
 		members = append(members, map[string]interface{}{
 			"peerNumber": peerNumber,
 			"name":       name,
@@ -1685,10 +1699,11 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 			"statusStr":  statusToStr(connStatus),
 			"statusText": "",
 			"role":       int(role),
+			"roleStr":    roleToStr(int(role)),
 			"publicKey":  pubKey,
 			"isSelf":     false,
 			"lastSeen":   nil,
-			"peerIp":     nil,
+			"peerIp":     peerIp,
 		})
 	}
 

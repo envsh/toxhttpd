@@ -30,8 +30,10 @@ struct PeerInfo {
     std::string statusText;
     std::string iconUrl;
     int role = 0;
+    std::string roleStr;      // "member"/"moderator"/"founder"
     std::string publicKey;
     bool isSelf = false;
+    std::string peerIp;       // IP address string from toxpriv
 };
 
 struct GroupInfo {

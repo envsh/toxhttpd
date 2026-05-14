@@ -15,6 +15,7 @@ struct ChatMessage {
     QString avatarText;
     QString avatarUrl;
     QString time;
+    QString ipAddress;
     int height;
 
     // Translation support

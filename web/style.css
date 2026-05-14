@@ -1120,3 +1120,34 @@ select option {
 #renameRandomPreview:hover {
     text-decoration: underline;
 }
+
+#memberListContent table {
+    width: 100%;
+    border-collapse: collapse;
+}
+#memberListContent th, #memberListContent td {
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid #30363d;
+    white-space: nowrap;
+    font-size: 13px;
+}
+#memberListContent th {
+    color: #8b949e;
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    background: #0d1117;
+}
+#memberListContent th[data-col="ip"] {
+    font-family: monospace;
+}
+.message-ip {
+    font-size: 10px;
+    color: #8b949e;
+    margin: 0 4px;
+    font-family: monospace;
+}
+.message.self .message-ip {
+    order: -1;
+}

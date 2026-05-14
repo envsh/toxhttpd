@@ -209,9 +209,21 @@
 
     <!-- Member list modal -->
     <div id="memberListModal" class="modal hidden">
-        <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-content" style="max-width: 650px;">
             <h3 id="memberListTitle">成员列表</h3>
-            <div id="memberListContent" style="max-height: 300px; overflow-y: auto; margin: 10px 0;"></div>
+            <div id="memberListContent" style="max-height: 400px; overflow-y: auto; margin: 10px 0;">
+                <table>
+                    <thead><tr id="memberListHeader">
+                        <th data-col="peer">#</th>
+                        <th data-col="name">名称</th>
+                        <th data-col="role">角色</th>
+                        <th data-col="conn">连接</th>
+                        <th data-col="ip">IP 地址</th>
+                        <th data-col="pubkey">公钥</th>
+                    </tr></thead>
+                    <tbody id="memberListBody"></tbody>
+                </table>
+            </div>
             <div class="modal-actions">
                 <button onclick="hideMemberList()">关闭</button>
             </div>
