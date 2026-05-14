@@ -21,6 +21,7 @@ import (
 	"time"
 
 	tox "github.com/TokTok/go-toxcore-c"
+	_ "github.com/envsh/toxera/toxpriv"
 	_ "github.com/mattn/go-sqlite3"
 )
 

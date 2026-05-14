@@ -1,7 +1,9 @@
-go 1.21
+go 1.21.1
+
 
 use (
 	.
 	./go-toxcore-c
+//    ../../go-toxcore
 //    /home/me/aprog/touse/oai
 )

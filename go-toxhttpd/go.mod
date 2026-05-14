@@ -1,8 +1,12 @@
 module github.com/envsh/toxhttpd
 
-go 1.21
+go 1.21.1
 
 // replace github.com/TokTok/go-toxcore-c => ./go-toxcore-c
+
+// replace github.com/envsh/toxera => ../../go-toxcore
+
+require github.com/envsh/toxera v0.0.0-20260514053454-c69938ccca9c
 
 require (
 	github.com/TokTok/go-toxcore-c v0.2.18-0.20250216202442-0f7463080d5c
@@ -11,8 +15,9 @@ require (
 )
 
 require (
-	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
-	github.com/sasha-s/go-deadlock v0.3.5 // indirect
+	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/petermattis/goid v0.0.0-20260330135022-df67b199bc81 // indirect
+	github.com/sasha-s/go-deadlock v0.3.9 // indirect
 	github.com/sashabaranov/go-openai v1.41.2 // indirect
 	github.com/streamrail/concurrent-map v0.0.0-20160823150647-8bf1e9bacbf6 // indirect
 )
