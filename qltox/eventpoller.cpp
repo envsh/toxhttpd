@@ -3,33 +3,47 @@
 #include "apilog.h"
 #include <queue>
 
+// ===== ApiWorker 线程：仅处理 API 请求，不阻塞事件轮询 =====
+class ApiWorkerThread : public QThread {
+    EventPoller* poller;
+public:
+#ifdef QT3_BUILD
+    ApiWorkerThread(EventPoller* p) : QThread((unsigned int)0), poller(p) {}
+#else
+    ApiWorkerThread(EventPoller* p) : QThread(p), poller(p) {}
+#endif
+    void run() override {
+        while (poller->running) {
+            poller->mutex.lock();
+            if (poller->pendingRequests.empty())
+                poller->wakeCondition.wait(&poller->mutex);
+            while (!poller->pendingRequests.empty()) {
+                ApiRequestEvent* req = poller->pendingRequests.front();
+                poller->pendingRequests.pop();
+                poller->mutex.unlock();
+                poller->processApiRequest(req);
+                delete req;
+                poller->mutex.lock();
+            }
+            poller->mutex.unlock();
+        }
+    }
+};
+
 EventPoller::EventPoller(QObject* parent) :
 #ifdef QT3_BUILD
     QThread((unsigned int)0),
 #else
     QThread(parent),
 #endif
-    running(false), lastEventId(0), receiver(nullptr) {
+    running(true), lastEventId(0), receiver(nullptr), apiWorker(nullptr) {
     api = new ToxAPI();
+    apiWorker = new ApiWorkerThread(this);
+    apiWorker->start();
 }
 
 void EventPoller::run() {
-    running = true;
     while (running) {
-        // 处理待处理的API请求
-        while (true) {
-            mutex.lock();
-            if (pendingRequests.empty()) {
-                mutex.unlock();
-                break;
-            }
-            ApiRequestEvent* req = pendingRequests.front();
-            pendingRequests.pop();
-            mutex.unlock();
-            processApiRequest(req);
-            delete req;
-        }
-        
         // 事件轮询
         std::vector<Event> events = api->pollEvents(lastEventId);
         
@@ -64,19 +78,20 @@ void EventPoller::run() {
                 }
             }
         } else if (!restartDetected) {
-            // 等待：有新请求入队时立即唤醒，否则最长等2秒
-            mutex.lock();
-            if (pendingRequests.empty()) {
-                wakeCondition.wait(&mutex, 2000);
-            }
-            mutex.unlock();
+            // 无事件且无重启：等待2秒后重试
+            QThread::sleep(2);
         }
     }
 }
 
 void EventPoller::stop() {
     running = false;
+    wakeCondition.wakeOne();
     wait();
+    if (apiWorker) {
+        apiWorker->wait();
+        delete apiWorker;
+    }
 }
 
 void EventPoller::setLastEventId(uint64_t id) {

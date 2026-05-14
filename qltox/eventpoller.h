@@ -172,6 +172,7 @@ public:
     void postApiRequest(ApiRequestEvent* req);
     
 private:
+    friend class ApiWorkerThread;
     void processApiRequest(ApiRequestEvent* req);
     
     bool running;
@@ -181,6 +182,7 @@ private:
     std::queue<ApiRequestEvent*> pendingRequests;
     QMutex mutex;
     QWaitCondition wakeCondition;
+    QThread* apiWorker;
 };
 
 #endif // EVENTPOLLER_H
