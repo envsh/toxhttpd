@@ -184,6 +184,7 @@
         "member": "Member",
         "moderator": "Mod.",
         "founder": "Founder",
+        "observer": "Observer",
         "unknown": "Unknown"
     },
     "no_members": "No members",

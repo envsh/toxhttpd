@@ -751,11 +751,13 @@ func statusToStr(s int) string {
 func roleToStr(role int) string {
 	switch role {
 	case 0:
-		return "member"
+		return "founder"
 	case 1:
 		return "moderator"
 	case 2:
-		return "founder"
+		return "member"
+	case 3:
+		return "observer"
 	default:
 		return "unknown"
 	}

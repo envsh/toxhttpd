@@ -141,6 +141,7 @@
         "member": "成员",
         "moderator": "管理员",
         "founder": "创建者",
+        "observer": "观察者",
         "unknown": "未知"
     },
     "no_members": "暂无成员",
