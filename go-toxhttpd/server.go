@@ -196,6 +196,15 @@ type Server struct {
 	mu                   sync.RWMutex
 }
 
+type toxemu struct {
+	opts unsafe.Pointer
+	ctox unsafe.Pointer
+}
+func getInnerPtr(t *tox.Tox) unsafe.Pointer{
+	x := (*toxemu)(unsafe.Pointer(t))
+	return x.ctox
+}
+
 func NewServer(udpEnabled bool) (*Server, error) {
 	// Load saved tox data if exists
 	saveDataPath := "data/savedata.bin"
@@ -228,7 +237,7 @@ func NewServer(udpEnabled bool) (*Server, error) {
 
 	server := &Server{
 		tox:                  t,
-		toxp:                toxpriv.NewTox(unsafe.Pointer(t)),
+		toxp:                toxpriv.NewTox(getInnerPtr(t)),
 		db:                   db,
 		eventQueue:           NewEventQueue(),
 		selfConnectionStatus: "offline",
@@ -1690,7 +1699,13 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 		pubKey, _ := s.tox.GroupPeerGetPublicKey(groupNumber, pn)
 		connStatus, _ := s.tox.GroupPeerGetConnectionStatus(groupNumber, pn)
 		role, _ := s.tox.GroupPeerGetRole(groupNumber, pn)
-		peerIp, _ := s.toxp.GroupPeerGetIPAddress(uint32(groupNumber), uint32(pn))
+		ip, ipErr := s.toxp.GroupPeerGetIPAddress(uint32(groupNumber), uint32(pn))
+		if ipErr != nil {
+			log.Printf("[IP] Group %d Peer %d: error: %v", int(groupNumber), peerNumber, ipErr)
+		} else if ip != "" {
+			// log.Printf("[IP] Group %d Peer %d: ip=%q", int(groupNumber), peerNumber, ip)
+		}
+
 		members = append(members, map[string]interface{}{
 			"peerNumber": peerNumber,
 			"name":       name,
@@ -1703,7 +1718,7 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 			"publicKey":  pubKey,
 			"isSelf":     false,
 			"lastSeen":   nil,
-			"peerIp":     peerIp,
+			"peerIp":     ip,
 		})
 	}
 
