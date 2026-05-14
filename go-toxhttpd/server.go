@@ -18,10 +18,11 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"unsafe"
 	"time"
 
 	tox "github.com/TokTok/go-toxcore-c"
-	_ "github.com/envsh/toxera/toxpriv"
+	"github.com/envsh/toxera/toxpriv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -186,6 +187,7 @@ const ContactNotFound = uint32(0xFFFFFFFF)
 // Server holds the server state
 type Server struct {
 	tox                  *tox.Tox
+	toxp                 *toxpriv.Tox
 	db                   *sql.DB // SQLite connection for event copy only
 	eventQueue           *EventQueue
 	selfConnectionStatus string
@@ -226,6 +228,7 @@ func NewServer(udpEnabled bool) (*Server, error) {
 
 	server := &Server{
 		tox:                  t,
+		toxp:                toxpriv.NewTox(unsafe.Pointer(t)),
 		db:                   db,
 		eventQueue:           NewEventQueue(),
 		selfConnectionStatus: "offline",
