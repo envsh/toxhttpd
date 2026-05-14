@@ -1,11 +1,24 @@
 {
     "app_title": "Tox Chat",
     "no_contacts": "No contacts yet",
-    "chat_with_friend": "Chat with friend %1",
-    "group": "Group",
+    "chat_with_friend": "Chat with friend {0}",
+    "group": {
+        "invitation_received": "Group invitation received",
+        "invitation_from": "From friend {0}",
+        "invite_chat_id": "chat_id",
+        "accept": "Accept",
+        "reject": "Reject",
+        "password_optional": "Password (optional):",
+        "joined": "Joined group {0}",
+        "group.joined": "Joined group {0}",
+        "join_failed": "Failed to join group",
+        "rejected": "Group invitation rejected",
+        "invite_message": "Group invitation",
+        "ignore": "Ignore"
+    },
     "conference_item": "Conference",
     "friend": "Friend",
-    "conference_joined": "Joined conference %1",
+    "conference_joined": "Joined conference {0}",
     "conference_join_failed": "Failed to join conference",
     "tabs": {
         "all": "All",
@@ -34,16 +47,26 @@
         "type_message": "Type your message here..."
     },
     "modals": {
-        "edit_info_title": "Edit Personal Info",
-        "friend_info_title": "Friend Info",
         "labels": {
+            "type": "Type",
             "name": "Name",
             "status_message": "Status Message",
             "friend_id": "Friend ID",
             "status": "Status",
             "connection": "Connection",
-            "public_key": "Public Key"
-        }
+            "public_key": "Public Key",
+            "group_name": "Group Name:",
+            "creator_name": "Creator Name:",
+            "group_password": "Password (optional):",
+            "privacy_state": "Privacy State:"
+        },
+        "edit_info_title": "Edit Personal Info",
+        "friend_info_title": "Friend Info",
+        "conference_info_title": "Conference Info",
+        "group_info_title": "Group Info",
+        "create_group_title": "Create Group",
+        "confirm_group": "Confirm",
+        "cancel_group": "Cancel"
     },
     "statuses": {
         "offline": "Offline",
@@ -59,13 +82,13 @@
     "load_contacts_failed": "Failed to load contacts",
     "conference": {
         "invitation_received": "Conference invitation received",
-        "invitation_from": "From %1",
+        "invitation_from": "From {0}",
         "invite_message": "Conference invitation",
         "accept": "Accept",
         "reject": "Reject",
         "ignore": "Ignore"
     },
-    "friend_label": "Friend %1",
+    "friend_label": "Friend {0}",
     "select_chat_first": "Please select chat first",
     "send_failed": "Send failed",
     "add_friend_prompt": "Please enter valid public key (64 chars) or address (76 chars)",
@@ -89,32 +112,21 @@
         "leave_group": "Leave Group",
         "invite_to_conference": "Invite to Conference",
         "invite_to_group": "Invite to Group",
-        "rename_nick": "Rename Nick"
+        "rename_nick": "Rename Nick",
+        "view_members": "View Members"
     },
     "select_chat_object": "Select chat object",
     "please_enter_chat_id": "Please enter group chat_id",
     "theme_dark": "Dark Theme",
     "theme_light": "Light Theme",
     "confirm": "Confirm",
-    "confirm_send_file": "Confirm sending this file?\n%1",
-    "confirm_delete_friend": "Delete friend %1?",
-    "confirm_leave_conference": "Leave conference %1?",
+    "confirm_send_file": "Confirm sending this file?\n{0}",
+    "confirm_delete_friend": "Delete friend {0}?",
+    "confirm_leave_conference": "Leave conference {0}?",
     "invite_to_conference": "Invite to Conference",
     "invite_to_group": "Invite to Group",
     "select_conference": "Select Conference",
     "select_group": "Select Group",
-    "group": {
-        "invitation_received": "Group invitation received",
-        "invitation_from": "From friend %1",
-        "invite_chat_id": "chat_id",
-        "accept": "Accept",
-        "reject": "Reject",
-        "password_optional": "Password (optional):",
-        "joined": "Joined group %1",
-        "group.joined": "Joined group %1",
-        "join_failed": "Failed to join group",
-        "rejected": "Group invitation rejected"
-    },
     "friend_info_title": "Friend Info",
     "conference_info_title": "Conference Info",
     "conference_leave_success": "Left conference",
@@ -122,11 +134,6 @@
     "invite_failed": "Invite failed",
     "not_yet_implemented": "Not yet implemented",
     "no_conference": "No conferences available",
-    "modals": {
-        "labels": {
-            "type": "Type"
-        }
-    },
     "emoji": {
         "search_placeholder": "Search emoji...",
         "recently_used": "Recently Used",
@@ -154,6 +161,16 @@
         "enter_nick": "Enter nickname...",
         "confirm": "Confirm",
         "failed": "Rename failed",
-        "name_empty": "Name cannot be empty"
-    }
+        "name_empty": "Name cannot be empty",
+        "generate_first": "Please generate a random name first"
+    },
+    "cannot_be_empty": "cannot be empty",
+    "group_info_title": "Group Info",
+    "group_leave_success": "Left group",
+    "member_list": {
+        "title": "Member List"
+    },
+    "conference_leave_failed": "Leave failed",
+    "group_leave_failed": "Leave failed",
+    "confirm_leave_group": "Leave group {0}?"
 }

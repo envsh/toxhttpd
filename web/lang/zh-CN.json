@@ -2,7 +2,20 @@
     "app_title": "Tox Chat",
     "no_contacts": "暂无联系人",
     "chat_with_friend": "与好友 {0} 聊天",
-    "group": "群组",
+    "group": {
+        "invitation_received": "收到群组邀请",
+        "invitation_from": "来自好友 {0} 的群组邀请",
+        "invite_chat_id": "chat_id",
+        "accept": "接受",
+        "reject": "拒绝",
+        "password_optional": "密码（可选）：",
+        "joined": "已加入群组 {0}",
+        "group.joined": "已加入群组 {0}",
+        "join_failed": "加入群组失败",
+        "rejected": "已拒绝群组邀请",
+        "invite_message": "群组邀请",
+        "ignore": "忽略"
+    },
     "conference_item": "会议",
     "friend": "好友",
     "conference_joined": "已加入会议 {0}",
@@ -14,41 +27,46 @@
         "conferences": "会议"
     },
     "buttons": {
+        "switch_account": "切换账号",
         "edit_info": "编辑信息",
         "connect_network": "连接网络",
         "qrcode": "二维码",
-        "create_conference": "创建会议",
-        "create_group": "创建群组",
+        "create_conference": "+ 会议",
+        "create_group": "+ 群组",
         "send": "发送",
         "save": "保存",
         "cancel": "取消",
-        "close": "关闭"
+        "close": "关闭",
+        "copy": "复制",
+        "add": "添加",
+        "join_group": "加入"
     },
     "placeholders": {
-        "add_friend": "输入 Tox ID 添加好友"
+        "add_friend": "输入 Tox ID 添加好友",
+        "join_group": "群组chat_id",
+        "type_message": "输入消息..."
     },
-    "please_enter_chat_id": "请输入群组 chat_id",
     "modals": {
+        "labels": {
+            "type": "类型",
+            "name": "名称",
+            "status_message": "状态消息",
+            "friend_id": "好友 ID",
+            "status": "状态",
+            "connection": "连接",
+            "public_key": "公钥",
+            "group_name": "群组名称：",
+            "creator_name": "创建者昵称：",
+            "group_password": "密码（可选）：",
+            "privacy_state": "隐私状态："
+        },
         "edit_info_title": "编辑个人信息",
         "friend_info_title": "好友信息",
         "conference_info_title": "会议信息",
         "group_info_title": "群组信息",
         "create_group_title": "创建群组",
         "confirm_group": "确认",
-        "cancel_group": "取消",
-        "labels": {
-            "name": "名称",
-            "status_message": "状态消息",
-            "friend_id": "好友 ID",
-            "status": "状态",
-            "connection": "连接",
-            "type": "类型",
-            "public_key": "公钥",
-            "group_name": "群组名称：",
-            "creator_name": "创建者昵称：",
-            "group_password": "密码（可选）：",
-            "privacy_state": "隐私状态："
-        }
+        "cancel_group": "取消"
     },
     "statuses": {
         "offline": "离线",
@@ -89,43 +107,52 @@
     "connect_failed": "连接失败",
     "context_menu": {
         "view_info": "查看信息",
-        "view_members": "查看成员",
         "delete_friend": "删除好友",
         "leave_conference": "离开会议",
         "leave_group": "离开群组",
-        "rename_nick": "修改昵称",
         "invite_to_conference": "邀请进会议",
-        "invite_to_group": "邀请进群组"
+        "invite_to_group": "邀请进群组",
+        "view_members": "查看成员",
+        "rename_nick": "修改昵称"
+    },
+    "emoji": {
+        "search_placeholder": "搜索 emoji...",
+        "recently_used": "最近使用",
+        "smileys": "笑脸与表情",
+        "people": "人物与手势",
+        "nature": "动物与自然",
+        "objects": "食物与物品",
+        "symbols": "符号与旅行"
     },
     "member_list": {
         "title": "成员列表",
         "title.conference": "会议成员 - {0}",
         "title.group": "群组成员 - {0}"
     },
+    "select_chat_object": "选择聊天对象",
+    "please_enter_chat_id": "请输入群组chat_id",
+    "theme_dark": "深色主题",
+    "theme_light": "浅色主题",
+    "confirm": "确认",
+    "confirm_send_file": "确认发送该文件？\n{0}",
     "confirm_delete_friend": "确定删除好友 {0} 吗？",
     "confirm_leave_conference": "确定离开会议 {0} 吗？",
+    "invite_to_conference": "邀请进会议",
+    "invite_to_group": "邀请进群组",
+    "select_conference": "选择会议",
+    "select_group": "选择群组",
+    "friend_info_title": "好友信息",
+    "conference_info_title": "会议信息",
     "conference_leave_success": "已离开会议",
-    "conference_leave_failed": "离开失败",
     "invite_success": "邀请成功",
     "invite_failed": "邀请失败",
-    "select_conference": "选择会议",
-    "conference_info_title": "会议信息",
-    "group_info_title": "群组信息",
-    "select_chat_object": "选择聊天对象",
-    "cannot_be_empty": "不能为空",
-    "confirm_leave_group": "确定离开群组 {0} 吗？",
-    "group_leave_success": "已离开群组",
-    "group_leave_failed": "离开失败",
-    "group": {
-        "invitation_received": "收到群组邀请",
-        "invitation_from": "来自 {0}",
-        "invite_message": "群组邀请",
-        "accept": "同意",
-        "reject": "拒绝",
-        "ignore": "忽略",
-        "joined": "已加入群组 {0}",
-        "join_failed": "加入群组失败"
-    },
+    "not_yet_implemented": "尚未实现",
+    "no_conference": "没有可用的会议",
+    "style.fusion": "Qt Fusion",
+    "style.macos": "macOS",
+    "style.windows": "Windows 11",
+    "style.material": "Material You",
+    "style.github": "GitHub",
     "rename": {
         "title": "修改群组昵称",
         "current_nick": "当前昵称",
@@ -137,5 +164,11 @@
         "failed": "修改失败",
         "name_empty": "昵称不能为空",
         "generate_first": "请先生成随机昵称"
-    }
+    },
+    "cannot_be_empty": "不能为空",
+    "group_info_title": "群组信息",
+    "group_leave_success": "已离开群组",
+    "conference_leave_failed": "离开失败",
+    "group_leave_failed": "离开失败",
+    "confirm_leave_group": "确定离开群组 {0} 吗？"
 }

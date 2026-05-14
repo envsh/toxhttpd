@@ -22,11 +22,16 @@ Translator::Translator() : m_root(nullptr), m_currentLang("zh-CN") {
     // 2. 当前工作目录
     m_searchPaths.append("lang");
 
-    // 3. 可执行文件上级目录的 qltox/lang/（如 exe=build3/qltox → ../../qltox/lang/）
+    // 3. 可执行文件上级目录的 qltox/lang/
     if (lastSlash >= 0) {
-        int secondLastSlash = qLastIndexOf(appPath.left(lastSlash), "/");
-        if (secondLastSlash >= 0)
-            m_searchPaths.append(appPath.left(secondLastSlash + 1) + "qltox/lang");
+        int secondSlash = qLastIndexOf(appPath.left(lastSlash), "/");
+        if (secondSlash >= 0) {
+            m_searchPaths.append(appPath.left(secondSlash + 1) + "qltox/lang");
+            // 4. 项目根目录的 lang/（exe=build3/qltox → ../../lang/）
+            int thirdSlash = qLastIndexOf(appPath.left(secondSlash), "/");
+            if (thirdSlash >= 0)
+                m_searchPaths.append(appPath.left(thirdSlash + 1) + "lang");
+        }
     }
 
     loadLanguage("zh-CN");

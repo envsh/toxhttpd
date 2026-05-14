@@ -2,7 +2,20 @@
     "app_title": "Tox Chat",
     "no_contacts": "No contacts yet",
     "chat_with_friend": "Chat with friend {0}",
-    "group": "Group",
+    "group": {
+        "invitation_received": "Group invitation received",
+        "invitation_from": "From friend {0}",
+        "invite_chat_id": "chat_id",
+        "accept": "Accept",
+        "reject": "Reject",
+        "password_optional": "Password (optional):",
+        "joined": "Joined group {0}",
+        "group.joined": "Joined group {0}",
+        "join_failed": "Failed to join group",
+        "rejected": "Group invitation rejected",
+        "invite_message": "Group invitation",
+        "ignore": "Ignore"
+    },
     "conference_item": "Conference",
     "friend": "Friend",
     "conference_joined": "Joined conference {0}",
@@ -14,41 +27,46 @@
         "conferences": "Conferences"
     },
     "buttons": {
+        "switch_account": "Switch Account",
         "edit_info": "Edit Info",
         "connect_network": "Connect Network",
         "qrcode": "QR Code",
-        "create_conference": "Create Conference",
-        "create_group": "Create Group",
+        "create_conference": "+ Conference",
+        "create_group": "+ Group",
         "send": "Send",
         "save": "Save",
         "cancel": "Cancel",
-        "close": "Close"
+        "close": "Close",
+        "copy": "Copy",
+        "add": "Add",
+        "join_group": "Join"
     },
     "placeholders": {
-        "add_friend": "Enter Tox ID to add friend"
+        "add_friend": "Enter Tox ID to add friend",
+        "join_group": "Group chat_id",
+        "type_message": "Type your message here..."
     },
-    "please_enter_chat_id": "Please enter group chat_id",
     "modals": {
+        "labels": {
+            "type": "Type",
+            "name": "Name",
+            "status_message": "Status Message",
+            "friend_id": "Friend ID",
+            "status": "Status",
+            "connection": "Connection",
+            "public_key": "Public Key",
+            "group_name": "Group Name:",
+            "creator_name": "Creator Name:",
+            "group_password": "Password (optional):",
+            "privacy_state": "Privacy State:"
+        },
         "edit_info_title": "Edit Personal Info",
         "friend_info_title": "Friend Info",
         "conference_info_title": "Conference Info",
         "group_info_title": "Group Info",
         "create_group_title": "Create Group",
         "confirm_group": "Confirm",
-        "cancel_group": "Cancel",
-        "labels": {
-            "name": "Name",
-            "status_message": "Status Message",
-            "friend_id": "Friend ID",
-            "status": "Status",
-            "connection": "Connection",
-            "type": "Type",
-            "public_key": "Public Key",
-            "group_name": "Group Name:",
-            "creator_name": "Creator Name:",
-            "group_password": "Password (optional):",
-            "privacy_state": "Privacy State:"
-        }
+        "cancel_group": "Cancel"
     },
     "statuses": {
         "offline": "Offline",
@@ -89,42 +107,50 @@
     "connect_failed": "Connect failed",
     "context_menu": {
         "view_info": "View Info",
-        "view_members": "View Members",
         "delete_friend": "Delete Friend",
         "leave_conference": "Leave Conference",
         "leave_group": "Leave Group",
-        "rename_nick": "Rename Nick",
         "invite_to_conference": "Invite to Conference",
-        "invite_to_group": "Invite to Group"
+        "invite_to_group": "Invite to Group",
+        "rename_nick": "Rename Nick",
+        "view_members": "View Members"
     },
-    "member_list": {
-        "title": "Member List",
-        "title.conference": "Conference Members - {0}",
-        "title.group": "Group Members - {0}"
-    },
+    "select_chat_object": "Select chat object",
+    "please_enter_chat_id": "Please enter group chat_id",
+    "theme_dark": "Dark Theme",
+    "theme_light": "Light Theme",
+    "confirm": "Confirm",
+    "confirm_send_file": "Confirm sending this file?\n{0}",
     "confirm_delete_friend": "Delete friend {0}?",
     "confirm_leave_conference": "Leave conference {0}?",
+    "invite_to_conference": "Invite to Conference",
+    "invite_to_group": "Invite to Group",
+    "select_conference": "Select Conference",
+    "select_group": "Select Group",
+    "friend_info_title": "Friend Info",
+    "conference_info_title": "Conference Info",
     "conference_leave_success": "Left conference",
-    "conference_leave_failed": "Leave failed",
     "invite_success": "Invited successfully",
     "invite_failed": "Invite failed",
-    "select_conference": "Select Conference",
-    "conference_info_title": "Conference Info",
-    "group_info_title": "Group Info",
-    "select_chat_object": "Select chat object",
-    "cannot_be_empty": "cannot be empty",
-    "confirm_leave_group": "Leave group {0}?",
-    "group_leave_success": "Left group",
-    "group_leave_failed": "Leave failed",
-    "group": {
-        "invitation_received": "Group invitation received",
-        "invitation_from": "From {0}",
-        "invite_message": "Group invitation",
-        "accept": "Accept",
-        "reject": "Reject",
-        "ignore": "Ignore",
-        "joined": "Joined group {0}",
-        "join_failed": "Failed to join group"
+    "not_yet_implemented": "Not yet implemented",
+    "no_conference": "No conferences available",
+    "emoji": {
+        "search_placeholder": "Search emoji...",
+        "recently_used": "Recently Used",
+        "smileys": "Smileys & Emotions",
+        "people": "People & Gestures",
+        "nature": "Animals & Nature",
+        "objects": "Food & Objects",
+        "symbols": "Symbols & Travel"
+    },
+    "style.fusion": "Qt Fusion",
+    "style.macos": "macOS",
+    "style.windows": "Windows 11",
+    "style.material": "Material You",
+    "style.github": "GitHub",
+    "context": {
+        "copy_message": "Copy Message",
+        "select_all": "Select All"
     },
     "rename": {
         "title": "Change Group Nick",
@@ -137,5 +163,14 @@
         "failed": "Rename failed",
         "name_empty": "Name cannot be empty",
         "generate_first": "Please generate a random name first"
-    }
+    },
+    "cannot_be_empty": "cannot be empty",
+    "group_info_title": "Group Info",
+    "group_leave_success": "Left group",
+    "member_list": {
+        "title": "Member List"
+    },
+    "conference_leave_failed": "Leave failed",
+    "group_leave_failed": "Leave failed",
+    "confirm_leave_group": "Leave group {0}?"
 }
