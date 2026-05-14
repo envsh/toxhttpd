@@ -225,6 +225,29 @@ void MainWindow::customEvent(CustomEventBase* event) {
             return;
         }
         
+        // 成员列表加载完成
+        if (e->type == ApiLoadGroupMembers) {
+            MembersLoadedEvent* evt = static_cast<MembersLoadedEvent*>(event);
+            if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
+                qWarning("MembersLoaded: %d members for %s %d", (int)evt->members.size(), evt->contactType.c_str(), evt->contactId);
+                for (const auto& m : evt->members) {
+                    std::string key = evt->contactType + "_" + std::to_string(evt->contactId) + "_" + std::to_string(m.peerNumber);
+                    peerInfoMap[key] = m;
+                }
+            }
+            return;
+        }
+        
+        // 历史消息加载完成
+        if (e->type == ApiLoadMessageHistory) {
+            MessageHistoryLoadedEvent* evt = static_cast<MessageHistoryLoadedEvent*>(event);
+            if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
+                qWarning("MessageHistoryLoaded: %d messages for %s %d", (int)evt->messages.size(), evt->contactType.c_str(), evt->contactId);
+                renderHistoryMessages(evt->messages);
+            }
+            return;
+        }
+        
         // 翻译结果
         if (e->type == ApiTranslate) {
             TranslateResultEvent* tev = static_cast<TranslateResultEvent*>(event);
@@ -263,23 +286,20 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     chatWidget->setHeaderText(headerText);
     chatWidget->clearMessages();
     
-    // 加载历史消息
-    loadMessageHistory();
-
-    // 预加载成员列表到 peerInfoMap 缓存
-    ToxAPI api;
-    if (type == "conference") {
-        auto members = api.getConferenceMembers(id);
-        for (const auto& m : members) {
-            std::string key = "conference_" + std::to_string(id) + "_" + std::to_string(m.peerNumber);
-            peerInfoMap[key] = m;
-        }
-    } else if (type == "group") {
-        auto members = api.getGroupMembers(id);
-        for (const auto& m : members) {
-            std::string key = "group_" + std::to_string(id) + "_" + std::to_string(m.peerNumber);
-            peerInfoMap[key] = m;
-        }
+    // 异步加载历史消息
+    {
+        ApiRequestEvent* req = new ApiRequestEvent(ApiLoadMessageHistory);
+        req->id = id;
+        req->contactType = std::string(qToUtf8(type).data());
+        eventPoller->postApiRequest(req);
+    }
+    
+    // 异步预加载成员列表到 peerInfoMap 缓存
+    if (type == "group" || type == "conference") {
+        ApiRequestEvent* req = new ApiRequestEvent(ApiLoadGroupMembers);
+        req->id = id;
+        req->contactType = std::string(qToUtf8(type).data());
+        eventPoller->postApiRequest(req);
     }
 }
 
@@ -919,75 +939,73 @@ void MainWindow::onSwitchAccount() {
     QMessageBox::information(this, "", _("not_yet_implemented"));
 }
 
+void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messages) {
+    if (currentChatId == -1 || currentChatType.isEmpty()) return;
+    
+    for (const auto& msg : messages) {
+        bool isSelf = (msg.sender_pubkey == selfPubkey);
+        QString senderLabel;
+        QString avatarText;
+        QString ipAddress;
+        
+        if (isSelf) {
+            senderLabel = "Me";
+            avatarText = "M";
+        } else {
+            if (currentChatType == "friend") {
+                std::string key = "friend_" + std::to_string(currentChatId);
+                auto it = peerInfoMap.find(key);
+                if (it != peerInfoMap.end() && !it->second.name.empty()) {
+                    senderLabel = QString::fromUtf8(it->second.name.c_str());
+                    avatarText = qToUpper(senderLabel.left(1));
+                } else {
+                    senderLabel = QString();
+                    avatarText = "F";
+                }
+            } else {
+                std::string key = std::string(qToUtf8(currentChatType).data())
+                    + "_" + std::to_string(currentChatId)
+                    + "_" + std::to_string(msg.sender_number);
+                auto it = peerInfoMap.find(key);
+                if (it != peerInfoMap.end()) {
+                    if (!it->second.name.empty()) {
+                        senderLabel = QString::fromUtf8(it->second.name.c_str());
+                        avatarText = qToUpper(senderLabel.left(1));
+                    }
+                    ipAddress = QString::fromUtf8(it->second.peerIp.c_str());
+                } else {
+                    senderLabel = QString();
+                    avatarText = "P";
+                }
+            }
+        }
+        
+        QString timeStr = qFormatTime(QString::fromUtf8(msg.created_at.c_str()));
+        
+        chatWidget->appendMessage(
+            QString::fromUtf8(msg.message.c_str()),
+            isSelf ? "self" : "other",
+            senderLabel,
+            isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
+            timeStr,
+            avatarText,
+            "",
+            ipAddress
+        );
+    }
+}
+
 void MainWindow::loadMessageHistory() {
     if (currentChatId == -1 || currentChatType.isEmpty()) {
         qWarning("loadMessageHistory: no contact selected");
         return;
     }
     
-    ToxAPI api;  // 临时创建，或保存在成员变量中
-    std::vector<HistoryMessage> messages;
-    
-    if (api.getMessagesHistory(currentChatId, std::string(qToUtf8(currentChatType).data()), messages)) {
-        qWarning("loadMessageHistory: loaded %d messages", (int)messages.size());
-        
-        for (const auto& msg : messages) {
-            bool isSelf = (msg.sender_pubkey == selfPubkey);
-            QString senderLabel;
-            QString avatarText;
-            QString ipAddress;
-            
-            if (isSelf) {
-                senderLabel = "Me";
-                avatarText = "M";
-            } else {
-                if (currentChatType == "friend") {
-                    std::string key = "friend_" + std::to_string(currentChatId);
-                    auto it = peerInfoMap.find(key);
-                    if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                        senderLabel = QString::fromUtf8(it->second.name.c_str());
-                        avatarText = qToUpper(senderLabel.left(1));
-                    } else {
-                        senderLabel = QString();
-                        avatarText = "F";
-                    }
-                } else {
-                    std::string key = std::string(qToUtf8(currentChatType).data())
-                        + "_" + std::to_string(currentChatId)
-                        + "_" + std::to_string(msg.sender_number);
-                    auto it = peerInfoMap.find(key);
-                    if (it != peerInfoMap.end()) {
-                        if (!it->second.name.empty()) {
-                            senderLabel = QString::fromUtf8(it->second.name.c_str());
-                            avatarText = qToUpper(senderLabel.left(1));
-                        }
-                        ipAddress = QString::fromUtf8(it->second.peerIp.c_str());
-                    } else {
-                        senderLabel = QString();
-                        avatarText = "P";
-                    }
-                }
-            }
-            
-            QString timeStr = qFormatTime(QString::fromUtf8(msg.created_at.c_str()));
-            
-            chatWidget->appendMessage(
-                QString::fromUtf8(msg.message.c_str()),
-                isSelf ? "self" : "other",
-                senderLabel,
-                isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
-                timeStr,
-                avatarText,
-                "",
-                ipAddress
-            );
-        }
-        
-        // 滚动到底部（显示最新消息）
-        // chatWidget 内部已经处理了滚动
-    } else {
-        qWarning("loadMessageHistory: failed to load history");
-    }
+    // 异步加载：post 请求到 EventPoller 线程
+    ApiRequestEvent* req = new ApiRequestEvent(ApiLoadMessageHistory);
+    req->id = currentChatId;
+    req->contactType = std::string(qToUtf8(currentChatType).data());
+    eventPoller->postApiRequest(req);
 }
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {

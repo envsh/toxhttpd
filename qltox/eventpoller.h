@@ -19,11 +19,13 @@ enum ApiRequestType {
     ApiLoadAllData,        // 加载所有初始数据（self + contacts）
     ApiSendFriendMessage,
     ApiSendConferenceMessage,
-    ApiSendGroupMessage,    // 新增：发送群组消息
+    ApiSendGroupMessage,
     ApiJoinConference,
     ApiRejectConference,
     ApiAddFriend,
-    ApiTranslate
+    ApiTranslate,
+    ApiLoadMessageHistory,
+    ApiLoadGroupMembers
 };
 
 // 事件轮询结果
@@ -50,6 +52,7 @@ public:
     int id;
     std::string message;
     std::string publicKey;
+    std::string contactType;
 };
 
 // API结果事件基类
@@ -136,6 +139,24 @@ public:
     bool success = false;
     std::string translatedText;
     std::string errorMessage;
+};
+
+// 成员列表加载完成事件
+class MembersLoadedEvent : public ApiResultEvent {
+public:
+    MembersLoadedEvent() : ApiResultEvent(ApiLoadGroupMembers) {}
+    int contactId = 0;
+    std::string contactType;
+    std::vector<PeerInfo> members;
+};
+
+// 历史消息加载完成事件
+class MessageHistoryLoadedEvent : public ApiResultEvent {
+public:
+    MessageHistoryLoadedEvent() : ApiResultEvent(ApiLoadMessageHistory) {}
+    int contactId = 0;
+    std::string contactType;
+    std::vector<HistoryMessage> messages;
 };
 
 class EventPoller : public QThread {

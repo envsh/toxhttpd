@@ -36,6 +36,7 @@ public:
     void onSwitchAccount();
     void loadMessageHistory();
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
+    void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     
 private:
     std::string selfPubkey;  // 自己的公钥（地址前64字符）

@@ -206,6 +206,21 @@ void EventPoller::processApiRequest(ApiRequestEvent* req) {
             QApplication::postEvent(receiver, result);
             break;
         }
-        // ... 处理其他请求类型
+        case ApiLoadGroupMembers: {
+            MembersLoadedEvent* result = new MembersLoadedEvent();
+            result->contactId = req->id;
+            result->contactType = req->contactType;
+            result->members = api->getGroupMembers(req->id);
+            QApplication::postEvent(receiver, result);
+            break;
+        }
+        case ApiLoadMessageHistory: {
+            MessageHistoryLoadedEvent* result = new MessageHistoryLoadedEvent();
+            result->contactId = req->id;
+            result->contactType = req->contactType;
+            api->getMessagesHistory(req->id, req->contactType, result->messages);
+            QApplication::postEvent(receiver, result);
+            break;
+        }
     }
 }
