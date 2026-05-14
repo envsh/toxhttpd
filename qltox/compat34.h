@@ -20,6 +20,8 @@
 #include <qtextcodec.h>
 #include <qdir.h>
 #include <qthread.h>
+#include <qmutex.h>
+#include <qwaitcondition.h>
 #include <qevent.h>
 #include <qtooltip.h>
 #include <qcombobox.h>
@@ -51,6 +53,8 @@
 #include <QTextCodec>
 #include <QDir>
 #include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
 #include <QEvent>
 #include <QComboBox>
 #include <QCheckBox>

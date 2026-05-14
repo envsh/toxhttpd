@@ -179,6 +179,8 @@ private:
     ToxAPI* api;
     QObject* receiver;
     std::queue<ApiRequestEvent*> pendingRequests;
+    QMutex mutex;
+    QWaitCondition wakeCondition;
 };
 
 #endif // EVENTPOLLER_H

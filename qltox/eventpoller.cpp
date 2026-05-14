@@ -17,9 +17,15 @@ void EventPoller::run() {
     running = true;
     while (running) {
         // 处理待处理的API请求
-        while (!pendingRequests.empty()) {
+        while (true) {
+            mutex.lock();
+            if (pendingRequests.empty()) {
+                mutex.unlock();
+                break;
+            }
             ApiRequestEvent* req = pendingRequests.front();
             pendingRequests.pop();
+            mutex.unlock();
             processApiRequest(req);
             delete req;
         }
@@ -58,8 +64,12 @@ void EventPoller::run() {
                 }
             }
         } else if (!restartDetected) {
-            // 无事件且无重启：等待2秒后重试
-            QThread::sleep(2);
+            // 等待：有新请求入队时立即唤醒，否则最长等2秒
+            mutex.lock();
+            if (pendingRequests.empty()) {
+                wakeCondition.wait(&mutex, 2000);
+            }
+            mutex.unlock();
         }
     }
 }
@@ -74,7 +84,10 @@ void EventPoller::setLastEventId(uint64_t id) {
 }
 
 void EventPoller::postApiRequest(ApiRequestEvent* req) {
+    mutex.lock();
     pendingRequests.push(req);
+    mutex.unlock();
+    wakeCondition.wakeOne();
 }
 
 void EventPoller::processApiRequest(ApiRequestEvent* req) {
