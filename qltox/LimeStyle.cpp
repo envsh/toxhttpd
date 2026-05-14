@@ -1490,7 +1490,7 @@ QSize LimeStyle::sizeFromContents(ContentsType ct,
                      contentsSize.height() + 2*fw);
     case CT_PopupMenuItem: {
         int h = contentsSize.height() + 4;
-        return QSize(contentsSize.width(), h < 20 ? 20 : h);
+        return QSize(contentsSize.width() + 28, h < 20 ? 20 : h);
     }
     case CT_CustomBase:
     case CT_DockWindow:

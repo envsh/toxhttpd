@@ -352,7 +352,9 @@ bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         if (mouseEvent->button() == Qt::RightButton) {
             QListBox* lb = (QListBox*)listWidget;
-            int index = lb->index(lb->selectedItem());
+            QListBoxItem* item = lb->itemAt(mouseEvent->pos());
+            if (!item) return false;
+            int index = lb->index(item);
             // 查找对应的联系人
             int count = 0;
             for (uint i = 0; i < allContacts.count(); ++i) {
@@ -365,7 +367,7 @@ bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
                 if (count == index) {
                     contextItemId = c->id;
                     contextItemType = c->type;
-                    QPoint globalPos = ((QListBox*)listWidget)->mapToGlobal(mouseEvent->pos());
+                    QPoint globalPos = lb->viewport()->mapToGlobal(mouseEvent->pos());
                     showContextMenuAt(c->id, c->type, c->name, globalPos);
                     return true;
                 }
@@ -387,7 +389,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
     contextItemType = type;
     
 #ifdef QT3_BUILD
-    QPopupMenu menu(this);
+    QPopupMenu menu(0);
 #else
     QMenu menu(this);
 #endif
