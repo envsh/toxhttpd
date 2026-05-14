@@ -572,9 +572,16 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
 
         f.setPointSize(11);
         p.setFont(f);
-        p.setPen(currentPalette().textPrimary);
-        int nameW = fm.width(msg.sender) + fm.width("  ");
-        p.drawText(contentRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, msg.sender);
+        p.setPen(currentPalette().textMuted);
+        QString displayName;
+        if (!msg.senderName.isEmpty())
+            displayName = msg.senderName;
+        else if (msg.peerNumber >= 0)
+            displayName = QString("Peer %1").arg(msg.peerNumber);
+        else
+            displayName = "?";
+        int nameW = fm.width(displayName) + fm.width("  ");
+        p.drawText(contentRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
 
         f.setPointSize(10);
         p.setFont(f);
@@ -618,13 +625,20 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
 
         f.setPointSize(11);
         p.setFont(f);
-        p.setPen(currentPalette().textPrimary);
-        p.drawText(contentX, y + kPad, contentW, headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.sender);
+        p.setPen(currentPalette().textMuted);
+        QString displayName;
+        if (!msg.senderName.isEmpty())
+            displayName = msg.senderName;
+        else if (msg.peerNumber >= 0)
+            displayName = QString("Peer %1").arg(msg.peerNumber);
+        else
+            displayName = "?";
+        p.drawText(contentX, y + kPad, contentW, headerH, Qt::AlignLeft | Qt::AlignVCenter, displayName);
 
         f.setPointSize(10);
         p.setFont(f);
         p.setPen(currentPalette().textMuted);
-        int timeX = contentX + fm.width(msg.sender) + kPad;
+        int timeX = contentX + fm.width(displayName) + kPad;
         p.drawText(timeX, y + kPad, contentW - (timeX - contentX), headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.time);
 
         p.setFont(font());

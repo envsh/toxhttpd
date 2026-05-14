@@ -125,14 +125,17 @@ void ChatWidget::setHeaderText(const QString& text) {
 }
 
 void ChatWidget::appendMessage(const QString& message, const QString& type, 
-                              const QString& sender, const QString& time,
-                              const QString& avatarText) {
+                              const QString& senderName, int peerNumber,
+                              const QString& time, const QString& avatarText,
+                              const QString& avatarUrl) {
     ChatMessage msg;
     msg.messageText = message;
     msg.type = type;
-    msg.sender = sender.isEmpty() ? "Peer" : sender;
+    msg.senderName = senderName;
+    msg.peerNumber = peerNumber;
     msg.time = time;
     msg.avatarText = avatarText;
+    msg.avatarUrl = avatarUrl;
     messageArea->appendMessage(msg);
 }
 

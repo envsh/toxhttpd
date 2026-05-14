@@ -10,8 +10,10 @@
 struct ChatMessage {
     QString messageText;
     QString type;
-    QString sender;
+    QString senderName;
+    int     peerNumber;
     QString avatarText;
+    QString avatarUrl;
     QString time;
     int height;
 
@@ -22,7 +24,7 @@ struct ChatMessage {
     bool translationInProgress;
     QRect translateBtnRect;
 
-    ChatMessage() : height(0), showTranslation(false), translationInProgress(false) {}
+    ChatMessage() : height(0), peerNumber(-1), showTranslation(false), translationInProgress(false) {}
 };
 
 struct LinkSpan {

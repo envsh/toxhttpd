@@ -308,7 +308,7 @@ void MainWindow::onMessageSent(const QString& message) {
     eventPoller->postApiRequest(req);
     
     // 乐观更新：先显示在界面
-    chatWidget->appendMessage(message, "self", "Me", getCurrentTime());
+    chatWidget->appendMessage(message, "self", "Me", -1, getCurrentTime());
 }
 
 void MainWindow::handleEvents(const EventList& events) {
@@ -325,8 +325,8 @@ void MainWindow::handleEvents(const EventList& events) {
                     int friendId = friendIdItem->valueint;
                     QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
                     if (friendId == currentChatId && currentChatType == "friend") {
-                        chatWidget->appendMessage(message, "other", 
-                                         _("friend_label").arg(QString::number(friendId)), getCurrentTime());
+                        chatWidget->appendMessage(message, "other", QString(),
+                                         friendId, getCurrentTime());
                     }
                     playNotifySound();
                 }
@@ -391,14 +391,11 @@ void MainWindow::handleEvents(const EventList& events) {
                         // 查询缓存获取 peer 名字
                         std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
                         auto it = peerInfoMap.find(key);
-                        QString sender;
-                        if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                            sender = QString::fromUtf8(it->second.name.c_str());
-                        } else {
-                            sender = QString("Peer %1").arg(peerNumber);
-                        }
+                        QString senderName;
+                        if (it != peerInfoMap.end() && !it->second.name.empty())
+                            senderName = QString::fromUtf8(it->second.name.c_str());
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
-                                                    chatWidget->appendMessage(message, "other", sender, getCurrentTime());
+                        chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
                     playNotifySound();
                 } else {
@@ -449,15 +446,10 @@ void MainWindow::handleEvents(const EventList& events) {
                         // 查询缓存获取 peer 名字
                         std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
                         auto it = peerInfoMap.find(key);
-                        QString sender;
-                        if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                            sender = QString::fromUtf8(it->second.name.c_str());
-                        } else if (peerNumber >= 0) {
-                            sender = QString("Peer %1").arg(peerNumber);
-                        } else {
-                            sender = _("group_item");
-                        }
-                        chatWidget->appendMessage(message, "other", sender, getCurrentTime());
+                        QString senderName;
+                        if (it != peerInfoMap.end() && !it->second.name.empty())
+                            senderName = QString::fromUtf8(it->second.name.c_str());
+                        chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
                     playNotifySound();
                 }
@@ -942,21 +934,19 @@ void MainWindow::loadMessageHistory() {
             
             if (isSelf) {
                 senderLabel = "Me";
-                avatarText = "M";  // Me 的首字母
+                avatarText = "M";
             } else {
                 if (currentChatType == "friend") {
-                    // 好友消息：从 peerInfoMap 获取昵称
                     std::string key = "friend_" + std::to_string(currentChatId);
                     auto it = peerInfoMap.find(key);
                     if (it != peerInfoMap.end() && !it->second.name.empty()) {
                         senderLabel = QString::fromUtf8(it->second.name.c_str());
                         avatarText = qToUpper(senderLabel.left(1));
                     } else {
-                        senderLabel = QString("Friend %1").arg(currentChatId);
+                        senderLabel = QString();
                         avatarText = "F";
                     }
                 } else {
-                    // 群组/会议消息：从缓存获取 peer 名字
                     std::string key = std::string(qToUtf8(currentChatType).data())
                         + "_" + std::to_string(currentChatId)
                         + "_" + std::to_string(msg.sender_number);
@@ -965,21 +955,21 @@ void MainWindow::loadMessageHistory() {
                         senderLabel = QString::fromUtf8(it->second.name.c_str());
                         avatarText = qToUpper(senderLabel.left(1));
                     } else {
-                        senderLabel = QString("Peer %1").arg(msg.sender_number);
+                        senderLabel = QString();
                         avatarText = "P";
                     }
                 }
             }
             
-            // 使用兼容函数格式化时间：从 "2026-05-07 12:00:00" 转换为 "12:00"
             QString timeStr = qFormatTime(QString::fromUtf8(msg.created_at.c_str()));
             
             chatWidget->appendMessage(
                 QString::fromUtf8(msg.message.c_str()),
                 isSelf ? "self" : "other",
                 senderLabel,
+                isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
                 timeStr,
-                avatarText  // 新增：头像文本
+                avatarText
             );
         }
         

@@ -16,8 +16,9 @@ public:
     
     void setHeaderText(const QString& text);
     void appendMessage(const QString& message, const QString& type, 
-                    const QString& sender = QString::null, const QString& time = "",
-                    const QString& avatarText = "");
+                    const QString& senderName = QString(), int peerNumber = -1,
+                    const QString& time = "", const QString& avatarText = "",
+                    const QString& avatarUrl = "");
     void clearMessages();
     void retranslateUi();
     
