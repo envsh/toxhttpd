@@ -751,6 +751,13 @@ func statusToStr(s int) string {
 	}
 }
 
+func groupStatusToStr(s int) string {
+	if s == 1 {
+		return "online"
+	}
+	return "none"
+}
+
 func roleToStr(role int) string {
 	switch role {
 	case 0:
@@ -1737,7 +1744,7 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 			"name":       name,
 			"iconUrl":    "",
 			"status":     connStatus,
-			"statusStr":  statusToStr(connStatus),
+			"statusStr":  groupStatusToStr(connStatus),
 			"statusText": "",
 			"role":       int(role),
 			"roleStr":    roleToStr(int(role)),
