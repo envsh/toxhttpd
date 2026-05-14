@@ -659,17 +659,20 @@ function loadMessageHistory() {
                 const selfPubkey = selfAddress ? selfAddress.toUpperCase().substring(0, 64) : '';
                 const isSelf = msg.sender_pubkey.toUpperCase() === selfPubkey;
 
-                let displayName = 'Me';
+                let senderName = 'Me';
+                let peerNumber = -1;
                 let avatarText = 'M';
                 if (!isSelf) {
                     if (contactType === 'friend') {
                         var fe = peerInfoMap["friend_" + contactId];
-                        displayName = (fe && fe.name) || `Friend ${contactId}`;
-                        avatarText = displayName.charAt(0).toUpperCase();
+                        senderName = (fe && fe.name) || '';
+                        peerNumber = contactId;
+                        avatarText = senderName ? senderName.charAt(0).toUpperCase() : 'F';
                     } else {
                         const peerKey = `${contactType}_${contactId}_${msg.sender_number}`;
-                        displayName = (peerInfoMap[peerKey] && peerInfoMap[peerKey].name) || `Peer ${msg.sender_number}`;
-                        avatarText = displayName.charAt(0).toUpperCase();
+                        senderName = (peerInfoMap[peerKey] && peerInfoMap[peerKey].name) || '';
+                        peerNumber = msg.sender_number;
+                        avatarText = senderName ? senderName.charAt(0).toUpperCase() : 'P';
                     }
                 }
 
@@ -681,9 +684,10 @@ function loadMessageHistory() {
                 batch.push({
                     text: msg.message,
                     type: isSelf ? 'self' : 'other',
-                    sender: displayName,
-                    avatarText: avatarText,
-                    timestamp: timestamp
+                    senderName,
+                    peerNumber,
+                    avatarText,
+                    timestamp
                 });
             });
 
@@ -750,9 +754,9 @@ function longPollEvents() {
                         if (data.friend_id == currentChatId && currentChatType === 'friend') {
                             // 对方消息：获取昵称首字母作为头像文本
                             var fe = peerInfoMap["friend_" + data.friend_id];
-                            const friendName = (fe && fe.name) || '?';
-                            const avatarText = friendName.charAt(0).toUpperCase();
-                            appendMessage(data.message, 'other', friendName, avatarText);
+                            const senderName = (fe && fe.name) || '';
+                            const avatarText = (senderName || String(data.friend_id)).charAt(0).toUpperCase();
+                            appendMessage(data.message, 'other', senderName, data.friend_id, avatarText);
                         }
                     } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
                         // Friend info updated, refresh contacts with current filter
@@ -771,9 +775,10 @@ function longPollEvents() {
                         }
                         if (data.conference_number == currentChatId && currentChatType === 'conference') {
                             const key = `conference_${data.conference_number}_${data.peer_number}`;
-                            const peerName = (peerInfoMap[key] && peerInfoMap[key].name) || 'Peer ' + data.peer_number;
-                            const avatarText = peerName.charAt(0).toUpperCase();
-                            appendMessage(data.message, 'other', peerName, avatarText);
+                            const cached = peerInfoMap[key];
+                            const senderName = (cached && cached.name) || '';
+                            const avatarText = (senderName || 'P').charAt(0).toUpperCase();
+                            appendMessage(data.message, 'other', senderName, data.peer_number, avatarText);
                         }
                     } else if (event.event_type === 'group_message') {
                         const data = JSON.parse(event.data);
@@ -784,9 +789,10 @@ function longPollEvents() {
                         }
                         if (data.group_number == currentChatId && currentChatType === 'group') {
                             const key = `group_${data.group_number}_${data.peer_number}`;
-                            const peerName = (peerInfoMap[key] && peerInfoMap[key].name) || 'Peer ' + data.peer_number;
-                            const avatarText = peerName.charAt(0).toUpperCase();
-                            appendMessage(data.message, 'other', peerName, avatarText);
+                            const cached = peerInfoMap[key];
+                            const senderName = (cached && cached.name) || '';
+                            const avatarText = (senderName || 'P').charAt(0).toUpperCase();
+                            appendMessage(data.message, 'other', senderName, data.peer_number, avatarText);
                         }
                     } else if (event.event_type === 'conference_peer_name') {
                         const data = JSON.parse(event.data);
@@ -919,7 +925,14 @@ class VirtualScroller {
         el.style.display = '';
 
         el._ap.textContent = (msg.avatarText || '').toUpperCase();
-        el._ss.textContent = msg.sender || '';
+        let displayText;
+        if (msg.senderName)
+            displayText = msg.senderName;
+        else if (msg.peerNumber >= 0)
+            displayText = 'Peer ' + msg.peerNumber;
+        else
+            displayText = '?';
+        el._ss.textContent = displayText;
         el._ts.textContent = msg.timestamp;
 
         // Render bubble content: text + translate button
@@ -1163,10 +1176,11 @@ const messageArea = document.getElementById('messageArea');
 const vsc = new VirtualScroller(messageArea);
 
 // Append message to chat area (VirtualScroller)
-function appendMessage(text, type, sender, avatarText = "") {
+function appendMessage(text, type, senderName = "", peerNumber = -1, avatarText = "", timestamp = "") {
     const now = new Date();
-    const timestamp = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    vsc.append({ text, type, sender, avatarText, timestamp });
+    if (!timestamp)
+        timestamp = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    vsc.append({ text, type, senderName, peerNumber, avatarText, timestamp });
     vsc.scrollToBottom();
 }
 
@@ -1356,7 +1370,7 @@ function sendMessage() {
                 return r.json().then(err => { throw err; });
             }
             // 自己消息：传递 Me 和 M 作为头像文本
-            appendMessage(msg, 'self', 'Me', 'M');
+            appendMessage(msg, 'self', 'Me', -1, 'M');
             input.value = '';
             autoResizeTextarea();
         }).catch(err => {

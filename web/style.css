@@ -700,6 +700,7 @@ select option {
 .message-sender {
     font-weight: 500;
     margin: 0 8px;
+    opacity: 0.7;
 }
 
 /* 消息时间 */
