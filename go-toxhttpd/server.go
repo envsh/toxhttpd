@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,6 +26,8 @@ import (
 	"github.com/envsh/toxera/toxpriv"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var webRoot string
 
 // BootstrapNode represents a Tox bootstrap node
 type BootstrapNode struct {
@@ -1436,13 +1439,28 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func detectWebRoot() (string, error) {
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		if fi, err := os.Stat(filepath.Join(exeDir, "web")); err == nil && fi.IsDir() {
+			return exeDir, nil
+		}
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		if fi, err := os.Stat(filepath.Join(cwd, "web")); err == nil && fi.IsDir() {
+			return cwd, nil
+		}
+	}
+	return "", fmt.Errorf("web/ directory not found: checked exe dir and current dir")
+}
+
 func (s *Server) handleWeb(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	if path == "/" {
 		path = "/web/index.html"
 	}
 
-	absPath := "/home/gzleo/aprog/toxhttpd" + path
+	absPath := filepath.Join(webRoot, path)
 	http.ServeFile(w, r, absPath)
 }
 
@@ -1497,6 +1515,12 @@ func main() {
 
 	// Set log level based on -debug flag
 	setLogLevel(*debugLevel)
+
+	var err error
+	webRoot, err = detectWebRoot()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	server, err := NewServer(*udpEnabled)
 	if err != nil {

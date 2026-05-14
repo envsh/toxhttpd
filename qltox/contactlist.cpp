@@ -89,6 +89,9 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
 }
 
 void ContactListWidget::setContacts(const ContactList& contacts) {
+    for (uint i = 0; i < allContacts.count(); ++i)
+        delete allContacts.at(i);
+    allContacts.clear();
     allContacts = contacts;
     updateView_v3();
 #ifndef QT3_BUILD
