@@ -1761,6 +1761,7 @@ function showConferenceInfo(conferenceId) {
     const conf = contacts.conferences ? contacts.conferences.find(c => c.conferenceNumber == conferenceId) : null;
     document.getElementById('infoConferenceId').textContent = conferenceId;
     document.getElementById('infoConferenceType').textContent = 'Tox Conference';
+    document.getElementById('infoConferenceTopic').textContent = conf ? (conf.statusText || t('no_status')) : 'N/A';
     document.getElementById('infoConferenceConn').textContent = conf ? 
         (conf.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('conferenceInfoModal').classList.remove('hidden');
@@ -1799,6 +1800,7 @@ function showGroupInfo(groupId) {
     const group = contacts.groups ? contacts.groups.find(g => g.groupNumber == groupId) : null;
     document.getElementById('infoGroupId').textContent = groupId;
     document.getElementById('infoGroupName').textContent = group ? (group.groupName || 'N/A') : 'N/A';
+    document.getElementById('infoGroupTopic').textContent = group ? (group.statusText || t('no_status')) : 'N/A';
     document.getElementById('infoGroupConn').textContent = group ? 
         (group.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('groupInfoModal').classList.remove('hidden');
