@@ -55,6 +55,7 @@
             "status": "Status",
             "connection": "Connection",
             "public_key": "Public Key",
+            "ip": "IP",
             "group_name": "Group Name:",
             "creator_name": "Creator Name:",
             "group_password": "Password (optional):",

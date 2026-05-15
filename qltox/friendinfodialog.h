@@ -2,6 +2,7 @@
 #define FRIENDINFODIALOG_H
 
 #include "compat34.h"
+#include "restapi.h"
 #include <qstring.h>
 
 class FriendInfoDialog : public QDialog {
@@ -14,6 +15,7 @@ public:
                  const QString& connection = QString(),
                  bool isConnected = false,
                  const QString& publicKey = QString());
+    void setInfo(const FriendInfo& info);
     void setTitle(const QString& title);
 
 private slots:
@@ -28,6 +30,7 @@ private:
     QLabel* connLabel;
     QLabel* connectedLabel;
     QLabel* pkLabel;
+    QLabel* ipLabel;
 };
 
 #endif // FRIENDINFODIALOG_H

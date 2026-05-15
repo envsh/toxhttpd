@@ -13,6 +13,7 @@ struct FriendInfo {
     std::string statusText;
     std::string iconUrl;
     std::string publicKey;
+    std::string peerIp;
 };
 
 struct GroupInfo {

@@ -558,11 +558,7 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
     if (type == "friend") {
         FriendInfo info;
         if (ToxAPI::getFriendInfo(id, info)) {
-            dialog.setInfo(id, QString::fromUtf8(info.name.c_str()), type,
-                          QString::fromUtf8(info.statusText.c_str()),
-                          QString::fromUtf8(info.statusStr.c_str()),
-                          false,
-                          QString::fromUtf8(info.publicKey.c_str()));
+            dialog.setInfo(info);
         } else {
             dialog.setInfo(id, _("no_name"), type);
         }

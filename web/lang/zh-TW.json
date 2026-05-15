@@ -55,6 +55,7 @@
             "status": "狀態",
             "connection": "連線",
             "public_key": "公鑰",
+            "ip": "IP 位址",
             "group_name": "群組名稱：",
             "creator_name": "建立者暱稱：",
             "group_password": "密碼（選填）：",

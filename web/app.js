@@ -1722,6 +1722,7 @@ function showFriendInfo(friendId) {
           document.getElementById('infoFriendStatus').textContent = f.statusText || t('unknown');
           document.getElementById('infoFriendConn').textContent = f.statusStr || t('unknown');
           document.getElementById('infoFriendPk').textContent = f.publicKey || t('unknown');
+          document.getElementById('infoFriendIp').textContent = f.peerIp || '';
           
           document.getElementById('friendInfoModal').classList.remove('hidden');
       });

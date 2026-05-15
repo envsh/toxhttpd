@@ -55,6 +55,7 @@
             "status": "状态",
             "connection": "连接",
             "public_key": "公钥",
+            "ip": "IP 地址",
             "group_name": "群组名称：",
             "creator_name": "创建者昵称：",
             "group_password": "密码（可选）：",

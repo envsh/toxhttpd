@@ -70,6 +70,15 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     connectedLayout->addWidget(connectedLabel, 1);
     mainLayout->addLayout(connectedLayout);
     
+    // IP
+    QBoxLayout* ipLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    QLabel* ipTitle = new QLabel(_("modals.labels.ip"), this);
+    ipTitle->setFixedWidth(80);
+    ipLayout->addWidget(ipTitle);
+    ipLabel = new QLabel(this);
+    ipLayout->addWidget(ipLabel, 1);
+    mainLayout->addLayout(ipLayout);
+
     // 公钥
     QBoxLayout* pkLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     QLabel* pkTitle = new QLabel(_("modals.labels.public_key"), this);
@@ -113,6 +122,15 @@ void FriendInfoDialog::setInfo(int id, const QString& name, const QString& type,
     }
     
     pkLabel->setText(publicKey.isEmpty() ? _("no_status") : publicKey);
+}
+
+void FriendInfoDialog::setInfo(const FriendInfo& info) {
+    setInfo(info.id, QString::fromUtf8(info.name.c_str()), "friend",
+            QString::fromUtf8(info.statusText.c_str()),
+            QString::fromUtf8(info.statusStr.c_str()),
+            false,
+            QString::fromUtf8(info.publicKey.c_str()));
+    ipLabel->setText(info.peerIp.empty() ? "-" : QString::fromUtf8(info.peerIp.c_str()));
 }
 
 void FriendInfoDialog::setTitle(const QString& title) {

@@ -841,6 +841,11 @@ func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 		entry["publicKey"] = pk
 		entry["lastSeen"] = lastSeen
 
+		ip, ipErr := s.toxp.FriendGetConnectionIP(fid)
+		if ipErr == nil {
+			entry["peerIp"] = ip
+		}
+
 		friends = append(friends, entry)
 	}
 
