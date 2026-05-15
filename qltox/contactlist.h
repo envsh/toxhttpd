@@ -31,6 +31,8 @@ public:
     
     void setContacts(const ContactList& contacts);
     void clear();
+    void updateFriendName(int friendId, const QString& newName);
+    void updateFriendStatus(int friendId, const QString& newStatus);
     void retranslateUi();
     
     signals:

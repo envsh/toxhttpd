@@ -778,9 +778,23 @@ function longPollEvents() {
                             const avatarText = (senderName || String(data.friend_id)).charAt(0).toUpperCase();
                             appendMessage(data.message, 'other', senderName, data.friend_id, avatarText);
                         }
-                    } else if (event.event_type === 'friend_name' || event.event_type === 'friend_status') {
-                        // Friend info updated, refresh contacts with current filter
-                        loadContacts(currentFilter);
+                    } else if (event.event_type === 'friend_name') {
+                        const d = JSON.parse(event.data);
+                        const k = "friend_" + d.friend_id;
+                        if (peerInfoMap[k]) peerInfoMap[k].name = d.name;
+                        const f = contacts.friends.find(f => f.friendId == d.friend_id);
+                        if (f) f.name = d.name;
+                        renderContactList(currentFilter);
+                    } else if (event.event_type === 'friend_status') {
+                        const d = JSON.parse(event.data);
+                        const k = "friend_" + d.friend_id;
+                        if (peerInfoMap[k]) {
+                            peerInfoMap[k].status = d.status;
+                            peerInfoMap[k].statusStr = d.status === 0 ? 'none' : d.status === 1 ? 'tcp' : 'udp';
+                        }
+                        const f = contacts.friends.find(f => f.friendId == d.friend_id);
+                        if (f) f.status = d.status;
+                        renderContactList(currentFilter);
                     } else if (event.event_type === 'self_connection_status') {
                         loadSelfInfo();
                     } else if (event.event_type === 'conference_invite') {

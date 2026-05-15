@@ -108,6 +108,34 @@ void ContactListWidget::clear() {
 #endif
 }
 
+void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == friendId && c->type == "friend") {
+            c->name = newName;
+            break;
+        }
+    }
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
+void ContactListWidget::updateFriendStatus(int friendId, const QString& newStatus) {
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == friendId && c->type == "friend") {
+            c->status = newStatus;
+            break;
+        }
+    }
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
 void ContactListWidget::onTabClicked() {
     QPushButton* senderBtn = (QPushButton*) sender();
     if (!senderBtn) return;

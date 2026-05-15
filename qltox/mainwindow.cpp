@@ -489,8 +489,36 @@ void MainWindow::handleEvents(const EventList& events) {
                 }
                 cJSON_Delete(root);
             }
-        } else if (e.type == "friend_name" || e.type == "friend_status") {
-            ToxAPI::loadAllData();
+        } else if (e.type == "friend_name") {
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* fid = cJSON_GetObjectItem(root, "friend_id");
+                cJSON* nameItem = cJSON_GetObjectItem(root, "name");
+                if (fid && nameItem && cJSON_IsString(nameItem)) {
+                    int friendId = fid->valueint;
+                    std::string newName = cJSON_GetStringValue(nameItem);
+                    std::string key = "friend_" + std::to_string(friendId);
+                    peerInfoMap[key].name = newName;
+                    contactListWidget->updateFriendName(friendId, QString::fromUtf8(newName.c_str()));
+                }
+                cJSON_Delete(root);
+            }
+        } else if (e.type == "friend_status") {
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* fid = cJSON_GetObjectItem(root, "friend_id");
+                cJSON* statusItem = cJSON_GetObjectItem(root, "status");
+                if (fid && statusItem) {
+                    int friendId = fid->valueint;
+                    int s = statusItem->valueint;
+                    std::string statusStr = (s == 1) ? "tcp" : (s == 2) ? "udp" : "none";
+                    std::string key = "friend_" + std::to_string(friendId);
+                    peerInfoMap[key].status = s;
+                    peerInfoMap[key].statusStr = statusStr;
+                    contactListWidget->updateFriendStatus(friendId, QString::fromUtf8(statusStr.c_str()));
+                }
+                cJSON_Delete(root);
+            }
         }
     }
 }
