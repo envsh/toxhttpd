@@ -1721,6 +1721,7 @@ function showFriendInfo(friendId) {
           document.getElementById('infoFriendId').textContent = f.friendId;
           document.getElementById('infoFriendStatus').textContent = f.statusText || t('unknown');
           document.getElementById('infoFriendConn').textContent = f.statusStr || t('unknown');
+          document.getElementById('infoFriendLastSeen').textContent = f.lastSeen ? new Date(f.lastSeen * 1000).toLocaleString() : t('never_online');
           document.getElementById('infoFriendPk').textContent = f.publicKey || t('unknown');
           document.getElementById('infoFriendIp').textContent = f.peerIp || '';
           
@@ -1762,6 +1763,7 @@ function showConferenceInfo(conferenceId) {
     document.getElementById('infoConferenceId').textContent = conferenceId;
     document.getElementById('infoConferenceType').textContent = 'Tox Conference';
     document.getElementById('infoConferenceTopic').textContent = conf ? (conf.statusText || t('no_status')) : 'N/A';
+    document.getElementById('infoConferenceMembers').textContent = conf ? (conf.memberCount || 0) : 'N/A';
     document.getElementById('infoConferenceConn').textContent = conf ? 
         (conf.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('conferenceInfoModal').classList.remove('hidden');
@@ -1801,6 +1803,7 @@ function showGroupInfo(groupId) {
     document.getElementById('infoGroupId').textContent = groupId;
     document.getElementById('infoGroupName').textContent = group ? (group.groupName || 'N/A') : 'N/A';
     document.getElementById('infoGroupTopic').textContent = group ? (group.statusText || t('no_status')) : 'N/A';
+    document.getElementById('infoGroupMembers').textContent = group ? (group.memberCount || 0) : 'N/A';
     document.getElementById('infoGroupConn').textContent = group ? 
         (group.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('groupInfoModal').classList.remove('hidden');

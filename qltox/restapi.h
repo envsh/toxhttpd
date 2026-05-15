@@ -14,6 +14,7 @@ struct FriendInfo {
     std::string iconUrl;
     std::string publicKey;
     std::string peerIp;
+    uint64_t lastSeen = 0;
 };
 
 struct GroupInfo {
@@ -22,6 +23,7 @@ struct GroupInfo {
     std::string chatId;
     bool isConnected = false;
     std::string statusText;
+    int memberCount = 0;
 };
 
 struct ConferenceInfo {
@@ -30,6 +32,7 @@ struct ConferenceInfo {
     std::string chatId;
     bool isConnected = false;
     std::string statusText;
+    int memberCount = 0;
 };
 
 class ToxAPI {

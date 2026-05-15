@@ -335,6 +335,8 @@ bool ToxAPI::getFriendInfo(int id, FriendInfo& info) {
     info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
     info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
     info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
+    cJSON* ls = cJSON_GetObjectItem(item, "lastSeen");
+    if (ls) info.lastSeen = (uint64_t)ls->valuedouble;
     cJSON_Delete(root);
     return true;
 }
@@ -360,6 +362,8 @@ std::vector<GroupInfo> ToxAPI::getGroupsSync() {
             v = cJSON_GetObjectItem(item, "isConnected");
             g.isConnected = v ? (v->valueint == 1) : false;
             g.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+            cJSON* mc = cJSON_GetObjectItem(item, "memberCount");
+            if (mc) g.memberCount = mc->valueint;
             groups.push_back(g);
         }
     }
@@ -388,6 +392,8 @@ std::vector<ConferenceInfo> ToxAPI::getConferencesSync() {
             v = cJSON_GetObjectItem(item, "isConnected");
             c.isConnected = v ? (v->valueint == 1) : false;
             c.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+            cJSON* mc = cJSON_GetObjectItem(item, "memberCount");
+            if (mc) c.memberCount = mc->valueint;
             conferences.push_back(c);
         }
     }

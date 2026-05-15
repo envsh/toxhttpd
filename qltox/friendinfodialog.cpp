@@ -79,6 +79,24 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     ipLayout->addWidget(ipLabel, 1);
     mainLayout->addLayout(ipLayout);
 
+    // 最后上线
+    QBoxLayout* lastSeenLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    QLabel* lastSeenTitle = new QLabel(_("modals.labels.last_seen"), this);
+    lastSeenTitle->setFixedWidth(80);
+    lastSeenLayout->addWidget(lastSeenTitle);
+    lastSeenLabel = new QLabel(this);
+    lastSeenLayout->addWidget(lastSeenLabel, 1);
+    mainLayout->addLayout(lastSeenLayout);
+
+    // 成员数
+    QBoxLayout* peerCountLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    QLabel* peerCountTitle = new QLabel(_("modals.labels.member_count"), this);
+    peerCountTitle->setFixedWidth(80);
+    peerCountLayout->addWidget(peerCountTitle);
+    peerCountLabel = new QLabel(this);
+    peerCountLayout->addWidget(peerCountLabel, 1);
+    mainLayout->addLayout(peerCountLayout);
+
     // 公钥
     QBoxLayout* pkLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     QLabel* pkTitle = new QLabel(_("modals.labels.public_key"), this);
@@ -131,6 +149,19 @@ void FriendInfoDialog::setInfo(const FriendInfo& info) {
             false,
             qFromUtf8(info.publicKey.c_str()));
     ipLabel->setText(info.peerIp.empty() ? "-" : qFromUtf8(info.peerIp.c_str()));
+    if (info.lastSeen > 0) {
+        setLastSeen(qFmtTime((uint)info.lastSeen));
+    } else {
+        setLastSeen(_("never_online"));
+    }
+}
+
+void FriendInfoDialog::setLastSeen(const QString& text) {
+    lastSeenLabel->setText(text.isEmpty() ? _("no_status") : text);
+}
+
+void FriendInfoDialog::setPeerCount(int count) {
+    peerCountLabel->setText(count > 0 ? QString::number(count) : "-");
 }
 
 void FriendInfoDialog::setTitle(const QString& title) {

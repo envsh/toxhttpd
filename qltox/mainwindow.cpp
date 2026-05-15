@@ -568,32 +568,38 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         bool isConnected = false;
         QString chatId = "";
         QString statusText = "";
+        int memberCount = 0;
         for (size_t i = 0; i < conferences.size(); ++i) {
             if (conferences[i].conferenceNumber == (uint32_t)id) {
                 isConnected = conferences[i].isConnected;
                 chatId = qFromUtf8(conferences[i].chatId.c_str());
                 statusText = qFromUtf8(conferences[i].statusText.c_str());
+                memberCount = conferences[i].memberCount;
                 break;
             }
         }
         dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type,
                        statusText, "", isConnected, chatId);
+        dialog.setPeerCount(memberCount);
     } else if (type == "group") {
         dialog.setTitle(_("modals.group_info_title"));
         std::vector<GroupInfo> groups = ToxAPI::getGroupsSync();
         bool isConnected = false;
         QString chatId = "";
         QString statusText = "";
+        int memberCount = 0;
         for (size_t i = 0; i < groups.size(); ++i) {
             if (groups[i].groupNumber == (uint32_t)id) {
                 isConnected = groups[i].isConnected;
                 chatId = qFromUtf8(groups[i].chatId.c_str());
                 statusText = qFromUtf8(groups[i].statusText.c_str());
+                memberCount = groups[i].memberCount;
                 break;
             }
         }
         dialog.setInfo(id, _("group_item") + " " + QString::number(id), type,
                        statusText, "", isConnected, chatId);
+        dialog.setPeerCount(memberCount);
     }
     
     dialog.exec();

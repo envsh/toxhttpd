@@ -983,6 +983,7 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 			if topic, err := s.tox.GroupGetTopic(gn); err == nil {
 				group["statusText"] = topic
 			}
+			group["memberCount"] = s.groupPeerCount(gn)
 			groups = append(groups, group)
 		}
 		resp := map[string]interface{}{
@@ -1068,6 +1069,7 @@ func (s *Server) handleConferences(w http.ResponseWriter, r *http.Request) {
 				conf["isConnected"] = connected
 			}
 			s.mu.RUnlock()
+			conf["memberCount"] = int(s.tox.ConferencePeerCount(confID))
 			conferences = append(conferences, conf)
 		}
 		resp := map[string]interface{}{
@@ -1882,6 +1884,16 @@ func (s *Server) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) groupPeerCount(gn tox.GroupNumber) int {
+	for peerNum := 0; peerNum < 256; peerNum++ {
+		_, err := s.tox.GroupPeerGetName(gn, tox.GroupPeerNumber(peerNum))
+		if err != nil {
+			return peerNum
+		}
+	}
+	return 256
 }
 
 func (s *Server) handleRandomName(w http.ResponseWriter, r *http.Request) {

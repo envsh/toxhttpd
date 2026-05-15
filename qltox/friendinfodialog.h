@@ -17,6 +17,8 @@ public:
                  const QString& publicKey = QString());
     void setInfo(const FriendInfo& info);
     void setTitle(const QString& title);
+    void setLastSeen(const QString& text);
+    void setPeerCount(int count);
 
 private slots:
     void onClose();
@@ -31,6 +33,8 @@ private:
     QLabel* connectedLabel;
     QLabel* pkLabel;
     QLabel* ipLabel;
+    QLabel* lastSeenLabel;
+    QLabel* peerCountLabel;
 };
 
 #endif // FRIENDINFODIALOG_H

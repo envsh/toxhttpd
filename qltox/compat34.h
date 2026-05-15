@@ -263,6 +263,17 @@ inline QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int
 QString qFormatTime(const QString& createdAt);
 QString qFormatISO8601(const QString& iso8601Str);
 
+// Unix 时间戳格式化（跨 Qt3/Qt4）
+inline QString qFmtTime(uint timestamp) {
+#ifdef QT3_BUILD
+    QDateTime dt;
+    dt.setTime_t(timestamp);
+    return dt.toString("yyyy-MM-dd hh:mm:ss");
+#else
+    return QDateTime::fromTime_t(timestamp).toString("yyyy-MM-dd hh:mm:ss");
+#endif
+}
+
 // QPtrList 兼容 (Qt3 原生，Qt4 用 QList<T*> 模拟)
 #ifndef QT3_BUILD
 #include <QList>
