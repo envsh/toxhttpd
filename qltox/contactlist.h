@@ -3,6 +3,7 @@
 
 #include "compat34.h"
 #include "placeholderlineedit.h"
+#include "LimeScrollBar.h"
 
 // Emoji constants defined in contactlist.cpp
 extern const char* EMOJI_FRIEND;
@@ -67,6 +68,7 @@ private:
     void setTabFilter(int index);
     
     void* listWidget;  // QListBox* (Qt3) or QListWidget* (Qt4)
+    LimeScrollBar* m_scrollBar;
     ContactList allContacts;
     QString currentFilter;
     int currentTab;

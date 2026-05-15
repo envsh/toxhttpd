@@ -24,7 +24,7 @@ const char* STATUS_ONLINE = "O";
 const char* STATUS_OFFLINE = "N";
 #endif
 
-ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0), contextItemId(-1), contextItemType("") {
+ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0), contextItemId(-1), contextItemType(""), m_scrollBar(nullptr) {
     QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 8, 2);
     qSetMargins(layout, 8, 8, 8, 8);
     
@@ -53,6 +53,8 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     connect(((QListWidget*)listWidget), SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(onItemClicked()));
     ((QListWidget*)listWidget)->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(((QListWidget*)listWidget), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showContextMenu(QPoint)));
+    m_scrollBar = new LimeScrollBar(Qt::Vertical, (QListWidget*)listWidget);
+    ((QListWidget*)listWidget)->setVerticalScrollBar(m_scrollBar);
 #endif
     layout->addWidget((QWidget*)listWidget, 1); // stretch
     

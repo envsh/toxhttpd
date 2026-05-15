@@ -609,7 +609,10 @@ void LimeStyle::drawComplexControl(ComplexControl cc,
         if (sliderRect.isValid()) {
             p->save();
             p->setRenderHint(QPainter::Antialiasing);
-            p->setBrush(pal.scrollbarSlider);
+            QColor sc = pal.scrollbarSlider;
+            if (params.scrollbarMode == StyleParams::AlwaysFaint)
+                sc = compositeColor(pal.windowBg, sc, 0.4f, mode);
+            p->setBrush(sc);
             p->setPen(Qt::NoPen);
             p->drawRoundedRect(sliderRect, 4, 4);
             p->restore();
@@ -1202,7 +1205,13 @@ void LimeStyle::drawComplexControl(ComplexControl cc, QPainter *p,
         p->setPen(Qt::NoPen);
         p->drawRect(groove);
         if (sliderRect.isValid()) {
-            p->setBrush(pal.scrollbarSlider);
+            QColor sc = pal.scrollbarSlider;
+            if (params.scrollbarMode == StyleParams::AlwaysFaint) {
+                bool hovered = widget && widget->hasMouse();
+                float ratio = hovered ? 1.0f : 0.4f;
+                sc = compositeColor(pal.windowBg, sc, ratio, mode);
+            }
+            p->setBrush(sc);
             p->drawRoundRect(sliderRect, 4, 4);
         }
         p->restore();

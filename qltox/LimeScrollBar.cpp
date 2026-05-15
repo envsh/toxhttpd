@@ -168,7 +168,7 @@ QColor LimeScrollBar::sliderColor(bool hovered) const {
     }
 
     if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
-        ratio = kAlwaysFaintRatio;
+        ratio = hovered ? 1.0f : kAlwaysFaintRatio;
     } else {
         ratio = m_animRatio;
     }
