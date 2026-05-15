@@ -10,6 +10,8 @@ QObject* ToxAPI::s_target = nullptr;
 std::string ToxAPI::s_baseUrl = "http://localhost:8181";
 uint64_t ToxAPI::s_lastEventId = 0;
 bool ToxAPI::s_pollRunning = false;
+bool ToxAPI::s_loadingAllData = false;
+bool ToxAPI::s_reloadPending = false;
 
 // ── Helpers ──
 
@@ -99,10 +101,24 @@ void ToxAPI::pollEvents() {
 }
 
 void ToxAPI::loadAllData() {
+    if (s_loadingAllData) {
+        s_reloadPending = true;
+        return;
+    }
+    s_loadingAllData = true;
     auto* chain = new LoadChain();
     auto* ctx = new ApiCtx(ApiLoadAllData);
     ctx->ptr = chain;
     EventPoller::addRequest(buildUrl("/api/self"), "GET", "", onHttpDone, ctx, 35);
+}
+
+bool ToxAPI::onLoadAllDataComplete() {
+    s_loadingAllData = false;
+    if (s_reloadPending) {
+        s_reloadPending = false;
+        return true;
+    }
+    return false;
 }
 
 void ToxAPI::getSelf() {

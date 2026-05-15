@@ -11,6 +11,8 @@ let contacts = {
     groups: [],
     conferences: []
 };
+let contactsLoading = false;
+let contactsReloadPending = false;
 
 // 使用 getter/setter 监控 currentFilter 的变化
 let _currentFilter = 'all';
@@ -312,6 +314,11 @@ function showQRCode() {
 // Load all contacts (friends, groups, conferences) and merge into single list
 function loadContacts(filter = 'all') {
     console.log('Loading contacts, filter:', filter);
+    if (contactsLoading) {
+        contactsReloadPending = true;
+        return;
+    }
+    contactsLoading = true;
     
     // Load friends
     fetch('/api/friends')
@@ -365,6 +372,13 @@ function loadContacts(filter = 'all') {
             }
             document.getElementById('contactList').innerHTML = 
                 '<div style="padding:10px;color:#f85149;">' + errorMsg + '</div>';
+        })
+        .then(() => {
+            contactsLoading = false;
+            if (contactsReloadPending) {
+                contactsReloadPending = false;
+                loadContacts(currentFilter);
+            }
         });
 }
 

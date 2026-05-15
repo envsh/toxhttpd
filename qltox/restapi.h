@@ -39,6 +39,7 @@ public:
     static void startPollEvent();
     static void stopPollEvent();
     static void loadAllData();
+    static bool onLoadAllDataComplete();
 
     static void getSelf();
     static void getFriends();
@@ -129,6 +130,8 @@ private:
     static std::string s_baseUrl;
     static uint64_t s_lastEventId;
     static bool s_pollRunning;
+    static bool s_loadingAllData;
+    static bool s_reloadPending;
 };
 
 #endif

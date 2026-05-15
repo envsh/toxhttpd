@@ -198,6 +198,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
             contactListWidget->setContacts(contacts);
             
             qWarning("MainWindow: initial data load complete");
+            if (ToxAPI::onLoadAllDataComplete()) {
+                ToxAPI::loadAllData();
+            }
             return;
         }
         
