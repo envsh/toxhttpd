@@ -1087,6 +1087,7 @@ class VirtualScroller {
             this.cumulative[i] = acc;
             acc += this.heights[i];
         }
+        this.cumulative[this.data.length] = acc;
         this.totalHeight = acc;
         this.viewport.style.height = this.totalHeight + 'px';
     }
