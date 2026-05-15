@@ -2,12 +2,8 @@ github.com/TokTok/go-toxcore-c v0.2.18-0.20250216202442-0f7463080d5c h1:VBvT5aur
 github.com/TokTok/go-toxcore-c v0.2.18-0.20250216202442-0f7463080d5c/go.mod h1:9W43AHvtIZcwN7WADUpM6Avjn2XxrvK+aMXQ8zCj3rk=
 github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/envsh/toxera v0.0.0-20260514053454-c69938ccca9c h1:dL22Zk12sQCCt0WqFMVy4eeD0VTRGHLbTZQY0y2hzMk=
-github.com/envsh/toxera v0.0.0-20260514053454-c69938ccca9c/go.mod h1:OmvYtW6UTQFHPVw3D7scLJmebzAAOuHGDR01MHQrT+4=
-github.com/envsh/toxera v0.0.0-20260514081400-e941e770728d h1:QV0jKDNZiezEfmyLT5urj6IINV9Qn9sDbboD+ukwTi8=
-github.com/envsh/toxera v0.0.0-20260514081400-e941e770728d/go.mod h1:OmvYtW6UTQFHPVw3D7scLJmebzAAOuHGDR01MHQrT+4=
-github.com/envsh/toxera v0.0.0-20260514083304-5303e11a7c20 h1:dIYfQA8Biun23OGAnD1cCWDRZBxhiYQVmitjARBYGAg=
-github.com/envsh/toxera v0.0.0-20260514083304-5303e11a7c20/go.mod h1:OmvYtW6UTQFHPVw3D7scLJmebzAAOuHGDR01MHQrT+4=
+github.com/envsh/toxera v0.0.0-20260515012820-45ca904efa5e h1:gMyzPozAty3ik1PfSmvP9vl+Vpw/fuZ/A9Yf96VSQis=
+github.com/envsh/toxera v0.0.0-20260515012820-45ca904efa5e/go.mod h1:OmvYtW6UTQFHPVw3D7scLJmebzAAOuHGDR01MHQrT+4=
 github.com/kitech/touse/oai v0.0.0-20260513104332-2e22e5195b77 h1:77gNEbS5bLP04+z9IYFRdO4Q2wH8J3y0E8qoNoiU0Os=
 github.com/kitech/touse/oai v0.0.0-20260513104332-2e22e5195b77/go.mod h1:RndqLg//u8EawJ2O3hpk/lTCVE8F/gcFb1KGjGcTAoQ=
 github.com/mattn/go-sqlite3 v1.14.44 h1:3VSe+xafpbzsLbdr2AWlAZk9yRHiBhTBakioXaCKTF8=

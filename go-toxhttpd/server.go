@@ -24,6 +24,7 @@ import (
 
 	tox "github.com/TokTok/go-toxcore-c"
 	"github.com/envsh/toxera/toxpriv"
+    "github.com/envsh/toxera/bsdata"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -61,6 +62,7 @@ func bootstrapAll(t *tox.Tox) {
 	for i, node := range bootstrapNodes {
 		log.Printf("Bootstrap %d: UDP %s:%d (maintainer: %s)", i, node.IPv4, node.Port, node.Maintainer)
 		t.Bootstrap(node.IPv4, node.Port, node.PublicKey)
+		t.AddTcpRelay(node.IPv4, node.Port, node.PublicKey)
 		log.Printf("Bootstrap %d: TCP relay %s:%d (maintainer: %s)", i, node.IPv4, node.Port, node.Maintainer)
 		// Note: go-toxcore-c's Bootstrap function handles both UDP and TCP
 	}
@@ -1559,6 +1561,7 @@ func main() {
 				return
 			default:
 				server.tox.Iterate()
+				server.checkRebootstrap()
 				time.Sleep(time.Millisecond * time.Duration(server.tox.IterationInterval()))
 			}
 		}
@@ -1580,6 +1583,29 @@ func main() {
 
 	log.Printf("[TOX] UDP enabled: %v", *udpEnabled)
 	log.Fatal(server.Start(*port))
+}
+
+// call in iterate
+// check self conn status per ~5s, 
+// if not online, select random node and bootstrap 
+var rebscnter int
+func (s *Server) checkRebootstrap() {
+	rebscnter++
+	// ~5s
+	if rebscnter < 20 * 5 {
+		return
+	}
+	rebscnter=0
+	t := s.tox
+	connected := t.SelfGetConnectionStatus() != tox.CONNECTION_NONE
+	if connected { return }
+	
+	node, err := bsdata.SelectOne()
+	if err != nil { panic(err) }
+	
+	_, err1 := t.Bootstrap(node.Host, node.Ports[0], node.Pubkey)
+	_, err2 := t.AddTcpRelay(node.Host, node.Ports[0], node.Pubkey)
+	log.Println("Rebootstraped", node.Host, err1, err2)
 }
 
 // logToxStatus logs the current status of the Tox instance

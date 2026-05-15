@@ -6,7 +6,7 @@ go 1.21.1
 
 // replace github.com/envsh/toxera => ../../go-toxcore
 
-require github.com/envsh/toxera v0.0.0-20260514083304-5303e11a7c20
+require github.com/envsh/toxera v0.0.0-20260515012820-45ca904efa5e
 
 require (
 	github.com/TokTok/go-toxcore-c v0.2.18-0.20250216202442-0f7463080d5c
