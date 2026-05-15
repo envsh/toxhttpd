@@ -84,6 +84,16 @@ inline QByteArray qToUtf8(const QString& s) {
 #endif
 }
 
+inline QString qFromUtf8(const std::string& s) {
+    return QString::fromUtf8(s.c_str());
+}
+inline QString qFromUtf8(const char* s) {
+    return QString::fromUtf8(s);
+}
+inline QString qFromUtf8(const char* data, int size) {
+    return QString::fromUtf8(data, size);
+}
+
 // 转本地编码
 inline QByteArray qToLocal8Bit(const QString& s) {
 #ifdef QT3_BUILD

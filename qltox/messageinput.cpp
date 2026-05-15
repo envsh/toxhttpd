@@ -153,7 +153,7 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
     for (int i = 0; (fmt = src->format(i)) != 0; i++) {
         if (qstrcmp(fmt, "text/uri-list") == 0) {
             QByteArray ba = src->encodedData("text/uri-list");
-            QString uris = QString::fromUtf8(ba.data());
+            QString uris = qFromUtf8(ba.data());
             uris = uris.stripWhiteSpace();
             int idx = uris.find('\n');
             if (idx >= 0) uris = uris.left(idx);

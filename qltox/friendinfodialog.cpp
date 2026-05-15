@@ -125,12 +125,12 @@ void FriendInfoDialog::setInfo(int id, const QString& name, const QString& type,
 }
 
 void FriendInfoDialog::setInfo(const FriendInfo& info) {
-    setInfo(info.id, QString::fromUtf8(info.name.c_str()), "friend",
-            QString::fromUtf8(info.statusText.c_str()),
-            QString::fromUtf8(info.statusStr.c_str()),
+    setInfo(info.id, qFromUtf8(info.name.c_str()), "friend",
+            qFromUtf8(info.statusText.c_str()),
+            qFromUtf8(info.statusStr.c_str()),
             false,
-            QString::fromUtf8(info.publicKey.c_str()));
-    ipLabel->setText(info.peerIp.empty() ? "-" : QString::fromUtf8(info.peerIp.c_str()));
+            qFromUtf8(info.publicKey.c_str()));
+    ipLabel->setText(info.peerIp.empty() ? "-" : qFromUtf8(info.peerIp.c_str()));
 }
 
 void FriendInfoDialog::setTitle(const QString& title) {

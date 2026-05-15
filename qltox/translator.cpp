@@ -140,7 +140,7 @@ QString Translator::t(const QString& key, const QStringList& args) const {
         return key;
     }
     
-    QString result = QString::fromUtf8(cJSON_GetStringValue(current));
+    QString result = qFromUtf8(cJSON_GetStringValue(current));
     
     // 替换占位符 {0}, {1}...
     for (int i = 0; i < (int)args.size(); ++i) {

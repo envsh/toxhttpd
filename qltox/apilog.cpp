@@ -54,9 +54,9 @@ void apiLogImpl(ApiLogLevel level, ApiLogTimeFormat timeFmt, const char* file, i
     }
     
     QString timeStr = getTimeString(timeFmt);
-    QString logMsg = "[" + QString::fromUtf8(levelStr) + "] "
+    QString logMsg = "[" + qFromUtf8(levelStr) + "] "
                    + timeStr + " "
-                   + QString::fromUtf8(shortFilename(file)) + ":"
+                   + qFromUtf8(shortFilename(file)) + ":"
                    + QString::number(line) + " - "
                    + msg;
     

@@ -67,12 +67,12 @@ public:
     }
     
     ALogStream& operator<<(const char* s) {
-        m_buffer += QString::fromUtf8(s) + " ";
+        m_buffer += qFromUtf8(s) + " ";
         return *this;
     }
     
     ALogStream& operator<<(const std::string& s) {
-        m_buffer += QString::fromUtf8(s.c_str()) + " ";
+        m_buffer += qFromUtf8(s.c_str()) + " ";
         return *this;
     }
     

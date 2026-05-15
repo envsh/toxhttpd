@@ -49,16 +49,16 @@ void MemberListDialog::setMembers(const std::vector<PeerInfo>& members) {
         .arg(_("member_list.table.ip"), -16)
         .arg(_("member_list.table.public_key")));
     for (const auto& peer : members) {
-        QString ip = QString::fromUtf8(peer.peerIp.c_str());
+        QString ip = qFromUtf8(peer.peerIp.c_str());
         if (ip.isEmpty()) ip = "--";
-        QString role = QString::fromUtf8(peer.roleStr.c_str());
+        QString role = qFromUtf8(peer.roleStr.c_str());
         if (role.isEmpty()) role = "member";
-        QString conn = QString::fromUtf8(peer.statusStr.c_str());
+        QString conn = qFromUtf8(peer.statusStr.c_str());
         if (conn.isEmpty()) conn = "--";
-        QString pk = QString::fromUtf8(peer.publicKey.c_str()).left(16);
+        QString pk = qFromUtf8(peer.publicKey.c_str()).left(16);
         QString line = QString("%1 | %2 | %3 | %4 | %5 | %6")
             .arg(QString::number(peer.peerNumber), -3)
-            .arg(QString::fromUtf8(peer.name.c_str()), -19)
+            .arg(qFromUtf8(peer.name.c_str()), -19)
             .arg(role, -9)
             .arg(conn, -5)
             .arg(ip, -16)
@@ -77,16 +77,16 @@ void MemberListDialog::setMembers(const std::vector<PeerInfo>& members) {
         .arg(_("member_list.table.ip"), -16)
         .arg(_("member_list.table.public_key")), lw);
     for (const auto& peer : members) {
-        QString ip = QString::fromUtf8(peer.peerIp.c_str());
+        QString ip = qFromUtf8(peer.peerIp.c_str());
         if (ip.isEmpty()) ip = "--";
-        QString role = QString::fromUtf8(peer.roleStr.c_str());
+        QString role = qFromUtf8(peer.roleStr.c_str());
         if (role.isEmpty()) role = "member";
-        QString conn = QString::fromUtf8(peer.statusStr.c_str());
+        QString conn = qFromUtf8(peer.statusStr.c_str());
         if (conn.isEmpty()) conn = "--";
-        QString pk = QString::fromUtf8(peer.publicKey.c_str()).left(16);
+        QString pk = qFromUtf8(peer.publicKey.c_str()).left(16);
         QString line = QString("%1 | %2 | %3 | %4 | %5 | %6")
             .arg(QString::number(peer.peerNumber), -3)
-            .arg(QString::fromUtf8(peer.name.c_str()), -19)
+            .arg(qFromUtf8(peer.name.c_str()), -19)
             .arg(role, -9)
             .arg(conn, -5)
             .arg(ip, -16)

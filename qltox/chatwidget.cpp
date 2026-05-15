@@ -18,14 +18,14 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     // 语言选择器
     langSelector = new QComboBox(this);
 #ifdef QT3_BUILD
-    langSelector->insertItem(QString::fromUtf8("简体中文"), 0);
-    langSelector->insertItem(QString::fromUtf8("繁體中文"), 1);
-    langSelector->insertItem(QString::fromUtf8("English"), 2);
+    langSelector->insertItem(qFromUtf8("简体中文"), 0);
+    langSelector->insertItem(qFromUtf8("繁體中文"), 1);
+    langSelector->insertItem(qFromUtf8("English"), 2);
     langSelector->setCurrentItem(0);
 #else
-    langSelector->insertItem(0, QString::fromUtf8("简体中文"));
-    langSelector->insertItem(1, QString::fromUtf8("繁體中文"));
-    langSelector->insertItem(2, QString::fromUtf8("English"));
+    langSelector->insertItem(0, qFromUtf8("简体中文"));
+    langSelector->insertItem(1, qFromUtf8("繁體中文"));
+    langSelector->insertItem(2, qFromUtf8("English"));
     langSelector->setCurrentIndex(0);
 #endif
     connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
@@ -72,10 +72,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     QGridLayout* inputGrid = new QGridLayout(2, 3, 2);
     inputEdit = new MessageInput(this);
     inputGrid->addMultiCellWidget(inputEdit, 0, 1, 0, 0);
-    emojiBtn = new EmojiPushButton(QString::fromUtf8("😊"), this);
+    emojiBtn = new EmojiPushButton(qFromUtf8("😊"), this);
     emojiBtn->setFixedSize(24, 24);
     inputGrid->addWidget(emojiBtn, 0, 1);
-    fileBtn = new EmojiPushButton(QString::fromUtf8("📎"), this);
+    fileBtn = new EmojiPushButton(qFromUtf8("📎"), this);
     fileBtn->setFixedSize(24, 24);
     inputGrid->addWidget(fileBtn, 1, 1);
     sendBtn = new QPushButton(_("buttons.send"), this);
@@ -90,10 +90,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     inputGrid->setSpacing(2);
     inputEdit = new MessageInput(this);
     inputGrid->addWidget(inputEdit, 0, 0, 2, 1);
-    emojiBtn = new EmojiPushButton(QString::fromUtf8("😊"), this);
+    emojiBtn = new EmojiPushButton(qFromUtf8("😊"), this);
     emojiBtn->setFixedSize(24, 24);
     inputGrid->addWidget(emojiBtn, 0, 1);
-    fileBtn = new EmojiPushButton(QString::fromUtf8("📎"), this);
+    fileBtn = new EmojiPushButton(qFromUtf8("📎"), this);
     fileBtn->setFixedSize(24, 24);
     inputGrid->addWidget(fileBtn, 1, 1);
     sendBtn = new QPushButton(_("buttons.send"), this);
@@ -218,7 +218,7 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
     msg.translationInProgress = true;
     messageArea->triggerRelayout();
     emit translateRequested(msgIndex, msg.messageText,
-                            QString::fromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
+                            qFromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
 }
 
 void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage) {

@@ -45,7 +45,7 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     
     // 地址行（含切换账号按钮在最左侧）
     QBoxLayout* addrLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
-    switchBtn = new QPushButton(QString::fromUtf8("⇄"), this);
+    switchBtn = new QPushButton(qFromUtf8("⇄"), this);
     switchBtn->setFixedSize(30, 25);
     connect(switchBtn, SIGNAL(clicked()), this, SLOT(onSwitchAccount()));
     addrLayout->addWidget(switchBtn);
@@ -54,7 +54,7 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     addressLabel->setFont(QFont("Monospace", 11));
     addrLayout->addWidget(addressLabel, 1);
     
-    copyBtn = new EmojiPushButton(QString::fromUtf8("📋"), this);
+    copyBtn = new EmojiPushButton(qFromUtf8("📋"), this);
     copyBtn->setFixedSize(50, 25);
     connect(copyBtn, SIGNAL(clicked()), this, SLOT(onCopyAddress()));
     addrLayout->addWidget(copyBtn);
@@ -153,10 +153,10 @@ void SelfInfoWidget::onEditInfo() {
         if (success) {
             std::string name2, statusMsg, connStatus, address;
             if (ToxAPI::getSelfSync(name2, statusMsg, connStatus, address)) {
-                updateInfo(QString::fromUtf8(name2.c_str()), 
-                          QString::fromUtf8(statusMsg.c_str()), 
-                          QString::fromUtf8(connStatus.c_str()),
-                          QString::fromUtf8(address.c_str()));
+                updateInfo(qFromUtf8(name2.c_str()), 
+                          qFromUtf8(statusMsg.c_str()), 
+                          qFromUtf8(connStatus.c_str()),
+                          qFromUtf8(address.c_str()));
             }
         } else {
             QMessageBox::warning(this, _("save_failed"), _("save_failed"));
@@ -169,10 +169,10 @@ void SelfInfoWidget::onBootstrap() {
     
     std::string name, statusMsg, connStatus, address;
     if (ToxAPI::getSelfSync(name, statusMsg, connStatus, address)) {
-        updateInfo(QString::fromUtf8(name.c_str()), 
-                  QString::fromUtf8(statusMsg.c_str()), 
-                  QString::fromUtf8(connStatus.c_str()),
-                  QString::fromUtf8(address.c_str()));
+        updateInfo(qFromUtf8(name.c_str()), 
+                  qFromUtf8(statusMsg.c_str()), 
+                  qFromUtf8(connStatus.c_str()),
+                  qFromUtf8(address.c_str()));
     }
 }
 
@@ -214,11 +214,11 @@ void SelfInfoWidget::onShowQRCode() {
 
 void SelfInfoWidget::retranslateUi() {
     // 更新按钮文字
-    if (switchBtn) switchBtn->setText(QString::fromUtf8("⇄"));
+    if (switchBtn) switchBtn->setText(qFromUtf8("⇄"));
     if (editBtn) editBtn->setText(_("buttons.edit_info"));
     if (connectBtn) connectBtn->setText(_("buttons.connect_network"));
     if (qrBtn) qrBtn->setText(_("buttons.qrcode"));
-    if (copyBtn) copyBtn->setText(QString::fromUtf8("📋"));
+    if (copyBtn) copyBtn->setText(qFromUtf8("📋"));
     
     // 更新状态标签（如果当前显示的是默认值）
     QString currentStatus = statusBadge->text();

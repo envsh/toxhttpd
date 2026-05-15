@@ -348,10 +348,10 @@ void EmojiPicker::buildCategoryPages() {
             const EmojiData& d = categories[ci].items[ei];
             int row = ei / GRID_COLS;
             int col = ei % GRID_COLS;
-            EmojiPushButton* btn = new EmojiPushButton(QString::fromUtf8(d.emoji), page);
+            EmojiPushButton* btn = new EmojiPushButton(qFromUtf8(d.emoji), page);
             btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
             btn->setFlat(true);
-            qSetToolTip(btn, QString::fromUtf8(d.name));
+            qSetToolTip(btn, qFromUtf8(d.name));
             connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
             grid->addWidget(btn, row, col);
         }
@@ -475,10 +475,10 @@ void EmojiPicker::rebuildSearchPage() {
     for (int i = 0; i < n; i++) {
         int row = i / GRID_COLS;
         int col = i % GRID_COLS;
-        EmojiPushButton* btn = new EmojiPushButton(QString::fromUtf8(items[i].emoji), emojiW);
+        EmojiPushButton* btn = new EmojiPushButton(qFromUtf8(items[i].emoji), emojiW);
         btn->setFixedSize(m_emojiCellSize, m_emojiCellSize);
         btn->setFlat(true);
-        qSetToolTip(btn, QString::fromUtf8(items[i].name));
+        qSetToolTip(btn, qFromUtf8(items[i].name));
         connect(btn, SIGNAL(clicked()), this, SLOT(onEmojiButtonClicked()));
         pageLayout->addWidget(btn, row, col);
     }

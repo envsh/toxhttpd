@@ -732,7 +732,7 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
     }
     f.setPointSize(11);
     p.setFont(f);
-    p.drawText(msg.translateBtnRect, Qt::AlignCenter, QString::fromUtf8("\xF0\x9F\x8C\x90"));
+    p.drawText(msg.translateBtnRect, Qt::AlignCenter, qFromUtf8("\xF0\x9F\x8C\x90"));
     p.setFont(font());
 
     // Translated text

@@ -134,7 +134,7 @@ extern "C" void qtapp_onExit(void (*callback)()) {
 }
 
 extern "C" void qtapp_installQtTranslations(const char* langCode) {
-    QtappSetup::installQtTranslations(QString::fromUtf8(langCode));
+    QtappSetup::installQtTranslations(qFromUtf8(langCode));
 }
 
 extern "C" int qtapp_addTimer(unsigned int intervalMs, void (*callback)()) {

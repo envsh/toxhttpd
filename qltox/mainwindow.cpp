@@ -148,10 +148,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
             
             // 更新self信息
             selfInfoWidget->updateInfo(
-                QString::fromUtf8(evt->selfName.c_str()),
-                QString::fromUtf8(evt->selfStatusMsg.c_str()),
-                QString::fromUtf8(evt->selfConnStatus.c_str()),
-                QString::fromUtf8(evt->selfAddress.c_str()));
+                qFromUtf8(evt->selfName.c_str()),
+                qFromUtf8(evt->selfStatusMsg.c_str()),
+                qFromUtf8(evt->selfConnStatus.c_str()),
+                qFromUtf8(evt->selfAddress.c_str()));
             
             // 保存自己的公钥（地址前64字符是公钥）
             std::string addr = evt->selfAddress;
@@ -165,10 +165,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
             for (const auto& cd : evt->contacts) {
                 Contact* c = new Contact();
                 c->id = cd.id;
-                c->name = QString::fromUtf8(cd.name.c_str());
-                c->type = QString::fromUtf8(cd.type.c_str());
-                c->status = QString::fromUtf8(cd.status.c_str());
-                c->chat_id = QString::fromUtf8(cd.chatId.c_str());
+                c->name = qFromUtf8(cd.name.c_str());
+                c->type = qFromUtf8(cd.type.c_str());
+                c->status = qFromUtf8(cd.status.c_str());
+                c->chat_id = qFromUtf8(cd.chatId.c_str());
                 c->is_connected = cd.isConnected;
                 contacts.append(c);
                 qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%s",
@@ -246,8 +246,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
         if (e->type == ApiTranslate) {
             TranslateResultEvent* tev = static_cast<TranslateResultEvent*>(event);
             chatWidget->onTranslateResult(tev->msgIndex, tev->success,
-                QString::fromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()),
-                QString::fromUtf8(tev->errorMessage.data(), (int)tev->errorMessage.size()));
+                qFromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()),
+                qFromUtf8(tev->errorMessage.data(), (int)tev->errorMessage.size()));
             return;
         }
     }
@@ -334,7 +334,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 cJSON* messageItem = cJSON_GetObjectItem(root, "message");
                 if (friendIdItem && messageItem) {
                     int friendId = friendIdItem->valueint;
-                    QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
+                    QString message = qFromUtf8(cJSON_GetStringValue(messageItem));
                     if (friendId == currentChatId && currentChatType == "friend") {
                         chatWidget->appendMessage(message, "other", QString(),
                                          friendId, getCurrentTime());
@@ -350,7 +350,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 cJSON* cookieItem = cJSON_GetObjectItem(root, "cookie");
                 if (friendNumberItem && cookieItem) {
                     QString friendNumber = QString::number(friendNumberItem->valueint);
-                    QString cookie = QString::fromUtf8(cJSON_GetStringValue(cookieItem));
+                    QString cookie = qFromUtf8(cJSON_GetStringValue(cookieItem));
                     
                      ConferenceInviteDialog dialog(friendNumber, cookie, this);
                       dialog.exec();
@@ -377,7 +377,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 
                 if (confNumberItem && messageItem) {
                     int confNumber = confNumberItem->valueint;
-                    QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
+                    QString message = qFromUtf8(cJSON_GetStringValue(messageItem));
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
                     // 更新 peer info 缓存
@@ -397,7 +397,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         auto it = peerInfoMap.find(key);
                         QString senderName;
                         if (it != peerInfoMap.end() && !it->second.name.empty())
-                            senderName = QString::fromUtf8(it->second.name.c_str());
+                            senderName = qFromUtf8(it->second.name.c_str());
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
@@ -418,7 +418,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 cJSON* chatIdItem = cJSON_GetObjectItem(root, "chat_id");
                 if (friendNumberItem && chatIdItem) {
                     int friendNumber = friendNumberItem->valueint;
-                    QString chatId = QString::fromUtf8(cJSON_GetStringValue(chatIdItem));
+                    QString chatId = qFromUtf8(cJSON_GetStringValue(chatIdItem));
                     onGroupInviteReceived(friendNumber, chatId);
                 }
                 cJSON_Delete(root);
@@ -434,7 +434,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 
                 if (groupNumberItem && messageItem) {
                     int groupNumber = groupNumberItem->valueint;
-                    QString message = QString::fromUtf8(cJSON_GetStringValue(messageItem));
+                    QString message = qFromUtf8(cJSON_GetStringValue(messageItem));
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
                     // 更新 peer info 缓存
@@ -452,8 +452,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         QString ipAddress;
                         if (it != peerInfoMap.end()) {
                             if (!it->second.name.empty())
-                                senderName = QString::fromUtf8(it->second.name.c_str());
-                            ipAddress = QString::fromUtf8(it->second.peerIp.c_str());
+                                senderName = qFromUtf8(it->second.name.c_str());
+                            ipAddress = qFromUtf8(it->second.peerIp.c_str());
                         }
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime(), "", "", ipAddress);
                     }
@@ -499,7 +499,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     std::string newName = cJSON_GetStringValue(nameItem);
                     std::string key = "friend_" + std::to_string(friendId);
                     peerInfoMap[key].name = newName;
-                    contactListWidget->updateFriendName(friendId, QString::fromUtf8(newName.c_str()));
+                    contactListWidget->updateFriendName(friendId, qFromUtf8(newName.c_str()));
                 }
                 cJSON_Delete(root);
             }
@@ -515,7 +515,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     std::string key = "friend_" + std::to_string(friendId);
                     peerInfoMap[key].status = s;
                     peerInfoMap[key].statusStr = statusStr;
-                    contactListWidget->updateFriendStatus(friendId, QString::fromUtf8(statusStr.c_str()));
+                    contactListWidget->updateFriendStatus(friendId, qFromUtf8(statusStr.c_str()));
                 }
                 cJSON_Delete(root);
             }
@@ -570,7 +570,7 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         for (size_t i = 0; i < conferences.size(); ++i) {
             if (conferences[i].conferenceNumber == (uint32_t)id) {
                 isConnected = conferences[i].isConnected;
-                chatId = QString::fromUtf8(conferences[i].chatId.c_str());
+                chatId = qFromUtf8(conferences[i].chatId.c_str());
                 break;
             }
         }
@@ -584,7 +584,7 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
         for (size_t i = 0; i < groups.size(); ++i) {
             if (groups[i].groupNumber == (uint32_t)id) {
                 isConnected = groups[i].isConnected;
-                chatId = QString::fromUtf8(groups[i].chatId.c_str());
+                chatId = qFromUtf8(groups[i].chatId.c_str());
                 break;
             }
         }
@@ -640,12 +640,12 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
     // Current nickname (from cache or fallback to global)
     std::string displayName = currentGroupNick.empty() ? "--" : currentGroupNick;
     QLabel* currentLabel = new QLabel(
-        _("rename.current_nick") + QString(": ") + QString::fromUtf8(displayName.c_str()), &dialog);
+        _("rename.current_nick") + QString(": ") + qFromUtf8(displayName.c_str()), &dialog);
     layout->addWidget(currentLabel);
 
     // Use global nick
     QRadioButton* selfRadio = new QRadioButton(
-        _("rename.use_self_nick") + QString(" (%1)").arg(QString::fromUtf8(globalName.c_str())), &dialog);
+        _("rename.use_self_nick") + QString(" (%1)").arg(qFromUtf8(globalName.c_str())), &dialog);
     selfRadio->setChecked(true);
     layout->addWidget(selfRadio);
 
@@ -654,7 +654,7 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
     layout->addWidget(customRadio);
 
     PlaceholderLineEdit* nameEdit = new PlaceholderLineEdit(_("rename.enter_nick"), &dialog);
-    nameEdit->setText(QString::fromUtf8(currentGroupNick.c_str()));
+    nameEdit->setText(qFromUtf8(currentGroupNick.c_str()));
     nameEdit->setEnabled(false);
     layout->addWidget(nameEdit);
 
@@ -663,7 +663,7 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
     layout->addWidget(randomRadio);
 
     QLabel* randomLabel = new QLabel(
-        QString::fromUtf8(ToxAPI::getRandomNameSync().c_str()), &dialog);
+        qFromUtf8(ToxAPI::getRandomNameSync().c_str()), &dialog);
     layout->addWidget(randomLabel);
 
     // Buttons
@@ -774,7 +774,7 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
         const auto& conf = conferences[i];
         QString displayName;
         if (!conf.conferenceName.empty()) {
-            displayName = QString::fromUtf8(conf.conferenceName.c_str());
+            displayName = qFromUtf8(conf.conferenceName.c_str());
         } else {
             displayName = QString(_("conference_item")) + " " + QString::number(conf.conferenceNumber);
         }
@@ -849,7 +849,7 @@ void MainWindow::onInviteToGroupRequested(int friendId) {
         const auto& grp = groups[i];
         QString displayName;
         if (!grp.groupName.empty()) {
-            displayName = QString::fromUtf8(grp.groupName.c_str());
+            displayName = qFromUtf8(grp.groupName.c_str());
         } else {
             displayName = QString(_("group_item")) + " " + QString::number(grp.groupNumber);
         }
@@ -937,7 +937,7 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
                 std::string key = "friend_" + std::to_string(currentChatId);
                 auto it = peerInfoMap.find(key);
                 if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                    senderLabel = QString::fromUtf8(it->second.name.c_str());
+                    senderLabel = qFromUtf8(it->second.name.c_str());
                     avatarText = qToUpper(senderLabel.left(1));
                 } else {
                     senderLabel = QString();
@@ -950,10 +950,10 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
                 auto it = peerInfoMap.find(key);
                 if (it != peerInfoMap.end()) {
                     if (!it->second.name.empty()) {
-                        senderLabel = QString::fromUtf8(it->second.name.c_str());
+                        senderLabel = qFromUtf8(it->second.name.c_str());
                         avatarText = qToUpper(senderLabel.left(1));
                     }
-                    ipAddress = QString::fromUtf8(it->second.peerIp.c_str());
+                    ipAddress = qFromUtf8(it->second.peerIp.c_str());
                 } else {
                     senderLabel = QString();
                     avatarText = "P";
@@ -961,10 +961,10 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
             }
         }
         
-        QString timeStr = qFormatTime(QString::fromUtf8(msg.created_at.c_str()));
+        QString timeStr = qFormatTime(qFromUtf8(msg.created_at.c_str()));
         
         chatWidget->appendMessage(
-            QString::fromUtf8(msg.message.c_str()),
+            qFromUtf8(msg.message.c_str()),
             isSelf ? "self" : "other",
             senderLabel,
             isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
