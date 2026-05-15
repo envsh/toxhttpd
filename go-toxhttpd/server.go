@@ -786,41 +786,66 @@ func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusBadRequest)
 		return
 	}
-	friendIDStr := params.Get("friend_id")
-	var friendID uint32
-	fmt.Sscanf(friendIDStr, "%d", &friendID)
 
-	name, _ := s.tox.FriendGetName(friendID)
-	pk, _ := s.tox.FriendGetPublicKey(friendID)
-	statusText, _ := s.tox.FriendGetStatusMessage(friendID)
-	lastSeen, _ := s.tox.FriendGetLastOnline(friendID)
+	idsStr := params.Get("friend_ids")
+	idStrs := strings.Split(idsStr, ",")
+	friends := make([]map[string]interface{}, 0, len(idStrs))
 
-	s.mu.RLock()
-	connStatus := s.friendStatuses[friendID]
-	s.mu.RUnlock()
+	for _, idStr := range idStrs {
+		idStr = strings.TrimSpace(idStr)
 
-	var statusInt int
-	switch connStatus {
-	case "tcp":
-		statusInt = 1
-	case "udp":
-		statusInt = 2
-	}
+		entry := map[string]interface{}{
+			"friendId": 0, "name": "", "iconUrl": "",
+			"status": 0, "statusStr": "none",
+			"statusText": "", "publicKey": "",
+			"lastSeen": 0, "peerIp": nil,
+			"error": "",
+		}
 
-	resp := map[string]interface{}{
-		"friendId":   friendID,
-		"name":       name,
-		"iconUrl":    "",
-		"status":     statusInt,
-		"statusStr":  statusToStr(statusInt),
-		"statusText": statusText,
-		"publicKey":  pk,
-		"lastSeen":   lastSeen,
-		"peerIp":     nil,
+		friendID, err := strconv.ParseUint(idStr, 10, 32)
+		if err != nil {
+			entry["error"] = "invalid friend id"
+			friends = append(friends, entry)
+			continue
+		}
+		fid := uint32(friendID)
+		entry["friendId"] = fid
+
+		name, err := s.tox.FriendGetName(fid)
+		if err != nil {
+			entry["error"] = err.Error()
+			friends = append(friends, entry)
+			continue
+		}
+
+		pk, _ := s.tox.FriendGetPublicKey(fid)
+		statusText, _ := s.tox.FriendGetStatusMessage(fid)
+		lastSeen, _ := s.tox.FriendGetLastOnline(fid)
+
+		s.mu.RLock()
+		connStatus := s.friendStatuses[fid]
+		s.mu.RUnlock()
+
+		statusInt := 0
+		switch connStatus {
+		case "tcp":
+			statusInt = 1
+		case "udp":
+			statusInt = 2
+		}
+
+		entry["name"] = name
+		entry["status"] = statusInt
+		entry["statusStr"] = statusToStr(statusInt)
+		entry["statusText"] = statusText
+		entry["publicKey"] = pk
+		entry["lastSeen"] = lastSeen
+
+		friends = append(friends, entry)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(friends)
 }
 
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {

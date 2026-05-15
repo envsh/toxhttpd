@@ -324,22 +324,31 @@ function loadContacts(filter = 'all') {
     fetch('/api/friends')
         .then(r => r.json())
         .then(data => {
-            contacts.friends = data.friends || [];
-            // Load details for each friend
-            const promises = contacts.friends.map(f => 
+            const ids = data.friends || [];
+            contacts.friends = ids;
+            // Batch 3 per request, parallel
+            const chunkSize = 3;
+            const chunks = [];
+            for (let i = 0; i < ids.length; i += chunkSize)
+                chunks.push(ids.slice(i, i + chunkSize));
+
+            return Promise.all(chunks.map(chunk =>
                 fetch('/api/friend', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: `friend_id=${f}`
+                    body: `friend_ids=${chunk.join(',')}`
                 }).then(r => r.json())
-            );
-            return Promise.all(promises);
+            )).then(results => {
+                const all = results.flat();
+                contacts.friends = all.filter(f => !f.error);
+                return all;
+            });
         })
         .then(friendDetails => {
             console.log('Friend details loaded:', friendDetails);
-            contacts.friends = friendDetails;
             // 填充 peerInfoMap 好友条目
             friendDetails.forEach(f => {
+                if (f.error) return;
                 peerInfoMap["friend_" + f.friendId] = {
                     name: f.name || '',
                     peerNumber: f.friendId,
@@ -1702,14 +1711,16 @@ function showFriendInfo(friendId) {
     fetch('/api/friend', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `friend_id=${friendId}`
+        body: `friend_ids=${friendId}`
     }).then(r => r.json())
       .then(data => {
-          document.getElementById('infoFriendName').textContent = data.name || t('no_name_label');
-          document.getElementById('infoFriendId').textContent = data.friendId;
-          document.getElementById('infoFriendStatus').textContent = data.statusText || t('unknown');
-          document.getElementById('infoFriendConn').textContent = data.statusStr || t('unknown');
-          document.getElementById('infoFriendPk').textContent = data.publicKey || t('unknown');
+          const f = data[0] || {};
+          if (f.error) { alert(t('friend_info_failed') + ': ' + f.error); return; }
+          document.getElementById('infoFriendName').textContent = f.name || t('no_name_label');
+          document.getElementById('infoFriendId').textContent = f.friendId;
+          document.getElementById('infoFriendStatus').textContent = f.statusText || t('unknown');
+          document.getElementById('infoFriendConn').textContent = f.statusStr || t('unknown');
+          document.getElementById('infoFriendPk').textContent = f.publicKey || t('unknown');
           
           document.getElementById('friendInfoModal').classList.remove('hidden');
       });

@@ -54,6 +54,7 @@ static size_t syncWriteCb(void* contents, size_t size, size_t nmemb, void* userp
 
 // ── LoadAllData chain ──
 struct LoadChain {
+    static const int kBatchSize = 3;
     AllDataLoadedEvent* result;
     int step = 0;
     std::vector<int> friendIds;
@@ -313,16 +314,26 @@ bool ToxAPI::syncRequest(const std::string& endpoint,
 bool ToxAPI::getFriendInfo(int id, FriendInfo& info) {
     std::string body;
     if (!syncRequest("/api/friend", "POST", body,
-                     "friend_id=" + std::to_string(id)))
+                     "friend_ids=" + std::to_string(id)))
         return false;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return false;
+    if (!root || !cJSON_IsArray(root) || cJSON_GetArraySize(root) == 0) {
+        if (root) cJSON_Delete(root);
+        return false;
+    }
+    cJSON* item = cJSON_GetArrayItem(root, 0);
+    if (!item) { cJSON_Delete(root); return false; }
+    cJSON* err = cJSON_GetObjectItem(item, "error");
+    if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0) {
+        cJSON_Delete(root);
+        return false;
+    }
     info.id = id;
-    info.name = jsonStr(cJSON_GetObjectItem(root, "name"));
-    info.publicKey = jsonStr(cJSON_GetObjectItem(root, "publicKey"));
-    info.statusStr = jsonStr(cJSON_GetObjectItem(root, "statusStr"));
-    info.statusText = jsonStr(cJSON_GetObjectItem(root, "statusText"));
-    info.iconUrl = jsonStr(cJSON_GetObjectItem(root, "iconUrl"));
+    info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
+    info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
+    info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+    info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+    info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
     cJSON_Delete(root);
     return true;
 }
@@ -859,36 +870,57 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode, const std::string& body,
             auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
             if (chain->step == 3)
                 EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
-            else
+            else {
+                int end = std::min(chain->friendIdx + LoadChain::kBatchSize, (int)chain->friendIds.size());
+                std::string ids;
+                for (int i = chain->friendIdx; i < end; ++i) {
+                    if (i > chain->friendIdx) ids += ",";
+                    ids += std::to_string(chain->friendIds[i]);
+                }
                 EventPoller::addRequest(buildUrl("/api/friend"), "POST",
-                    "friend_id=" + std::to_string(chain->friendIds[0]), onHttpDone, next, 35);
+                    "friend_ids=" + urlEncode(ids), onHttpDone, next, 35);
+            }
             break;
         }
-        case 2: { // friend info
+        case 2: { // batch friend info
             if (httpCode == 200 && !body.empty()) {
                 cJSON* root = cJSON_Parse(body.c_str());
-                if (root) {
-                    ContactData cd;
-                    cd.id = chain->friendIds[chain->friendIdx];
-                    cd.type = "friend";
-                    cd.name = jsonStr(cJSON_GetObjectItem(root, "name"));
-                    cd.status = jsonStr(cJSON_GetObjectItem(root, "statusStr"));
-                    cd.chatId = jsonStr(cJSON_GetObjectItem(root, "publicKey"));
-                    cd.iconUrl = jsonStr(cJSON_GetObjectItem(root, "iconUrl"));
-                    cd.statusText = jsonStr(cJSON_GetObjectItem(root, "statusText"));
-                    chain->result->contacts.push_back(cd);
+                if (root && cJSON_IsArray(root)) {
+                    int n = cJSON_GetArraySize(root);
+                    for (int i = 0; i < n; ++i) {
+                        cJSON* item = cJSON_GetArrayItem(root, i);
+                        if (!item) continue;
+                        cJSON* err = cJSON_GetObjectItem(item, "error");
+                        if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0)
+                            continue;
+                        ContactData cd;
+                        cJSON* v = cJSON_GetObjectItem(item, "friendId");
+                        cd.id = v ? v->valueint : 0;
+                        cd.type = "friend";
+                        cd.name = jsonStr(cJSON_GetObjectItem(item, "name"));
+                        cd.status = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+                        cd.chatId = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
+                        cd.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
+                        cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+                        chain->result->contacts.push_back(cd);
+                    }
                     cJSON_Delete(root);
                 }
             }
-            chain->friendIdx++;
+            chain->friendIdx += LoadChain::kBatchSize;
             auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
             if ((size_t)chain->friendIdx >= chain->friendIds.size()) {
                 chain->step = 3;
                 EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
             } else {
+                int end = std::min(chain->friendIdx + LoadChain::kBatchSize, (int)chain->friendIds.size());
+                std::string ids;
+                for (int i = chain->friendIdx; i < end; ++i) {
+                    if (i > chain->friendIdx) ids += ",";
+                    ids += std::to_string(chain->friendIds[i]);
+                }
                 EventPoller::addRequest(buildUrl("/api/friend"), "POST",
-                    "friend_id=" + std::to_string(chain->friendIds[chain->friendIdx]),
-                    onHttpDone, next, 35);
+                    "friend_ids=" + urlEncode(ids), onHttpDone, next, 35);
             }
             break;
         }
