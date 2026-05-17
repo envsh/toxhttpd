@@ -102,15 +102,40 @@ void SelfInfoWidget::updateInfo(const QString& name, const QString& statusMsg,
     statusBadge->setText(statusText);
     
     if (connStatus == "offline") {
-        QPalette opal(currentPalette().textMuted, currentPalette().textPrimary);
-        statusBadge->setPalette(opal);
-    } else {
-        QPalette cpal(currentPalette().accent, currentPalette().accentText);
-        statusBadge->setPalette(cpal);
-    }
-#ifndef QT3_BUILD
-    statusBadge->setAutoFillBackground(true);
+        QPalette opal;
+#ifdef QT3_BUILD
+        opal.setColor(QPalette::Active, QColorGroup::Background, currentPalette().textMuted);
+        opal.setColor(QPalette::Active, QColorGroup::Foreground, currentPalette().textPrimary);
+        opal.setColor(QPalette::Disabled, QColorGroup::Background, currentPalette().textMuted);
+        opal.setColor(QPalette::Disabled, QColorGroup::Foreground, currentPalette().textPrimary);
+        opal.setColor(QPalette::Inactive, QColorGroup::Background, currentPalette().textMuted);
+        opal.setColor(QPalette::Inactive, QColorGroup::Foreground, currentPalette().textPrimary);
+#else
+        opal.setColor(QPalette::Window, currentPalette().textMuted);
+        opal.setColor(QPalette::WindowText, currentPalette().textPrimary);
 #endif
+        statusBadge->setPalette(opal);
+#ifndef QT3_BUILD
+        statusBadge->setAutoFillBackground(true);
+#endif
+    } else {
+        QPalette cpal;
+#ifdef QT3_BUILD
+        cpal.setColor(QPalette::Active, QColorGroup::Background, currentPalette().hoverBg);
+        cpal.setColor(QPalette::Active, QColorGroup::Foreground, currentPalette().textPrimary);
+        cpal.setColor(QPalette::Disabled, QColorGroup::Background, currentPalette().hoverBg);
+        cpal.setColor(QPalette::Disabled, QColorGroup::Foreground, currentPalette().textPrimary);
+        cpal.setColor(QPalette::Inactive, QColorGroup::Background, currentPalette().hoverBg);
+        cpal.setColor(QPalette::Inactive, QColorGroup::Foreground, currentPalette().textPrimary);
+#else
+        cpal.setColor(QPalette::Window, currentPalette().hoverBg);
+        cpal.setColor(QPalette::WindowText, currentPalette().textPrimary);
+#endif
+        statusBadge->setPalette(cpal);
+#ifndef QT3_BUILD
+        statusBadge->setAutoFillBackground(true);
+#endif
+    }
     
     // 更新状态消息
     statusMsgLabel->setText(statusMsg.isEmpty() ? _("no_status") : statusMsg);
