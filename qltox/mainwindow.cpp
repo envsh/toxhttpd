@@ -511,11 +511,23 @@ void MainWindow::handleEvents(const EventList& events) {
                 if (fid && statusItem) {
                     int friendId = fid->valueint;
                     int s = statusItem->valueint;
-                    std::string statusStr = (s == 1) ? "tcp" : (s == 2) ? "udp" : "none";
                     std::string key = "friend_" + std::to_string(friendId);
                     peerInfoMap[key].status = s;
+                }
+                cJSON_Delete(root);
+            }
+        } else if (e.type == "friend_connection_status") {
+            cJSON* root = cJSON_Parse(e.data.c_str());
+            if (root) {
+                cJSON* fid = cJSON_GetObjectItem(root, "friend_id");
+                cJSON* statusItem = cJSON_GetObjectItem(root, "status");
+                if (fid && statusItem && cJSON_IsString(statusItem)) {
+                    int friendId = fid->valueint;
+                    std::string statusStr = cJSON_GetStringValue(statusItem);
+                    std::string key = "friend_" + std::to_string(friendId);
+                    peerInfoMap[key].status = (statusStr == "udp") ? 2 : (statusStr == "tcp") ? 1 : 0;
                     peerInfoMap[key].statusStr = statusStr;
-                    contactListWidget->updateFriendStatus(friendId, qFromUtf8(statusStr.c_str()));
+                    contactListWidget->updateFriendConnectionStatus(friendId, qFromUtf8(statusStr.c_str()));
                 }
                 cJSON_Delete(root);
             }

@@ -124,7 +124,7 @@ void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
 #endif
 }
 
-void ContactListWidget::updateFriendStatus(int friendId, const QString& newStatus) {
+void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString& newStatus) {
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         if (c->id == friendId && c->type == "friend") {

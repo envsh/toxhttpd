@@ -354,6 +354,7 @@ function loadContacts(filter = 'all') {
                     peerNumber: f.friendId,
                     status: f.status || 0,
                     statusStr: f.statusStr || 'none',
+                    connectionStatus: f.statusStr || 'none',
                     statusText: f.statusText || '',
                     iconUrl: f.iconUrl || '',
                     publicKey: f.publicKey || '',
@@ -406,7 +407,7 @@ function renderContactList(filter) {
     if (filter === 'all' || filter === 'friends') {
         contacts.friends.forEach(f => {
             const isSelected = f.friendId == currentChatId && currentChatType === 'friend';
-            const dotClass = f.status ? 'online-dot' : 'offline-dot';
+            const dotClass = (f.connectionStatus === 'tcp' || f.connectionStatus === 'udp') ? 'online-dot' : 'offline-dot';
             const emoji = '👤';
             // Show name, or public key first 7 chars if name empty
             let displayName = f.name;
@@ -799,10 +800,19 @@ function longPollEvents() {
                         const k = "friend_" + d.friend_id;
                         if (peerInfoMap[k]) {
                             peerInfoMap[k].status = d.status;
-                            peerInfoMap[k].statusStr = d.status === 0 ? 'none' : d.status === 1 ? 'tcp' : 'udp';
+                        }
+                    } else if (event.event_type === 'friend_connection_status') {
+                        const d = JSON.parse(event.data);
+                        const k = "friend_" + d.friend_id;
+                        if (peerInfoMap[k]) {
+                            peerInfoMap[k].status = d.status === 'tcp' ? 1 : d.status === 'udp' ? 2 : 0;
+                            peerInfoMap[k].statusStr = d.status;
+                            peerInfoMap[k].connectionStatus = d.status;
                         }
                         const f = contacts.friends.find(f => f.friendId == d.friend_id);
-                        if (f) f.status = d.status;
+                        if (f) {
+                            f.connectionStatus = d.status;
+                        }
                         renderContactList(currentFilter);
                     } else if (event.event_type === 'self_connection_status') {
                         loadSelfInfo();
