@@ -10,6 +10,7 @@ struct FriendInfo {
     int id;
     std::string name;
     std::string statusStr;
+    std::string userStatus;
     std::string statusText;
     std::string iconUrl;
     std::string publicKey;

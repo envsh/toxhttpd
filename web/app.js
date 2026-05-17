@@ -1730,6 +1730,8 @@ function showFriendInfo(friendId) {
           document.getElementById('infoFriendName').textContent = f.name || t('no_name_label');
           document.getElementById('infoFriendId').textContent = f.friendId;
           document.getElementById('infoFriendStatus').textContent = f.statusText || t('unknown');
+          var userStatusMap = {0: t('statuses.online'), 1: t('statuses.away'), 2: t('statuses.busy')};
+          document.getElementById('infoFriendUserStatus').textContent = userStatusMap[f.userStatus] || t('statuses.online');
           document.getElementById('infoFriendConn').textContent = f.statusStr || t('unknown');
           document.getElementById('infoFriendLastSeen').textContent = f.lastSeen ? new Date(f.lastSeen * 1000).toLocaleString() : t('never_online');
           document.getElementById('infoFriendPk').textContent = f.publicKey || t('unknown');

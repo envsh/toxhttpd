@@ -52,6 +52,15 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     statusLayout->addWidget(statusLabel, 1);
     mainLayout->addLayout(statusLayout);
     
+    // 用户状态
+    QBoxLayout* userStatusLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    QLabel* userStatusTitle = new QLabel(_("modals.labels.user_status"), this);
+    userStatusTitle->setFixedWidth(80);
+    userStatusLayout->addWidget(userStatusTitle);
+    userStatusLabel = new QLabel(this);
+    userStatusLayout->addWidget(userStatusLabel, 1);
+    mainLayout->addLayout(userStatusLayout);
+
     // 连接状态
     QBoxLayout* connLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     QLabel* connTitle = new QLabel(_("modals.labels.connection"), this);
@@ -123,13 +132,21 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
 }
 
 void FriendInfoDialog::setInfo(int id, const QString& name, const QString& type,
-                                 const QString& status, const QString& connection,
-                                 bool isConnected, const QString& publicKey) {
+                                 const QString& status, const QString& userStatus,
+                                 const QString& connection, bool isConnected,
+                                 const QString& publicKey) {
     idLabel->setText(QString::number(id));
     nameLabel->setText(name.isEmpty() ? _("no_name") : name);
     typeLabel->setText(type == "friend" ? _("friend") : 
                       type == "conference" ? _("conference_item") : _("group"));
     statusLabel->setText(status.isEmpty() ? _("no_status") : status);
+    if (userStatus == "1") {
+        userStatusLabel->setText(_("statuses.away"));
+    } else if (userStatus == "2") {
+        userStatusLabel->setText(_("statuses.busy"));
+    } else {
+        userStatusLabel->setText(_("statuses.online"));
+    }
     connLabel->setText(connection.isEmpty() ? _("statuses.offline") : connection);
     
     // 设置连接状态（在线/离线）
@@ -145,6 +162,7 @@ void FriendInfoDialog::setInfo(int id, const QString& name, const QString& type,
 void FriendInfoDialog::setInfo(const FriendInfo& info) {
     setInfo(info.id, qFromUtf8(info.name.c_str()), "friend",
             qFromUtf8(info.statusText.c_str()),
+            qFromUtf8(info.userStatus.c_str()),
             qFromUtf8(info.statusStr.c_str()),
             false,
             qFromUtf8(info.publicKey.c_str()));

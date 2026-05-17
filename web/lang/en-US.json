@@ -53,6 +53,7 @@
             "status_message": "Status Message",
             "friend_id": "Friend ID",
             "status": "Status",
+            "user_status": "User Status",
             "connection": "Connection",
             "public_key": "Public Key",
             "ip": "IP",
@@ -74,6 +75,8 @@
     "statuses": {
         "offline": "Offline",
         "online": "Online",
+        "away": "Away",
+        "busy": "Busy",
         "tcp": "TCP",
         "udp": "UDP"
     },

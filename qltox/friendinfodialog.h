@@ -12,6 +12,7 @@ public:
     
     void setInfo(int id, const QString& name, const QString& type,
                  const QString& status = QString(),
+                 const QString& userStatus = QString(),
                  const QString& connection = QString(),
                  bool isConnected = false,
                  const QString& publicKey = QString());
@@ -29,6 +30,7 @@ private:
     QLabel* nameLabel;
     QLabel* typeLabel;
     QLabel* statusLabel;
+    QLabel* userStatusLabel;
     QLabel* connLabel;
     QLabel* connectedLabel;
     QLabel* pkLabel;

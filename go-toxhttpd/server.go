@@ -252,6 +252,7 @@ type Server struct {
 	eventQueue           *EventQueue
 	selfConnectionStatus string
 	friendStatuses       map[uint32]string
+	friendUserStatuses   map[uint32]int
 	conferenceConnected  map[uint32]bool // 新增：会议连接状态
 	mu                   sync.RWMutex
 }
@@ -302,6 +303,7 @@ func NewServer(udpEnabled bool) (*Server, error) {
 		eventQueue:           NewEventQueue(),
 		selfConnectionStatus: "offline",
 		friendStatuses:       make(map[uint32]string),
+		friendUserStatuses:   make(map[uint32]int),
 	}
 
 	setupCallbacks(server)
@@ -414,6 +416,9 @@ func setupCallbacks(s *Server) {
 
 	// Friend status callback (stub)
 	s.tox.CallbackFriendStatus(func(this *tox.Tox, friendNumber uint32, status int, userData interface{}) {
+		s.mu.Lock()
+		s.friendUserStatuses[friendNumber] = status
+		s.mu.Unlock()
 		log.Printf("[TOX_CALLBACK] FriendStatus: friend=%d, status=%d", friendNumber, status)
 		data, _ := json.Marshal(map[string]interface{}{
 			"friend_id": friendNumber,
@@ -889,9 +894,14 @@ func (s *Server) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 			statusInt = 2
 		}
 
+		s.mu.RLock()
+		userStatus := s.friendUserStatuses[fid]
+		s.mu.RUnlock()
+
 		entry["name"] = name
 		entry["status"] = statusInt
 		entry["statusStr"] = statusToStr(statusInt)
+		entry["userStatus"] = userStatus
 		entry["statusText"] = statusText
 		entry["publicKey"] = pk
 		entry["lastSeen"] = lastSeen

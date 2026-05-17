@@ -53,6 +53,7 @@
             "status_message": "状态消息",
             "friend_id": "好友 ID",
             "status": "状态",
+            "user_status": "用户状态",
             "connection": "连接",
             "public_key": "公钥",
             "ip": "IP 地址",
@@ -74,6 +75,8 @@
     "statuses": {
         "offline": "离线",
         "online": "在线",
+        "away": "离开",
+        "busy": "忙碌",
         "tcp": "TCP",
         "udp": "UDP"
     },

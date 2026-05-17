@@ -332,6 +332,7 @@ bool ToxAPI::getFriendInfo(int id, FriendInfo& info) {
     info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
     info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
     info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+    info.userStatus = jsonStr(cJSON_GetObjectItem(item, "userStatus"));
     info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
     info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
     info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));

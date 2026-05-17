@@ -591,7 +591,7 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
             }
         }
         dialog.setInfo(id, _("conference_item") + " " + QString::number(id), type,
-                       statusText, "", isConnected, chatId);
+                       statusText, QString(), "", isConnected, chatId);
         dialog.setPeerCount(memberCount);
     } else if (type == "group") {
         dialog.setTitle(_("modals.group_info_title"));
@@ -610,7 +610,7 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
             }
         }
         dialog.setInfo(id, _("group_item") + " " + QString::number(id), type,
-                       statusText, "", isConnected, chatId);
+                       statusText, QString(), "", isConnected, chatId);
         dialog.setPeerCount(memberCount);
     }
     
