@@ -301,6 +301,56 @@ inline void qStackSetCurrent(StackedWidget* stack, QWidget* page) {
 #endif
 }
 
+// Qt3: 双击 QLabel 复制文本（闪烁 ✓ 反馈）
+#ifdef QT3_BUILD
+class LabelDblClickFilter : public QObject {
+    QLabel* m_label;
+    QString m_origText;
+    int m_timerId;
+public:
+    LabelDblClickFilter(QObject* parent)
+        : QObject(parent), m_label(nullptr), m_timerId(-1) {}
+
+    bool eventFilter(QObject* obj, QEvent* event) {
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            QLabel* label = static_cast<QLabel*>(obj);
+            if (label && !label->text().isEmpty()) {
+                QApplication::clipboard()->setText(label->text());
+                if (m_timerId == -1) {
+                    m_label = label;
+                    m_origText = label->text();
+                    label->setText(m_origText + " ✓");
+                    m_timerId = startTimer(1000);
+                }
+                return true;
+            }
+        }
+        return QObject::eventFilter(obj, event);
+    }
+
+    void timerEvent(QTimerEvent* event) {
+        if (event->timerId() == m_timerId) {
+            killTimer(m_timerId);
+            m_timerId = -1;
+            if (m_label) {
+                m_label->setText(m_origText);
+                m_label = nullptr;
+            }
+        }
+        QObject::timerEvent(event);
+    }
+};
+#endif
+
+// 让 QLabel 可选中的兼容宏（Qt4: 鼠标拖动选中; Qt3: 双击复制）
+inline void qSetLabelSelectable(QLabel* label) {
+#ifndef QT3_BUILD
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+#else
+    label->installEventFilter(new LabelDblClickFilter(label));
+#endif
+}
+
 // 跨平台消息提示音（支持 WAV / Opus）
 void playNotifySound(const QString& filePath);
 void playNotifySound();

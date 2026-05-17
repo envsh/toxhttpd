@@ -432,27 +432,29 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 #endif
     
     if (type == "friend") {
-        // 好友：删除、邀请进会议、邀请进群组
+        // 好友：邀请进会议、邀请进群组，删除在最下
 #ifdef QT3_BUILD
-        menu.insertItem(_("context_menu.delete_friend"), 1);
         menu.insertSeparator();
-        menu.insertItem(_("context_menu.invite_to_conference"), 2);
-        menu.insertItem(_("context_menu.invite_to_group"), 3);
+        menu.insertItem(_("context_menu.invite_to_conference"), 1);
+        menu.insertItem(_("context_menu.invite_to_group"), 2);
+        menu.insertSeparator();
+        menu.insertItem(_("context_menu.delete_friend"), 3);
         int choice = menu.exec(globalPos);
         if (choice == 0) emit viewInfoRequested(id, type);
-        else if (choice == 1) emit deleteOrLeaveRequested(id, type);
-        else if (choice == 2) emit inviteToConferenceRequested(id);
-        else if (choice == 3) emit inviteToGroupRequested(id);
+        else if (choice == 1) emit inviteToConferenceRequested(id);
+        else if (choice == 2) emit inviteToGroupRequested(id);
+        else if (choice == 3) emit deleteOrLeaveRequested(id, type);
 #else
         menu.addSeparator();
-        QAction* deleteAction = menu.addAction(_("context_menu.delete_friend"));
         QAction* inviteConfAction = menu.addAction(_("context_menu.invite_to_conference"));
         QAction* inviteGroupAction = menu.addAction(_("context_menu.invite_to_group"));
+        menu.addSeparator();
+        QAction* deleteAction = menu.addAction(_("context_menu.delete_friend"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) emit viewInfoRequested(id, type);
-        else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
         else if (selected == inviteConfAction) emit inviteToConferenceRequested(id);
         else if (selected == inviteGroupAction) emit inviteToGroupRequested(id);
+        else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
 #endif
     } else if (type == "conference") {
         // 会议：查看成员、离开会议（离开放在最后）

@@ -10,6 +10,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     
     // 标题
     titleLabel = new QLabel(this);
+    qSetLabelSelectable(titleLabel);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 2);
@@ -22,6 +23,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     idTitle->setFixedWidth(80);
     idLayout->addWidget(idTitle);
     idLabel = new QLabel(this);
+    qSetLabelSelectable(idLabel);
     idLayout->addWidget(idLabel, 1);
     mainLayout->addLayout(idLayout);
     
@@ -31,6 +33,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     nameTitle->setFixedWidth(80);
     nameLayout->addWidget(nameTitle);
     nameLabel = new QLabel(this);
+    qSetLabelSelectable(nameLabel);
     nameLayout->addWidget(nameLabel, 1);
     mainLayout->addLayout(nameLayout);
     
@@ -40,6 +43,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     typeTitle->setFixedWidth(80);
     typeLayout->addWidget(typeTitle);
     typeLabel = new QLabel(this);
+    qSetLabelSelectable(typeLabel);
     typeLayout->addWidget(typeLabel, 1);
     mainLayout->addLayout(typeLayout);
     
@@ -49,6 +53,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     statusTitle->setFixedWidth(80);
     statusLayout->addWidget(statusTitle);
     statusLabel = new QLabel(this);
+    qSetLabelSelectable(statusLabel);
     statusLayout->addWidget(statusLabel, 1);
     mainLayout->addLayout(statusLayout);
     
@@ -58,6 +63,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     userStatusTitle->setFixedWidth(80);
     userStatusLayout->addWidget(userStatusTitle);
     userStatusLabel = new QLabel(this);
+    qSetLabelSelectable(userStatusLabel);
     userStatusLayout->addWidget(userStatusLabel, 1);
     mainLayout->addLayout(userStatusLayout);
 
@@ -67,6 +73,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     connTitle->setFixedWidth(80);
     connLayout->addWidget(connTitle);
     connLabel = new QLabel(this);
+    qSetLabelSelectable(connLabel);
     connLayout->addWidget(connLabel, 1);
     mainLayout->addLayout(connLayout);
     
@@ -76,6 +83,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     connectedTitle->setFixedWidth(80);
     connectedLayout->addWidget(connectedTitle);
     connectedLabel = new QLabel(this);
+    qSetLabelSelectable(connectedLabel);
     connectedLayout->addWidget(connectedLabel, 1);
     mainLayout->addLayout(connectedLayout);
     
@@ -85,6 +93,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     ipTitle->setFixedWidth(80);
     ipLayout->addWidget(ipTitle);
     ipLabel = new QLabel(this);
+    qSetLabelSelectable(ipLabel);
     ipLayout->addWidget(ipLabel, 1);
     mainLayout->addLayout(ipLayout);
 
@@ -94,6 +103,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     lastSeenTitle->setFixedWidth(80);
     lastSeenLayout->addWidget(lastSeenTitle);
     lastSeenLabel = new QLabel(this);
+    qSetLabelSelectable(lastSeenLabel);
     lastSeenLayout->addWidget(lastSeenLabel, 1);
     mainLayout->addLayout(lastSeenLayout);
 
@@ -103,6 +113,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     peerCountTitle->setFixedWidth(80);
     peerCountLayout->addWidget(peerCountTitle);
     peerCountLabel = new QLabel(this);
+    qSetLabelSelectable(peerCountLabel);
     peerCountLayout->addWidget(peerCountLabel, 1);
     mainLayout->addLayout(peerCountLayout);
 
@@ -112,6 +123,7 @@ FriendInfoDialog::FriendInfoDialog(QWidget* parent) : QDialog(parent) {
     pkTitle->setFixedWidth(80);
     pkLayout->addWidget(pkTitle);
     pkLabel = new QLabel(this);
+    qSetLabelSelectable(pkLabel);
 #ifdef QT3_BUILD
     // Qt3: use break lines manually or use QTextEdit
     pkLabel->setTextFormat(Qt::PlainText);
