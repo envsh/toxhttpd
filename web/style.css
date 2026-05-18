@@ -1151,3 +1151,91 @@ select option {
 .message.self .message-ip {
     order: -1;
 }
+
+/* Login overlay */
+#loginOverlay {
+    position: fixed;
+    inset: 0;
+    background: #0d1117;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+#loginBox {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 32px;
+    width: 400px;
+}
+#loginBox h2 {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    color: #c9d1d9;
+}
+#loginBox label {
+    display: block;
+    margin-bottom: 6px;
+    color: #8b949e;
+    font-size: 13px;
+}
+.login-input-row input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 14px;
+    font-family: monospace;
+    box-sizing: border-box;
+}
+.login-input-row input:focus {
+    outline: none;
+    border-color: #58a6ff;
+}
+#loginClearBtn {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+}
+#loginClearBtn:hover {
+    background: #30363d;
+}
+#loginConnectBtn {
+    background: #238636;
+    color: #fff;
+    border: 1px solid rgba(240,246,252,0.1);
+    border-radius: 6px;
+    padding: 6px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+#loginConnectBtn:hover {
+    background: #2ea043;
+}
+#loginConnectBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.login-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+}
+#loginStatus {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #f85149;
+    min-height: 1.2em;
+}
+#loginStatus.connecting {
+    color: #8b949e;
+}

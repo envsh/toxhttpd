@@ -6,6 +6,21 @@
     <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
+    <div id="loginOverlay">
+        <div id="loginBox">
+            <h2 id="loginTitle">连接到服务器</h2>
+            <label for="serverUrlInput">服务器地址：</label>
+            <div class="login-input-row">
+                <input type="text" id="serverUrlInput" placeholder="http://localhost:8181" list="serverHistory" />
+                <datalist id="serverHistory"></datalist>
+            </div>
+            <div class="login-actions">
+                <button id="loginClearBtn" onclick="clearServerHistory()">清空历史</button>
+                <button id="loginConnectBtn" onclick="onLoginConnect()">连接</button>
+            </div>
+            <p id="loginStatus"></p>
+        </div>
+    </div>
     <div class="container">
         <div class="sidebar">
             <div class="self-info" id="selfInfo">

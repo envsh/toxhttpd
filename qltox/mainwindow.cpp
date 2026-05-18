@@ -1,17 +1,8 @@
 #include "mainwindow.h"
-#include "compat34.h"
-
-// 获取当前时间字符串 (hh:mm:ss)
-static QString getCurrentTime() {
-    QTime now = QTime::currentTime();
-    return now.toString("hh:mm:ss");
-}
-
-#include "selfinfo.h"
-#include "contactlist.h"
-#include "chatwidget.h"
 #include "restapi.h"
+#include "eventpoller.h"
 #include "translator.h"
+#include "logindialog.h"
 #include "conferenceinvitedialog.h"
 #include "groupinvitedialog.h"
 #include "cJSON.h"
@@ -939,7 +930,30 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
 }
 
 void MainWindow::onSwitchAccount() {
-    QMessageBox::information(this, "", _("not_yet_implemented"));
+    ToxAPI::stopPollEvent();
+
+    LoginDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted) {
+        ToxAPI::startPollEvent();
+        ToxAPI::loadAllData();
+        return;
+    }
+
+    ToxAPI::setBaseUrl(dialog.selectedUrl());
+    ToxAPI::resetLastEventId();
+
+    // 清空 UI 状态
+    currentChatId = -1;
+    currentChatType = "";
+    selfPubkey.clear();
+    peerInfoMap.clear();
+    contactListWidget->clear();
+    chatWidget->clearMessages();
+    chatWidget->setHeaderText("");
+
+    // 重新加载数据
+    ToxAPI::startPollEvent();
+    ToxAPI::loadAllData();
 }
 
 void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messages) {

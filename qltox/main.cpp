@@ -2,6 +2,8 @@
 #include "mainwindow.h"
 #include "translator.h"
 #include "appsetup.h"
+#include "logindialog.h"
+#include "restapi.h"
 
 #include "ThemeManager.h"
 #include "LimeStyle.h"
@@ -51,6 +53,19 @@ int main(int argc, char* argv[]) {
     // 加载语言
     Translator::instance().loadLanguage(savedLang);
     QtappSetup::installQtTranslations(savedLang);
+    
+    // 登录对话框 — 临时阻止 accept() → hide() 触发 exit(0)
+    QtappSetup::setQuitOnExit(false);
+
+    LoginDialog loginDialog;
+    if (loginDialog.exec() != QDialog::Accepted) {
+        return 0;
+    }
+
+    // 对话框接受后恢复，MainWindow关闭时仍能正常退出
+    QtappSetup::setQuitOnExit(true);
+
+    ToxAPI::setBaseUrl(loginDialog.selectedUrl());
     
     // 创建主窗口
     MainWindow window;

@@ -49,6 +49,12 @@ void QtappSetup::onExit(std::function<void()> callback) {
     inst().exitCallbacks_.push_back(std::move(callback));
 }
 
+static bool g_quitOnExit = true;
+
+void QtappSetup::setQuitOnExit(bool enabled) {
+    g_quitOnExit = enabled;
+}
+
 void QtappSetup::onTimerTimeout() {
     for (auto& pair : timers_) {
         if (pair.second.first == sender()) {
@@ -65,8 +71,10 @@ void QtappSetup::onAppQuit() {
     exitCallbacks_.clear();
 
 	#if QT_VERSION < 0x050000
-	// 但进程不会终止，直到所有非守护线程都结束
-	exit(0);
+	if (g_quitOnExit) {
+		// 但进程不会终止，直到所有非守护线程都结束
+		exit(0);
+	}
 	#endif
 }
 

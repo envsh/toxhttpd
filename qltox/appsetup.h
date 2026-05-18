@@ -29,6 +29,8 @@ public:
     // langCode: 应用语言代码格式，如 "zh-CN", "zh-TW", "en-US"
     // 内部自动转为 Qt 格式 "zh_CN", "zh_TW" 并加载对应 .qm 文件
     static void installQtTranslations(const QString& langCode);
+    // 临时控制 lastWindowClosed → onAppQuit → exit(0) 的行为
+    static void setQuitOnExit(bool enabled);
 
 private slots:
     void onTimerTimeout();

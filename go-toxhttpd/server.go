@@ -1577,36 +1577,50 @@ func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func (s *Server) Start(port string) error {
-	http.HandleFunc("/api/self", loggingMiddleware(s.handleSelf))
-	http.HandleFunc("/api/friends", loggingMiddleware(s.handleFriends))
-	http.HandleFunc("/api/friend_delete", loggingMiddleware(s.handleFriendDelete))
-	http.HandleFunc("/api/friend", loggingMiddleware(s.handleFriendInfo))
-	http.HandleFunc("/api/messages", loggingMiddleware(s.handleSendMessage))
-	http.HandleFunc("/api/groups", loggingMiddleware(s.handleGroups))
-	http.HandleFunc("/api/conferences", loggingMiddleware(s.handleConferences))
-	http.HandleFunc("/api/conference_messages", loggingMiddleware(s.handleConferenceMessages))
-	http.HandleFunc("/api/conferences/join", loggingMiddleware(s.handleConferenceJoin))
-	http.HandleFunc("/api/conferences/reject", loggingMiddleware(s.handleConferenceReject))
-	http.HandleFunc("/api/conferences/ignore", loggingMiddleware(s.handleConferenceIgnore))
-	http.HandleFunc("/api/bootstrap", loggingMiddleware(s.handleBootstrap))
-	http.HandleFunc("/api/events", loggingMiddleware(s.handleEvents))
-	http.HandleFunc("/api/messages/history", loggingMiddleware(s.handleMessageHistory))
-	http.HandleFunc("/", loggingMiddleware(s.handleWeb))
+	http.HandleFunc("/api/self", corsMiddleware(loggingMiddleware(s.handleSelf)))
+	http.HandleFunc("/api/friends", corsMiddleware(loggingMiddleware(s.handleFriends)))
+	http.HandleFunc("/api/friend_delete", corsMiddleware(loggingMiddleware(s.handleFriendDelete)))
+	http.HandleFunc("/api/friend", corsMiddleware(loggingMiddleware(s.handleFriendInfo)))
+	http.HandleFunc("/api/messages", corsMiddleware(loggingMiddleware(s.handleSendMessage)))
+	http.HandleFunc("/api/groups", corsMiddleware(loggingMiddleware(s.handleGroups)))
+	http.HandleFunc("/api/conferences", corsMiddleware(loggingMiddleware(s.handleConferences)))
+	http.HandleFunc("/api/conference_messages", corsMiddleware(loggingMiddleware(s.handleConferenceMessages)))
+	http.HandleFunc("/api/conferences/join", corsMiddleware(loggingMiddleware(s.handleConferenceJoin)))
+	http.HandleFunc("/api/conferences/reject", corsMiddleware(loggingMiddleware(s.handleConferenceReject)))
+	http.HandleFunc("/api/conferences/ignore", corsMiddleware(loggingMiddleware(s.handleConferenceIgnore)))
+	http.HandleFunc("/api/bootstrap", corsMiddleware(loggingMiddleware(s.handleBootstrap)))
+	http.HandleFunc("/api/events", corsMiddleware(loggingMiddleware(s.handleEvents)))
+	http.HandleFunc("/api/messages/history", corsMiddleware(loggingMiddleware(s.handleMessageHistory)))
+	http.HandleFunc("/", corsMiddleware(loggingMiddleware(s.handleWeb)))
 
 	// Group Chat API 路由 (复数形式 /api/groups)
-	http.HandleFunc("/api/groups/join", loggingMiddleware(s.handleGroupJoin))
-	http.HandleFunc("/api/groups/leave", loggingMiddleware(s.handleGroupLeave))
-	http.HandleFunc("/api/group_messages", loggingMiddleware(s.handleGroupSendMessage))
-	http.HandleFunc("/api/groups/invite", loggingMiddleware(s.handleGroupInvite))
-	http.HandleFunc("/api/groups/accept", loggingMiddleware(s.handleGroupAccept))
+	http.HandleFunc("/api/groups/join", corsMiddleware(loggingMiddleware(s.handleGroupJoin)))
+	http.HandleFunc("/api/groups/leave", corsMiddleware(loggingMiddleware(s.handleGroupLeave)))
+	http.HandleFunc("/api/group_messages", corsMiddleware(loggingMiddleware(s.handleGroupSendMessage)))
+	http.HandleFunc("/api/groups/invite", corsMiddleware(loggingMiddleware(s.handleGroupInvite)))
+	http.HandleFunc("/api/groups/accept", corsMiddleware(loggingMiddleware(s.handleGroupAccept)))
 
 	// 成员列表 API 路由
-	http.HandleFunc("/api/conference/members", loggingMiddleware(s.handleConferenceMembers))
-	http.HandleFunc("/api/group/members", loggingMiddleware(s.handleGroupMembers))
-	http.HandleFunc("/api/random-name", loggingMiddleware(s.handleRandomName))
-	http.HandleFunc("/api/groups/set-name", loggingMiddleware(s.handleGroupSetName))
-	http.HandleFunc("/api/translate", loggingMiddleware(s.handleTranslate))
+	http.HandleFunc("/api/conference/members", corsMiddleware(loggingMiddleware(s.handleConferenceMembers)))
+	http.HandleFunc("/api/group/members", corsMiddleware(loggingMiddleware(s.handleGroupMembers)))
+	http.HandleFunc("/api/random-name", corsMiddleware(loggingMiddleware(s.handleRandomName)))
+	http.HandleFunc("/api/groups/set-name", corsMiddleware(loggingMiddleware(s.handleGroupSetName)))
+	http.HandleFunc("/api/translate", corsMiddleware(loggingMiddleware(s.handleTranslate)))
 
 	log.Printf("Server starting on :%s", port)
 	return http.ListenAndServe(":"+port, nil)

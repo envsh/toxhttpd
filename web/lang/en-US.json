@@ -197,5 +197,15 @@
     "no_members": "No members",
     "conference_leave_failed": "Leave failed",
     "group_leave_failed": "Leave failed",
-    "confirm_leave_group": "Leave group {0}?"
+    "confirm_leave_group": "Leave group {0}?",
+    "login": {
+        "title": "Connect to Server",
+        "server_url": "Server URL:",
+        "connect": "Connect",
+        "clear_history": "Clear History",
+        "connecting": "Connecting...",
+        "invalid_url": "Please enter a valid URL starting with http:// or https://",
+        "timeout": "Connection timed out",
+        "failed": "Connection failed"
+    }
 }

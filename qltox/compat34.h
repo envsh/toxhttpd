@@ -274,6 +274,11 @@ inline QString qFmtTime(uint timestamp) {
 #endif
 }
 
+// 当前时间字符串
+inline QString getCurrentTime() {
+    return QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+}
+
 // QPtrList 兼容 (Qt3 原生，Qt4 用 QList<T*> 模拟)
 #ifndef QT3_BUILD
 #include <QList>

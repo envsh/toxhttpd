@@ -6,13 +6,13 @@ CONFIG += moc
 SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
-             friendinfodialog.cpp memberlistdialog.cpp \
+             friendinfodialog.cpp memberlistdialog.cpp logindialog.cpp \
              messageinput.cpp
 
 HEADERS = mainwindow.h restapi.h eventpoller.h \
             chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
-            friendinfodialog.h memberlistdialog.h \
+            friendinfodialog.h memberlistdialog.h logindialog.h \
             messageinput.h
             
 # LimeStyle theme system

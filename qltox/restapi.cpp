@@ -85,6 +85,8 @@ void ToxAPI::onHttpDone(int httpCode, const std::string& body,
 void ToxAPI::setEventTarget(QObject* target) { s_target = target; }
 void ToxAPI::setBaseUrl(const std::string& url) { s_baseUrl = url; }
 
+void ToxAPI::resetLastEventId() { s_lastEventId = 0; }
+
 void ToxAPI::startPollEvent() {
     s_pollRunning = true;
     s_lastEventId = 0;

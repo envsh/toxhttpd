@@ -4,6 +4,15 @@ let lastEventId = 0;
 let currentEventId = 0; // For deleting events after processing
 let pollTimeout = null;
 let selfAddress = ''; // 保存完整地址
+let serverBaseUrl = ''; // 服务器 URL（跨域时使用，同源时留空）
+
+// API URL 工具函数
+function apiUrl(path) {
+    return (serverBaseUrl || '') + path;
+}
+function apiFetch(path, options) {
+    return fetch((serverBaseUrl || '') + path, options);
+}
 
 // Contact list data
 let contacts = {
@@ -31,7 +40,7 @@ let langData = {}; // 语言数据
 // 加载语言文件
 async function loadLanguage(lang) {
     try {
-        const response = await fetch(`/web/lang/${lang}.json`);
+        const response = await apiFetch(`/web/lang/${lang}.json`);
         langData = await response.json();
         currentLang = lang;
         // 保存到本地存储
@@ -227,7 +236,7 @@ function switchLanguage(lang) {
 
 // Load self info
 function loadSelfInfo() {
-    fetch('/api/self')
+    apiFetch('/api/self')
         .then(r => r.json())
         .then(data => {
             selfInfo = data;
@@ -321,7 +330,7 @@ function loadContacts(filter = 'all') {
     contactsLoading = true;
     
     // Load friends
-    fetch('/api/friends')
+    apiFetch('/api/friends')
         .then(r => r.json())
         .then(data => {
             const ids = data.friends || [];
@@ -333,7 +342,7 @@ function loadContacts(filter = 'all') {
                 chunks.push(ids.slice(i, i + chunkSize));
 
             return Promise.all(chunks.map(chunk =>
-                fetch('/api/friend', {
+                apiFetch('/api/friend', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: `friend_ids=${chunk.join(',')}`
@@ -362,12 +371,12 @@ function loadContacts(filter = 'all') {
                 };
             });
             // Load groups
-            return fetch('/api/groups').then(r => r.json());
+            return apiFetch('/api/groups').then(r => r.json());
         })
         .then(data => {
             contacts.groups = data.groups || [];
             // Load conferences
-            return fetch('/api/conferences').then(r => r.json());
+            return apiFetch('/api/conferences').then(r => r.json());
         })
         .then(data => {
             contacts.conferences = data.conferences || [];
@@ -592,7 +601,7 @@ function translateMessage(dataIdx) {
     msg.translationInProgress = true;
     updateMessageNode(dataIdx);
 
-    fetch('/api/translate', {
+    apiFetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: msg.text, to: TARGET_LANG })
@@ -672,7 +681,7 @@ function loadMessageHistory() {
     const contactId = currentChatId;
     const contactType = currentChatType;
 
-    fetch(`/api/messages/history?contact_id=${contactId}&contact_type=${contactType}`)
+    apiFetch(`/api/messages/history?contact_id=${contactId}&contact_type=${contactType}`)
         .then(r => r.json())
         .then(data => {
             if (!data.messages || data.messages.length === 0) {
@@ -760,7 +769,7 @@ function updateSelection(id, type) {
 
 // Long polling for events
 function longPollEvents() {
-    fetch(`/api/events?after=${lastEventId}`)
+    apiFetch(`/api/events?after=${lastEventId}`)
         .then(r => {
             // 读取 X-Server-Next-Id header，检测服务端重启
             const serverNextId = r.headers.get('X-Server-Next-Id');
@@ -1278,7 +1287,7 @@ function showConferenceInviteDialog(data) {
     // 同意按钮（最左）
     document.getElementById('acceptBtn').onclick = function() {
         document.body.removeChild(overlay);
-        fetch('/api/conferences/join', {
+        apiFetch('/api/conferences/join', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `friend_number=${data.friend_number}&cookie=${data.cookie}`
@@ -1294,7 +1303,7 @@ function showConferenceInviteDialog(data) {
     // 拒绝按钮（中间）
     document.getElementById('rejectBtn').onclick = function() {
         document.body.removeChild(overlay);
-        fetch('/api/conferences/reject', {
+        apiFetch('/api/conferences/reject', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `friend_number=${data.friend_number}`
@@ -1306,7 +1315,7 @@ function showConferenceInviteDialog(data) {
     // 忽略按钮（最右）
     document.getElementById('ignoreBtn').onclick = function() {
         document.body.removeChild(overlay);
-        fetch('/api/conferences/ignore', {
+        apiFetch('/api/conferences/ignore', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `friend_number=${data.friend_number}`
@@ -1343,7 +1352,7 @@ function showGroupInviteDialog(data) {
         document.body.removeChild(overlay);
         // Delete the event
         if (currentEventId > 0) {
-            fetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
+            apiFetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
         }
         const inviteData = data.chat_id || data.invite_data || data.cookie || '';
         if (!inviteData) {
@@ -1351,7 +1360,7 @@ function showGroupInviteDialog(data) {
             console.error('Missing invite data:', data);
             return;
         }
-        fetch('/api/groups/accept', {
+        apiFetch('/api/groups/accept', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `invite_data=${encodeURIComponent(inviteData)}&friend_number=${data.friend_number}&name=${encodeURIComponent(data.name || '')}`
@@ -1373,9 +1382,9 @@ function showGroupInviteDialog(data) {
         document.body.removeChild(overlay);
         // Delete the event
         if (currentEventId > 0) {
-            fetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
+            apiFetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
         }
-        fetch('/api/groups/reject', {
+        apiFetch('/api/groups/reject', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `friend_number=${data.friend_number}`
@@ -1389,9 +1398,9 @@ function showGroupInviteDialog(data) {
         document.body.removeChild(overlay);
         // Delete the event
         if (currentEventId > 0) {
-            fetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
+            apiFetch(`/api/events?id=${currentEventId}`, { method: 'DELETE' });
         }
-        fetch('/api/groups/ignore', {
+        apiFetch('/api/groups/ignore', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `friend_number=${data.friend_number}`
@@ -1424,7 +1433,7 @@ function sendMessage() {
         body = `conference_id=${currentChatId}&message=${encodeURIComponent(msg)}`;
     }
     
-    fetch(url, {
+    apiFetch(url, {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: body
@@ -1450,7 +1459,7 @@ function addFriend() {
         alert(t('add_friend_prompt'));
         return;
     }
-    fetch('/api/friends', {
+    apiFetch('/api/friends', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `public_key=${encodeURIComponent(pubkey)}`
@@ -1472,7 +1481,7 @@ function addFriendFromBottom() {
         alert(t('add_friend_prompt'));
         return;
     }
-    fetch('/api/friends', {
+    apiFetch('/api/friends', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `public_key=${encodeURIComponent(pubkey)}`
@@ -1495,7 +1504,7 @@ function joinGroupFromBottom() {
         return;
     }
 
-    fetch('/api/groups/join', {
+    apiFetch('/api/groups/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `chat_id=${encodeURIComponent(chatId)}`
@@ -1549,7 +1558,7 @@ function confirmCreateGroup() {
     if (password) params.append('password', password);
     if (privacyState === 'private') params.append('privacy_state', 'private');
     
-    fetch('/api/groups', {
+    apiFetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString()
@@ -1569,7 +1578,7 @@ function confirmCreateGroup() {
 
 // Create conference
 function createConference() {
-    fetch('/api/conferences', {
+    apiFetch('/api/conferences', {
         method: 'POST'
     }).then(r => r.json())
       .then(data => {
@@ -1586,7 +1595,7 @@ function leaveGroup() {
     if (!confirm(t('confirm_leave_group', selectedGroupId))) {
         return;
     }
-    fetch('/api/groups/leave', {
+    apiFetch('/api/groups/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `group_number=${selectedGroupId}`
@@ -1719,7 +1728,7 @@ function hideFriendMenu() {
 }
 
 function showFriendInfo(friendId) {
-    fetch('/api/friend', {
+    apiFetch('/api/friend', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `friend_ids=${friendId}`
@@ -1753,7 +1762,7 @@ function deleteFriend() {
         return;
     }
     
-    fetch('/api/friend_delete', {
+    apiFetch('/api/friend_delete', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `friend_id=${selectedFriendId}`
@@ -1793,7 +1802,7 @@ function leaveConference() {
         return;
     }
     
-    fetch('/api/conference_delete', {
+    apiFetch('/api/conference_delete', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `conference_id=${selectedConferenceId}`
@@ -1829,7 +1838,7 @@ function hideGroupInfo() {
 // Member list functions
 async function fetchConferenceMembers(conferenceId) {
     try {
-        const resp = await fetch(`/api/conference/members?conference_id=${conferenceId}`);
+        const resp = await apiFetch(`/api/conference/members?conference_id=${conferenceId}`);
         const data = await resp.json();
         return data.members || [];
     } catch (err) {
@@ -1840,7 +1849,7 @@ async function fetchConferenceMembers(conferenceId) {
 
 async function fetchGroupMembers(groupId) {
     try {
-        const resp = await fetch(`/api/group/members?group_number=${groupId}`);
+        const resp = await apiFetch(`/api/group/members?group_number=${groupId}`);
         const data = await resp.json();
         return data;
     } catch (err) {
@@ -1912,7 +1921,7 @@ function hideMemberList() {
 function inviteToConference(friendId) {
     inviteFriendId = friendId;
     
-    fetch('/api/conferences')
+    apiFetch('/api/conferences')
         .then(r => r.json())
         .then(data => {
             const select = document.getElementById('conferenceSelect');
@@ -1934,7 +1943,7 @@ function inviteToConference(friendId) {
 
 function confirmConferenceInvite() {
     const confId = document.getElementById('conferenceSelect').value;
-    fetch('/api/conference_invite', {
+    apiFetch('/api/conference_invite', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `friend_id=${inviteFriendId}&conference_id=${confId}`
@@ -1953,7 +1962,7 @@ function confirmConferenceInvite() {
 
 function confirmGroupInvite() {
     const groupId = document.getElementById('groupSelect').value;
-    fetch('/api/groups/invite', {
+    apiFetch('/api/groups/invite', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `friend_id=${inviteFriendId}&group_id=${groupId}`
@@ -1977,7 +1986,7 @@ function hideSelectConference() {
 // Invite friend to group
 function inviteToGroup(friendId) {
     // 获取群组列表
-    fetch('/api/groups')
+    apiFetch('/api/groups')
         .then(r => r.json())
         .then(data => {
             if (!data.groups || data.groups.length === 0) {
@@ -1996,7 +2005,7 @@ function inviteToGroup(friendId) {
             
             const groupId = prompt('选择群组 ID:', data.groups[0]);
             if (groupId) {
-                fetch('/api/groups/invite', {
+                apiFetch('/api/groups/invite', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: `friend_id=${friendId}&group_id=${groupId}`
@@ -2016,7 +2025,7 @@ function inviteToGroup(friendId) {
 
 // Show edit self modal
 function showEditSelf() {
-    fetch('/api/self')
+    apiFetch('/api/self')
         .then(r => r.json())
         .then(data => {
             document.getElementById('editName').value = data.name || '';
@@ -2043,7 +2052,7 @@ function saveSelfInfo() {
     }
     
     if (name || status) {
-        fetch('/api/self', {
+        apiFetch('/api/self', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: params.toString()
@@ -2063,7 +2072,7 @@ function saveSelfInfo() {
 
 // Bootstrap
 function bootstrap() {
-    fetch('/api/bootstrap', {
+    apiFetch('/api/bootstrap', {
         method: 'POST'
     }).then(() => {
         alert(t('connecting_network'));
@@ -2073,15 +2082,131 @@ function bootstrap() {
     });
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing...');
-    initLanguage();
+// ── Initialize app (after login) ──
+function initApp() {
     loadSelfInfo();
     loadContacts('all');
     longPollEvents();
     initEmojiPicker();
     document.getElementById('messageInput').addEventListener('keydown', _messageInputHandler);
+}
+
+// ── Login overlay ──
+function showLoginOverlay() {
+    document.getElementById('loginOverlay').style.display = 'flex';
+
+    // Load history from localStorage
+    var history = [];
+    try {
+        var saved = localStorage.getItem('toxchat_server_history');
+        if (saved) history = JSON.parse(saved);
+    } catch(e) {}
+    var datalist = document.getElementById('serverHistory');
+    datalist.innerHTML = '';
+    history.forEach(function(url) {
+        var opt = document.createElement('option');
+        opt.value = url;
+        datalist.appendChild(opt);
+    });
+
+    // Pre-fill last used URL
+    try {
+        var lastUrl = localStorage.getItem('toxchat_server_url');
+        if (lastUrl) document.getElementById('serverUrlInput').value = lastUrl;
+    } catch(e) {}
+}
+
+function hideLoginOverlay() {
+    document.getElementById('loginOverlay').style.display = 'none';
+}
+
+function saveServerUrl(url) {
+    try {
+        localStorage.setItem('toxchat_server_url', url);
+        // Update history
+        var history = [];
+        var saved = localStorage.getItem('toxchat_server_history');
+        if (saved) history = JSON.parse(saved);
+        history = [url].concat(history.filter(function(u) { return u !== url; }));
+        if (history.length > 20) history = history.slice(0, 20);
+        localStorage.setItem('toxchat_server_history', JSON.stringify(history));
+    } catch(e) {}
+}
+
+function clearServerHistory() {
+    try {
+        localStorage.removeItem('toxchat_server_url');
+        localStorage.removeItem('toxchat_server_history');
+    } catch(e) {}
+    document.getElementById('serverUrlInput').value = 'http://localhost:8181';
+    document.getElementById('serverHistory').innerHTML = '';
+}
+
+function onLoginConnect() {
+    var url = document.getElementById('serverUrlInput').value.trim();
+    if (!url) return;
+
+    if (url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) {
+        document.getElementById('loginStatus').textContent = t('login.invalid_url');
+        return;
+    }
+    if (url.endsWith('/')) url = url.slice(0, -1);
+
+    var btn = document.getElementById('loginConnectBtn');
+    var status = document.getElementById('loginStatus');
+    btn.disabled = true;
+    status.textContent = t('login.connecting');
+    status.className = 'connecting';
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 3000);
+
+    fetch(url + '/api/self', { signal: controller.signal })
+        .then(function(r) {
+            clearTimeout(timeoutId);
+            return r.json();
+        })
+        .then(function(data) {
+            saveServerUrl(url);
+            serverBaseUrl = url;
+            status.textContent = '';
+            status.className = '';
+            hideLoginOverlay();
+            initApp();
+        })
+        .catch(function(err) {
+            clearTimeout(timeoutId);
+            btn.disabled = false;
+            status.textContent = err.name === 'AbortError'
+                ? t('login.timeout')
+                : t('login.failed');
+            status.className = '';
+        });
+}
+
+// Export for HTML onclick
+window.showLoginOverlay = showLoginOverlay;
+window.hideLoginOverlay = hideLoginOverlay;
+window.onLoginConnect = onLoginConnect;
+window.clearServerHistory = clearServerHistory;
+
+// ── Initialize on page load ──
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
+    initLanguage();
+
+    // Check if we have a saved server URL
+    try {
+        var savedUrl = localStorage.getItem('toxchat_server_url');
+        if (savedUrl) {
+            serverBaseUrl = savedUrl;
+            initApp();
+        } else {
+            showLoginOverlay();
+        }
+    } catch(e) {
+        showLoginOverlay();
+    }
 });
 
 // ── Input helpers ──
@@ -2351,7 +2476,7 @@ function doSetGroupName(groupId, name) {
     var params = new URLSearchParams();
     params.append('group_number', groupId);
     params.append('name', name);
-    fetch('/api/groups/set-name', {
+    apiFetch('/api/groups/set-name', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString()
@@ -2363,7 +2488,7 @@ function doSetGroupName(groupId, name) {
 }
 
 function generateRandomName() {
-    fetch('/api/random-name').then(function(r) { return r.json(); }).then(function(d) {
+    apiFetch('/api/random-name').then(function(r) { return r.json(); }).then(function(d) {
         var preview = document.getElementById('renameRandomPreview');
         if (preview) preview.textContent = d.name;
     });

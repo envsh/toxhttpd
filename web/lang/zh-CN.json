@@ -193,5 +193,15 @@
     "group_leave_success": "已离开群组",
     "conference_leave_failed": "离开失败",
     "group_leave_failed": "离开失败",
-    "confirm_leave_group": "确定离开群组 {0} 吗？"
+    "confirm_leave_group": "确定离开群组 {0} 吗？",
+    "login": {
+        "title": "连接到服务器",
+        "server_url": "服务器地址：",
+        "connect": "连接",
+        "clear_history": "清空历史",
+        "connecting": "正在连接...",
+        "invalid_url": "请输入有效的 URL（以 http:// 或 https:// 开头）",
+        "timeout": "连接超时",
+        "failed": "连接失败"
+    }
 }

@@ -40,6 +40,7 @@ class ToxAPI {
 public:
     static void setEventTarget(QObject* target);
     static void setBaseUrl(const std::string& url);
+    static void resetLastEventId();
 
     static void startPollEvent();
     static void stopPollEvent();
