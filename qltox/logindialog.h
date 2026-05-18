@@ -21,6 +21,7 @@ private:
     QLabel* m_statusLabel;
     std::string m_selectedUrl;
     volatile int m_httpResult;
+    volatile int m_curlError;
     QTimer* m_pollTimer;
 
     void loadHistory();

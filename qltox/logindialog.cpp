@@ -68,6 +68,7 @@ static int qComboFindText(QComboBox* combo, const QString& text) {
 
 LoginDialog::LoginDialog(QWidget* parent) : QDialog(parent) {
     m_httpResult = -1;
+    m_curlError = 0;
     m_pollTimer = new QTimer(this);
 
     qSetWindowTitle(this, _("login.title"));
@@ -201,6 +202,7 @@ void LoginDialog::onConnect() {
 
     m_selectedUrl = url;
     m_httpResult = -1;
+    m_curlError = 0;
 
     std::thread([this, url]() {
         CURL* curl = curl_easy_init();
@@ -221,6 +223,7 @@ void LoginDialog::onConnect() {
         curl_easy_cleanup(curl);
 
         m_httpResult = (int)httpCode;
+        m_curlError = (int)res;
     }).detach();
 
     m_pollTimer->start(50);
@@ -235,11 +238,15 @@ void LoginDialog::checkHttpResult() {
         m_statusLabel->setText("");
         saveHistory(m_selectedUrl);
         accept();
+    } else if (m_curlError != 0) {
+        m_connectBtn->setEnabled(true);
+        m_statusLabel->setText(qFromUtf8(curl_easy_strerror((CURLcode)m_curlError)));
+    } else if (m_httpResult > 0) {
+        m_connectBtn->setEnabled(true);
+        m_statusLabel->setText(QString("HTTP %1").arg(m_httpResult));
     } else {
         m_connectBtn->setEnabled(true);
-        m_statusLabel->setText(m_httpResult == 0
-            ? _("login.timeout")
-            : _("login.failed"));
+        m_statusLabel->setText(_("login.timeout"));
     }
 }
 
