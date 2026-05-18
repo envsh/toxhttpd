@@ -207,5 +207,12 @@
         "invalid_url": "Please enter a valid URL starting with http:// or https://",
         "timeout": "Connection timed out",
         "failed": "Connection failed"
+    },
+    "style": {
+        "fusion": "Fusion",
+        "macos": "macOS",
+        "windows": "Windows 11",
+        "material": "Material You",
+        "github": "GitHub"
     }
 }

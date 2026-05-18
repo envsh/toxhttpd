@@ -108,12 +108,12 @@ QString Translator::t(const QString& key, const QStringList& args) const {
     cJSON* current = (cJSON*)m_root;
     
     // 调试输出
-    qWarning("DEBUG t: key=%s, parts.size=%d, m_root=%p", qToUtf8(key).data(), parts.size(), m_root);
+    // qWarning("DEBUG t: key=%s, parts.size=%d, m_root=%p", qToUtf8(key).data(), parts.size(), m_root);
     
     for (int i = 0; i < (int)parts.size(); ++i) {
-        qWarning("DEBUG t: i=%d, part=%s, current=%p, type=%d", i, qToUtf8(parts[i]).data(), current, ((cJSON*)current)->type);
+        // qWarning("DEBUG t: i=%d, part=%s, current=%p, type=%d", i, qToUtf8(parts[i]).data(), current, ((cJSON*)current)->type);
         current = cJSON_GetObjectItem(current, qToUtf8(parts[i]).data());
-        qWarning("DEBUG t: after cJSON_GetObjectItem, current=%p, type=%d", current, current ? ((cJSON*)current)->type : -1);
+        // qWarning("DEBUG t: after cJSON_GetObjectItem, current=%p, type=%d", current, current ? ((cJSON*)current)->type : -1);
         if (!current) {
             qWarning("Translation missing: %s (failed at part %d: %s)", 
                      qToUtf8(key).data(), i, qToUtf8(parts[i]).data());

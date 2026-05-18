@@ -207,5 +207,12 @@
         "invalid_url": "請輸入有效的 URL（以 http:// 或 https:// 開頭）",
         "timeout": "連線逾時",
         "failed": "連接失敗"
+    },
+    "style": {
+        "fusion": "Fusion",
+        "macos": "macOS",
+        "windows": "Windows 11",
+        "material": "Material You",
+        "github": "GitHub"
     }
 }
