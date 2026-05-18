@@ -8,30 +8,15 @@
 #include "ThemeManager.h"
 #include "LimeStyle.h"
 
-// 读取保存的语言设置（替代 QSettings）
+// 读取保存的语言设置（从 config.json）
 static QString loadSavedLanguage() {
-    QString home = qGetHomePath();
-    QFile file(home + "/.q3tox_lang");
-    if (file.exists() && qOpenReadOnly(file)) {
-        QTextStream stream(&file);
-        stream.setCodec(QTextCodec::codecForName("UTF-8"));
-        QString lang = qTrim(stream.readLine());
-        file.close();
-        if (!lang.isEmpty()) return lang;
-    }
-    return "zh-CN"; // 默认简体
+    QString lang = LoginDialog::configValue("lang");
+    return lang.isEmpty() ? "zh-CN" : lang;
 }
 
 // 保存语言设置
 static void saveLanguage(const QString& lang) {
-    QString home = qGetHomePath();
-    QFile file(home + "/.q3tox_lang");
-    if (qOpenWriteOnly(file)) {
-        QTextStream stream(&file);
-        stream.setCodec(QTextCodec::codecForName("UTF-8"));
-        stream << lang << "\n";
-        file.close();
-    }
+    LoginDialog::setConfigValue("lang", lang);
 }
 
 int main(int argc, char* argv[]) {
