@@ -729,7 +729,7 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
 #ifdef QT3_BUILD
     int result = QMessageBox::question(this, _("confirm"), confirmMsg,
                                        QMessageBox::Yes, QMessageBox::No);
-    if (result == 0) {
+    if (result == QMessageBox::Yes) {
 #else
     if (QMessageBox::question(this, _("confirm"), confirmMsg,
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
@@ -740,6 +740,8 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
             success = ToxAPI::deleteFriendSync(id);
             if (success) {
                 QMessageBox::information(this, _("friend_deleted"), _("friend_deleted"));
+            } else {
+                QMessageBox::warning(this, _("error"), _("delete_failed"));
             }
         } else if (type == "conference") {
             success = ToxAPI::leaveConferenceSync(id);
