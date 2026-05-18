@@ -356,8 +356,4 @@ inline void qSetLabelSelectable(QLabel* label) {
 #endif
 }
 
-// 跨平台消息提示音（支持 WAV / Opus）
-void playNotifySound(const QString& filePath);
-void playNotifySound();
-
 #endif  // COMPAT34_H

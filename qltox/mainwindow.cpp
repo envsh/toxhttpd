@@ -8,6 +8,7 @@
 #include "cJSON.h"
 #include "appsetup.h"
 #include "placeholderlineedit.h"
+#include "sound.h"
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
@@ -330,7 +331,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", QString(),
                                          friendId, getCurrentTime());
                     }
-                    playNotifySound();
+                    playSoundNopcm("../web/sound/notification.s16le.pcm");
                 }
                 cJSON_Delete(root);
             }
@@ -392,7 +393,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
-                    playNotifySound();
+                    playSoundNopcm("../web/sound/notification.s16le.pcm");
                 } else {
                     qWarning("conference_message: missing confNumber or message");
                 }
@@ -448,7 +449,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime(), "", "", ipAddress);
                     }
-                    playNotifySound();
+                    playSoundNopcm("../web/sound/notification.s16le.pcm");
                 }
                 cJSON_Delete(root);
             }

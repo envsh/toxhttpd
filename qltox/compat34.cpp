@@ -79,28 +79,3 @@ QString qFormatISO8601(const QString& iso8601Str) {
     return QString();
 #endif
 }
-
-// 跨平台消息提示音（WAV / Opus）
-// Linux:   paplay (PulseAudio, 支持 Opus/WAV) → fallback aplay (ALSA, 仅 WAV)
-// macOS:   afplay
-// Windows: PowerShell SoundPlayer (仅 WAV, Opus 静默忽略)
-void playNotifySound(const QString& filePath) {
-    QString cmd;
-#if defined(Q_OS_WIN)
-    if (!filePath.endsWith(".opus"))
-        cmd = QString("powershell -c (New-Object Media.SoundPlayer '%1').PlaySync()").arg(filePath);
-#elif defined(Q_OS_MAC)
-    cmd = QString("afplay \"%1\" &").arg(filePath);
-#else
-    if (filePath.endsWith(".opus"))
-        cmd = QString("paplay \"%1\" &").arg(filePath);
-    else
-        cmd = QString("( which paplay >/dev/null 2>&1 && paplay \"%1\" ) || aplay \"%1\" &").arg(filePath);
-#endif
-    if (!cmd.isEmpty())
-        system(qToUtf8(cmd).data());
-}
-
-void playNotifySound() {
-    playNotifySound("notification.opus");
-}

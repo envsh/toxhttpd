@@ -7,13 +7,13 @@ SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
              friendinfodialog.cpp memberlistdialog.cpp logindialog.cpp \
-             messageinput.cpp
+             messageinput.cpp sound.c
 
 HEADERS = mainwindow.h restapi.h eventpoller.h \
             chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
             friendinfodialog.h memberlistdialog.h logindialog.h \
-            messageinput.h
+            messageinput.h sound.h
             
 # LimeStyle theme system
 LIME_STYLE_H = StyleParams.h LimeStyle.h LimeScrollBar.h
@@ -72,7 +72,7 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
 FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
 !isEmpty(FREETYPE_LIBS) {
     QMAKE_CXXFLAGS += $$system(pkg-config --cflags freetype2 2>/dev/null)
-    LIBS += -lcurl $$FREETYPE_LIBS
+    LIBS += -lcurl -lopenal $$FREETYPE_LIBS
     message("FreeType2: detected via pkg-config")
 } else {
     INCLUDEPATH += /usr/include/freetype2
