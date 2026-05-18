@@ -96,6 +96,18 @@ function applyLanguage() {
     if (actions[1]) actions[1].textContent = t('buttons.connect_network');
     if (actions[2]) actions[2].textContent = t('buttons.qrcode');
     
+    // 更新登录界面
+    const loginTitle = document.getElementById('loginTitle');
+    if (loginTitle) loginTitle.textContent = t('login.title');
+    const loginLabel = document.querySelector('#loginBox label');
+    if (loginLabel) loginLabel.textContent = t('login.server_url');
+    const loginInput = document.getElementById('serverUrlInput');
+    if (loginInput) loginInput.placeholder = t('login.url_placeholder');
+    const connectBtn = document.getElementById('loginConnectBtn');
+    if (connectBtn) connectBtn.textContent = t('login.connect');
+    const clearBtn = document.getElementById('loginClearBtn');
+    if (clearBtn) clearBtn.textContent = t('login.clear_history');
+
     // 更新底部添加好友区域
     const addInput = document.getElementById('addFriendInputBottom');
     if (addInput) addInput.placeholder = t('placeholders.add_friend');

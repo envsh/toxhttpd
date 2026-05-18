@@ -1157,7 +1157,7 @@ select option {
     position: fixed;
     inset: 0;
     background: #0d1117;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: 9999;
@@ -1194,6 +1194,9 @@ select option {
 .login-input-row input:focus {
     outline: none;
     border-color: #58a6ff;
+}
+.login-input-row input::placeholder {
+    color: #6e7681;
 }
 #loginClearBtn {
     background: #21262d;

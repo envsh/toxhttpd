@@ -201,6 +201,7 @@
     "login": {
         "title": "Connect to Server",
         "server_url": "Server URL:",
+        "url_placeholder": "http://localhost:8181",
         "connect": "Connect",
         "clear_history": "Clear History",
         "connecting": "Connecting...",
