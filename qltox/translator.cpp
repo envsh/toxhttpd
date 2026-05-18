@@ -147,5 +147,14 @@ QString Translator::t(const QString& key, const QStringList& args) const {
         result.replace(QString("{%1}").arg(i), args[i]);
     }
     
+#ifdef QT3_BUILD
+    // Qt3 的 QString::arg() 只支持 %1 %2 格式，不支持 {0} {1}
+    result.replace("{0}", "%1");
+    result.replace("{1}", "%2");
+    result.replace("{2}", "%3");
+    result.replace("{3}", "%4");
+    result.replace("{4}", "%5");
+#endif
+    
     return result;
 }
