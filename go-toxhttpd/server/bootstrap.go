@@ -47,7 +47,7 @@ func (s *Server) checkRebootstrap() {
 		return
 	}
 	s.rebscnter = 0
-	t := s.tox
+	t := s.Tox
 	connected := t.SelfGetConnectionStatus() != tox.CONNECTION_NONE
 	if connected {
 		return

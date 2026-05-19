@@ -116,24 +116,4 @@ func initMsgHistDB(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-func (s *Server) getOrCreatePubKeyID(pubkey string) (int64, error) {
-	var pkid int64
-	err := s.db.QueryRow(`SELECT pkid FROM pubkey_ids WHERE pubkey = ?`, pubkey).Scan(&pkid)
-	if err == nil {
-		return pkid, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, err
-	}
-	result, err := s.db.Exec(`INSERT INTO pubkey_ids(pubkey) VALUES(?)`, pubkey)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
-}
 
-func (s *Server) persistEventToSQLite(chanid int64, data string) {
-	if _, err := s.db.Exec("INSERT INTO events(chanid, data) VALUES(?, ?)", chanid, data); err != nil {
-		log.Printf("Failed to persist event to SQLite: %v", err)
-	}
-}
