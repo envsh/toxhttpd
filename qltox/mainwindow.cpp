@@ -163,9 +163,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 c->chat_id = qFromUtf8(cd.chatId.c_str());
                 c->is_connected = cd.isConnected;
                 contacts.append(c);
-                qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%s",
-                          cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chatId.c_str(), 
-                          cd.isConnected ? "true" : "false");
+                //qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%s",
+                 //         cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chatId.c_str(), 
+                  //        cd.isConnected ? "true" : "false");
                 
                 // 写入 peerInfoMap
                 if (cd.type == "friend") {
