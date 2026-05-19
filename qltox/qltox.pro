@@ -2,6 +2,8 @@ TEMPLATE = app
 TARGET = qltox
 QT = core gui widgets
 CONFIG += moc
+CONFIG += sdk_no_version_check
+QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.7
 
 SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
@@ -41,7 +43,7 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
 # 检测逻辑：如果 QT_VERSION 不为空，则是 Qt4
 !isEmpty(QT_VERSION) {
     # Qt4: QT_VERSION 不为空（如 "4.8.7"）
-    message("Building for Qt4 - QT3_BUILD not defined")
+    message("Building for Qt4+ - QT3_BUILD not defined")
 } else {
     # Qt3: QT_VERSION 为空
     message("Building for Qt3 - adding QT3_BUILD")
@@ -67,6 +69,11 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
 
 # 包含路径
 # INCLUDEPATH += /opt/qt338sh/include /opt/qt338sh/include/qt3
+
+# PKG_CONFIG_PATH=/opt/vcpkg/installed/.../lib/pkgconfig qmake
+QMAKE_CXXFLAGS += $$system(pkg-config --cflags openal 2>/dev/null)
+INCLUDEPATH += $$system(pkg-config --cflags-only-I openal 2>/dev/null|sed 's/-I//g')
+LIBS += $$system(pkg-config --libs openal 2>/dev/null)
 
 # FreeType2 自动检测
 FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
