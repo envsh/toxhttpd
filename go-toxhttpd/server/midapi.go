@@ -112,9 +112,11 @@ func (m *Midapi) SelfGet() *SelfInfo {
 	name := m.ctx.Tox.SelfGetName()
 	status, _ := m.ctx.Tox.SelfGetStatusMessage()
 
-	m.ctx.Mu.RLock()
-	connStatus := m.ctx.SelfConnectionStatus
-	m.ctx.Mu.RUnlock()
+	connStatus := statusToStr(m.ctx.Tox.SelfGetConnectionStatus())
+
+	m.ctx.Mu.Lock()
+	m.ctx.SelfConnectionStatus = connStatus
+	m.ctx.Mu.Unlock()
 
 	return &SelfInfo{
 		Address:          addr,

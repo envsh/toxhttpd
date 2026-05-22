@@ -94,12 +94,12 @@ func safeTruncate(s string, maxLen int) string {
 
 func statusToStr(s int) string {
 	switch s {
-	case 1:
+	case tox.CONNECTION_TCP:
 		return "tcp"
-	case 2:
+	case tox.CONNECTION_UDP:
 		return "udp"
 	default:
-		return "none"
+		return "offline"
 	}
 }
 
