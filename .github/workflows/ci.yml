@@ -48,7 +48,7 @@ jobs:
           go-version: '1.21'
       - name: Install toxcore dependencies
         run: |
-          brew install toxcore opus libsodium openal
+          brew install toxcore opus libsodium openal-soft
       - name: Build backend
         run: |
           git clone -b group-ngc https://github.com/envsh/go-toxcore-c.git go-toxhttpd/go-toxcore-c
@@ -73,6 +73,7 @@ jobs:
   # version `GLIBC_2.28' not found
 
   build-qltox-qt4:
+    if: false
     runs-on: ubuntu-22.04
     container: ubuntu:20.04
     env:
@@ -171,7 +172,8 @@ jobs:
 
   package-release-linux:
     runs-on: ubuntu-22.04
-    needs: [build-backend, build-qltox-qt4]
+    # needs: [build-backend, build-qltox-qt4]
+    needs: [build-backend]
     steps:
       - uses: actions/checkout@v4
       - name: Download backend artifact
@@ -179,16 +181,16 @@ jobs:
         with:
           name: toxhttpd-linux-backend
           path: release/
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: qltox-qt4-frontend
-          path: release/
+      #- name: Download frontend artifact
+      #  uses: actions/download-artifact@v4
+      #  with:
+      #    name: qltox-qt4-frontend
+      #    path: release/
       - name: Organize files for packaging
         run: |
           mkdir -p release/bin release/web
           mv release/toxhttpd release/bin/
-          mv release/qltox release/bin/
+          #mv release/qltox release/bin/
           cp -r web/* release/web/
           ls -lhR release/
       - name: Create tarball
