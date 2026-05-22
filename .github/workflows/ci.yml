@@ -72,61 +72,27 @@ jobs:
   # Error: /__e/node20/bin/node: /lib/x86_64-linux-gnu/libc.so.6:
   # version `GLIBC_2.28' not found
 
-  build-qltox-qt4:
-    if: false
-    runs-on: ubuntu-22.04
-    container: ubuntu:20.04
-    env:
-      DEBIAN_FRONTEND: noninteractive
-      TERM: xterm
+  build-qltox-qt3:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install Qt4 from PPA
+      - name: Install build dependencies
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            software-properties-common \
-            wget \
-            gnupg \
-            build-essential \
-            pkg-config \
-            xvfb
-
-          # 添加 rock-core/qt4 PPA
-          add-apt-repository ppa:rock-core/qt4 -y
-
-          apt-get update
-
-          # 安装Qt4及依赖
-          apt-get install -y --no-install-recommends \
-            qt4-default \
-            libqt4-dev \
-            qt4-qmake \
-            qt4-dev-tools \
-            libcurl4-openssl-dev \
-            libfreetype-dev \
-            libcjson-dev \
-            libgl1-mesa-dev \
-            libx11-dev \
-            libxext-dev \
-            libxrender-dev
-
-          rm -rf /var/lib/apt/lists/*
-      - name: Verify Qt4 installation
+          sudo apt update
+          sudo apt install -y build-essential pkg-config \
+            libcurl4-openssl-dev libfreetype-dev libopenal-dev \
+            libx11-dev libxext-dev uuid-dev
+      - name: Download and extract precompiled Qt3
         run: |
-          qmake -v
-          dpkg -l | grep -E "qt4|libqt" | head -10
-      - name: Verify build tools and libcurl
+          sudo ln -sv /opt /opu
+          curl -sL "https://github.com/qtchina/qt_build_scripts/releases/download/qt4.8/tde-qt338sh-linux-cjkinput-x64.tar.gz" \
+            | sudo tar xzf - -C /opt
+      - name: Build qltox with Qt3
         run: |
-          make -v
-          gcc --version | head -1
-          g++ --version | head -1
-          pkg-config --modversion libcurl || true
-          dpkg -l | grep -E "libcurl|build-essential"
-      - name: Build qltox with Qt4
-        run: |
+          export PATH=/opt/qt338sh/bin:$PATH
+          export QMAKESPEC=linux-g++
           cd qltox
-          qmake qltox.pro
+          /opt/qt338sh/bin/qmake -makefile
           make -j$(nproc)
       - name: Prepare frontend artifact
         run: |
@@ -136,7 +102,7 @@ jobs:
       - name: Upload qltox binary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qltox-qt4-frontend
+          name: qltox-qt3-frontend
           path: bin/
           retention-days: 30
 
@@ -172,8 +138,7 @@ jobs:
 
   package-release-linux:
     runs-on: ubuntu-22.04
-    # needs: [build-backend, build-qltox-qt4]
-    needs: [build-backend]
+    needs: [build-backend, build-qltox-qt3]
     steps:
       - uses: actions/checkout@v4
       - name: Download backend artifact
@@ -181,16 +146,16 @@ jobs:
         with:
           name: toxhttpd-linux-backend
           path: release/
-      #- name: Download frontend artifact
-      #  uses: actions/download-artifact@v4
-      #  with:
-      #    name: qltox-qt4-frontend
-      #    path: release/
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: qltox-qt3-frontend
+          path: release/
       - name: Organize files for packaging
         run: |
           mkdir -p release/bin release/web
           mv release/toxhttpd release/bin/
-          #mv release/qltox release/bin/
+          mv release/qltox release/bin/
           cp -r web/* release/web/
           ls -lhR release/
       - name: Create tarball
