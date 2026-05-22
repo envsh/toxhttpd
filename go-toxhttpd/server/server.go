@@ -103,6 +103,7 @@ func (s *Server) Start() error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		ms20 := 20 * time.Millisecond
 		for {
 			select {
 			case <-ctx.Done():
@@ -110,7 +111,7 @@ func (s *Server) Start() error {
 			default:
 				s.Tox.Iterate()
 				s.checkRebootstrap()
-				time.Sleep(time.Millisecond * time.Duration(s.Tox.IterationInterval()))
+				time.Sleep(ms20 + time.Millisecond * time.Duration(s.Tox.IterationInterval()))
 			}
 		}
 	}()
