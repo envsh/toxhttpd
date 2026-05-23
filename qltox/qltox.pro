@@ -6,28 +6,18 @@ CONFIG += sdk_no_version_check
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.7
 
 SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
-             chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp translator.cpp \
+             chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
              friendinfodialog.cpp memberlistdialog.cpp logindialog.cpp \
              messageinput.cpp sound.c
 
 HEADERS = mainwindow.h restapi.h eventpoller.h \
-            chatwidget.h chatview.h contactlist.h selfinfo.h translator.h \
+            chatwidget.h chatview.h contactlist.h selfinfo.h \
             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
             friendinfodialog.h memberlistdialog.h logindialog.h \
             messageinput.h sound.h
             
-# LimeStyle theme system
-LIME_STYLE_H = StyleParams.h LimeStyle.h LimeScrollBar.h
-LIME_STYLE_CPP = StyleParams.cpp LimeStyle.cpp LimeScrollBar.cpp
-
-QTCOMP_CPP = apilog.cpp appsetup.cpp compat34.cpp emojiutil.cpp emojiwidgets.cpp emojiitems.cpp \
-			emoji_picker.cpp ThemeManager.cpp placeholderlineedit.cpp toastwidget.cpp
-QTCOMP_HDR = apilog.h appsetup.h appsetup_c.h compat34.h emojiutil.h emojiwidgets.h emojiitems.h \
-			emoji_picker.h ThemeManager.h placeholderlineedit.h toastwidget.h
-
-HEADERS += $$LIME_STYLE_H $$QTCOMP_HDR
-SOURCES += $$LIME_STYLE_CPP $$QTCOMP_CPP
+include(qlite.pri)
 
 # moc 处理
 MOC_DIR = .
@@ -63,6 +53,7 @@ QMAKE_CXXFLAGS += -std=c++11 -O0
 		QMAKE_MOC          = $$QTDIR/bin/moc
 		QMAKE_UIC          = $$QTDIR/bin/uic
 		QMAKE_QMAKE        = $$QMAKE_EXE
+		QMAKE        = $$QMAKE_EXE # subdirs use this!!!
 		QMAKE_LRELEASE     = $$QTDIR/bin/lrelease # no works
     }
 }
