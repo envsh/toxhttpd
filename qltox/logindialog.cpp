@@ -10,6 +10,7 @@
 #include <thread>
 #include <fstream>
 #include <sstream>
+#include <qdir.h>
 #include <cstdlib>
 
 static size_t writeCb(void* contents, size_t size, size_t nmemb, void* userp) {

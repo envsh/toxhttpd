@@ -7,10 +7,12 @@
 #include <map>
 #include <cstdint>
 #include <curl/curl.h>
+#include <qthread.h>
+#include <qmutex.h>
 
 // ── 事件类型常量 ──
-const int EventListReadyType = QEvent::User + 100;
-const int ApiResultReadyType = QEvent::User + 102;
+const EventType34 EventListReadyType = toEventType34(QEvent::User + 100);
+const EventType34 ApiResultReadyType = toEventType34(QEvent::User + 102);
 
 // ── API 请求类型 ──
 enum ApiRequestType {
@@ -98,21 +100,13 @@ typedef std::vector<Event> EventList;
 
 class EventListEvent : public CustomEventBase {
 public:
-#ifdef QT3_BUILD
-    EventListEvent(const EventList& evts) : QCustomEvent(EventListReadyType), events(evts) {}
-#else
-    EventListEvent(const EventList& evts) : QEvent((QEvent::Type)EventListReadyType), events(evts) {}
-#endif
+    EventListEvent(const EventList& evts) : CustomEventBase(EventListReadyType), events(evts) {}
     EventList events;
 };
 
 class ApiResultEvent : public CustomEventBase {
 public:
-#ifdef QT3_BUILD
-    ApiResultEvent(ApiRequestType t) : QCustomEvent(ApiResultReadyType), type(t) {}
-#else
-    ApiResultEvent(ApiRequestType t) : QEvent((QEvent::Type)ApiResultReadyType), type(t) {}
-#endif
+    ApiResultEvent(ApiRequestType t) : CustomEventBase(ApiResultReadyType), type(t) {}
     ApiRequestType type;
 };
 

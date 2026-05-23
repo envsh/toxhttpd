@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include <cstdlib>
 #include <cctype>
+#include <qapplication.h>
 
 // ── Static members ──
 QObject* ToxAPI::s_target = nullptr;

@@ -4,6 +4,11 @@
 #include "compat34.h"
 #include <qstring.h>
 #include <qfont.h>
+#ifdef QT3_BUILD
+#include <qlistbox.h>
+#else
+#include <qlistwidget.h>
+#endif
 
 MemberListDialog::MemberListDialog(QWidget* parent) : QDialog(parent), listWidget(nullptr) {
     qSetWindowTitle(this, _("member_list.title"));

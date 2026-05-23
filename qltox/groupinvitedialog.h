@@ -3,6 +3,8 @@
 
 #include "compat34.h"
 #include <qstring.h>
+#include <qdialog.h>
+#include <qlineedit.h>
 
 class GroupInviteDialog : public QDialog {
     Q_OBJECT

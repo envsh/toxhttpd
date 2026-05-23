@@ -3,6 +3,7 @@
 
 #include "compat34.h"
 #include <qstring.h>
+#include <qdialog.h>
 
 class ConferenceInviteDialog : public QDialog {
     Q_OBJECT

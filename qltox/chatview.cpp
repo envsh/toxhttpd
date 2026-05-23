@@ -13,6 +13,7 @@
 #include <qregexp.h>
 #include <qstringlist.h>
 #include <qcursor.h>
+#include <qclipboard.h>
 #else
 #include <QPainter>
 #include <QWheelEvent>

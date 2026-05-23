@@ -6,6 +6,8 @@
 #include <vector>
 #include <qdatetime.h>
 #include <qrect.h>
+#include <qwidget.h>
+#include <qpainter.h>
 
 struct ChatMessage {
     QString messageText;

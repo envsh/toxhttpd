@@ -3,6 +3,12 @@
 #include "compat34.h"
 #include "restapi.h"
 #include "placeholderlineedit.h"
+#include <qmessagebox.h>
+#ifdef QT3_BUILD
+#include <qlistbox.h>
+#else
+#include <qlistwidget.h>
+#endif
 
 // 静态数组定义
 const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
@@ -374,6 +380,10 @@ void ContactListWidget::showContextMenu(QPoint pos) {
     QString type = item->data(Qt::UserRole + 1).toString();
     QPoint globalPos = lw->mapToGlobal(pos);
     showContextMenuAt(id, type, item->text(), globalPos);
+}
+
+bool ContactListWidget::eventFilter(QObject*, QEvent*) {
+    return false;
 }
 #else
 // Qt3: 事件过滤器处理右键

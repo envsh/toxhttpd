@@ -2,6 +2,10 @@
 #define CHATWIDGET_H
 
 #include "compat34.h"
+#include <qwidget.h>
+#include <qlabel.h>
+#include <qcombobox.h>
+#include <qcheckbox.h>
 #include "chatview.h"
 #include "messageinput.h"
 #include "emojiwidgets.h"

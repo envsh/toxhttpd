@@ -5,6 +5,8 @@
 #include "compat34.h"
 #include "LimeStyle.h"
 #include "toastwidget.h"
+#include <qmessagebox.h>
+#include <qclipboard.h>
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 12, 10);

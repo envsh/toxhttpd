@@ -1,5 +1,7 @@
 #include "appsetup.h"
 #include "compat34.h"
+#include <qtextcodec.h>
+#include <qdir.h>
 
 void QtappSetup::setup(QApplication& app) {
     QtappSetup& s = inst();

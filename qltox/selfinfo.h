@@ -3,7 +3,7 @@
 
 #include "compat34.h"
 #include "emojiwidgets.h"
-#include <qstring.h>
+#include <qwidget.h>
 
 class SelfInfoWidget : public QWidget {
     Q_OBJECT

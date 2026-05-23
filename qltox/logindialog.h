@@ -4,6 +4,11 @@
 #include "compat34.h"
 #include <string>
 #include <curl/curl.h>
+#include <qdialog.h>
+#include <qcombobox.h>
+#include <qpushbutton.h>
+#include <qlabel.h>
+#include <qtimer.h>
 
 class LoginDialog : public QDialog {
     Q_OBJECT

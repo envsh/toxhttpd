@@ -1,6 +1,9 @@
 #include "translator.h"
 #include "cJSON.h"
 #include "compat34.h"
+#include <qapplication.h>
+#include <qtextstream.h>
+#include <qtextcodec.h>
 
 Translator& Translator::instance() {
     static Translator instance;

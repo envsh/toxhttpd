@@ -1,5 +1,6 @@
 #include "messageinput.h"
 #include "translator.h"
+#include <qmessagebox.h>
 #ifdef QT3_BUILD
 #include <qfile.h>
 #else
@@ -11,6 +12,7 @@
 #include <qclipboard.h>
 #include <qdatetime.h>
 #include <qimage.h>
+#include <qapplication.h>
 #else
 #include <QMimeData>
 #include <QClipboard>

@@ -3,6 +3,9 @@
 
 #include <map>
 #include "compat34.h"
+#include <qmainwindow.h>
+#include <qsplitter.h>
+#include <qwidget.h>
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"

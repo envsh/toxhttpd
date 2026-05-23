@@ -2,6 +2,28 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+// ========== 实现所需的 Qt 头文件 ==========
+#include <qwidget.h>         // QWidget (setWindowTitle, setToolTip, newBoxLayout)
+#include <qfile.h>           // QFile, QIODevice (qOpenReadOnly/WriteOnly)
+#include <qdir.h>            // QDir (qGetHomePath)
+#include <qdatetime.h>       // QDateTime (qFmtTime, getCurrentTime)
+#include <qapplication.h>    // QApplication::clipboard (LabelDblClickFilter)
+#include <qclipboard.h>      // QClipboard (LabelDblClickFilter)
+
+#ifdef QT3_BUILD
+#include <qtooltip.h>        // QToolTip::add
+#include <qfileinfo.h>       // QFileInfo (qAppDir)
+#endif
+
+// ========== EventType34 ==========
+EventType34 toEventType34(int raw) {
+#ifdef QT3_BUILD
+    return raw;
+#else
+    return static_cast<QEvent::Type>(raw);
+#endif
+}
+
 // 时间字符串解析：支持 "yyyy-MM-dd hh:mm:ss" 和 ISO8601 格式
 QString qFormatTime(const QString& createdAt) {
     // 如果是 ISO8601 格式（包含 'T'），使用 qFormatISO8601 处理

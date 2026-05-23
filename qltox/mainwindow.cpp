@@ -7,6 +7,10 @@
 #include "groupinvitedialog.h"
 #include "cJSON.h"
 #include "appsetup.h"
+#include <qmessagebox.h>
+#include <qtextcodec.h>
+#include <qtextstream.h>
+#include <qradiobutton.h>
 #include "placeholderlineedit.h"
 #include "sound.h"
 

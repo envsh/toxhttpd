@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include "restapi.h"
 #include <qstring.h>
+#include <qdialog.h>
 
 class FriendInfoDialog : public QDialog {
     Q_OBJECT

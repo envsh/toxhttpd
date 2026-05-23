@@ -4,6 +4,8 @@
 #include "compat34.h"
 #include "placeholderlineedit.h"
 #include "LimeScrollBar.h"
+#include <qwidget.h>
+#include <qpoint.h>
 
 // Emoji constants defined in contactlist.cpp
 extern const char* EMOJI_FRIEND;
@@ -19,11 +21,7 @@ struct Contact {
     bool is_connected; // 群组/会议连接状态
 };
 
-#ifdef QT3_BUILD
-typedef QPtrList<Contact> ContactList; // QPtrList<Contact> stores Contact*
-#else
-typedef QList<Contact*> ContactList; // Qt4: QList<Contact*> to match Qt3's pointer list
-#endif
+typedef QPtrList<Contact> ContactList;
 
 class ContactListWidget : public QWidget {
     Q_OBJECT
@@ -57,9 +55,7 @@ private slots:
     void onCreateGroupClicked();
     
 private:
-#ifdef QT3_BUILD
-    bool eventFilter(QObject* obj, QEvent* event); // Qt3: handle right-click
-#endif
+    bool eventFilter(QObject* obj, QEvent* event);
     void showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos);
     
 private:
