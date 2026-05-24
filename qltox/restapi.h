@@ -116,10 +116,13 @@ private:
         ApiCtx(int t, int i, const std::string& s1, const std::string& s2, int n) : type(t), id(i), str1(s1), str2(s2), n1(n) {}
         void* ptr = nullptr;
     };
-    static void onHttpDone(int httpCode, const std::string& body,
+    static void onHttpDone(int httpCode, const std::string& curlErrStr,
+                           const std::string& body,
                            const std::map<std::string, std::string>* headers,
                            void* udata);
-    static void dispatchResult(ApiCtx* ctx, int httpCode, const std::string& body,
+    static void dispatchResult(ApiCtx* ctx, int httpCode,
+                               const std::string& curlErrStr,
+                               const std::string& body,
                                const std::map<std::string, std::string>* headers);
     static std::string buildUrl(const std::string& endpoint);
     static void pollEvents();

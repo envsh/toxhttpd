@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include <cstdlib>
 #include <cctype>
+#include <unistd.h>
 #include <qapplication.h>
 
 // ── Static members ──
@@ -73,11 +74,12 @@ void ToxAPI::request(ApiRequestType type, const std::string& endpoint,
     EventPoller::addRequest(url, method, data, onHttpDone, ctx, timeoutSec);
 }
 
-void ToxAPI::onHttpDone(int httpCode, const std::string& body,
+void ToxAPI::onHttpDone(int httpCode, const std::string& curlErrStr,
+                         const std::string& body,
                          const std::map<std::string, std::string>* headers,
                          void* udata) {
     auto* ctx = static_cast<ApiCtx*>(udata);
-    dispatchResult(ctx, httpCode, body, headers);
+    dispatchResult(ctx, httpCode, curlErrStr, body, headers);
     delete ctx;
 }
 
@@ -591,7 +593,9 @@ bool ToxAPI::joinGroupByChatIdSync(const std::string& chatId,
 
 // ── dispatchResult ──
 
-void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode, const std::string& body,
+void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
+                             const std::string& curlErrStr,
+                             const std::string& body,
                              const std::map<std::string, std::string>* headers) {
     if (!s_target) return;
     int type = ctx->type;
@@ -610,7 +614,18 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode, const std::string& body,
             }
         }
 
-        if (httpCode != 200 || body.empty()) {
+        if (httpCode == 0 && !curlErrStr.empty()) {
+            ALOG_WARN("Event poll error:", curlErrStr);
+            if (s_pollRunning) {
+                usleep(2000000);
+                EventPoller::addRequest(
+                    buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+            }
+            break;
+        }
+
+        if (httpCode != 200) {
             if (s_pollRunning)
                 EventPoller::addRequest(
                     buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),

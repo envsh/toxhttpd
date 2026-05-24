@@ -172,7 +172,8 @@ struct HttpCtx {
     std::string postData;
     std::string body;
     std::map<std::string, std::string> headers;
-    void (*done)(int httpCode, const std::string& body,
+    void (*done)(int httpCode, const std::string& curlErrStr,
+                 const std::string& body,
                  const std::map<std::string, std::string>* headers,
                  void* udata);
     void* udata;
@@ -185,7 +186,8 @@ public:
     static void addRequest(const std::string& url,
                            const std::string& method,
                            const std::string& data,
-                           void (*done)(int httpCode, const std::string& body,
+                           void (*done)(int httpCode, const std::string& curlErrStr,
+                                       const std::string& body,
                                        const std::map<std::string, std::string>* headers,
                                        void* udata),
                            void* udata = nullptr,
