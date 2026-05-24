@@ -56,9 +56,7 @@ void EventPoller::stop() {
 void EventPoller::addRequest(const std::string& url,
                               const std::string& method,
                               const std::string& data,
-                              void (*done)(int, const std::string&, const std::string&,
-                                          const std::map<std::string, std::string>*,
-                                          void*),
+                              void (*done)(const HttpResponse& resp, void* udata),
                               void* udata, int timeoutSec) {
     if (!s_instance || !s_instance->multi) return;
 
@@ -104,8 +102,13 @@ void EventPoller::run() {
                 long httpCode = 0;
                 curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
                 int curlResult = msg->data.result;
-                const char* curlErrStr = (curlResult != 0) ? curl_easy_strerror((CURLcode)curlResult) : "";
-                ctx->done(httpCode, curlErrStr, ctx->body, &ctx->headers, ctx->udata);
+                HttpResponse resp;
+                resp.httpCode = (int)httpCode;
+                if (curlResult != 0)
+                    resp.curlErrStr = curl_easy_strerror((CURLcode)curlResult);
+                resp.body = std::move(ctx->body);
+                resp.headers = std::move(ctx->headers);
+                ctx->done(resp, ctx->udata);
                 delete ctx;
                 curl_multi_remove_handle(multi, msg->easy_handle);
                 curl_easy_cleanup(msg->easy_handle);

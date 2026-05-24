@@ -74,12 +74,9 @@ void ToxAPI::request(ApiRequestType type, const std::string& endpoint,
     EventPoller::addRequest(url, method, data, onHttpDone, ctx, timeoutSec);
 }
 
-void ToxAPI::onHttpDone(int httpCode, const std::string& curlErrStr,
-                         const std::string& body,
-                         const std::map<std::string, std::string>* headers,
-                         void* udata) {
+void ToxAPI::onHttpDone(const HttpResponse& resp, void* udata) {
     auto* ctx = static_cast<ApiCtx*>(udata);
-    dispatchResult(ctx, httpCode, curlErrStr, body, headers);
+    dispatchResult(ctx, resp);
     delete ctx;
 }
 
@@ -593,10 +590,7 @@ bool ToxAPI::joinGroupByChatIdSync(const std::string& chatId,
 
 // ── dispatchResult ──
 
-void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
-                             const std::string& curlErrStr,
-                             const std::string& body,
-                             const std::map<std::string, std::string>* headers) {
+void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
     if (!s_target) return;
     int type = ctx->type;
 
@@ -604,8 +598,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
 
     case ApiPollEvents: {
         bool restartDetected = false;
-        auto it = headers->find("x-server-next-id");
-        if (it != headers->end()) {
+        auto it = resp.headers.find("x-server-next-id");
+        if (it != resp.headers.end()) {
             char* endptr = nullptr;
             uint64_t serverNextId = std::strtoull(it->second.c_str(), &endptr, 10);
             if (endptr != it->second.c_str() && serverNextId <= s_lastEventId) {
@@ -614,8 +608,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             }
         }
 
-        if (httpCode == 0 && !curlErrStr.empty()) {
-            ALOG_WARN("Event poll error:", curlErrStr);
+        if (resp.httpCode == 0 && !resp.curlErrStr.empty()) {
+            ALOG_WARN("Event poll error:", resp.curlErrStr);
             if (s_pollRunning) {
                 usleep(2000000);
                 EventPoller::addRequest(
@@ -625,7 +619,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             break;
         }
 
-        if (httpCode != 200) {
+        if (resp.httpCode != 200) {
             if (s_pollRunning)
                 EventPoller::addRequest(
                     buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
@@ -640,7 +634,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             events.push_back(e);
         }
 
-        cJSON* root = cJSON_Parse(body.c_str());
+        cJSON* root = cJSON_Parse(resp.body.c_str());
         if (root && cJSON_IsArray(root)) {
             int count = cJSON_GetArraySize(root);
             for (int i = 0; i < count; ++i) {
@@ -669,12 +663,12 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
 
     case ApiGetSelf: {
         auto* ev = new SelfInfoResultEvent();
-        if (httpCode != 200 || body.empty()) {
+        if (resp.httpCode != 200 || resp.body.empty()) {
             ev->success = false;
             QApplication::postEvent(s_target, ev);
             break;
         }
-        cJSON* root = cJSON_Parse(body.c_str());
+        cJSON* root = cJSON_Parse(resp.body.c_str());
         if (!root) { ev->success = false; QApplication::postEvent(s_target, ev); break; }
         ev->success = true;
         ev->name = jsonStr(cJSON_GetObjectItem(root, "name"));
@@ -688,11 +682,11 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
 
     case ApiGetFriends: {
         auto* ev = new FriendsResultEvent();
-        if (httpCode != 200 || body.empty()) {
+        if (resp.httpCode != 200 || resp.body.empty()) {
             QApplication::postEvent(s_target, ev);
             break;
         }
-        cJSON* root = cJSON_Parse(body.c_str());
+        cJSON* root = cJSON_Parse(resp.body.c_str());
         if (!root) { QApplication::postEvent(s_target, ev); break; }
         cJSON* arr = cJSON_GetObjectItem(root, "friends");
         if (arr && cJSON_IsArray(arr)) {
@@ -711,7 +705,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
     case ApiSendConferenceMessage:
     case ApiSendGroupMessage: {
         auto* ev = new MessageSentResultEvent((ApiRequestType)type);
-        ev->success = (httpCode == 200 && !body.empty());
+        ev->success = (resp.httpCode == 200 && !resp.body.empty());
         ev->chatId = ctx->id;
         ev->message = ctx->str1;
         switch (ctx->type) {
@@ -755,11 +749,11 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
         auto* ev = new MembersLoadedEvent();
         ev->contactId = ctx->id;
         ev->contactType = ctx->str1;
-        if (httpCode != 200 || body.empty()) {
+        if (resp.httpCode != 200 || resp.body.empty()) {
             QApplication::postEvent(s_target, ev);
             break;
         }
-        cJSON* root = cJSON_Parse(body.c_str());
+        cJSON* root = cJSON_Parse(resp.body.c_str());
         if (!root) { QApplication::postEvent(s_target, ev); break; }
 
         cJSON* selfPpItem = cJSON_GetObjectItem(root, "selfPeerNumber");
@@ -799,11 +793,11 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
         auto* ev = new MessageHistoryLoadedEvent();
         ev->contactId = ctx->id;
         ev->contactType = ctx->str1;
-        if (httpCode != 200 || body.empty()) {
+        if (resp.httpCode != 200 || resp.body.empty()) {
             QApplication::postEvent(s_target, ev);
             break;
         }
-        cJSON* root = cJSON_Parse(body.c_str());
+        cJSON* root = cJSON_Parse(resp.body.c_str());
         if (!root) { QApplication::postEvent(s_target, ev); break; }
         cJSON* msgsItem = cJSON_GetObjectItem(root, "messages");
         if (msgsItem && cJSON_IsArray(msgsItem)) {
@@ -831,12 +825,12 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
     case ApiTranslate: {
         auto* ev = new TranslateResultEvent();
         ev->msgIndex = ctx->id;
-        if (httpCode != 200 || body.empty()) {
+        if (resp.httpCode != 200 || resp.body.empty()) {
             ev->errorMessage = "NETWORK_ERROR: cannot connect to server";
             QApplication::postEvent(s_target, ev);
             break;
         }
-        cJSON* root = cJSON_Parse(body.c_str());
+        cJSON* root = cJSON_Parse(resp.body.c_str());
         if (!root) {
             ev->errorMessage = "PARSE_ERROR: invalid server response";
             QApplication::postEvent(s_target, ev);
@@ -862,8 +856,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
 
         switch (chain->step) {
         case 0: { // self
-            if (httpCode == 200 && !body.empty()) {
-                cJSON* root = cJSON_Parse(body.c_str());
+            if (resp.httpCode == 200 && !resp.body.empty()) {
+                cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
                     chain->result->selfName = jsonStr(cJSON_GetObjectItem(root, "name"));
                     chain->result->selfStatusMsg = jsonStr(cJSON_GetObjectItem(root, "status_message"));
@@ -878,8 +872,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             break;
         }
         case 1: { // friend ids
-            if (httpCode == 200 && !body.empty()) {
-                cJSON* root = cJSON_Parse(body.c_str());
+            if (resp.httpCode == 200 && !resp.body.empty()) {
+                cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
                     cJSON* arr = cJSON_GetObjectItem(root, "friends");
                     if (arr && cJSON_IsArray(arr)) {
@@ -909,8 +903,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             break;
         }
         case 2: { // batch friend info
-            if (httpCode == 200 && !body.empty()) {
-                cJSON* root = cJSON_Parse(body.c_str());
+            if (resp.httpCode == 200 && !resp.body.empty()) {
+                cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root && cJSON_IsArray(root)) {
                     int n = cJSON_GetArraySize(root);
                     for (int i = 0; i < n; ++i) {
@@ -951,8 +945,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             break;
         }
         case 3: { // groups
-            if (httpCode == 200 && !body.empty()) {
-                cJSON* root = cJSON_Parse(body.c_str());
+            if (resp.httpCode == 200 && !resp.body.empty()) {
+                cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
                     cJSON* arr = cJSON_GetObjectItem(root, "groups");
                     if (arr && cJSON_IsArray(arr)) {
@@ -980,9 +974,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, int httpCode,
             EventPoller::addRequest(buildUrl("/api/conferences"), "GET", "", onHttpDone, next, 35);
             break;
         }
-        case 4: { // conferences → done
-            if (httpCode == 200 && !body.empty()) {
-                cJSON* root = cJSON_Parse(body.c_str());
+        case 4: { // conferences -> done
+            if (resp.httpCode == 200 && !resp.body.empty()) {
+                cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
                     cJSON* arr = cJSON_GetObjectItem(root, "conferences");
                     if (arr && cJSON_IsArray(arr)) {
