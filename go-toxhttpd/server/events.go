@@ -104,12 +104,12 @@ func (q *EventQueue) DeleteEvent(id uint64) {
 	q.events = newEvents
 }
 
-func (q *EventQueue) PopAfter(after uint64) []Event {
+func (q *EventQueue) PopAfter(after uint64) ([]Event, uint64) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	cutoff := time.Now().Add(-eventTimeWindow)
-	result := make([]Event, 0)
+	result := make([]Event, 0, len(q.events))
 	for _, e := range q.events {
 		if e.ID > after {
 			if after == 0 && e.Timestamp.Before(cutoff) {
@@ -118,11 +118,5 @@ func (q *EventQueue) PopAfter(after uint64) []Event {
 			result = append(result, e)
 		}
 	}
-	return result
-}
-
-func (q *EventQueue) GetNextID() uint64 {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	return q.nextID
+	return result, q.nextID
 }

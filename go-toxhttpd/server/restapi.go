@@ -509,14 +509,16 @@ func (h *Restapi) handleEvents(w http.ResponseWriter, r *http.Request) {
 	var afterID uint64
 	fmt.Sscanf(after, "%d", &afterID)
 
-	var timeoutDuration = 30 * time.Second
 	if afterID > 0 {
-		_, nextID := h.m.EventsPoll(afterID)
-		if afterID >= nextID {
-			timeoutDuration = 3 * time.Second
+		events, nextID := h.m.EventsPoll(afterID)
+		if len(events) > 0 {
+			w.Header().Set("X-Server-Next-Id", strconv.FormatUint(nextID, 10))
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(events)
+			return
 		}
 	}
-	timeout := time.After(timeoutDuration)
+	timeout := time.After(30 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 

@@ -539,7 +539,7 @@ func (m *Midapi) ConferenceMembers(confID uint32) *ConferenceMemberList {
 // ── Events ──
 
 func (m *Midapi) EventsPoll(after uint64) (events []Event, nextID uint64) {
-	return m.ctx.EventQueue.PopAfter(after), m.ctx.EventQueue.GetNextID()
+	return m.ctx.EventQueue.PopAfter(after)
 }
 
 func (m *Midapi) EventsDelete(id uint64) {
