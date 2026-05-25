@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"strings"
 
 	tox "github.com/TokTok/go-toxcore-c"
 	"github.com/envsh/toxera/bsdata"
@@ -56,6 +57,8 @@ func (s *Server) checkRebootstrap() {
 	if err != nil {
 		return
 	}
+	if strings.Contains(node.Host, ":") { return }
+
 	_, err1 := t.Bootstrap(node.Host, node.Ports[0], node.Pubkey)
 	_, err2 := t.AddTcpRelay(node.Host, node.Ports[0], node.Pubkey)
 	log.Println("Rebootstraped", node.Host, err1, err2)

@@ -34,6 +34,7 @@ func New(cfg Config) (*Server, error) {
 
 	opts := tox.NewToxOptions()
 	opts.Udp_enabled = cfg.UDPEnabled
+	opts.Local_discovery_enabled = false
 	opts.GroupsPersistence = true
 	if saveData != nil {
 		opts.Savedata_type = tox.SAVEDATA_TYPE_TOX_SAVE
@@ -85,7 +86,7 @@ func New(cfg Config) (*Server, error) {
 	log.Println("[TOX] Bootstrap completed")
 	logToxStatus(t)
 
-	log.Printf("[TOX] UDP enabled: %v", cfg.UDPEnabled)
+	log.Printf("[TOX] UDP enabled: %v, LAN_Discovery %v", cfg.UDPEnabled, false)
 
 	return server, nil
 }
