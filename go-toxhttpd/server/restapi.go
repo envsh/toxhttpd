@@ -46,6 +46,9 @@ func (h *Restapi) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/group/members", corsMiddleware(loggingMiddleware(h.handleGroupMembers)))
 	mux.HandleFunc("/api/random-name", corsMiddleware(loggingMiddleware(h.handleRandomName)))
 	mux.HandleFunc("/api/groups/set-name", corsMiddleware(loggingMiddleware(h.handleGroupSetName)))
+	mux.HandleFunc("/api/groups/set-topic", corsMiddleware(loggingMiddleware(h.handleGroupSetTopic)))
+	mux.HandleFunc("/api/conferences/set-title", corsMiddleware(loggingMiddleware(h.handleConferenceSetTitle)))
+	mux.HandleFunc("/api/conferences/leave", corsMiddleware(loggingMiddleware(h.handleConferenceLeave)))
 	mux.HandleFunc("/api/translate", corsMiddleware(loggingMiddleware(h.handleTranslate)))
 }
 
@@ -396,6 +399,31 @@ func (h *Restapi) handleGroupSetName(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"message": "ok"})
 }
 
+func (h *Restapi) handleGroupSetTopic(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	params, err := getRequestParams(r)
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	gnStr := params.Get("group_number")
+	topic := strings.TrimSpace(params.Get("topic"))
+	if gnStr == "" || topic == "" {
+		writeErr(w, "missing group_number or topic", http.StatusBadRequest)
+		return
+	}
+	var gn uint32
+	fmt.Sscanf(gnStr, "%d", &gn)
+	if err := h.m.GroupSetTopic(gn, topic); err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": "ok"})
+}
+
 // ── Conferences ──
 
 func (h *Restapi) handleConferences(w http.ResponseWriter, r *http.Request) {
@@ -482,6 +510,55 @@ func (h *Restapi) handleConferenceMembers(w http.ResponseWriter, r *http.Request
 	var confID uint32
 	fmt.Sscanf(confIDStr, "%d", &confID)
 	writeJSON(w, h.m.ConferenceMembers(confID))
+}
+
+func (h *Restapi) handleConferenceSetTitle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	params, err := getRequestParams(r)
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	confStr := params.Get("conference_id")
+	title := strings.TrimSpace(params.Get("title"))
+	if confStr == "" || title == "" {
+		writeErr(w, "missing conference_id or title", http.StatusBadRequest)
+		return
+	}
+	var confID uint32
+	fmt.Sscanf(confStr, "%d", &confID)
+	if err := h.m.ConferenceSetTitle(confID, title); err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": "ok"})
+}
+
+func (h *Restapi) handleConferenceLeave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	params, err := getRequestParams(r)
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	confStr := params.Get("conference_id")
+	if confStr == "" {
+		writeErr(w, "missing conference_id", http.StatusBadRequest)
+		return
+	}
+	var confID uint32
+	fmt.Sscanf(confStr, "%d", &confID)
+	if err := h.m.ConferenceLeave(confID); err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": "conference left"})
 }
 
 // ── Events ──
