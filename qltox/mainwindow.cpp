@@ -726,14 +726,23 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
 }
 
 void MainWindow::onSetGroupTopicRequested(int groupId) {
+    auto groups = ToxAPI::getGroupsSync();
+    std::string currentTopic;
+    for (const auto& g : groups) {
+        if (g.groupNumber == groupId) {
+            currentTopic = g.statusText;
+            break;
+        }
+    }
+
     bool ok = false;
     QString topic;
 #ifdef QT3_BUILD
     topic = QInputDialog::getText(_("set_topic.title"), _("set_topic.prompt"),
-                                  QLineEdit::Normal, QString(), &ok, this);
+                                  QLineEdit::Normal, qFromUtf8(currentTopic.c_str()), &ok, this);
 #else
     topic = QInputDialog::getText(this, _("set_topic.title"), _("set_topic.prompt"),
-                                  QLineEdit::Normal, QString(), &ok);
+                                  QLineEdit::Normal, qFromUtf8(currentTopic.c_str()), &ok);
 #endif
     if (ok && !topic.isEmpty()) {
         if (ToxAPI::setGroupTopicSync(groupId, qToUtf8(topic).data())) {
@@ -745,14 +754,23 @@ void MainWindow::onSetGroupTopicRequested(int groupId) {
 }
 
 void MainWindow::onSetConferenceTitleRequested(int conferenceId) {
+    auto conferences = ToxAPI::getConferencesSync();
+    std::string currentTitle;
+    for (const auto& c : conferences) {
+        if (c.conferenceNumber == conferenceId) {
+            currentTitle = c.statusText;
+            break;
+        }
+    }
+
     bool ok = false;
     QString title;
 #ifdef QT3_BUILD
     title = QInputDialog::getText(_("set_title.title"), _("set_title.prompt"),
-                                  QLineEdit::Normal, QString(), &ok, this);
+                                  QLineEdit::Normal, qFromUtf8(currentTitle.c_str()), &ok, this);
 #else
     title = QInputDialog::getText(this, _("set_title.title"), _("set_title.prompt"),
-                                  QLineEdit::Normal, QString(), &ok);
+                                  QLineEdit::Normal, qFromUtf8(currentTitle.c_str()), &ok);
 #endif
     if (ok && !title.isEmpty()) {
         if (ToxAPI::setConferenceTitleSync(conferenceId, qToUtf8(title).data())) {

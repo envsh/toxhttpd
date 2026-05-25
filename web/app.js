@@ -1795,19 +1795,19 @@ function showConferenceInfo(conferenceId) {
     const conf = contacts.conferences ? contacts.conferences.find(c => c.conferenceNumber == conferenceId) : null;
     document.getElementById('infoConferenceId').textContent = conferenceId;
     document.getElementById('infoConferenceType').textContent = 'Tox Conference';
-    document.getElementById('infoConferenceTopic').value = conf ? (conf.statusText || '') : '';
+    document.getElementById('infoConferenceTitleInput').value = conf ? (conf.statusText || '') : '';
     document.getElementById('infoConferenceMembers').textContent = conf ? (conf.memberCount || 0) : 'N/A';
     document.getElementById('infoConferenceConn').textContent = conf ? 
         (conf.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('conferenceInfoModal').classList.remove('hidden');
-    document.getElementById('saveConferenceTopicBtn').dataset.conferenceId = conferenceId;
+    document.getElementById('saveConferenceTitleBtn').dataset.conferenceId = conferenceId;
     hideAllContextMenus();
 }
 
-function saveConferenceTopic() {
-    const btn = document.getElementById('saveConferenceTopicBtn');
+function saveConferenceTitle() {
+    const btn = document.getElementById('saveConferenceTitleBtn');
     const confId = btn.dataset.conferenceId;
-    const title = document.getElementById('infoConferenceTopic').value.trim();
+    const title = document.getElementById('infoConferenceTitleInput').value.trim();
     if (!title) return;
     apiFetch('/api/conferences/set-title', {
         method: 'POST',

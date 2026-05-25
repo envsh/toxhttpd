@@ -59,6 +59,7 @@
             "ip": "IP 地址",
             "last_seen": "最后上线",
             "member_count": "成员数",
+            "conference_title": "标题：",
             "group_name": "群组名称：",
             "creator_name": "创建者昵称：",
             "group_password": "密码（可选）：",
@@ -120,7 +121,19 @@
         "invite_to_conference": "邀请进会议",
         "invite_to_group": "邀请进群组",
         "view_members": "查看成员",
-        "rename_nick": "修改昵称"
+        "rename_nick": "修改昵称",
+        "set_topic": "设置话题",
+        "set_title": "设置标题"
+    },
+    "set_topic": {
+        "title": "设置群组话题",
+        "prompt": "输入新话题：",
+        "failed": "设置话题失败"
+    },
+    "set_title": {
+        "title": "设置会议标题",
+        "prompt": "输入新标题：",
+        "failed": "设置标题失败"
     },
     "emoji": {
         "search_placeholder": "搜索 emoji...",

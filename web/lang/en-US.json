@@ -59,6 +59,7 @@
             "ip": "IP",
             "last_seen": "Last Seen",
             "member_count": "Members",
+            "conference_title": "Title:",
             "group_name": "Group Name:",
             "creator_name": "Creator Name:",
             "group_password": "Password (optional):",
@@ -120,7 +121,19 @@
         "invite_to_conference": "Invite to Conference",
         "invite_to_group": "Invite to Group",
         "rename_nick": "Rename Nick",
-        "view_members": "View Members"
+        "view_members": "View Members",
+        "set_topic": "Set Topic",
+        "set_title": "Set Title"
+    },
+    "set_topic": {
+        "title": "Set Group Topic",
+        "prompt": "Enter new topic:",
+        "failed": "Failed to set topic"
+    },
+    "set_title": {
+        "title": "Set Conference Title",
+        "prompt": "Enter new title:",
+        "failed": "Failed to set title"
     },
     "select_chat_object": "Select chat object",
     "please_enter_chat_id": "Please enter group chat_id",
