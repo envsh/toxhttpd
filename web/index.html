@@ -161,10 +161,11 @@
             <h3 id="conferenceInfoTitle">会议信息</h3>
             <div class="info-row"><label>会议ID:</label><span id="infoConferenceId"></span></div>
             <div class="info-row"><label>类型:</label><span id="infoConferenceType"></span></div>
-            <div class="info-row"><label>主题:</label><span id="infoConferenceTopic"></span></div>
+            <div class="info-row"><label>主题:</label><input id="infoConferenceTopic" class="editable-input" /></div>
             <div class="info-row"><label>成员数:</label><span id="infoConferenceMembers"></span></div>
             <div class="info-row"><label>连接状态:</label><span id="infoConferenceConn"></span></div>
             <div class="modal-actions">
+                <button onclick="saveConferenceTopic()" id="saveConferenceTopicBtn">保存主题</button>
                 <button onclick="hideConferenceInfo()">关闭</button>
             </div>
         </div>
@@ -176,10 +177,11 @@
             <h3 id="groupInfoTitle">群组信息</h3>
             <div class="info-row"><label>群组ID:</label><span id="infoGroupId"></span></div>
             <div class="info-row"><label>群组名称:</label><span id="infoGroupName"></span></div>
-            <div class="info-row"><label>主题:</label><span id="infoGroupTopic"></span></div>
+            <div class="info-row"><label>主题:</label><input id="infoGroupTopic" class="editable-input" /></div>
             <div class="info-row"><label>成员数:</label><span id="infoGroupMembers"></span></div>
             <div class="info-row"><label>连接状态:</label><span id="infoGroupConn"></span></div>
             <div class="modal-actions">
+                <button onclick="saveGroupTopic()" id="saveGroupTopicBtn">保存主题</button>
                 <button onclick="hideGroupInfo()">关闭</button>
             </div>
         </div>

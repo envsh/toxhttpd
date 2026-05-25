@@ -900,6 +900,20 @@ select option {
     color: #c9d1d9;
 }
 
+.editable-input {
+    flex: 1;
+    padding: 4px 8px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    outline: none;
+    font-size: 14px;
+}
+.editable-input:focus {
+    border-color: #58a6ff;
+}
+
 .mono {
     font-family: monospace;
     font-size: 12px;

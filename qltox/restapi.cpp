@@ -247,6 +247,16 @@ void ToxAPI::setGroupSelfName(int groupId, const std::string& name) {
             "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name));
 }
 
+void ToxAPI::setGroupTopic(int groupId, const std::string& topic) {
+    request(ApiSetGroupTopic, "/api/groups/set-topic", "POST",
+            "group_number=" + std::to_string(groupId) + "&topic=" + urlEncode(topic));
+}
+
+void ToxAPI::setConferenceTitle(int conferenceId, const std::string& title) {
+    request(ApiSetConferenceTitle, "/api/conferences/set-title", "POST",
+            "conference_id=" + std::to_string(conferenceId) + "&title=" + urlEncode(title));
+}
+
 void ToxAPI::getRandomName() {
     request(ApiGetRandomName, "/api/random-name", "GET");
 }
@@ -585,6 +595,20 @@ bool ToxAPI::setGroupSelfNameSync(int groupId, const std::string& name) {
                        + "&name=" + urlEncode(name));
 }
 
+bool ToxAPI::setGroupTopicSync(int groupId, const std::string& topic) {
+    std::string body;
+    return syncRequest("/api/groups/set-topic", "POST", body,
+                       "group_number=" + std::to_string(groupId)
+                       + "&topic=" + urlEncode(topic));
+}
+
+bool ToxAPI::setConferenceTitleSync(int conferenceId, const std::string& title) {
+    std::string body;
+    return syncRequest("/api/conferences/set-title", "POST", body,
+                       "conference_id=" + std::to_string(conferenceId)
+                       + "&title=" + urlEncode(title));
+}
+
 bool ToxAPI::joinGroupByChatIdSync(const std::string& chatId,
                                     const std::string& name, const std::string& password) {
     std::string data = "chat_id=" + chatId;
@@ -736,6 +760,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
     case ApiJoinGroup:
     case ApiJoinGroupByChatId:
     case ApiSetGroupSelfName:
+    case ApiSetGroupTopic:
+    case ApiSetConferenceTitle:
     case ApiSetSelfInfo:
         break; // fire-and-forget
 

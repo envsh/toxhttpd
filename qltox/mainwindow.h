@@ -35,6 +35,8 @@ public:
     void onGroupInviteReceived(int friendNumber, const QString& chatId);
     void onViewMembersRequested(int id, const QString& type);
     void onRenameNickRequested(int groupId, const QString& groupName);
+    void onSetGroupTopicRequested(int groupId);
+    void onSetConferenceTitleRequested(int conferenceId);
     void onSwitchAccount();
     void loadMessageHistory();
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);

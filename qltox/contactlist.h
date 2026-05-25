@@ -42,6 +42,8 @@ public:
     void inviteToGroupRequested(int friendId);
     void viewMembersRequested(int id, const QString& type);
     void renameNickRequested(int groupId, const QString& groupName);
+    void setGroupTopicRequested(int groupId);
+    void setConferenceTitleRequested(int conferenceId);
     
 private slots:
     void onTabClicked();

@@ -1,4 +1,6 @@
-# ToxHTTPd - Tox HTTP REST API Server (Go) + Qt3 GUI Client
+# ToxHTTPd - Tox HTTP REST API Server (Go) + Qt3 GUI Client (deprecated dir name: q3tox)
+
+注意：`q3tox/` 目录名源自私家重命名前的 qTox 分支，实为本项目的 qltox 客户端。所有文件路径采用 `qltox/` 前缀。
 
 ## Goal
 实现完整的 Tox 客户端：Go 后端（toxhttpd）提供 REST API，Qt3 前端（q3tox）提供 GUI 界面。功能包括：会议、好友管理、消息收发、多语言支持（简/繁/英）。
@@ -1126,5 +1128,43 @@ srv.SaveRequestCh <- struct{}{}  // 手动触发保存
 
 #### 未修改
 - `web/` 全部
-- `q3tox/` 全部
+- `qltox/` 全部
 - `go-toxhttpd/build.sh`
+
+---
+
+## 2026-05-25 会话更新（二）— REST 端点补齐 + UI 端群组/会议管理功能
+
+### Goal
+补齐两端（Web + qltox）对群组话题、会议标题、离开会议等管理功能的支持。
+
+### Phase 1: Bug 修复
+
+| # | 问题 | 文件 | 修复 |
+|---|------|------|------|
+| 1a | Web leave conference 发到 `/api/conference_delete`（不存在） | `web/app.js:1817` | → `/api/conferences/leave` |
+| 1b | qltox leave conference 发到 `/api/conference_delete`（2 处） | `qltox/restapi.cpp:202,516` | → `/api/conferences/leave` |
+| 1c | qltox `onDeleteOrLeaveRequested` 无 `"group"` 分支（leave group 菜单点无反应） | `qltox/mainwindow.cpp:729` | 添加 `"group"` 分支，确认后调 `leaveGroupSync()` |
+| 1c | 缺少 `leaveGroupSync()` 方法 | `qltox/restapi.h/cpp` | 新增同步方法 |
+| 1c | `leaveGroup()` 异步方法参数错发 `group_id`（实际应发 `group_number`） | `qltox/restapi.cpp:221` | 改为 `group_number=` |
+
+### Phase 2: 新增 Set Topic / Set Title
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 2a | Web 信息弹窗：topic/title 从只读 `<span>` 改为可编辑 `<input>` + 保存按钮 | `web/index.html` |
+| 2a | Web 保存函数：`saveGroupTopic()`、`saveConferenceTopic()` | `web/app.js` |
+| 2a | CSS：`.editable-input` 样式 | `web/style.css` |
+| 2b | qltox 右键菜单：「群组」加 Set Topic，「会议」加 Set Title | `qltox/contactlist.cpp` |
+| 2b | qltox 信号：`setGroupTopicRequested`、`setConferenceTitleRequested` | `qltox/contactlist.h` |
+| 2b | qltox API：`setGroupTopic()` / `setGroupTopicSync()` | `qltox/restapi.h/cpp`、`eventpoller.h` |
+| 2b | qltox API：`setConferenceTitle()` / `setConferenceTitleSync()` | `qltox/restapi.h/cpp`、`eventpoller.h` |
+| 2b | qltox 槽实现：`onSetGroupTopicRequested()`、`onSetConferenceTitleRequested()` | `qltox/mainwindow.h/cpp` |
+| 2b | qltox 信号连接：`connect()` 绑定新信号/槽 | `qltox/mainwindow.cpp:106` |
+| 2c | Go server REST 处理：`handleGroupSetTopic`、`handleConferenceSetTitle`、`handleConferenceLeave` | `go-toxhttpd/server/restapi.go` |
+
+### 编译结果
+| 环境 | 命令 | 结果 |
+|------|------|------|
+| Qt3 | `cd qltox && make -j1` | ✅ 编译通过 |
+| Go | `bash build.sh` | ✅ 编译通过 |

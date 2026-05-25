@@ -1795,12 +1795,30 @@ function showConferenceInfo(conferenceId) {
     const conf = contacts.conferences ? contacts.conferences.find(c => c.conferenceNumber == conferenceId) : null;
     document.getElementById('infoConferenceId').textContent = conferenceId;
     document.getElementById('infoConferenceType').textContent = 'Tox Conference';
-    document.getElementById('infoConferenceTopic').textContent = conf ? (conf.statusText || t('no_status')) : 'N/A';
+    document.getElementById('infoConferenceTopic').value = conf ? (conf.statusText || '') : '';
     document.getElementById('infoConferenceMembers').textContent = conf ? (conf.memberCount || 0) : 'N/A';
     document.getElementById('infoConferenceConn').textContent = conf ? 
         (conf.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('conferenceInfoModal').classList.remove('hidden');
+    document.getElementById('saveConferenceTopicBtn').dataset.conferenceId = conferenceId;
     hideAllContextMenus();
+}
+
+function saveConferenceTopic() {
+    const btn = document.getElementById('saveConferenceTopicBtn');
+    const confId = btn.dataset.conferenceId;
+    const title = document.getElementById('infoConferenceTopic').value.trim();
+    if (!title) return;
+    apiFetch('/api/conferences/set-title', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `conference_id=${confId}&title=${encodeURIComponent(title)}`
+    }).then(r => r.json())
+      .then(data => {
+          loadContacts();
+      }).catch(err => {
+          console.error('Failed to set conference title:', err);
+      });
 }
 
 function hideConferenceInfo() {
@@ -1835,12 +1853,30 @@ function showGroupInfo(groupId) {
     const group = contacts.groups ? contacts.groups.find(g => g.groupNumber == groupId) : null;
     document.getElementById('infoGroupId').textContent = groupId;
     document.getElementById('infoGroupName').textContent = group ? (group.groupName || 'N/A') : 'N/A';
-    document.getElementById('infoGroupTopic').textContent = group ? (group.statusText || t('no_status')) : 'N/A';
+    document.getElementById('infoGroupTopic').value = group ? (group.statusText || '') : '';
     document.getElementById('infoGroupMembers').textContent = group ? (group.memberCount || 0) : 'N/A';
     document.getElementById('infoGroupConn').textContent = group ? 
         (group.isConnected ? '在线' : '离线') : 'N/A';
     document.getElementById('groupInfoModal').classList.remove('hidden');
+    document.getElementById('saveGroupTopicBtn').dataset.groupId = groupId;
     hideAllContextMenus();
+}
+
+function saveGroupTopic() {
+    const btn = document.getElementById('saveGroupTopicBtn');
+    const groupId = btn.dataset.groupId;
+    const topic = document.getElementById('infoGroupTopic').value.trim();
+    if (!topic) return;
+    apiFetch('/api/groups/set-topic', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `group_number=${groupId}&topic=${encodeURIComponent(topic)}`
+    }).then(r => r.json())
+      .then(data => {
+          loadContacts();
+      }).catch(err => {
+          console.error('Failed to set group topic:', err);
+      });
 }
 
 function hideGroupInfo() {

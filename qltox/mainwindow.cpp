@@ -11,6 +11,7 @@
 #include <qtextcodec.h>
 #include <qtextstream.h>
 #include <qradiobutton.h>
+#include <qinputdialog.h>
 #include "placeholderlineedit.h"
 #include "sound.h"
 
@@ -103,6 +104,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
             this, SLOT(onViewMembersRequested(int, const QString&)));
     connect(contactListWidget, SIGNAL(renameNickRequested(int, const QString&)),
             this, SLOT(onRenameNickRequested(int, const QString&)));
+    connect(contactListWidget, SIGNAL(setGroupTopicRequested(int)),
+            this, SLOT(onSetGroupTopicRequested(int)));
+    connect(contactListWidget, SIGNAL(setConferenceTitleRequested(int)),
+            this, SLOT(onSetConferenceTitleRequested(int)));
     connect(contactListWidget, SIGNAL(inviteToConferenceRequested(int)),
             this, SLOT(onInviteToConferenceRequested(int)));
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
@@ -716,6 +721,44 @@ void MainWindow::onRenameNickRequested(int groupId, const QString& groupName) {
         }
         if (!name.empty()) {
             ToxAPI::setGroupSelfNameSync(groupId, name);
+        }
+    }
+}
+
+void MainWindow::onSetGroupTopicRequested(int groupId) {
+    bool ok = false;
+    QString topic;
+#ifdef QT3_BUILD
+    topic = QInputDialog::getText(_("set_topic.title"), _("set_topic.prompt"),
+                                  QLineEdit::Normal, QString(), &ok, this);
+#else
+    topic = QInputDialog::getText(this, _("set_topic.title"), _("set_topic.prompt"),
+                                  QLineEdit::Normal, QString(), &ok);
+#endif
+    if (ok && !topic.isEmpty()) {
+        if (ToxAPI::setGroupTopicSync(groupId, qToUtf8(topic).data())) {
+            ToxAPI::loadAllData();
+        } else {
+            QMessageBox::warning(this, _("error"), _("set_topic.failed"));
+        }
+    }
+}
+
+void MainWindow::onSetConferenceTitleRequested(int conferenceId) {
+    bool ok = false;
+    QString title;
+#ifdef QT3_BUILD
+    title = QInputDialog::getText(_("set_title.title"), _("set_title.prompt"),
+                                  QLineEdit::Normal, QString(), &ok, this);
+#else
+    title = QInputDialog::getText(this, _("set_title.title"), _("set_title.prompt"),
+                                  QLineEdit::Normal, QString(), &ok);
+#endif
+    if (ok && !title.isEmpty()) {
+        if (ToxAPI::setConferenceTitleSync(conferenceId, qToUtf8(title).data())) {
+            ToxAPI::loadAllData();
+        } else {
+            QMessageBox::warning(this, _("error"), _("set_title.failed"));
         }
     }
 }

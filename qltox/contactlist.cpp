@@ -467,45 +467,53 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
 #endif
     } else if (type == "conference") {
-        // 会议：查看成员、离开会议（离开放在最后）
+        // 会议：查看成员、设置标题、离开会议
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.view_members"), 1);
+        menu.insertItem(_("context_menu.set_title"), 2);
         menu.insertSeparator();
-        menu.insertItem(_("context_menu.leave_conference"), 2);
+        menu.insertItem(_("context_menu.leave_conference"), 3);
         int choice = menu.exec(globalPos);
         if (choice == 0) emit viewInfoRequested(id, type);
         else if (choice == 1) emit viewMembersRequested(id, type);
-        else if (choice == 2) emit deleteOrLeaveRequested(id, type);
+        else if (choice == 2) emit setConferenceTitleRequested(id);
+        else if (choice == 3) emit deleteOrLeaveRequested(id, type);
 #else
         QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
+        QAction* setTitleAction = menu.addAction(_("context_menu.set_title"));
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_conference"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) emit viewInfoRequested(id, type);
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
+        else if (selected == setTitleAction) emit setConferenceTitleRequested(id);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
 #endif
     } else if (type == "group") {
-        // 群组：查看成员、修改昵称、离开群组（离开放在最后）
+        // 群组：查看成员、修改昵称、设置主题、离开群组
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.view_members"), 1);
         menu.insertItem(_("context_menu.rename_nick"), 2);
+        menu.insertItem(_("context_menu.set_topic"), 3);
         menu.insertSeparator();
-        menu.insertItem(_("context_menu.leave_group"), 3);
+        menu.insertItem(_("context_menu.leave_group"), 4);
         int choice = menu.exec(globalPos);
         if (choice == 0) emit viewInfoRequested(id, type);
         else if (choice == 1) emit viewMembersRequested(id, type);
         else if (choice == 2) emit renameNickRequested(id, name);
-        else if (choice == 3) emit deleteOrLeaveRequested(id, type);
+        else if (choice == 3) emit setGroupTopicRequested(id);
+        else if (choice == 4) emit deleteOrLeaveRequested(id, type);
 #else
         QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
         QAction* renameAction = menu.addAction(_("context_menu.rename_nick"));
+        QAction* setTopicAction = menu.addAction(_("context_menu.set_topic"));
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_group"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) emit viewInfoRequested(id, type);
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
         else if (selected == renameAction) emit renameNickRequested(id, name);
+        else if (selected == setTopicAction) emit setGroupTopicRequested(id);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
 #endif
     }

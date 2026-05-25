@@ -40,6 +40,8 @@ enum ApiRequestType {
     ApiJoinGroup,
     ApiJoinGroupByChatId,
     ApiSetGroupSelfName,
+    ApiSetGroupTopic,
+    ApiSetConferenceTitle,
     ApiGetRandomName,
     ApiLoadAllData,
 };
