@@ -23,5 +23,7 @@ func main() {
 		srv.Shutdown()
 	}()
 
-	log.Fatal(srv.Start())
+	if err := srv.Start(); err != nil {
+		log.Fatal(err)
+	}
 }
