@@ -199,7 +199,7 @@ void ToxAPI::createConference() {
 }
 
 void ToxAPI::leaveConference(int confId) {
-    request(ApiLeaveConference, "/api/conference_delete", "POST",
+    request(ApiLeaveConference, "/api/conferences/leave", "POST",
             "conference_id=" + std::to_string(confId));
 }
 
@@ -218,7 +218,7 @@ void ToxAPI::createGroup(const std::string& groupName, const std::string& creato
 
 void ToxAPI::leaveGroup(int groupId) {
     request(ApiLeaveGroup, "/api/groups/leave", "POST",
-            "group_id=" + std::to_string(groupId));
+            "group_number=" + std::to_string(groupId));
 }
 
 void ToxAPI::inviteToGroup(int friendId, int groupId) {
@@ -513,8 +513,14 @@ bool ToxAPI::deleteFriendSync(int friendId) {
 
 bool ToxAPI::leaveConferenceSync(int confId) {
     std::string body;
-    return syncRequest("/api/conference_delete", "POST", body,
+    return syncRequest("/api/conferences/leave", "POST", body,
                        "conference_id=" + std::to_string(confId));
+}
+
+bool ToxAPI::leaveGroupSync(int groupId) {
+    std::string body;
+    return syncRequest("/api/groups/leave", "POST", body,
+                       "group_number=" + std::to_string(groupId));
 }
 
 bool ToxAPI::setSelfInfoSync(const std::string& name, const std::string& statusMessage) {

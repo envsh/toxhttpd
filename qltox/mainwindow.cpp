@@ -726,6 +726,8 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
         confirmMsg = _("confirm_delete_friend").arg(QString::number(id));
     } else if (type == "conference") {
         confirmMsg = _("confirm_leave_conference").arg(QString::number(id));
+    } else if (type == "group") {
+        confirmMsg = _("confirm_leave_group").arg(QString::number(id));
     } else {
         return;
     }
@@ -751,6 +753,11 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
             success = ToxAPI::leaveConferenceSync(id);
             if (success) {
                 QMessageBox::information(this, _("conference_leave_success"), _("conference_leave_success"));
+            }
+        } else if (type == "group") {
+            success = ToxAPI::leaveGroupSync(id);
+            if (success) {
+                QMessageBox::information(this, _("group_leave_success"), _("group_leave_success"));
             }
         }
         

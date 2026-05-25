@@ -90,6 +90,7 @@ public:
                                const std::string& password = "", bool isPrivate = false);
     static bool deleteFriendSync(int friendId);
     static bool leaveConferenceSync(int confId);
+    static bool leaveGroupSync(int groupId);
     static bool setSelfInfoSync(const std::string& name, const std::string& statusMessage);
     static bool getSelfSync(std::string& name, std::string& statusMsg,
                             std::string& connStatus, std::string& address);

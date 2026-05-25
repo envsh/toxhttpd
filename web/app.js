@@ -1814,7 +1814,7 @@ function leaveConference() {
         return;
     }
     
-    apiFetch('/api/conference_delete', {
+    apiFetch('/api/conferences/leave', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `conference_id=${selectedConferenceId}`
