@@ -40,6 +40,8 @@ func logToxStatus(t *tox.Tox) {
 		name, addr[:16]+"...", connStr, connStatus, len(friends))
 }
 
+type SaveHook func(t any, path string, data []byte)
+
 func saveToxData(t *tox.Tox, path string) {
 	os.MkdirAll("data", 0700)
 	err := t.WriteSavedata(path)

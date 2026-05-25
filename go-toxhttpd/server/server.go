@@ -91,6 +91,28 @@ func New(cfg Config) (*Server, error) {
 	return server, nil
 }
 
+func (s *Server) saveLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var saveCount int
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.SaveRequestCh:
+			for len(s.SaveRequestCh) > 0 {
+				<-s.SaveRequestCh
+			}
+			saveCount++
+			log.Printf("[TOX] Save #%d started", saveCount)
+			saveToxData(s.Tox, "data/savedata.bin")
+			if s.SaveHook != nil {
+				data := s.Tox.GetSavedata()
+				s.SaveHook(s.Tox, "data/savedata.bin", data)
+			}
+		}
+	}
+}
+
 func (s *Server) Start() error {
 	m := NewMidapi(&s.ApiContext)
 	h := NewRestapi(m, s.webRoot)
@@ -116,6 +138,7 @@ func (s *Server) Start() error {
 			}
 		}
 	}()
+	go s.saveLoop(ctx, &wg)
 
 	s.httpServer = &http.Server{Addr: ":" + s.config.Port, Handler: mux}
 
@@ -134,13 +157,24 @@ func (s *Server) Start() error {
 		return err
 	case <-s.shutdownCh:
 		log.Println("Shutting down...")
+
+		t0 := time.Now()
 		cancel()
 		wg.Wait()
 		saveToxData(s.Tox, "data/savedata.bin")
+		log.Printf("[SHUTDOWN] iteration+save loop stopped in %v", time.Since(t0))
+
+		t1 := time.Now()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		s.httpServer.Shutdown(shutdownCtx)
+		log.Printf("[SHUTDOWN] HTTP server stopped in %v", time.Since(t1))
+
+		t2 := time.Now()
 		s.Tox.Kill()
+		log.Printf("[SHUTDOWN] Tox killed in %v", time.Since(t2))
+
+		log.Printf("[SHUTDOWN] total: %v", time.Since(t0))
 		log.Println("Server stopped.")
 		return nil
 	}

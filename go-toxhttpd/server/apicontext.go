@@ -18,6 +18,8 @@ type ApiContext struct {
 	FriendUserStatuses   map[uint32]int
 	ConferenceConnected  map[uint32]bool
 	Mu                   sync.RWMutex
+	SaveRequestCh        chan struct{}
+	SaveHook             SaveHook
 }
 
 func NewApiContext(t *tox.Tox, toxp *toxpriv.Tox, db *sql.DB) *ApiContext {
@@ -30,5 +32,6 @@ func NewApiContext(t *tox.Tox, toxp *toxpriv.Tox, db *sql.DB) *ApiContext {
 		FriendStatuses:      make(map[uint32]string),
 		FriendUserStatuses:  make(map[uint32]int),
 		ConferenceConnected: make(map[uint32]bool),
+		SaveRequestCh:       make(chan struct{}, 16),
 	}
 }
