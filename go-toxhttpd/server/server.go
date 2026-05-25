@@ -138,6 +138,7 @@ func (s *Server) Start() error {
 			}
 		}
 	}()
+	wg.Add(1)
 	go s.saveLoop(ctx, &wg)
 
 	s.httpServer = &http.Server{Addr: ":" + s.config.Port, Handler: mux}
@@ -167,6 +168,7 @@ func (s *Server) Start() error {
 		t1 := time.Now()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
+		s.httpServer.Close()
 		s.httpServer.Shutdown(shutdownCtx)
 		log.Printf("[SHUTDOWN] HTTP server stopped in %v", time.Since(t1))
 

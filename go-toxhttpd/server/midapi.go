@@ -105,6 +105,13 @@ func NewMidapi(ctx *ApiContext) *Midapi {
 	return &Midapi{ctx: ctx}
 }
 
+func (m *Midapi) requestSave() {
+	select {
+	case m.ctx.SaveRequestCh <- struct{}{}:
+	default:
+	}
+}
+
 // ── Self ──
 
 func (m *Midapi) SelfGet() *SelfInfo {
@@ -142,6 +149,7 @@ func (m *Midapi) SelfUpdate(name, statusMessage string) (*SelfInfo, error) {
 		log.Printf("[TOX] Self status message updated: %s", statusMessage)
 	}
 
+	m.requestSave()
 	return m.SelfGet(), nil
 }
 
@@ -159,12 +167,17 @@ func (m *Midapi) FriendAdd(pubkey, message string) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+	m.requestSave()
 	return fn, nil
 }
 
 func (m *Midapi) FriendDelete(friendID uint32) error {
 	_, err := m.ctx.Tox.FriendDelete(friendID)
-	return err
+	if err != nil {
+		return err
+	}
+	m.requestSave()
+	return nil
 }
 
 func (m *Midapi) FriendsInfo(ids []string) []FriendInfo {
@@ -345,6 +358,7 @@ func (m *Midapi) GroupCreate(privacyState, groupName, creatorName, password stri
 			return 0, fmt.Errorf("set password failed: %s", err)
 		}
 	}
+	m.requestSave()
 	return uint32(gn), nil
 }
 
@@ -375,11 +389,17 @@ func (m *Midapi) GroupJoin(chatId, name, password string) (uint32, error) {
 		return 0, err
 	}
 	log.Printf("[GroupJoin] SUCCESS: group_number=%d, chat_id=%s...", uint32(gn), safeTruncate(chatId, 16))
+	m.requestSave()
 	return uint32(gn), nil
 }
 
 func (m *Midapi) GroupLeave(gn uint32, partMessage string) error {
-	return m.ctx.Tox.GroupLeave(tox.GroupNumber(gn), partMessage)
+	err := m.ctx.Tox.GroupLeave(tox.GroupNumber(gn), partMessage)
+	if err != nil {
+		return err
+	}
+	m.requestSave()
+	return nil
 }
 
 func (m *Midapi) GroupInvite(gn uint32, friendNumber uint32) error {
@@ -396,7 +416,21 @@ func (m *Midapi) GroupAccept(inviteData string, friendNumber uint32, name, passw
 }
 
 func (m *Midapi) GroupSetName(gn uint32, name string) error {
-	return m.ctx.Tox.GroupSelfSetName(tox.GroupNumber(gn), name)
+	err := m.ctx.Tox.GroupSelfSetName(tox.GroupNumber(gn), name)
+	if err != nil {
+		return err
+	}
+	m.requestSave()
+	return nil
+}
+
+func (m *Midapi) GroupSetTopic(gn uint32, topic string) error {
+	err := m.ctx.Tox.GroupSetTopic(tox.GroupNumber(gn), topic)
+	if err != nil {
+		return err
+	}
+	m.requestSave()
+	return nil
 }
 
 func (m *Midapi) GroupMembers(gn uint32) *GroupMemberList {
@@ -504,6 +538,7 @@ func (m *Midapi) ConferenceCreate() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+	m.requestSave()
 	return confID, nil
 }
 
@@ -513,8 +548,26 @@ func (m *Midapi) ConferenceJoin(friendNumber uint32, cookie string) (uint32, err
 		return 0, err
 	}
 	log.Printf("[TOX] Successfully joined conference %d from friend %d", confID, friendNumber)
-	go saveToxData(m.ctx.Tox, "data/savedata.bin")
+	m.requestSave()
 	return confID, nil
+}
+
+func (m *Midapi) ConferenceSetTitle(confID uint32, title string) error {
+	_, err := m.ctx.Tox.ConferenceSetTitle(confID, title)
+	if err != nil {
+		return err
+	}
+	m.requestSave()
+	return nil
+}
+
+func (m *Midapi) ConferenceLeave(confID uint32) error {
+	_, err := m.ctx.Tox.ConferenceDelete(confID)
+	if err != nil {
+		return err
+	}
+	m.requestSave()
+	return nil
 }
 
 func (m *Midapi) ConferenceMembers(confID uint32) *ConferenceMemberList {
@@ -762,6 +815,7 @@ func (m *Midapi) SetupCallbacks() {
 		} else {
 			data, _ := json.Marshal(map[string]interface{}{"public_key": pubkey})
 			s.EventQueue.Push("friend_request", string(data))
+			m.requestSave()
 		}
 	}, nil)
 
@@ -813,6 +867,7 @@ func (m *Midapi) SetupCallbacks() {
 			"name":      newName,
 		})
 		s.EventQueue.Push("friend_name", string(data))
+		m.requestSave()
 	}, nil)
 
 	s.Tox.CallbackFriendStatusMessage(func(this *tox.Tox, friendNumber uint32, newStatus string, userData interface{}) {
@@ -822,6 +877,7 @@ func (m *Midapi) SetupCallbacks() {
 			"status_message": newStatus,
 		})
 		s.EventQueue.Push("friend_status_message", string(data))
+		m.requestSave()
 	}, nil)
 
 	s.Tox.CallbackFriendStatus(func(this *tox.Tox, friendNumber uint32, status int, userData interface{}) {
@@ -926,6 +982,7 @@ func (m *Midapi) SetupCallbacks() {
 			"title":             title,
 		})
 		s.EventQueue.Push("conference_title", string(data))
+		m.requestSave()
 	}, nil)
 
 	s.Tox.CallbackConferencePeerName(func(this *tox.Tox, groupNumber uint32, peerNumber uint32, name string, userData interface{}) {
@@ -1036,6 +1093,17 @@ func (m *Midapi) SetupCallbacks() {
 			"is_connected":      true,
 		})
 		s.EventQueue.Push("conference_connected", string(data))
+	}, nil)
+
+	s.Tox.CallbackGroupTopic(func(this *tox.Tox, groupNumber tox.GroupNumber, peerNumber tox.GroupPeerNumber, topic string, userData interface{}) {
+		log.Printf("[TOX_CALLBACK] GroupTopic: group=%d, peer=%d, topic=%s", int(groupNumber), int(peerNumber), topic)
+		data, _ := json.Marshal(map[string]interface{}{
+			"group_number": int(groupNumber),
+			"peer_number":  int(peerNumber),
+			"topic":        topic,
+		})
+		s.EventQueue.Push("group_topic", string(data))
+		m.requestSave()
 	}, nil)
 
 	log.Println("[TOX] All callbacks registered")
