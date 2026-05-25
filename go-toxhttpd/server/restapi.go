@@ -45,7 +45,7 @@ func (h *Restapi) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/conference/members", corsMiddleware(loggingMiddleware(h.handleConferenceMembers)))
 	mux.HandleFunc("/api/group/members", corsMiddleware(loggingMiddleware(h.handleGroupMembers)))
 	mux.HandleFunc("/api/random-name", corsMiddleware(loggingMiddleware(h.handleRandomName)))
-	mux.HandleFunc("/api/groups/set-name", corsMiddleware(loggingMiddleware(h.handleGroupSetName)))
+	mux.HandleFunc("/api/groups/set-self-name", corsMiddleware(loggingMiddleware(h.handleGroupSetName)))
 	mux.HandleFunc("/api/groups/set-topic", corsMiddleware(loggingMiddleware(h.handleGroupSetTopic)))
 	mux.HandleFunc("/api/conferences/set-title", corsMiddleware(loggingMiddleware(h.handleConferenceSetTitle)))
 	mux.HandleFunc("/api/conferences/leave", corsMiddleware(loggingMiddleware(h.handleConferenceLeave)))

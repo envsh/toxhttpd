@@ -2524,7 +2524,7 @@ function doSetGroupName(groupId, name) {
     var params = new URLSearchParams();
     params.append('group_number', groupId);
     params.append('name', name);
-    apiFetch('/api/groups/set-name', {
+    apiFetch('/api/groups/set-self-name', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString()

@@ -243,7 +243,7 @@ void ToxAPI::joinGroupByChatId(const std::string& chatId,
 }
 
 void ToxAPI::setGroupSelfName(int groupId, const std::string& name) {
-    request(ApiSetGroupSelfName, "/api/groups/set-name", "POST",
+    request(ApiSetGroupSelfName, "/api/groups/set-self-name", "POST",
             "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name));
 }
 
@@ -590,7 +590,7 @@ bool ToxAPI::inviteToGroupSync(int friendId, int groupId) {
 
 bool ToxAPI::setGroupSelfNameSync(int groupId, const std::string& name) {
     std::string body;
-    return syncRequest("/api/groups/set-name", "POST", body,
+    return syncRequest("/api/groups/set-self-name", "POST", body,
                        "group_number=" + std::to_string(groupId)
                        + "&name=" + urlEncode(name));
 }
