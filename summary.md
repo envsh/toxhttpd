@@ -1034,3 +1034,97 @@ void keyPressEvent(QKeyEvent* event);
 - Go: `go-toxhttpd/server.go`
 - q3tox: `restapi.h`, `restapi.cpp`, `eventpoller.h`, `eventpoller.cpp`, `mainwindow.cpp`, `chatwidget.h`, `chatwidget.cpp`, `chatview.h`, `chatview.cpp`
 - Web: `app.js`, `style.css`
+
+---
+
+## 2026-05-25 会话更新 — Events poll 原子化 + 独立 save 机制
+
+### Goal
+1. 修复 Go server event poll 超时在并发连接下的竞态
+2. 将 toxsave 从 fire-and-forget goroutine 改为独立永久 goroutine + channel 驱动
+
+### 1. Events poll 原子化
+
+**问题**：`EventsPoll` 中 `PopAfter` 和 `GetNextID` 是两次独立取锁，并发连接下 events 与 nextID 可能不一致。
+
+**修复**：
+- `events.go`：`PopAfter` 改为返回 `([]Event, uint64)`，单次锁内返回 events + nextID；移除 `GetNextID`
+- `midapi.go`：`EventsPoll` 简化为单次 `PopAfter` 调用
+- `restapi.go`：`handleEvents` 初始检查有事件时直接返回（不再丢弃 events）；移除 3s 超时特殊分支（原竞态下 `afterID >= nextID` 条件不可靠，原子化后每次命中变为常态 ⇒ 统一 30s）
+
+### 2. Toxsave 独立 goroutine + channel
+
+**问题**：`saveToxData` 只在 conference join 时 fire-and-forget 调用一次，大多数状态变更不触发保存；无排重机制。
+
+**改造**：
+
+| 文件 | 改动 |
+|---|---|
+| `toxutil.go` | +`SaveHook` 导出类型 `func(t any, path string, data []byte)` |
+| `apicontext.go` | `ApiContext` 加 `SaveRequestCh chan struct{}(buffer=16)` + `SaveHook SaveHook` |
+| `server.go` | +`saveLoop(ctx, wg)`（排重 + saveCount 日志 + SaveHook），`Start()` 中 `wg.Add(1); go s.saveLoop(ctx, &wg)`；shutdown 移除旧 save 改为时间统计日志 |
+| `midapi.go` | +`requestSave()` helper；17 个触发点；3 个新方法；新注册 `CallbackGroupTopic` |
+
+**saveLoop 排重机制**：
+```
+收到 signal → drain channel 全部积压 → 只保存一次 → 可选外部 SaveHook
+```
+
+**17 个触发点**：
+
+| # | 位置 | 类型 | 触发时机 |
+|---|---|---|---|
+| 1 | `SelfUpdate` | 显式方法 | 改名/改status |
+| 2 | `FriendAdd` | 显式方法 | 加好友 |
+| 3 | `FriendDelete` | 显式方法 | 删好友 |
+| 4 | `GroupCreate` | 显式方法 | 创建群组 |
+| 5 | `GroupJoin` | 显式方法 | 加入群组 |
+| 6 | `GroupLeave` | 显式方法 | 离开群组 |
+| 7 | `GroupSetName` | 显式方法 | 改群组名 |
+| 8 | `GroupSetTopic` | 显式方法（新） | 改群组话题 |
+| 9 | `ConferenceCreate` | 显式方法 | 创建会议 |
+| 10 | `ConferenceJoin` | 显式方法 | 加入会议（替换 `go saveToxData`） |
+| 11 | `ConferenceSetTitle` | 显式方法（新） | 改会议标题 |
+| 12 | `ConferenceLeave` | 显式方法（新） | 离开/删除会议 |
+| 13 | `CallbackFriendRequest` | 回调 | 自动接受好友 |
+| 14 | `CallbackFriendName` | 回调 | 好友改名 |
+| 15 | `CallbackFriendStatusMessage` | 回调 | 好友状态/topic 变更 |
+| 16 | `CallbackConferenceTitle` | 回调 | 会议标题变更 |
+| 17 | `CallbackGroupTopic` | 回调（新注册） | 群组话题变更 |
+
+**新方法**：
+- `GroupSetTopic(gn uint32, topic string) error`
+- `ConferenceSetTitle(confID uint32, title string) error`
+- `ConferenceLeave(confID uint32) error`
+
+**外部扩展**：
+```go
+srv.SaveHook = func(t any, path string, data []byte) {
+    // 例如上传备份，不影响内部文件保存
+}
+srv.SaveRequestCh <- struct{}{}  // 手动触发保存
+```
+
+### Bug 修复
+- **panic: negative WaitGroup counter**：`go s.saveLoop(ctx, &wg)` 前缺 `wg.Add(1)`，已修复
+- **shutdown 日志 `<nil>`**：`main.go` 中 `log.Fatal(srv.Start())` 改为 `if err := srv.Start(); err != nil { log.Fatal(err) }`，正常退出不再打印 `<nil>`
+- **shutdown 5s**：HTTP server 关闭等待长连接超时 5s，当前行为预期
+
+### 编译
+- `bash build.sh` → 编译通过 ✅
+
+### 关键文件修改清单
+
+#### Go 后端
+- `go-toxhttpd/main.go` — `log.Fatal` → `if err` 判断，去除 `<nil>` 日志
+- `go-toxhttpd/server/events.go` — `PopAfter` 原子返回 `([]Event, uint64)`，移除 `GetNextID`
+- `go-toxhttpd/server/midapi.go` — `EventsPoll` 简化、`requestSave` helper、12 显式触发点、3 新方法、5 回调触发点、`CallbackGroupTopic` 注册
+- `go-toxhttpd/server/restapi.go` — `handleEvents` 移除 3s 超时、初始有事件立即返回
+- `go-toxhttpd/server/toxutil.go` — `SaveHook` 类型
+- `go-toxhttpd/server/apicontext.go` — `SaveRequestCh` + `SaveHook` 字段
+- `go-toxhttpd/server/server.go` — `saveLoop` 方法、`wg.Add(1)` 修复、shutdown 时间日志
+
+#### 未修改
+- `web/` 全部
+- `q3tox/` 全部
+- `go-toxhttpd/build.sh`
