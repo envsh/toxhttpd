@@ -17,7 +17,6 @@ type Server struct {
 	ApiContext
 	webRoot    string
 	config     Config
-	rebscnter  int
 	shutdownCh chan struct{}
 	httpServer *http.Server
 }
@@ -113,6 +112,32 @@ func (s *Server) saveLoop(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
+// about 5s
+// in case outer iterate
+func(s *Server) ToxIterate() {
+		
+		ms20 := 20 * time.Millisecond
+		for i := 0; i < 100; i++ {
+				s.Tox.Iterate()
+				s.checkRebootstrap()
+				time.Sleep(ms20 + time.Millisecond * time.Duration(s.Tox.IterationInterval()))
+		}
+}
+
+func (s *Server) toxIterateBackground(ctx context.Context) {
+	ms20 := 20 * time.Millisecond
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			s.Tox.Iterate()
+			s.checkRebootstrap()
+			time.Sleep(ms20 + time.Millisecond * time.Duration(s.Tox.IterationInterval()))
+		}
+	}
+}
+
 func (s *Server) Start() error {
 	m := NewMidapi(&s.ApiContext)
 	h := NewRestapi(m, s.webRoot)
@@ -126,17 +151,7 @@ func (s *Server) Start() error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ms20 := 20 * time.Millisecond
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				s.Tox.Iterate()
-				s.checkRebootstrap()
-				time.Sleep(ms20 + time.Millisecond * time.Duration(s.Tox.IterationInterval()))
-			}
-		}
+		s.toxIterateBackground(ctx)
 	}()
 	wg.Add(1)
 	go s.saveLoop(ctx, &wg)

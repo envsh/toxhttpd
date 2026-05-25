@@ -42,13 +42,13 @@ func bootstrapAll(t *tox.Tox) {
 	}
 }
 
-func (s *Server) checkRebootstrap() {
-	s.rebscnter++
-	if s.rebscnter < 20*5 {
+func (ctx *ApiContext) checkRebootstrap() {
+	ctx.Rebscnter++
+	if ctx.Rebscnter < 20*5 {
 		return
 	}
-	s.rebscnter = 0
-	t := s.Tox
+	ctx.Rebscnter = 0
+	t := ctx.Tox
 	connected := t.SelfGetConnectionStatus() != tox.CONNECTION_NONE
 	if connected {
 		return

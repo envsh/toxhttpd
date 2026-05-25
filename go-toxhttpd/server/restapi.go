@@ -49,6 +49,7 @@ func (h *Restapi) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/groups/set-topic", corsMiddleware(loggingMiddleware(h.handleGroupSetTopic)))
 	mux.HandleFunc("/api/conferences/set-title", corsMiddleware(loggingMiddleware(h.handleConferenceSetTitle)))
 	mux.HandleFunc("/api/conferences/leave", corsMiddleware(loggingMiddleware(h.handleConferenceLeave)))
+	mux.HandleFunc("/api/toxiterate", corsMiddleware(loggingMiddleware(h.handleToxIterate)))
 	mux.HandleFunc("/api/translate", corsMiddleware(loggingMiddleware(h.handleTranslate)))
 }
 
@@ -656,6 +657,41 @@ func (h *Restapi) handleGroupMembers(w http.ResponseWriter, r *http.Request) {
 	var gn uint32
 	fmt.Sscanf(gnStr, "%d", &gn)
 	writeJSON(w, h.m.GroupMembers(gn))
+}
+
+// ── Tox Iterate ──
+
+func (h *Restapi) handleToxIterate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	params, err := getRequestParams(r)
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	timeoutStr := params.Get("timeout")
+	if timeoutStr == "" {
+		writeErr(w, "missing timeout", http.StatusBadRequest)
+		return
+	}
+	var timeout int
+	fmt.Sscanf(timeoutStr, "%d", &timeout)
+	if timeout < 3 {
+		timeout = 3
+	}
+	if timeout > 60 {
+		timeout = 60
+	}
+	start := time.Now()
+	count := h.m.ToxIterate(time.Duration(timeout) * time.Second)
+	elapsed := time.Since(start).Milliseconds()
+	writeJSON(w, map[string]interface{}{
+		"iterations": count,
+		"elapsed_ms": elapsed,
+		"timeout":    timeout,
+	})
 }
 
 // ── Translate ──

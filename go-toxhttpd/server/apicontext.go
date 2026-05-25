@@ -20,6 +20,7 @@ type ApiContext struct {
 	Mu                   sync.RWMutex
 	SaveRequestCh        chan struct{}
 	SaveHook             SaveHook
+	Rebscnter            int
 }
 
 func NewApiContext(t *tox.Tox, toxp *toxpriv.Tox, db *sql.DB) *ApiContext {

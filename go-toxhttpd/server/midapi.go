@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	tox "github.com/TokTok/go-toxcore-c"
 	"github.com/kitech/touse/oai"
@@ -597,6 +598,19 @@ func (m *Midapi) EventsPoll(after uint64) (events []Event, nextID uint64) {
 
 func (m *Midapi) EventsDelete(id uint64) {
 	m.ctx.EventQueue.DeleteEvent(id)
+}
+
+func (m *Midapi) ToxIterate(duration time.Duration) int {
+	deadline := time.Now().Add(duration)
+	count := 0
+	ms20 := 20 * time.Millisecond
+	for time.Now().Before(deadline) {
+		m.ctx.Tox.Iterate()
+		m.ctx.checkRebootstrap()
+		count++
+		time.Sleep(ms20 + time.Duration(m.ctx.Tox.IterationInterval())*time.Millisecond)
+	}
+	return count
 }
 
 // ── Bootstrap ──
