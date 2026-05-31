@@ -19,15 +19,8 @@ CustomTitleBar::CustomTitleBar(QWidget* parent)
     layout->addWidget(appMenuBtn, 0);
     layout->addSpacing(4);
 
-    menubar = new QMenuBar(this);
-#ifdef QT3_BUILD
-    menubar->setMargin(0);
-#else
-    menubar->setContentsMargins(3, 0, 3, 0);
-#endif
-    QFont f = menubar->font();
-    f.setPointSize(10);
-    menubar->setFont(f);
+    menubar = new EmbeddedMenuBar(this);
+    menubar->init();
     layout->addWidget(menubar, 0);
 
     titleLabel = new QLabel(_("app_title"), this);

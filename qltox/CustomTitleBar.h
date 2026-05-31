@@ -2,6 +2,7 @@
 #define CUSTOMTITLEBAR_H
 
 #include "compat34.h"
+#include "EmbeddedMenuBar.h"
 #include <qlabel.h>
 
 class FramelessHelper;
@@ -13,7 +14,7 @@ public:
     void connectFramelessHelper(FramelessHelper* helper);
     void setLabel(const QString& text);
     QString label() const;
-    QMenuBar* menuBar() const { return menubar; }
+    EmbeddedMenuBar* menuBar() const { return menubar; }
 
 signals:
     void appMenuClicked();
@@ -23,7 +24,7 @@ private slots:
 
 private:
     QPushButton* appMenuBtn;
-    QMenuBar* menubar;
+    EmbeddedMenuBar* menubar;
     QPushButton* sysMenuBtn;
     bool m_menuVisible = true;
     QLabel* titleLabel;

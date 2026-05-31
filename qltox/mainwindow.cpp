@@ -15,11 +15,6 @@
 #include <qtextstream.h>
 #include <qradiobutton.h>
 #include <qinputdialog.h>
-#ifdef QT3_BUILD
-#include <qstyle.h>
-#else
-#include <QStyleFactory>
-#endif
 #include "placeholderlineedit.h"
 #include "sound.h"
 
@@ -155,75 +150,24 @@ MainWindow::MainWindow(QWidget* parent)
     // ≡ 应用菜单：切换 menubar 显隐
     QObject::connect(titleBar, SIGNAL(appMenuClicked()), titleBar, SLOT(toggleMenu()));
 
-    // 菜单栏项
-#ifdef QT3_BUILD
-    {
-        QPopupMenu* fileMenu = new QPopupMenu(titleBar);
-        fileMenu->setFont(titleBar->menuBar()->font());
-        fileMenu->insertItem(qFromUtf8("新建\tCtrl+N"), this, SLOT(onMenu1Stub()));
-        fileMenu->insertSeparator();
-        fileMenu->insertItem(qFromUtf8("退出\tCtrl+Q"), this, SLOT(close()));
-        titleBar->menuBar()->insertItem(qFromUtf8("文件(&F)"), fileMenu);
-    }
-    {
-        QPopupMenu* editMenu = new QPopupMenu(titleBar);
-        editMenu->setFont(titleBar->menuBar()->font());
-        editMenu->insertItem(qFromUtf8("撤销\tCtrl+Z"), this, SLOT(onMenu1Stub()));
-        editMenu->insertItem(qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
-        titleBar->menuBar()->insertItem(qFromUtf8("编辑(&E)"), editMenu);
-    }
-    {
-        QPopupMenu* toolMenu = new QPopupMenu(titleBar);
-        toolMenu->setFont(titleBar->menuBar()->font());
-        toolMenu->insertItem(qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
-        titleBar->menuBar()->insertItem(qFromUtf8("工具(&T)"), toolMenu);
-    }
-    {
-        QPopupMenu* helpMenu = new QPopupMenu(titleBar);
-        helpMenu->setFont(titleBar->menuBar()->font());
-        helpMenu->insertItem(qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
-        titleBar->menuBar()->insertItem(qFromUtf8("帮助(&H)"), helpMenu);
-    }
-    // Qt3 QMenuBar sizeHint() uses internal 2px spacing, but LimeStyle sets PM_MenuBarItemSpacing=8.
-    // Compensate: add (n * gap) to the reported sizeHint.
-    {
-        int n = titleBar->menuBar()->count();
-        int gap = titleBar->menuBar()->style().pixelMetric((QStyle::PixelMetric)QStyle::PM_MenuBarItemSpacing, titleBar->menuBar());
-        titleBar->menuBar()->setMinimumWidth(titleBar->menuBar()->sizeHint().width() + n * gap);
-    }
-#else
-    {
-        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("文件(&F)"));
-        m->setFont(titleBar->menuBar()->font());
-        m->addAction(qFromUtf8("新建\tCtrl+N"), this, SLOT(onMenu1Stub()));
-        m->addSeparator();
-        m->addAction(qFromUtf8("退出\tCtrl+Q"), this, SLOT(close()));
-    }
-    {
-        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("编辑(&E)"));
-        m->setFont(titleBar->menuBar()->font());
-        m->addAction(qFromUtf8("撤销\tCtrl+Z"), this, SLOT(onMenu1Stub()));
-        m->addAction(qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
-    }
-    {
-        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("工具(&T)"));
-        m->setFont(titleBar->menuBar()->font());
-        m->addAction(qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
-    }
-    {
-        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("帮助(&H)"));
-        m->setFont(titleBar->menuBar()->font());
-        m->addAction(qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
-    }
-    titleBar->menuBar()->setMinimumWidth(titleBar->menuBar()->sizeHint().width());
-    {
-        QStyle* ws = QStyleFactory::create("windows");
-        if (ws) {
-            titleBar->menuBar()->setStyle(ws);
-            titleBar->menuBar()->setNativeMenuBar(false);
-        }
-    }
-#endif
+    EmbeddedMenuBar* mb = titleBar->menuBar();
+
+    MenuWidget34* file = mb->addMenu(qFromUtf8("文件(&F)"));
+    EmbeddedMenuBar::addItem(file, qFromUtf8("新建\tCtrl+N"), this, SLOT(onMenu1Stub()));
+    EmbeddedMenuBar::addSeparator(file);
+    EmbeddedMenuBar::addItem(file, qFromUtf8("退出\tCtrl+Q"), this, SLOT(close()));
+
+    MenuWidget34* edit = mb->addMenu(qFromUtf8("编辑(&E)"));
+    EmbeddedMenuBar::addItem(edit, qFromUtf8("撤销\tCtrl+Z"), this, SLOT(onMenu1Stub()));
+    EmbeddedMenuBar::addItem(edit, qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
+
+    MenuWidget34* tool = mb->addMenu(qFromUtf8("工具(&T)"));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
+
+    MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));
+    EmbeddedMenuBar::addItem(help, qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
+
+    mb->finalize();
 }
 
 MainWindow::~MainWindow() {

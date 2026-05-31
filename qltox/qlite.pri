@@ -15,7 +15,7 @@ QTCOMP_CPP = apilog.cpp appsetup.cpp compat34.cpp translator.cpp \
 QTCOMP_HDR = apilog.h appsetup.h appsetup_c.h translator.h compat34.h \
 			emojiutil.h emojiwidgets.h emojiitems.h \
 			emoji_picker.h ThemeManager.h placeholderlineedit.h toastwidget.h \
-			FramelessHelper.h CustomTitleBar.h
+			FramelessHelper.h CustomTitleBar.h EmbeddedMenuBar.h
 
 HEADERS += $$LIME_STYLE_H $$QTCOMP_HDR
 SOURCES += $$LIME_STYLE_CPP $$QTCOMP_CPP
