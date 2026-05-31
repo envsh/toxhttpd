@@ -6,9 +6,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
+
+const matrixHost = "127.0.0.1:8181"
 
 type SelfProvider interface {
 	SelfGet() *SelfInfo
@@ -50,8 +54,82 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 		ms.handleWhoami(w, r)
 	case strings.HasPrefix(path, "/_matrix/client/v3/profile/"):
 		ms.handleProfile(w, r)
+	case path == "/_matrix/client/v3/capabilities":
+		writeJSON(w, map[string]interface{}{
+			"capabilities": map[string]interface{}{
+				"m.room_versions": map[string]interface{}{
+					"default": "10",
+					"available": map[string]string{
+						"1": "stable", "2": "stable", "3": "stable",
+						"4": "stable", "5": "stable", "6": "stable",
+						"7": "stable", "8": "stable", "9": "stable",
+						"10": "stable",
+					},
+				},
+				"m.change_password": map[string]bool{"enabled": false},
+			},
+		})
 	case path == "/_matrix/client/v5/sync":
 		ms.handleV5Sync(w, r)
+	case strings.HasPrefix(path, "/_matrix/client/v3/pushrules"):
+		suffix := strings.TrimPrefix(path, "/_matrix/client/v3/pushrules")
+		switch {
+		case suffix == "" || suffix == "/":
+			writeJSON(w, map[string]interface{}{
+				"global": map[string][]interface{}{
+					"content": {}, "override": {},
+					"room": {}, "sender": {}, "underride": {},
+				},
+			})
+		case strings.Count(suffix, "/") == 2:
+			writeJSON(w, []interface{}{})
+		default:
+			writeJSON(w, map[string]interface{}{
+				"rule_id": "default",
+				"actions": []string{"notify"},
+				"default": true,
+				"enabled": true,
+			})
+		}
+	case path == "/_matrix/client/v3/sync":
+		q := r.URL.Query()
+		timeout := 30000
+		if t := q.Get("timeout"); t != "" {
+			if v, err := strconv.Atoi(t); err == nil && v > 0 {
+				timeout = v
+			}
+		}
+		time.Sleep(time.Duration(timeout) * time.Millisecond)
+		writeJSON(w, map[string]interface{}{
+			"next_batch": "s2",
+			"rooms": map[string]interface{}{
+				"join":   map[string]interface{}{},
+				"invite": map[string]interface{}{},
+				"leave":  map[string]interface{}{},
+			},
+		})
+	case path == "/_matrix/client/v3/keys/query":
+		var req struct {
+			DeviceKeys map[string][]string `json:"device_keys"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		dk := make(map[string]interface{}, len(req.DeviceKeys))
+		for uid := range req.DeviceKeys {
+			dk[uid] = map[string]interface{}{}
+		}
+		writeJSON(w, map[string]interface{}{
+			"device_keys": dk,
+			"failures":    map[string]interface{}{},
+		})
+	case path == "/_matrix/client/v3/keys/upload":
+		writeJSON(w, map[string]interface{}{
+			"one_time_key_counts": map[string]int{"signed_curve25519": 50},
+		})
+	case path == "/_matrix/client/v3/room_keys/version":
+		writeJSON(w, map[string]interface{}{
+			"version":   nil,
+			"algorithm": nil,
+		})
 	default:
 		writeJSON(w, map[string]string{
 			"errcode": "M_UNRECOGNIZED",
@@ -61,7 +139,7 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ms *MatrixServer) userID() string {
-	return "@" + ms.self.SelfGet().Address + ":127.0.0.1"
+	return "@" + ms.self.SelfGet().Address + ":" + matrixHost
 }
 
 func (ms *MatrixServer) newToken() string {
@@ -88,12 +166,26 @@ func (ms *MatrixServer) handleVersions(w http.ResponseWriter, r *http.Request) {
 // ── POST /_matrix/client/v3/login ──
 
 type loginRequest struct {
-	Type     string `json:"type"`
-	User     string `json:"user"`
-	Password string `json:"password"`
+	Type       string           `json:"type"`
+	User       string           `json:"user"`
+	Password   string           `json:"password"`
+	Identifier *loginIdentifier `json:"identifier,omitempty"`
+}
+
+type loginIdentifier struct {
+	Type string `json:"type"`
+	User string `json:"user"`
 }
 
 func (ms *MatrixServer) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		writeJSON(w, map[string]interface{}{
+			"flows": []map[string]string{
+				{"type": "m.login.password"},
+			},
+		})
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeJSON(w, map[string]string{
 			"errcode": "M_UNRECOGNIZED",
@@ -109,6 +201,9 @@ func (ms *MatrixServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"error":   "Invalid JSON",
 		})
 		return
+	}
+	if req.User == "" && req.Identifier != nil {
+		req.User = req.Identifier.User
 	}
 	if req.User == "" || req.Password == "" {
 		writeJSON(w, map[string]string{
@@ -133,7 +228,7 @@ func (ms *MatrixServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 		"device_id":    "MATRIX",
 		"well_known": map[string]interface{}{
 			"m.homeserver": map[string]string{
-				"base_url": "http://127.0.0.1:8181",
+				"base_url": "http://" + matrixHost,
 			},
 		},
 	})
@@ -224,12 +319,12 @@ func (ms *MatrixServer) handleProfile(w http.ResponseWriter, r *http.Request) {
 		userPart = strings.TrimSuffix(userPart, "/avatar_url")
 	}
 
-	if !strings.HasPrefix(userPart, "@") || !strings.HasSuffix(userPart, ":127.0.0.1") {
+	if !strings.HasPrefix(userPart, "@") || !strings.HasSuffix(userPart, ":"+matrixHost) {
 		writeProfileError(w)
 		return
 	}
 
-	localpart := userPart[1 : len(userPart)-len(":127.0.0.1")]
+	localpart := userPart[1 : len(userPart)-len(":"+matrixHost)]
 	if !isHex72(localpart) {
 		writeProfileError(w)
 		return
@@ -262,7 +357,7 @@ func (ms *MatrixServer) handleWellKnown(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, map[string]interface{}{
 		"m.homeserver": map[string]string{
-			"base_url": "http://127.0.0.1:8181",
+			"base_url": "http://" + matrixHost,
 		},
 	})
 }

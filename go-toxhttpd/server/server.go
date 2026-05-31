@@ -141,9 +141,11 @@ func (s *Server) toxIterateBackground(ctx context.Context) {
 func (s *Server) Start() error {
 	m := NewMidapi(&s.ApiContext)
 	h := NewRestapi(m, s.webRoot)
+	ms := NewMatrixServer(m, m)
 
 	mux := http.NewServeMux()
 	h.Register(mux)
+	ms.RegisterMatrix(mux)
 
 	// Start tox iteration in background
 	ctx, cancel := context.WithCancel(context.Background())

@@ -146,8 +146,8 @@ func TestHandleLogin_Valid(t *testing.T) {
 	if _, ok := resp["access_token"]; !ok {
 		t.Fatal("missing access_token")
 	}
-	if uid, _ := resp["user_id"].(string); uid != "@"+testAddr+":127.0.0.1" {
-		t.Fatalf("user_id: got %s, want @%s:127.0.0.1", uid, testAddr)
+	if uid, _ := resp["user_id"].(string); uid != "@"+testAddr+":"+matrixHost {
+		t.Fatalf("user_id: got %s, want @%s:%s", uid, testAddr, matrixHost)
 	}
 	wk, ok := resp["well_known"].(map[string]interface{})
 	if !ok {
@@ -157,7 +157,7 @@ func TestHandleLogin_Valid(t *testing.T) {
 	if !ok {
 		t.Fatal("missing well_known.m.homeserver")
 	}
-	if mh["base_url"] != "http://127.0.0.1:8181" {
+	if mh["base_url"] != "http://"+matrixHost {
 		t.Fatalf("base_url: got %s, want http://127.0.0.1:8181", mh["base_url"])
 	}
 }
@@ -213,10 +213,14 @@ func TestHandleLogin_NotPOST(t *testing.T) {
 	r := httptest.NewRequest("GET", "/_matrix/client/v3/login", nil)
 	ms.handleLogin(w, r)
 
-	var resp map[string]string
+	if w.Code != 200 {
+		t.Fatalf("status: got %d, want 200", w.Code)
+	}
+	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp["errcode"] != "M_UNRECOGNIZED" {
-		t.Fatalf("errcode: got %s, want M_UNRECOGNIZED", resp["errcode"])
+	flows, ok := resp["flows"].([]interface{})
+	if !ok || len(flows) == 0 {
+		t.Fatal("expected flows list")
 	}
 }
 
@@ -306,7 +310,7 @@ func TestHandleWhoami_Valid(t *testing.T) {
 	}
 	var resp map[string]string
 	json.NewDecoder(w.Body).Decode(&resp)
-	want := "@" + testAddr + ":127.0.0.1"
+	want := "@" + testAddr + ":" + matrixHost
 	if resp["user_id"] != want {
 		t.Fatalf("user_id: got %s, want %s", resp["user_id"], want)
 	}
@@ -364,7 +368,7 @@ func TestHandleProfile_Full(t *testing.T) {
 	ms := newTestServer(testAddr)
 	ms.self.(*mockSelf).name = "ToxUser"
 
-	p := "/_matrix/client/v3/profile/@" + testAddr + ":127.0.0.1"
+	p := "/_matrix/client/v3/profile/@" + testAddr + ":" + matrixHost
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", p, nil)
 	ms.handleProfile(w, r)
@@ -386,7 +390,7 @@ func TestHandleProfile_Displayname(t *testing.T) {
 	ms := newTestServer(testAddr)
 	ms.self.(*mockSelf).name = "ToxUser"
 
-	p := "/_matrix/client/v3/profile/@" + testAddr + ":127.0.0.1/displayname"
+	p := "/_matrix/client/v3/profile/@" + testAddr + ":" + matrixHost + "/displayname"
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", p, nil)
 	ms.handleProfile(w, r)
@@ -404,7 +408,7 @@ func TestHandleProfile_Displayname(t *testing.T) {
 func TestHandleProfile_AvatarUrl(t *testing.T) {
 	ms := newTestServer(testAddr)
 
-	p := "/_matrix/client/v3/profile/@" + testAddr + ":127.0.0.1/avatar_url"
+	p := "/_matrix/client/v3/profile/@" + testAddr + ":" + matrixHost + "/avatar_url"
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", p, nil)
 	ms.handleProfile(w, r)
@@ -424,7 +428,7 @@ func TestHandleProfile_InvalidUserID(t *testing.T) {
 	tests := []string{
 		"/_matrix/client/v3/profile/@short:127.0.0.1",
 		"/_matrix/client/v3/profile/@" + testAddr + ":wronghost",
-		"/_matrix/client/v3/profile/" + testAddr + ":127.0.0.1", // missing @
+		"/_matrix/client/v3/profile/" + testAddr + ":" + matrixHost, // missing @
 	}
 	for _, p := range tests {
 		w := httptest.NewRecorder()
@@ -443,7 +447,7 @@ func TestHandleProfile_InvalidUserID(t *testing.T) {
 
 func TestHandleProfile_NotGET(t *testing.T) {
 	ms := newTestServer(testAddr)
-	p := "/_matrix/client/v3/profile/@" + testAddr + ":127.0.0.1"
+	p := "/_matrix/client/v3/profile/@" + testAddr + ":" + matrixHost
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", p, nil)
 	ms.handleProfile(w, r)
@@ -472,7 +476,7 @@ func TestHandleWellKnown_GET(t *testing.T) {
 	if !ok {
 		t.Fatal("missing m.homeserver")
 	}
-	if mh["base_url"] != "http://127.0.0.1:8181" {
+	if mh["base_url"] != "http://"+matrixHost {
 		t.Fatalf("base_url: got %s, want http://127.0.0.1:8181", mh["base_url"])
 	}
 }

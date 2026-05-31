@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const serverSuffix = ":127.0.0.1"
+const serverSuffix = ":" + matrixHost
 
 func roomID(chatID string) string {
 	return "!" + chatID + serverSuffix
@@ -337,12 +337,11 @@ func (ms *MatrixServer) v5filterRoom(r roomEntry, req *V5SyncRequest) bool {
 }
 
 func (ms *MatrixServer) v5roomResult(r roomEntry, initial bool) RoomResult {
-	u := r.roomID
 	membership := "join"
+	var heroes []Hero
 	if r.contactType == "friend" {
-		u = "@" + r.chatID + serverSuffix
+		heroes = []Hero{{UserID: "@" + r.chatID + serverSuffix}}
 	}
-	heroes := []Hero{{UserID: u}}
 
 	var name *string
 	if r.name != "" {
