@@ -13,9 +13,19 @@ public:
     void connectFramelessHelper(FramelessHelper* helper);
     void setLabel(const QString& text);
     QString label() const;
+    QMenuBar* menuBar() const { return menubar; }
+
+signals:
+    void appMenuClicked();
+
+private slots:
+    void toggleMenu();
 
 private:
-    QPushButton* sysBtn;
+    QPushButton* appMenuBtn;
+    QMenuBar* menubar;
+    QPushButton* sysMenuBtn;
+    bool m_menuVisible = true;
     QLabel* titleLabel;
     QPushButton* minBtn;
     QPushButton* maxBtn;

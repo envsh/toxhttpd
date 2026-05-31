@@ -10,11 +10,13 @@
 // ========== 平台特有头文件 ==========
 #ifdef QT3_BUILD
 #include <qpushbt.h>         // QPushButton
+#include <qmenubar.h>        // QMenuBar
 #include <qpopupmenu.h>      // QPopupMenu
 #include <qwidgetstack.h>    // QWidgetStack
 #include <qptrlist.h>        // Qt3 原生 QPtrList<T>
 #else
 #include <qpushbutton.h>     // QPushButton
+#include <QMenuBar>          // QMenuBar
 #include <qmenu.h>           // QMenu
 #include <qstackedwidget.h>  // QStackedWidget
 #include <qstyleoption.h>    // QStyleOption* (Qt4 only)

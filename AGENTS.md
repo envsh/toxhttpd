@@ -4,8 +4,8 @@
 - qltox Qt3: `cd qltox && bash buildqt3.sh` — generates `qltox`
 - qltox Qt4: `cd qltox && bash buildqt4.sh` — generates `q4tox`
 - Run server: `./go-toxhttpd/toxhttpd-go 8181`
-- Run client: `./qltox/qltox`
-- Build qltox cpp: `cd qltox && make -j1`
+- Run client: `./qltox/build-qt3/qltox`
+- Build qltox cpp: `cd qltox/build-qt3 && make -j1` (already in build dir after `buildqt3.sh`)
 
 # Architecture
 
@@ -22,6 +22,7 @@
 
 # Important constraints
 
+- **先做 Qt3，Qt4 也要同步兼容。** 所有新功能先用 Qt3 API 实现（`buildqt3.sh`），同时用 `#ifdef` 适配 Qt4（`buildqt4.sh`），确保两个版本均可编译运行。
 - **Never auto-commit to git.** Only commit when explicitly asked by the user.
 
 - Peer name cache key: `"conference_{id}_{peer}"` / `"group_{id}_{peer}"` — web (`app.js`) and qltox (`mainwindow.cpp`) must stay in sync.

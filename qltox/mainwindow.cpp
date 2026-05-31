@@ -6,6 +6,8 @@
 #include "logindialog.h"
 #include "conferenceinvitedialog.h"
 #include "groupinvitedialog.h"
+#include "friendinfodialog.h"
+#include "memberlistdialog.h"
 #include "cJSON.h"
 #include "appsetup.h"
 #include <qmessagebox.h>
@@ -13,6 +15,11 @@
 #include <qtextstream.h>
 #include <qradiobutton.h>
 #include <qinputdialog.h>
+#ifdef QT3_BUILD
+#include <qstyle.h>
+#else
+#include <QStyleFactory>
+#endif
 #include "placeholderlineedit.h"
 #include "sound.h"
 
@@ -144,6 +151,57 @@ MainWindow::MainWindow(QWidget* parent)
     framelessHelper = new FramelessHelper(this);
     framelessHelper->setup(this);
     titleBar->connectFramelessHelper(framelessHelper);
+
+    // ≡ 应用菜单：切换 menubar 显隐
+    QObject::connect(titleBar, SIGNAL(appMenuClicked()), titleBar, SLOT(toggleMenu()));
+
+    // 菜单栏项
+#ifdef QT3_BUILD
+    {
+        QPopupMenu* fileMenu = new QPopupMenu(titleBar);
+        fileMenu->setFont(titleBar->menuBar()->font());
+        fileMenu->insertItem(qFromUtf8("新建\tCtrl+N"), this, SLOT(onMenu1Stub()));
+        fileMenu->insertSeparator();
+        fileMenu->insertItem(qFromUtf8("退出\tCtrl+Q"), this, SLOT(close()));
+        titleBar->menuBar()->insertItem(qFromUtf8("文件(&F)"), fileMenu);
+    }
+    {
+        QPopupMenu* editMenu = new QPopupMenu(titleBar);
+        editMenu->setFont(titleBar->menuBar()->font());
+        editMenu->insertItem(qFromUtf8("撤销\tCtrl+Z"), this, SLOT(onMenu1Stub()));
+        editMenu->insertItem(qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
+        titleBar->menuBar()->insertItem(qFromUtf8("编辑(&E)"), editMenu);
+    }
+    {
+        QPopupMenu* toolMenu = new QPopupMenu(titleBar);
+        toolMenu->setFont(titleBar->menuBar()->font());
+        toolMenu->insertItem(qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
+        titleBar->menuBar()->insertItem(qFromUtf8("工具(&T)"), toolMenu);
+    }
+    {
+        QPopupMenu* helpMenu = new QPopupMenu(titleBar);
+        helpMenu->setFont(titleBar->menuBar()->font());
+        helpMenu->insertItem(qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
+        titleBar->menuBar()->insertItem(qFromUtf8("帮助(&H)"), helpMenu);
+    }
+    // Qt3 QMenuBar sizeHint() uses internal 2px spacing, but LimeStyle sets PM_MenuBarItemSpacing=8.
+    // Compensate: add (n * gap) to the reported sizeHint.
+    {
+        int n = titleBar->menuBar()->count();
+        int gap = titleBar->menuBar()->style().pixelMetric((QStyle::PixelMetric)QStyle::PM_MenuBarItemSpacing, titleBar->menuBar());
+        titleBar->menuBar()->setMinimumWidth(titleBar->menuBar()->sizeHint().width() + n * gap);
+    }
+#else
+    titleBar->menuBar()->addMenu(qFromUtf8("文件(&F)"));
+    titleBar->menuBar()->addMenu(qFromUtf8("编辑(&E)"));
+    titleBar->menuBar()->addMenu(qFromUtf8("工具(&T)"));
+    titleBar->menuBar()->addMenu(qFromUtf8("帮助(&H)"));
+    titleBar->menuBar()->setMinimumWidth(titleBar->menuBar()->sizeHint().width());
+    {
+        QStyle* ws = QStyleFactory::create("windows");
+        if (ws) titleBar->menuBar()->setStyle(ws);
+    }
+#endif
 }
 
 MainWindow::~MainWindow() {
@@ -1117,4 +1175,12 @@ void MainWindow::loadMessageHistory() {
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
     ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)), msgIndex);
+}
+
+void MainWindow::onMenu1Stub() {
+    qWarning("onMenu1Stub: not implemented yet");
+}
+
+void MainWindow::onMenu2Stub() {
+    qWarning("onMenu2Stub: not implemented yet");
 }

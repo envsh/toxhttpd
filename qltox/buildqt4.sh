@@ -1,7 +1,8 @@
 set -x
 
 # for qt4
-qmake-qt4
+mkdir -p build-qt4 && cd build-qt4
+qmake-qt4 ../qltox.pro
 
 sed -i 's/\-O2/\-O1/g' Makefile
 

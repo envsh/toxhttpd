@@ -42,6 +42,8 @@ public:
     void loadMessageHistory();
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
+    void onMenu1Stub();
+    void onMenu2Stub();
     
 private:
     FramelessHelper* framelessHelper;

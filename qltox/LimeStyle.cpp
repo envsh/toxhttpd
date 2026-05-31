@@ -566,6 +566,22 @@ void LimeStyle::drawControl(ControlElement ce, const QStyleOption *opt,
         }
         return;
     }
+    case CE_MenuBarItem: {
+        bool hover = opt->state & State_MouseOver;
+        if (hover)
+            p->fillRect(opt->rect, pal.hoverBg);
+        p->save();
+        p->setPen(pal.textPrimary);
+        if (const QStyleOptionMenuItem* mbi =
+            qstyleoption_cast<const QStyleOptionMenuItem*>(opt)) {
+            QString text = mbi->text;
+            int ampPos = text.indexOf(QLatin1Char('&'));
+            if (ampPos >= 0) text.remove(ampPos, 1);
+            p->drawText(opt->rect, Qt::AlignCenter, text);
+        }
+        p->restore();
+        return;
+    }
     default:
         break;
     }
@@ -688,7 +704,7 @@ int LimeStyle::pixelMetric(PixelMetric m, const QWidget *w) const {
     case PM_TitleBarHeight:       return 20;
     case PM_ArrowSize:            return 12;
     case PM_MenuBarFrameWidth:    return 2;
-    case PM_MenuBarItemSpacing:   return 0;
+    case PM_MenuBarItemSpacing:   return 8;
     case PM_HeaderMargin:         return 4;
     case PM_HeaderMarkSize:       return 12;
     case PM_HeaderGripMargin:     return 2;
