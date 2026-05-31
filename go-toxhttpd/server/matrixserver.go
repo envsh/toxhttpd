@@ -28,12 +28,29 @@ func NewMatrixServer(s SelfProvider) *MatrixServer {
 }
 
 func (ms *MatrixServer) RegisterMatrix(mux *http.ServeMux) {
-	mux.HandleFunc("/_matrix/client/versions",
-		corsMiddleware(loggingMiddleware(ms.handleVersions)))
-	mux.HandleFunc("/_matrix/client/v3/login",
-		corsMiddleware(loggingMiddleware(ms.handleLogin)))
-	mux.HandleFunc("/_matrix/client/v3/account/whoami",
-		corsMiddleware(loggingMiddleware(ms.handleWhoami)))
+	mux.HandleFunc("/_matrix/", corsMiddleware(loggingMiddleware(ms.serveMatrix)))
+	mux.HandleFunc("/.well-known/matrix/client", corsMiddleware(loggingMiddleware(ms.handleWellKnown)))
+}
+
+func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	switch {
+	case path == "/_matrix/client/versions":
+		ms.handleVersions(w, r)
+	case path == "/_matrix/client/v3/login":
+		ms.handleLogin(w, r)
+	case path == "/_matrix/client/v3/logout":
+		ms.handleLogout(w, r)
+	case path == "/_matrix/client/v3/account/whoami":
+		ms.handleWhoami(w, r)
+	case strings.HasPrefix(path, "/_matrix/client/v3/profile/"):
+		ms.handleProfile(w, r)
+	default:
+		writeJSON(w, map[string]string{
+			"errcode": "M_UNRECOGNIZED",
+			"error":   "Unrecognized endpoint",
+		})
+	}
 }
 
 func (ms *MatrixServer) userID() string {
@@ -45,6 +62,8 @@ func (ms *MatrixServer) newToken() string {
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// ── GET /_matrix/client/versions ──
 
 func (ms *MatrixServer) handleVersions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -58,6 +77,8 @@ func (ms *MatrixServer) handleVersions(w http.ResponseWriter, r *http.Request) {
 		"versions": {"v1.11", "v1.12", "v1.13", "v1.14", "v1.15", "v1.16", "v1.17", "v1.18"},
 	})
 }
+
+// ── POST /_matrix/client/v3/login ──
 
 type loginRequest struct {
 	Type     string `json:"type"`
@@ -111,6 +132,38 @@ func (ms *MatrixServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ── POST /_matrix/client/v3/logout ──
+
+func (ms *MatrixServer) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, map[string]string{
+			"errcode": "M_UNRECOGNIZED",
+			"error":   "Unrecognized endpoint",
+		})
+		return
+	}
+
+	token := extractBearer(r)
+	if token == "" {
+		writeMatrixUnauthorized(w, "M_MISSING_TOKEN", "Missing access token")
+		return
+	}
+
+	ms.mu.Lock()
+	_, ok := ms.tokens[token]
+	delete(ms.tokens, token)
+	ms.mu.Unlock()
+
+	if !ok {
+		writeMatrixUnauthorized(w, "M_UNKNOWN_TOKEN", "Invalid access token")
+		return
+	}
+
+	writeJSON(w, map[string]interface{}{})
+}
+
+// ── GET /_matrix/client/v3/account/whoami ──
+
 func (ms *MatrixServer) handleWhoami(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, map[string]string{
@@ -122,12 +175,7 @@ func (ms *MatrixServer) handleWhoami(w http.ResponseWriter, r *http.Request) {
 
 	token := extractBearer(r)
 	if token == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"errcode": "M_MISSING_TOKEN",
-			"error":   "Missing access token",
-		})
+		writeMatrixUnauthorized(w, "M_MISSING_TOKEN", "Missing access token")
 		return
 	}
 
@@ -136,18 +184,109 @@ func (ms *MatrixServer) handleWhoami(w http.ResponseWriter, r *http.Request) {
 	ms.mu.Unlock()
 
 	if !ok {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"errcode": "M_UNKNOWN_TOKEN",
-			"error":   "Invalid access token",
-		})
+		writeMatrixUnauthorized(w, "M_UNKNOWN_TOKEN", "Invalid access token")
 		return
 	}
 
 	writeJSON(w, map[string]string{
 		"user_id": ms.userID(),
 	})
+}
+
+// ── GET /_matrix/client/v3/profile/<user_id> ──
+
+func (ms *MatrixServer) handleProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, map[string]string{
+			"errcode": "M_UNRECOGNIZED",
+			"error":   "Unrecognized endpoint",
+		})
+		return
+	}
+
+	path := r.URL.Path
+	userPart := strings.TrimPrefix(path, "/_matrix/client/v3/profile/")
+
+	subpath := ""
+	switch {
+	case strings.HasSuffix(userPart, "/displayname"):
+		subpath = "displayname"
+		userPart = strings.TrimSuffix(userPart, "/displayname")
+	case strings.HasSuffix(userPart, "/avatar_url"):
+		subpath = "avatar_url"
+		userPart = strings.TrimSuffix(userPart, "/avatar_url")
+	}
+
+	if !strings.HasPrefix(userPart, "@") || !strings.HasSuffix(userPart, ":127.0.0.1") {
+		writeProfileError(w)
+		return
+	}
+
+	localpart := userPart[1 : len(userPart)-len(":127.0.0.1")]
+	if !isHex72(localpart) {
+		writeProfileError(w)
+		return
+	}
+
+	info := ms.self.SelfGet()
+
+	switch subpath {
+	case "displayname":
+		writeJSON(w, map[string]string{"displayname": info.Name})
+	case "avatar_url":
+		writeJSON(w, map[string]interface{}{"avatar_url": nil})
+	default:
+		writeJSON(w, map[string]interface{}{
+			"displayname": info.Name,
+			"avatar_url":  nil,
+		})
+	}
+}
+
+// ── GET /.well-known/matrix/client ──
+
+func (ms *MatrixServer) handleWellKnown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, map[string]string{
+			"errcode": "M_UNRECOGNIZED",
+			"error":   "Unrecognized endpoint",
+		})
+		return
+	}
+	writeJSON(w, map[string]interface{}{
+		"m.homeserver": map[string]string{
+			"base_url": "http://127.0.0.1:8181",
+		},
+	})
+}
+
+func writeProfileError(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]string{
+		"errcode": "M_INVALID_PARAM",
+		"error":   "Invalid user ID",
+	})
+}
+
+// ── helpers ──
+
+func isHex72(s string) bool {
+	if len(s) != 72 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func writeMatrixUnauthorized(w http.ResponseWriter, errcode, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	json.NewEncoder(w).Encode(map[string]string{"errcode": errcode, "error": msg})
 }
 
 func extractBearer(r *http.Request) string {
