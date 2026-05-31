@@ -15,15 +15,20 @@ type SelfProvider interface {
 }
 
 type MatrixServer struct {
-	self   SelfProvider
-	mu     sync.Mutex
-	tokens map[string]string
+	self     SelfProvider
+	midapi   *Midapi
+	mu       sync.Mutex
+	tokens   map[string]string
+	v5mu     sync.Mutex
+	v5after  uint64
+	v5bump   int64
 }
 
-func NewMatrixServer(s SelfProvider) *MatrixServer {
+func NewMatrixServer(s SelfProvider, m *Midapi) *MatrixServer {
 	return &MatrixServer{
-		self:   s,
-		tokens: make(map[string]string),
+		self:     s,
+		midapi:   m,
+		tokens:   make(map[string]string),
 	}
 }
 
@@ -45,6 +50,8 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 		ms.handleWhoami(w, r)
 	case strings.HasPrefix(path, "/_matrix/client/v3/profile/"):
 		ms.handleProfile(w, r)
+	case path == "/_matrix/client/v5/sync":
+		ms.handleV5Sync(w, r)
 	default:
 		writeJSON(w, map[string]string{
 			"errcode": "M_UNRECOGNIZED",
@@ -74,7 +81,7 @@ func (ms *MatrixServer) handleVersions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string][]string{
-		"versions": {"v1.11", "v1.12", "v1.13", "v1.14", "v1.15", "v1.16", "v1.17", "v1.18"},
+		"versions": {"v1.11", "v1.12", "v1.13", "v1.14", "v1.15", "v1.16", "v1.17", "v1.18", "v5"},
 	})
 }
 

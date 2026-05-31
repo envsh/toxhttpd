@@ -87,7 +87,7 @@ func TestServeMatrix_Versions(t *testing.T) {
 	var resp map[string][]string
 	json.NewDecoder(w.Body).Decode(&resp)
 	versions := resp["versions"]
-	if len(versions) == 0 || versions[len(versions)-1] != "v1.18" {
+	if len(versions) == 0 || versions[len(versions)-1] != "v5" {
 		t.Fatalf("unexpected versions response")
 	}
 }
@@ -109,8 +109,8 @@ func TestHandleVersions_GET(t *testing.T) {
 	if len(versions) == 0 {
 		t.Fatal("versions list empty")
 	}
-	if versions[len(versions)-1] != "v1.18" {
-		t.Fatalf("last version: got %s, want v1.18", versions[len(versions)-1])
+	if versions[len(versions)-1] != "v5" {
+		t.Fatalf("last version: got %s, want v5", versions[len(versions)-1])
 	}
 }
 

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -97,17 +96,6 @@ type Hero struct {
 	UserID string `json:"user_id"`
 }
 
-type SyncProvider interface {
-	SelfGet() *SelfInfo
-	AllFriends() []FriendInfo
-	AllGroups() []GroupInfo
-	AllConferences() []ConferenceInfo
-	GroupMembers(gn uint32) *GroupMemberList
-	ChanIDForContact(contactID uint32, contactType string) (string, error)
-	MessageHistory(chanid, contactType string) ([]MessageRecord, error)
-	EventQueue() *EventQueue
-}
-
 type roomEntry struct {
 	roomID      string
 	chatID      string
@@ -117,27 +105,9 @@ type roomEntry struct {
 	isDM        bool
 }
 
-type SyncSession struct {
-	ConnID string
-	Pos    string
-	After  uint64
-}
+// ── MatrixServer v5 sync methods ──
 
-type SyncManager struct {
-	provider SyncProvider
-	mu       sync.Mutex
-	sessions map[string]*SyncSession
-	bumpSeq  atomic.Int64
-}
-
-func NewSyncManager(p SyncProvider) *SyncManager {
-	return &SyncManager{
-		provider: p,
-		sessions: make(map[string]*SyncSession),
-	}
-}
-
-func (sm *SyncManager) HandleV5Sync(w http.ResponseWriter, r *http.Request) {
+func (ms *MatrixServer) handleV5Sync(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, map[string]string{
 			"errcode": "M_UNRECOGNIZED",
@@ -152,6 +122,14 @@ func (sm *SyncManager) HandleV5Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ms.mu.Lock()
+	_, ok := ms.tokens[token]
+	ms.mu.Unlock()
+	if !ok {
+		writeMatrixUnauthorized(w, "M_UNKNOWN_TOKEN", "Invalid access token")
+		return
+	}
+
 	var req V5SyncRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, map[string]string{
@@ -161,57 +139,35 @@ func (sm *SyncManager) HandleV5Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ConnID == "" {
-		req.ConnID = "default"
-	}
 	if req.Timeout <= 0 {
 		req.Timeout = 0
 	} else if req.Timeout > 60000 {
 		req.Timeout = 60000
 	}
 
-	resp := sm.process(token, &req)
+	resp := ms.v5process(&req)
 	writeJSON(w, resp)
 }
 
-func (sm *SyncManager) process(token string, req *V5SyncRequest) *V5SyncResponse {
-	sm.mu.Lock()
-	ses, ok := sm.sessions[req.ConnID]
-	if !ok {
-		ses = &SyncSession{ConnID: req.ConnID}
-		sm.sessions[req.ConnID] = ses
+func (ms *MatrixServer) v5process(req *V5SyncRequest) *V5SyncResponse {
+	if req.Pos == "" {
+		return ms.v5buildInitial(req)
 	}
-	sm.mu.Unlock()
-
-	if req.Pos == "" || req.Pos != ses.Pos {
-		return sm.buildInitial(ses, req)
-	}
-	return sm.buildIncremental(ses, req)
+	return ms.v5buildIncremental(req)
 }
 
-func (sm *SyncManager) buildInitial(ses *SyncSession, req *V5SyncRequest) *V5SyncResponse {
-	eq := sm.provider.EventQueue()
-	_, nextID := eq.PopAfter(0)
-	ses.After = nextID
+func (ms *MatrixServer) v5buildInitial(req *V5SyncRequest) *V5SyncResponse {
+	ms.v5mu.Lock()
+	_, nextID := ms.midapi.EventsPoll(0)
+	ms.v5after = nextID
+	ms.v5bump++
+	pos := fmt.Sprintf("s%d", ms.v5bump)
+	ms.v5mu.Unlock()
 
-	rooms := sm.collectRooms(req)
-	pos := fmt.Sprintf("s%d", sm.bumpSeq.Add(1))
-	ses.Pos = pos
-
+	rooms := ms.v5collectRooms(req)
 	rmap := make(map[string]RoomResult, len(rooms))
 	for _, r := range rooms {
-		rmap[r.roomID] = sm.roomResult(r, true)
-	}
-
-	count := len(rooms)
-	if lst, ok := req.Lists["all"]; ok && len(lst.Range) == 2 {
-		start, end := lst.Range[0], lst.Range[1]
-		if start >= 0 && start <= end {
-			if end >= count {
-				end = count - 1
-			}
-			count = end - start + 1
-		}
+		rmap[r.roomID] = ms.v5roomResult(r, true)
 	}
 
 	return &V5SyncResponse{
@@ -221,33 +177,35 @@ func (sm *SyncManager) buildInitial(ses *SyncSession, req *V5SyncRequest) *V5Syn
 	}
 }
 
-func (sm *SyncManager) buildIncremental(ses *SyncSession, req *V5SyncRequest) *V5SyncResponse {
-	eq := sm.provider.EventQueue()
-	events, nextID := eq.PopAfter(ses.After)
-
-	pos := fmt.Sprintf("s%d", sm.bumpSeq.Add(1))
-	ses.Pos = pos
-	ses.After = nextID
+func (ms *MatrixServer) v5buildIncremental(req *V5SyncRequest) *V5SyncResponse {
+	ms.v5mu.Lock()
+	events, nextID := ms.midapi.EventsPoll(ms.v5after)
+	ms.v5after = nextID
+	ms.v5bump++
+	pos := fmt.Sprintf("s%d", ms.v5bump)
+	ms.v5mu.Unlock()
 
 	if len(events) == 0 {
 		if req.Timeout > 0 {
 			time.Sleep(time.Duration(req.Timeout) * time.Millisecond)
-			events2, nextID2 := eq.PopAfter(ses.After)
+			ms.v5mu.Lock()
+			events2, nextID2 := ms.midapi.EventsPoll(ms.v5after)
 			if len(events2) == 0 {
-				ses.Pos = pos
+				ms.v5mu.Unlock()
 				return &V5SyncResponse{Pos: pos}
 			}
-			ses.After = nextID2
+			ms.v5after = nextID2
+			ms.v5mu.Unlock()
 			events = events2
 		} else {
 			return &V5SyncResponse{Pos: pos}
 		}
 	}
 
-	rooms := sm.collectRooms(req)
+	rooms := ms.v5collectRooms(req)
 	rmap := make(map[string]RoomResult, len(rooms))
 	for _, r := range rooms {
-		rmap[r.roomID] = sm.roomResult(r, false)
+		rmap[r.roomID] = ms.v5roomResult(r, false)
 	}
 
 	return &V5SyncResponse{
@@ -257,10 +215,15 @@ func (sm *SyncManager) buildIncremental(ses *SyncSession, req *V5SyncRequest) *V
 	}
 }
 
-func (sm *SyncManager) collectRooms(req *V5SyncRequest) []roomEntry {
-	friends := sm.provider.AllFriends()
-	groups := sm.provider.AllGroups()
-	confs := sm.provider.AllConferences()
+func (ms *MatrixServer) v5collectRooms(req *V5SyncRequest) []roomEntry {
+	ids := ms.midapi.FriendsList()
+	strIDs := make([]string, len(ids))
+	for i, id := range ids {
+		strIDs[i] = strconv.FormatUint(uint64(id), 10)
+	}
+	friends := ms.midapi.FriendsInfo(strIDs)
+	groups := ms.midapi.GroupsList()
+	confs := ms.midapi.ConferencesList()
 
 	all := make([]roomEntry, 0, len(friends)+len(groups)+len(confs))
 
@@ -274,12 +237,12 @@ func (sm *SyncManager) collectRooms(req *V5SyncRequest) []roomEntry {
 			chatID:      chatID,
 			contactType: "friend",
 			isDM:        true,
-			memberCount: 1,
+			memberCount: 2,
 		}
 		if f.Name != "" {
 			entry.name = f.Name
 		}
-		if sm.filterRoom(entry, req) {
+		if ms.v5filterRoom(entry, req) {
 			all = append(all, entry)
 		}
 	}
@@ -297,7 +260,7 @@ func (sm *SyncManager) collectRooms(req *V5SyncRequest) []roomEntry {
 			memberCount: g.MemberCount,
 			isDM:        false,
 		}
-		if sm.filterRoom(entry, req) {
+		if ms.v5filterRoom(entry, req) {
 			all = append(all, entry)
 		}
 	}
@@ -315,14 +278,16 @@ func (sm *SyncManager) collectRooms(req *V5SyncRequest) []roomEntry {
 			memberCount: c.MemberCount,
 			isDM:        false,
 		}
-		if sm.filterRoom(entry, req) {
+		if ms.v5filterRoom(entry, req) {
 			all = append(all, entry)
 		}
 	}
 
-	bumpSeq := sm.bumpSeq.Add(int64(len(all)))
+	ms.v5mu.Lock()
+	base := ms.v5bump
+	ms.v5mu.Unlock()
 	sort.Slice(all, func(i, j int) bool {
-		return (bumpSeq - int64(i)) > (bumpSeq - int64(j))
+		return (base - int64(i)) > (base - int64(j))
 	})
 
 	if len(req.Lists) == 0 {
@@ -346,7 +311,7 @@ func (sm *SyncManager) collectRooms(req *V5SyncRequest) []roomEntry {
 	return all
 }
 
-func (sm *SyncManager) filterRoom(r roomEntry, req *V5SyncRequest) bool {
+func (ms *MatrixServer) v5filterRoom(r roomEntry, req *V5SyncRequest) bool {
 	if len(req.Lists) == 0 && len(req.RoomSubscriptions) == 0 {
 		return true
 	}
@@ -371,7 +336,7 @@ func (sm *SyncManager) filterRoom(r roomEntry, req *V5SyncRequest) bool {
 	return false
 }
 
-func (sm *SyncManager) roomResult(r roomEntry, initial bool) RoomResult {
+func (ms *MatrixServer) v5roomResult(r roomEntry, initial bool) RoomResult {
 	u := r.roomID
 	membership := "join"
 	if r.contactType == "friend" {
@@ -384,7 +349,10 @@ func (sm *SyncManager) roomResult(r roomEntry, initial bool) RoomResult {
 		name = &r.name
 	}
 
-	bump := sm.bumpSeq.Add(1)
+	ms.v5mu.Lock()
+	ms.v5bump++
+	bump := ms.v5bump
+	ms.v5mu.Unlock()
 
 	res := RoomResult{
 		Initial:     initial,
