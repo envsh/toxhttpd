@@ -11,6 +11,7 @@
 #include "chatwidget.h"
 #include "restapi.h"
 #include "translator.h"
+#include "FramelessHelper.h"
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"
 
@@ -43,6 +44,7 @@ public:
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     
 private:
+    FramelessHelper* framelessHelper;
     std::string selfPubkey;  // 自己的公钥（地址前64字符）
     std::map<std::string, PeerInfo> peerInfoMap;  // 会议/群组 peer info 缓存: "conf_N_M" / "group_N_M"
     

@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "CustomTitleBar.h"
 #include "restapi.h"
 #include "eventpoller.h"
 #include "translator.h"
@@ -39,7 +40,14 @@ static void saveLanguage(const QString& lang) {
     }
 }
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), 
+MainWindow::MainWindow(QWidget* parent) 
+    : QMainWindow(parent
+#ifdef QT3_BUILD
+        , "mainwindow", Qt::WType_TopLevel | Qt::WStyle_Customize | Qt::WSubWindow | Qt::WStyle_MinMax | Qt::WStyle_SysMenu | Qt::WStyle_NoBorder
+#else
+        , Qt::FramelessWindowHint
+#endif
+    ), 
     currentChatId(-1), currentChatType("") {
     qWarning("MainWindow: constructor started");
     
@@ -50,8 +58,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     // 设置 UTF-8 编解码器
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     
+    QWidget* centralContainer = new QWidget(this);
+    QBoxLayout* mainLayout = qNewBoxLayout(centralContainer, QBoxLayout::TopToBottom, 0, 0);
+
     // 主分割器（左右布局）
-    splitter = new QSplitter(Qt::Horizontal, this);
+    splitter = new QSplitter(Qt::Horizontal, centralContainer);
     
     // ===== 左侧边栏 =====
     QWidget* sidebar = new QWidget(splitter);
@@ -88,9 +99,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     sizes << leftWidth << rightWidth;
     splitter->setSizes(sizes);
 #endif
-    
-    setCentralWidget(splitter);
-    
+
+    CustomTitleBar* titleBar = new CustomTitleBar(centralContainer);
+    mainLayout->addWidget(titleBar, 0);
+    mainLayout->addWidget(splitter, 1);
+    setCentralWidget(centralContainer);
+
     // 连接信号槽
     connect(selfInfoWidget, SIGNAL(switchAccountRequested()),
             this, SLOT(onSwitchAccount()));
@@ -125,6 +139,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
     // 异步加载初始数据
     qWarning("MainWindow: requesting initial data load (async)");
     ToxAPI::loadAllData();
+    
+    // 设置 frameless 窗口
+    framelessHelper = new FramelessHelper(this);
+    framelessHelper->setup(this);
+    titleBar->connectFramelessHelper(framelessHelper);
 }
 
 MainWindow::~MainWindow() {
