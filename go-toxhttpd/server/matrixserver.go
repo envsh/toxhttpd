@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 const matrixHost = "127.0.0.1:8181"
@@ -49,6 +47,8 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 	case path == "/_matrix/client/v3/login":
 		ms.handleLogin(w, r)
 	case path == "/_matrix/client/v3/logout":
+		ms.handleLogout(w, r)
+	case path == "/_matrix/client/v3/logout/all":
 		ms.handleLogout(w, r)
 	case path == "/_matrix/client/v3/account/whoami":
 		ms.handleWhoami(w, r)
@@ -92,22 +92,7 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	case path == "/_matrix/client/v3/sync":
-		q := r.URL.Query()
-		timeout := 30000
-		if t := q.Get("timeout"); t != "" {
-			if v, err := strconv.Atoi(t); err == nil && v > 0 {
-				timeout = v
-			}
-		}
-		time.Sleep(time.Duration(timeout) * time.Millisecond)
-		writeJSON(w, map[string]interface{}{
-			"next_batch": "s2",
-			"rooms": map[string]interface{}{
-				"join":   map[string]interface{}{},
-				"invite": map[string]interface{}{},
-				"leave":  map[string]interface{}{},
-			},
-		})
+		ms.handleV3Sync(w, r)
 	case path == "/_matrix/client/v3/keys/query":
 		var req struct {
 			DeviceKeys map[string][]string `json:"device_keys"`
