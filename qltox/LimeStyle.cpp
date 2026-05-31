@@ -976,16 +976,60 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p,
         return;
     }
     case CE_PopupMenuItem: {
-        if (flags & Style_Selected) {
-            p->save();
-            p->fillRect(r, pal.accent);
-            p->restore();
-        }
         if (const QMenuItem* mi = opt.menuItem()) {
+            bool selected = (flags & Style_Selected);
+            bool disabled = !(flags & Style_Enabled);
+            QString text = mi->text();
+            bool isSep = mi->isSeparator();
+
+            if (isSep) {
+                p->save();
+                p->setPen(pal.border);
+                p->drawLine(r.left() + 8, r.center().y(),
+                            r.right() - 8, r.center().y());
+                p->restore();
+                return;
+            }
+
             p->save();
-            QRect textR(r.x() + 24, r.y(), r.width() - 28, r.height());
-            p->setPen((flags & Style_Selected) ? pal.accentText : pal.textPrimary);
-            p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, mi->text());
+            if (selected)
+                p->fillRect(r, pal.accent);
+            else
+                p->fillRect(r, pal.windowBg);
+
+            QColor fg = selected ? pal.accentText
+                        : (disabled ? pal.textDisabled : pal.textPrimary);
+            p->setPen(fg);
+
+            int ampPos = text.find('&');
+            if (ampPos >= 0)
+                text.remove(ampPos, 1);
+
+            QRect textR(r.x() + 20, r.y(), r.width() - 36, r.height());
+            int tabPos = text.find('\t');
+            if (tabPos >= 0) {
+                QString label = text.left(tabPos);
+                p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, label);
+                p->drawText(textR, Qt::AlignRight | Qt::AlignVCenter, text.mid(tabPos + 1));
+                if (ampPos >= 0 && ampPos < tabPos) {
+                    QFontMetrics fm = p->fontMetrics();
+                    int beforeW = fm.width(label.left(ampPos));
+                    int charW = fm.width(label[ampPos]);
+                    int baselineY = r.y() + (r.height() + fm.ascent() - fm.descent()) / 2;
+                    p->drawLine(textR.x() + beforeW, baselineY + 1,
+                                textR.x() + beforeW + charW, baselineY + 1);
+                }
+            } else {
+                p->drawText(textR, Qt::AlignLeft | Qt::AlignVCenter, text);
+                if (ampPos >= 0) {
+                    QFontMetrics fm = p->fontMetrics();
+                    int beforeW = fm.width(text.left(ampPos));
+                    int charW = fm.width(text[ampPos]);
+                    int baselineY = r.y() + (r.height() + fm.ascent() - fm.descent()) / 2;
+                    p->drawLine(textR.x() + beforeW, baselineY + 1,
+                                textR.x() + beforeW + charW, baselineY + 1);
+                }
+            }
             p->restore();
         }
         return;
@@ -1021,7 +1065,22 @@ void LimeStyle::drawControl(ControlElement ce, QPainter *p,
         p->save();
         p->setPen(pal.textPrimary);
         if (const QMenuItem* mi = opt.menuItem()) {
-            p->drawText(r, Qt::AlignCenter, mi->text());
+            QString text = mi->text();
+            int ampPos = text.find('&');
+            if (ampPos >= 0) {
+                text.remove(ampPos, 1);
+                p->drawText(r, Qt::AlignCenter, text);
+                QFontMetrics fm = p->fontMetrics();
+                int beforeW = fm.width(text.left(ampPos));
+                int charW = fm.width(text[ampPos]);
+                int textW = fm.width(text);
+                int x0 = r.x() + (r.width() - textW) / 2;
+                int baselineY = r.y() + (r.height() + fm.ascent() - fm.descent()) / 2;
+                p->drawLine(x0 + beforeW, baselineY + 1,
+                            x0 + beforeW + charW, baselineY + 1);
+            } else {
+                p->drawText(r, Qt::AlignCenter, text);
+            }
         }
         p->restore();
         return;
