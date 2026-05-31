@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -58,8 +59,14 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	json.NewEncoder(w).Encode(v)
 }
 
+func WriteJsonErr(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 func writeErr(w http.ResponseWriter, msg string, code int) {
-	http.Error(w, fmt.Sprintf(`{"error":"%s"}`, msg), code)
+	WriteJsonErr(w, msg, code)
 }
 
 // ── Self ──
@@ -794,5 +801,9 @@ func (h *Restapi) handleWeb(w http.ResponseWriter, r *http.Request) {
 		path = "/web/index.html"
 	}
 	absPath := filepath.Join(h.webRoot, path)
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		WriteJsonErr(w, "not found", http.StatusNotFound)
+		return
+	}
 	http.ServeFile(w, r, absPath)
 }

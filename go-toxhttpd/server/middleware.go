@@ -5,10 +5,21 @@ import (
 	"net/http"
 )
 
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *loggingResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
 func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-		next(w, r)
+		rw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next(rw, r)
+		log.Printf("[HTTP] %s %s from %s → %d", r.Method, r.URL.Path, r.RemoteAddr, rw.statusCode)
 	}
 }
 
