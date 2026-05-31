@@ -192,14 +192,36 @@ MainWindow::MainWindow(QWidget* parent)
         titleBar->menuBar()->setMinimumWidth(titleBar->menuBar()->sizeHint().width() + n * gap);
     }
 #else
-    titleBar->menuBar()->addMenu(qFromUtf8("文件(&F)"));
-    titleBar->menuBar()->addMenu(qFromUtf8("编辑(&E)"));
-    titleBar->menuBar()->addMenu(qFromUtf8("工具(&T)"));
-    titleBar->menuBar()->addMenu(qFromUtf8("帮助(&H)"));
+    {
+        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("文件(&F)"));
+        m->setFont(titleBar->menuBar()->font());
+        m->addAction(qFromUtf8("新建\tCtrl+N"), this, SLOT(onMenu1Stub()));
+        m->addSeparator();
+        m->addAction(qFromUtf8("退出\tCtrl+Q"), this, SLOT(close()));
+    }
+    {
+        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("编辑(&E)"));
+        m->setFont(titleBar->menuBar()->font());
+        m->addAction(qFromUtf8("撤销\tCtrl+Z"), this, SLOT(onMenu1Stub()));
+        m->addAction(qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
+    }
+    {
+        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("工具(&T)"));
+        m->setFont(titleBar->menuBar()->font());
+        m->addAction(qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
+    }
+    {
+        QMenu* m = titleBar->menuBar()->addMenu(qFromUtf8("帮助(&H)"));
+        m->setFont(titleBar->menuBar()->font());
+        m->addAction(qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
+    }
     titleBar->menuBar()->setMinimumWidth(titleBar->menuBar()->sizeHint().width());
     {
         QStyle* ws = QStyleFactory::create("windows");
-        if (ws) titleBar->menuBar()->setStyle(ws);
+        if (ws) {
+            titleBar->menuBar()->setStyle(ws);
+            titleBar->menuBar()->setNativeMenuBar(false);
+        }
     }
 #endif
 }
