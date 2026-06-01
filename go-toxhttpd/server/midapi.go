@@ -172,6 +172,18 @@ func (m *Midapi) FriendAdd(pubkey, message string) (uint32, error) {
 	return fn, nil
 }
 
+func (m *Midapi) FriendGetPublicKey(fid uint32) (string, error) {
+	return m.ctx.Tox.FriendGetPublicKey(fid)
+}
+
+func (m *Midapi) GroupGetChatId(gn tox.GroupNumber) (string, error) {
+	return m.ctx.Tox.GroupGetChatId(gn)
+}
+
+func (m *Midapi) ConferenceGetIdentifier(cid uint32) (string, error) {
+	return m.ctx.Tox.ConferenceGetIdentifier(cid)
+}
+
 func (m *Midapi) FriendDelete(friendID uint32) error {
 	_, err := m.ctx.Tox.FriendDelete(friendID)
 	if err != nil {

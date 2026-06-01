@@ -29,6 +29,8 @@ type MatrixServer struct {
 	v5mu     sync.Mutex
 	v5after  uint64
 	v5bump   int64
+	v3mu     sync.Mutex
+	v3after  uint64
 }
 
 func NewMatrixServer(s SelfProvider, m *Midapi) *MatrixServer {

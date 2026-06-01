@@ -1,10 +1,13 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
+
+	tox "github.com/TokTok/go-toxcore-c"
 )
 
 type v3EventList struct {
@@ -66,11 +69,12 @@ type v3Unread struct {
 	HighlightCount    int `json:"highlight_count"`
 }
 
-// handleV3Sync 模拟实现 v3 sync。返回伪造数据让 Matrix 客户端（Cinny）正常显示房间列表。
-// 初始 sync 立即返回含 state 事件的完整房间数据；增量 sync 短时等待后返回房间元数据（无 state）。
+// handleV3Sync 模拟实现 v3 sync。
+// 初始 sync 返回含 state 事件的完整房间数据；增量 sync 同时返回待处理消息事件。
 func (ms *MatrixServer) handleV3Sync(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	since := q.Get("since")
+	fullSync := since == ""
 	timeout := 30000
 	if t := q.Get("timeout"); t != "" {
 		if v, err := strconv.Atoi(t); err == nil && v > 0 {
@@ -103,28 +107,139 @@ func (ms *MatrixServer) handleV3Sync(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if since == "" {
-		join := make(map[string]*v3Room, len(entries))
-		for _, r := range entries {
-			join[r.roomID] = ms.v3BuildRoom(r)
-		}
-		resp.Rooms = &v3Rooms{
-			Join:   join,
-			Invite: map[string]interface{}{},
-			Leave:  map[string]interface{}{},
-		}
+	// 拉取待处理事件
+	ms.v3mu.Lock()
+	var events []Event
+	var nextID uint64
+	if fullSync {
+		events, ms.v3after = ms.midapi.EventsPoll(0)
+	} else {
+		events, nextID = ms.midapi.EventsPoll(ms.v3after)
+		ms.v3after = nextID
+	}
+	ms.v3mu.Unlock()
+
+	if fullSync {
+		// 初始 sync 直接返回全量状态，无需等待
 	} else {
 		if timeout > 5000 {
 			timeout = 5000
 		}
 		time.Sleep(time.Duration(timeout) * time.Millisecond)
-		join := make(map[string]*v3Room, len(entries))
-		for _, r := range entries {
-			join[r.roomID] = ms.v3BuildRoom(r)
-		}
-		resp.Rooms = &v3Rooms{Join: join, Invite: map[string]interface{}{}, Leave: map[string]interface{}{}}
+
+		ms.v3mu.Lock()
+		moreEvents, nextID2 := ms.midapi.EventsPoll(ms.v3after)
+		ms.v3after = nextID2
+		ms.v3mu.Unlock()
+		events = append(events, moreEvents...)
 	}
+
+	join := make(map[string]*v3Room, len(entries))
+	for _, r := range entries {
+		join[r.roomID] = ms.v3BuildRoom(r)
+	}
+	resp.Rooms = &v3Rooms{
+		Join:   join,
+		Invite: map[string]interface{}{},
+		Leave:  map[string]interface{}{},
+	}
+
+	if len(events) > 0 {
+		ms.v3injectMessages(entries, events, resp.Rooms.Join)
+	}
+
 	writeJSON(w, resp)
+}
+
+// v3injectMessages 将 EventQueue 事件转为 Matrix 消息事件注入房间 timeline。
+func (ms *MatrixServer) v3injectMessages(entries []roomEntry, events []Event, join map[string]*v3Room) {
+	selfAddr := ms.self.SelfGet().Address
+
+	for _, ev := range events {
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(ev.Data), &data); err != nil {
+			continue
+		}
+
+		msgText, _ := data["message"].(string)
+		if msgText == "" {
+			continue
+		}
+
+		chatID := ms.v3eventChatID(ev.Type, data)
+		if chatID == "" {
+			continue
+		}
+
+		rid := roomID(chatID)
+		room, ok := join[rid]
+		if !ok {
+			continue
+		}
+
+		direction, _ := data["direction"].(string)
+		var senderMXID string
+		if direction == "sent" {
+			senderMXID = "@" + selfAddr + ":" + matrixHost
+		} else {
+			senderMXID = "@" + chatID + ":" + matrixHost
+		}
+
+		msgEvent := map[string]interface{}{
+			"type": "m.room.message",
+			"content": map[string]interface{}{
+				"msgtype": "m.text",
+				"body":    msgText,
+			},
+			"event_id":         "$" + chatID + "_" + strconv.FormatUint(ev.ID, 36) + ":" + matrixHost,
+			"room_id":          rid,
+			"sender":           senderMXID,
+			"origin_server_ts": ev.Timestamp.UnixMilli(),
+		}
+
+		room.Timeline.Events = append(room.Timeline.Events, msgEvent)
+	}
+}
+
+// v3eventChatID 从事件类型和数据中解析 chatID（pubkey）。
+func (ms *MatrixServer) v3eventChatID(evType string, data map[string]interface{}) string {
+	switch evType {
+	case "friend_message":
+		fid, _ := data["friend_id"].(float64)
+		if fid == 0 {
+			return ""
+		}
+		pk, err := ms.midapi.FriendGetPublicKey(uint32(fid))
+		if err != nil {
+			return ""
+		}
+		return pk
+
+	case "group_message":
+		gn, _ := data["group_number"].(float64)
+		if gn == 0 {
+			return ""
+		}
+		chatId, err := ms.midapi.GroupGetChatId(tox.GroupNumber(uint32(gn)))
+		if err != nil {
+			return ""
+		}
+		return chatId
+
+	case "conference_message":
+		cn, _ := data["conference_number"].(float64)
+		if cn == 0 {
+			return ""
+		}
+		chatId, err := ms.midapi.ConferenceGetIdentifier(uint32(cn))
+		if err != nil {
+			return ""
+		}
+		return chatId
+
+	default:
+		return ""
+	}
 }
 
 func (ms *MatrixServer) v3collectRooms() []roomEntry {
