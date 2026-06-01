@@ -903,7 +903,7 @@ func (m *Midapi) SetupCallbacks() {
 			"status_message": newStatus,
 		})
 		s.EventQueue.Push("friend_status_message", string(data))
-		m.requestSave()
+		// m.requestSave()
 	}, nil)
 
 	s.Tox.CallbackFriendStatus(func(this *tox.Tox, friendNumber uint32, status int, userData interface{}) {
@@ -1067,8 +1067,8 @@ func (m *Midapi) SetupCallbacks() {
 
 	s.Tox.CallbackGroupPeerExit(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		peerNumber tox.GroupPeerNumber, exitType tox.GroupExitType, name string, userData interface{}) {
-		log.Printf("[GroupPeerExit] group=%d, peer=%d, type=%s, name=%s",
-			int(groupNumber), int(peerNumber), tox.GroupExitTypeToString(exitType), name)
+		// log.Printf("[GroupPeerExit] group=%d, peer=%d, type=%s, name=%s",
+			// int(groupNumber), int(peerNumber), tox.GroupExitTypeToString(exitType), name)
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": int(groupNumber),
 			"peer_number":  int(peerNumber),

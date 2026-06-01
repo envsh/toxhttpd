@@ -3,12 +3,11 @@ package server
 import (
 	"log"
 	"strings"
+	"math/rand"
 
 	tox "github.com/TokTok/go-toxcore-c"
 	"github.com/envsh/toxera/bsdata"
 )
-
-var relayCount int
 
 type BootstrapNode struct {
 	IPv4       string
@@ -40,11 +39,13 @@ func bootstrapAll(t *tox.Tox) {
 		log.Printf("Bootstrap %d: UDP %s:%d (maintainer: %s)", i, node.IPv4, node.Port, node.Maintainer)
 		t.Bootstrap(node.IPv4, node.Port, node.PublicKey)
 		if ok, _ := t.AddTcpRelay(node.IPv4, node.Port, node.PublicKey); ok {
-			relayCount++
+			extraRelays = append(extraRelays, node)
 		}
-		log.Printf("Bootstrap %d: TCP relay %s:%d (maintainer: %s) count=%d", i, node.IPv4, node.Port, node.Maintainer, relayCount)
+		log.Printf("Bootstrap %d: TCP relay %s:%d (maintainer: %s) count=%d", i, node.IPv4, node.Port, node.Maintainer, len(extraRelays))
 	}
 }
+
+var extraRelays []BootstrapNode
 
 func (ctx *ApiContext) checkRebootstrap() {
 	ctx.Rebscnter++
@@ -57,7 +58,11 @@ func (ctx *ApiContext) checkRebootstrap() {
 	if connected {
 		return
 	}
-	if relayCount >= 5 {
+	if len(extraRelays) >= 5 {
+		cnt := len(extraRelays)
+		idx := int(rand.Uint32()/2)%cnt
+		n := extraRelays[idx]
+		t.Bootstrap(n.IPv4, n.Port, n.PublicKey)
 		return
 	}
 	node, err := bsdata.SelectOne()
@@ -67,8 +72,14 @@ func (ctx *ApiContext) checkRebootstrap() {
 	if strings.Contains(node.Host, ":") { return }
 
 	if ok, err2 := t.AddTcpRelay(node.Host, node.Ports[0], node.Pubkey); ok && err2 == nil {
-		relayCount++
-		log.Printf("Relay added %d/5: %s", relayCount, node.Host)
+		n := BootstrapNode{}
+		n.IPv4  = node.Host
+		n.Port  = node.Ports[0]
+		n.PublicKey  = node.Pubkey
+		n.Maintainer = node.Motd
+
+		extraRelays = append(extraRelays, n)
+		log.Printf("Relay added %d/5: %s", len(extraRelays), node.Host)
 	}
 	_, err1 := t.Bootstrap(node.Host, node.Ports[0], node.Pubkey)
 	if err1 == nil {
