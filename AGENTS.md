@@ -24,6 +24,7 @@
 
 - **先做 Qt3，Qt4 也要同步兼容。** 所有新功能先用 Qt3 API 实现（`buildqt3.sh`），同时用 `#ifdef` 适配 Qt4（`buildqt4.sh`），确保两个版本均可编译运行。
 - **Never auto-commit to git.** Only commit when explicitly asked by the user.
+- **Matrix 端点必须遵循 CS 协议标准**，不加自定义 API、不返回非标字段/值。所有响应须与 spec 兼容，不引入客户端无法识别的端点或逻辑。
 
 - Peer name cache key: `"conference_{id}_{peer}"` / `"group_{id}_{peer}"` — web (`app.js`) and qltox (`mainwindow.cpp`) must stay in sync.
 - Event system: long-poll `/api/events`. qltox uses `QThread` + libcurl, events delivered via `CustomEventBase` (compat wrapper).

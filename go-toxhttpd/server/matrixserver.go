@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -91,6 +92,8 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 				"enabled": true,
 			})
 		}
+	case strings.HasPrefix(path, "/_matrix/client/v3/directory/list/room/"):
+		ms.handleRoomDirectory(w, r)
 	case path == "/_matrix/client/v3/sync":
 		ms.handleV3Sync(w, r)
 	case path == "/_matrix/client/v3/keys/query":
@@ -247,6 +250,52 @@ func (ms *MatrixServer) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, map[string]interface{}{})
+}
+
+// ── GET /_matrix/client/v3/directory/list/room/{roomId} ──
+
+func (ms *MatrixServer) handleRoomDirectory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, map[string]string{"errcode": "M_UNRECOGNIZED", "error": "Unrecognized endpoint"})
+		return
+	}
+	prefix := "/_matrix/client/v3/directory/list/room/"
+	roomID := r.URL.Path[len(prefix):]
+	chatID := parseRoomID(roomID)
+	if chatID == "" {
+		writeJSON(w, map[string]string{"errcode": "M_NOT_FOUND", "error": "Room not found"})
+		return
+	}
+	vis, ok := ms.lookupRoomVisibility(chatID)
+	if !ok {
+		writeJSON(w, map[string]string{"errcode": "M_NOT_FOUND", "error": "Room not found"})
+		return
+	}
+	writeJSON(w, map[string]string{"visibility": vis})
+}
+
+func (ms *MatrixServer) lookupRoomVisibility(chatID string) (string, bool) {
+	ids := ms.midapi.FriendsList()
+	strIDs := make([]string, len(ids))
+	for i, id := range ids {
+		strIDs[i] = strconv.FormatUint(uint64(id), 10)
+	}
+	for _, f := range ms.midapi.FriendsInfo(strIDs) {
+		if f.PublicKey == chatID {
+			return "private", true
+		}
+	}
+	for _, g := range ms.midapi.GroupsList() {
+		if g.ChatId == chatID {
+			return "public", true
+		}
+	}
+	for _, c := range ms.midapi.ConferencesList() {
+		if c.ChatId == chatID {
+			return "public", true
+		}
+	}
+	return "", false
 }
 
 // ── GET /_matrix/client/v3/account/whoami ──

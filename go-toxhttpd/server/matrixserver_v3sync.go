@@ -87,8 +87,23 @@ func (ms *MatrixServer) handleV3Sync(w http.ResponseWriter, r *http.Request) {
 		DeviceOneTimeKeysCount: map[string]int{"signed_curve25519": 50},
 	}
 
+	entries := ms.v3collectRooms()
+
+	directContent := make(map[string][]string)
+	for _, e := range entries {
+		if e.isDM {
+			mxid := "@" + e.chatID + ":" + matrixHost
+			directContent[mxid] = []string{e.roomID}
+		}
+	}
+	if len(directContent) > 0 {
+		resp.AccountData.Events = append(resp.AccountData.Events, map[string]interface{}{
+			"type":    "m.direct",
+			"content": directContent,
+		})
+	}
+
 	if since == "" {
-		entries := ms.v3collectRooms()
 		join := make(map[string]*v3Room, len(entries))
 		for _, r := range entries {
 			join[r.roomID] = ms.v3BuildRoom(r)
@@ -103,14 +118,9 @@ func (ms *MatrixServer) handleV3Sync(w http.ResponseWriter, r *http.Request) {
 			timeout = 5000
 		}
 		time.Sleep(time.Duration(timeout) * time.Millisecond)
-		entries := ms.v3collectRooms()
 		join := make(map[string]*v3Room, len(entries))
 		for _, r := range entries {
-			join[r.roomID] = &v3Room{
-				Summary:             ms.v3BuildSummary(r),
-				Ephemeral:           &v3EventList{Events: []interface{}{}},
-				UnreadNotifications: v3Unread{},
-			}
+			join[r.roomID] = ms.v3BuildRoom(r)
 		}
 		resp.Rooms = &v3Rooms{Join: join, Invite: map[string]interface{}{}, Leave: map[string]interface{}{}}
 	}
