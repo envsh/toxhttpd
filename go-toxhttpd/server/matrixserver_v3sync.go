@@ -154,6 +154,7 @@ func (ms *MatrixServer) handleV3Sync(w http.ResponseWriter, r *http.Request) {
 // v3injectMessages 将 EventQueue 事件转为 Matrix 消息事件注入房间 timeline。
 func (ms *MatrixServer) v3injectMessages(entries []roomEntry, events []Event, join map[string]*v3Room) {
 	selfAddr := ms.self.SelfGet().Address
+	peerSeen := make(map[string]map[string]bool)
 
 	for _, ev := range events {
 		var data map[string]interface{}
@@ -178,11 +179,40 @@ func (ms *MatrixServer) v3injectMessages(entries []roomEntry, events []Event, jo
 		}
 
 		direction, _ := data["direction"].(string)
+		senderPubKey, _ := data["sender_pubkey"].(string)
 		var senderMXID string
 		if direction == "sent" {
 			senderMXID = "@" + selfAddr + ":" + matrixHost
+		} else if senderPubKey != "" {
+			senderMXID = "@" + senderPubKey + ":" + matrixHost
 		} else {
 			senderMXID = "@" + chatID + ":" + matrixHost
+		}
+
+		if direction != "sent" && senderPubKey != "" {
+			seenMap, ok := peerSeen[rid]
+			if !ok {
+				seenMap = make(map[string]bool)
+				peerSeen[rid] = seenMap
+			}
+			if !seenMap[senderPubKey] {
+				seenMap[senderPubKey] = true
+				peerName, _ := data["peer_name"].(string)
+				memberEvent := map[string]interface{}{
+					"type":      "m.room.member",
+					"state_key": senderMXID,
+					"content": map[string]interface{}{
+						"membership":  "join",
+						"displayname": peerName,
+					},
+					"event_id":         "$" + senderPubKey + "_join_" + strconv.FormatUint(ev.ID, 36) + ":" + matrixHost,
+					"room_id":          rid,
+					"sender":           senderMXID,
+					"origin_server_ts": ev.Timestamp.UnixMilli(),
+				}
+				room.Timeline.Events = append(room.Timeline.Events, memberEvent)
+				room.State.Events = append(room.State.Events, memberEvent)
+			}
 		}
 
 		msgEvent := map[string]interface{}{
@@ -336,8 +366,18 @@ func (ms *MatrixServer) v3BuildRoom(r roomEntry) *v3Room {
 				"content": map[string]interface{}{
 					"creator":      selfID,
 					"room_version": "10",
+					"join_rule":    "public",
 				},
 				"event_id":         "$" + r.chatID + "_create:" + matrixHost,
+				"room_id":          r.roomID,
+				"sender":           selfID,
+				"origin_server_ts": ts,
+			},
+			{
+				"type":      "m.room.join_rules",
+				"state_key": "",
+				"content":   map[string]string{"join_rule": "public"},
+				"event_id":         "$" + r.chatID + "_join_rules:" + matrixHost,
 				"room_id":          r.roomID,
 				"sender":           selfID,
 				"origin_server_ts": ts,

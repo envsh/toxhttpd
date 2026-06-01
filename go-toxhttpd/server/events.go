@@ -111,7 +111,7 @@ func (q *EventQueue) PopAfter(after uint64) ([]Event, uint64) {
 	cutoff := time.Now().Add(-eventTimeWindow)
 	result := make([]Event, 0, len(q.events))
 	for _, e := range q.events {
-		if e.ID > after {
+		if e.ID >= after {
 			if after == 0 && e.Timestamp.Before(cutoff) {
 				continue
 			}

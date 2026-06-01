@@ -976,6 +976,7 @@ func (m *Midapi) SetupCallbacks() {
 			"conference_number": groupNumber,
 			"peer_number":       peerNumber,
 			"peer_name":         peerName,
+			"sender_pubkey":     peerPubKey,
 		})
 		s.EventQueue.Push("conference_message", string(data))
 		m.persistEventToSQLite(chanidInt, string(data))
@@ -989,12 +990,13 @@ func (m *Midapi) SetupCallbacks() {
 		senderInt, _ := m.getOrCreatePubKeyID(peerPubKey)
 		peerName, _ := s.Tox.GroupPeerGetName(groupNumber, peerNumber)
 		data, _ := json.Marshal(map[string]interface{}{
-			"message":      message,
-			"sender":       senderInt,
-			"direction":    "received",
-			"group_number": int(groupNumber),
-			"peer_number":  int(peerNumber),
-			"peer_name":    peerName,
+			"message":       message,
+			"sender":        senderInt,
+			"direction":     "received",
+			"group_number":  int(groupNumber),
+			"peer_number":   int(peerNumber),
+			"peer_name":     peerName,
+			"sender_pubkey": peerPubKey,
 		})
 		s.EventQueue.Push("group_message", string(data))
 		m.persistEventToSQLite(chanidInt, string(data))
