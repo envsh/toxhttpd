@@ -8,6 +8,8 @@ import (
 	"github.com/envsh/toxera/bsdata"
 )
 
+var relayCount int
+
 type BootstrapNode struct {
 	IPv4       string
 	IPv6       string
@@ -37,14 +39,16 @@ func bootstrapAll(t *tox.Tox) {
 	for i, node := range bootstrapNodes {
 		log.Printf("Bootstrap %d: UDP %s:%d (maintainer: %s)", i, node.IPv4, node.Port, node.Maintainer)
 		t.Bootstrap(node.IPv4, node.Port, node.PublicKey)
-		t.AddTcpRelay(node.IPv4, node.Port, node.PublicKey)
-		log.Printf("Bootstrap %d: TCP relay %s:%d (maintainer: %s)", i, node.IPv4, node.Port, node.Maintainer)
+		if ok, _ := t.AddTcpRelay(node.IPv4, node.Port, node.PublicKey); ok {
+			relayCount++
+		}
+		log.Printf("Bootstrap %d: TCP relay %s:%d (maintainer: %s) count=%d", i, node.IPv4, node.Port, node.Maintainer, relayCount)
 	}
 }
 
 func (ctx *ApiContext) checkRebootstrap() {
 	ctx.Rebscnter++
-	if ctx.Rebscnter < 20*5 {
+	if ctx.Rebscnter < 30*5 {
 		return
 	}
 	ctx.Rebscnter = 0
@@ -53,13 +57,21 @@ func (ctx *ApiContext) checkRebootstrap() {
 	if connected {
 		return
 	}
+	if relayCount >= 5 {
+		return
+	}
 	node, err := bsdata.SelectOne()
 	if err != nil {
 		return
 	}
 	if strings.Contains(node.Host, ":") { return }
 
+	if ok, err2 := t.AddTcpRelay(node.Host, node.Ports[0], node.Pubkey); ok && err2 == nil {
+		relayCount++
+		log.Printf("Relay added %d/5: %s", relayCount, node.Host)
+	}
 	_, err1 := t.Bootstrap(node.Host, node.Ports[0], node.Pubkey)
-	_, err2 := t.AddTcpRelay(node.Host, node.Ports[0], node.Pubkey)
-	log.Println("Rebootstraped", node.Host, err1, err2)
+	if err1 == nil {
+		log.Println("Rebootstraped", node.Host)
+	}
 }

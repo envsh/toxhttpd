@@ -1057,7 +1057,7 @@ func (m *Midapi) SetupCallbacks() {
 
 	s.Tox.CallbackGroupPeerJoin(func(this *tox.Tox, groupNumber tox.GroupNumber,
 		peerNumber tox.GroupPeerNumber, userData interface{}) {
-		log.Printf("[GroupPeerJoin] group=%d, peer=%d", int(groupNumber), int(peerNumber))
+		// log.Printf("[GroupPeerJoin] group=%d, peer=%d", int(groupNumber), int(peerNumber))
 		data, _ := json.Marshal(map[string]interface{}{
 			"group_number": int(groupNumber),
 			"peer_number":  int(peerNumber),

@@ -116,7 +116,7 @@ func (s *Server) saveLoop(ctx context.Context, wg *sync.WaitGroup) {
 // in case outer iterate
 func(s *Server) ToxIterate() {
 		
-		ms20 := 20 * time.Millisecond
+		ms20 := 2 * time.Millisecond
 		for i := 0; i < 100; i++ {
 				s.Tox.Iterate()
 				s.checkRebootstrap()
@@ -125,15 +125,15 @@ func(s *Server) ToxIterate() {
 }
 
 func (s *Server) toxIterateBackground(ctx context.Context) {
-	ms20 := 20 * time.Millisecond
+	ms20 := 2 * time.Millisecond
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 			s.Tox.Iterate()
-			s.checkRebootstrap()
 			time.Sleep(ms20 + time.Millisecond * time.Duration(s.Tox.IterationInterval()))
+			s.checkRebootstrap()
 		}
 	}
 }
