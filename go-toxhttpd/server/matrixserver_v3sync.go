@@ -206,6 +206,7 @@ func (ms *MatrixServer) v3BuildSummary(r roomEntry) v3Summary {
 
 func (ms *MatrixServer) v3BuildRoom(r roomEntry) *v3Room {
 	selfID := ms.userID()
+	selfInfo := ms.self.SelfGet()
 	ts := time.Now().UnixMilli()
 	tl := &v3Timeline{
 		Events:    []map[string]interface{}{},
@@ -229,7 +230,7 @@ func (ms *MatrixServer) v3BuildRoom(r roomEntry) *v3Room {
 			{
 				"type":      "m.room.member",
 				"state_key": selfID,
-				"content":   map[string]string{"membership": "join"},
+				"content":   map[string]string{"membership": "join", "displayname": selfInfo.Name},
 				"event_id":         "$" + r.chatID + "_member:" + matrixHost,
 				"room_id":          r.roomID,
 				"sender":           selfID,
@@ -239,10 +240,14 @@ func (ms *MatrixServer) v3BuildRoom(r roomEntry) *v3Room {
 	}
 	if r.contactType == "friend" {
 		friendMXID := "@" + r.chatID + ":" + matrixHost
+		friendContent := map[string]string{"membership": "join"}
+		if r.name != "" {
+			friendContent["displayname"] = r.name
+		}
 		st.Events = append(st.Events, map[string]interface{}{
 			"type":             "m.room.member",
 			"state_key":        friendMXID,
-			"content":          map[string]string{"membership": "join"},
+			"content":          friendContent,
 			"event_id":         "$" + r.chatID + "_peer:" + matrixHost,
 			"room_id":          r.roomID,
 			"sender":           friendMXID,

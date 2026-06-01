@@ -3,7 +3,7 @@
 - Go server: `bash build.sh` (from repo root) — uses old glibc 2.17 toolchain, **do not modify** `build.sh`
 - qltox Qt3: `cd qltox && bash buildqt3.sh` — generates `qltox`
 - qltox Qt4: `cd qltox && bash buildqt4.sh` — generates `q4tox`
-- Run server: `./go-toxhttpd/toxhttpd-go 8181`
+- Run server: `./go-toxhttpd/toxhttpd -port 8181`
 - Run client: `./qltox/build-qt3/qltox`
 - Build qltox cpp: `cd qltox/build-qt3 && make -j1` (already in build dir after `buildqt3.sh`)
 

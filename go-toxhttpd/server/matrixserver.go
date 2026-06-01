@@ -11,7 +11,11 @@ import (
 	"sync"
 )
 
-const matrixHost = "127.0.0.1:8181"
+const (
+	pubkeyHexLen = 64
+	addrHexLen   = 76
+	matrixHost   = "127.0.0.1:8181"
+)
 
 type SelfProvider interface {
 	SelfGet() *SelfInfo
@@ -94,6 +98,8 @@ func (ms *MatrixServer) serveMatrix(w http.ResponseWriter, r *http.Request) {
 		}
 	case strings.HasPrefix(path, "/_matrix/client/v3/directory/list/room/"):
 		ms.handleRoomDirectory(w, r)
+	case strings.HasPrefix(path, "/_matrix/client/v3/rooms/") && strings.HasSuffix(path, "/aliases"):
+		writeJSON(w, map[string][]interface{}{"aliases": {}})
 	case path == "/_matrix/client/v3/sync":
 		ms.handleV3Sync(w, r)
 	case path == "/_matrix/client/v3/keys/query":
@@ -359,12 +365,18 @@ func (ms *MatrixServer) handleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	localpart := userPart[1 : len(userPart)-len(":"+matrixHost)]
-	if !isHex72(localpart) {
+	if !isHexLened(localpart) {
 		writeProfileError(w)
 		return
 	}
 
-	info := ms.self.SelfGet()
+	var info *SelfInfo
+	selfAddr := ms.self.SelfGet().Address
+	if localpart == selfAddr {
+		info = ms.self.SelfGet()
+	} else {
+		info = ms.lookupFriendProfile(localpart)
+	}
 
 	switch subpath {
 	case "displayname":
@@ -377,6 +389,24 @@ func (ms *MatrixServer) handleProfile(w http.ResponseWriter, r *http.Request) {
 			"avatar_url":  nil,
 		})
 	}
+}
+
+func (ms *MatrixServer) lookupFriendProfile(pubkey string) *SelfInfo {
+	ids := ms.midapi.FriendsList()
+	strIDs := make([]string, len(ids))
+	for i, id := range ids {
+		strIDs[i] = strconv.FormatUint(uint64(id), 10)
+	}
+	for _, f := range ms.midapi.FriendsInfo(strIDs) {
+		if strings.EqualFold(f.PublicKey, pubkey) {
+			return &SelfInfo{
+				Address:       f.PublicKey,
+				Name:          f.Name,
+				StatusMessage: f.StatusText,
+			}
+		}
+	}
+	return &SelfInfo{Address: pubkey, Name: pubkey[:7] + "..."}
 }
 
 // ── GET /.well-known/matrix/client ──
@@ -407,8 +437,8 @@ func writeProfileError(w http.ResponseWriter) {
 
 // ── helpers ──
 
-func isHex72(s string) bool {
-	if len(s) != 72 {
+func isHexLened(s string) bool {
+	if len(s) != pubkeyHexLen && len(s) != addrHexLen {
 		return false
 	}
 	for _, c := range s {
