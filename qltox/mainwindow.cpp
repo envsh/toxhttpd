@@ -383,7 +383,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", QString(),
                                          friendId, getCurrentTime());
                     }
-                    playSoundNopcm("../web/sound/notification.s16le.pcm");
+                    if (!qIsAppActive())
+                        playSoundNopcm("../web/sound/notification.s16le.pcm");
                 }
                 cJSON_Delete(root);
             }
@@ -445,7 +446,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
-                    playSoundNopcm("../web/sound/notification.s16le.pcm");
+                    if (!qIsAppActive())
+                        playSoundNopcm("../web/sound/notification.s16le.pcm");
                 } else {
                     qWarning("conference_message: missing confNumber or message");
                 }
@@ -501,7 +503,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime(), "", "", ipAddress);
                     }
-                    playSoundNopcm("../web/sound/notification.s16le.pcm");
+                    if (!qIsAppActive())
+                        playSoundNopcm("../web/sound/notification.s16le.pcm");
                 }
                 cJSON_Delete(root);
             }

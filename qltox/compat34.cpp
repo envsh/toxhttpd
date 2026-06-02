@@ -346,3 +346,15 @@ void qSetLabelSelectable(QLabel* label) {
     label->installEventFilter(new LabelDblClickFilter(label));
 #endif
 }
+
+// ========== 活动窗口检测 ==========
+bool qIsAppActive(const QWidget* widget) {
+    if (widget) {
+#ifdef QT3_BUILD
+        return qApp->activeWindow() == widget->topLevelWidget();
+#else
+        return widget->isActiveWindow();
+#endif
+    }
+    return qApp->activeWindow() != 0;
+}

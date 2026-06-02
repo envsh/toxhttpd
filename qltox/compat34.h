@@ -107,4 +107,7 @@ typedef QStackedWidget StackedWidget;
 void qStackSetCurrent(StackedWidget* stack, QWidget* page);
 void qSetLabelSelectable(QLabel* label);
 
+// ========== 活动窗口检测 ==========
+bool qIsAppActive(const QWidget* widget = 0);
+
 #endif  // COMPAT34_H
