@@ -63,6 +63,9 @@ private:
     // loading ID 常量
     static const int kLoadAll = 1;
     static const int kLoadFriend = 2;
+    static const int kLoadMessages = 3;
+    static const int kLoadMembers = 4;
+    static const int kLoadSendMsg = 5;
 
     // 增量累积的 contacts（值类型，避免指针所有权混乱）
     std::vector<ContactData> m_accumulatedContactData;

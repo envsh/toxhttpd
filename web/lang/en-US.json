@@ -2,6 +2,9 @@
     "app_title": "Tox Chat",
     "loading_data": "Loading data",
     "loading_contact": "Loading contact",
+    "loading_messages": "Loading messages",
+    "loading_members": "Loading members",
+    "sending_message": "Sending message",
     "no_contacts": "No contacts yet",
     "chat_with_friend": "Chat with friend {0}",
     "group": {

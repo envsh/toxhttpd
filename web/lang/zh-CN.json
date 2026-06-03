@@ -2,6 +2,9 @@
     "app_title": "Tox Chat",
     "loading_data": "正在加载数据",
     "loading_contact": "正在加载联系人",
+    "loading_messages": "正在加载消息",
+    "loading_members": "正在加载成员",
+    "sending_message": "正在发送消息",
     "no_contacts": "暂无联系人",
     "chat_with_friend": "与好友 {0} 聊天",
     "group": {

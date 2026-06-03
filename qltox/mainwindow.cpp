@@ -258,6 +258,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
             qWarning("MainWindow: initial data load complete");
             chatWidget->loadingBar()->hideLoading(kLoadAll);
             if (ToxAPI::onLoadAllDataComplete()) {
+                chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
                 ToxAPI::loadAllData();
             }
             return;
@@ -288,8 +289,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
         }
         
         // 消息发送结果
-        if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage) {
+        if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage || e->type == ApiSendGroupMessage) {
             MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);
+            chatWidget->loadingBar()->hideLoading(kLoadSendMsg);
             if (!evt->success) {
                 QMessageBox::warning(this, _("send_failed"), _("send_failed"));
             }
@@ -298,6 +300,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
         
         // 会议加入结果 → 重新加载联系人
         if (e->type == ApiJoinConference) {
+            chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
             ToxAPI::loadAllData();
             return;
         }
@@ -305,6 +308,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
         // 成员列表加载完成
         if (e->type == ApiLoadGroupMembers) {
             MembersLoadedEvent* evt = static_cast<MembersLoadedEvent*>(event);
+            chatWidget->loadingBar()->hideLoading(kLoadMembers);
             if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
                 qWarning("MembersLoaded: %d members for %s %d", (int)evt->members.size(), evt->contactType.c_str(), evt->contactId);
                 for (const auto& m : evt->members) {
@@ -318,6 +322,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
         // 历史消息加载完成
         if (e->type == ApiLoadMessageHistory) {
             MessageHistoryLoadedEvent* evt = static_cast<MessageHistoryLoadedEvent*>(event);
+            chatWidget->loadingBar()->hideLoading(kLoadMessages);
             if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
                 qWarning("MessageHistoryLoaded: %d messages for %s %d", (int)evt->messages.size(), evt->contactType.c_str(), evt->contactId);
                 renderHistoryMessages(evt->messages);
@@ -373,12 +378,15 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     chatWidget->clearMessages();
     
     // 异步加载历史消息
+    chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
     ToxAPI::getMessagesHistory(id, std::string(qToUtf8(type).data()));
     
     // 异步预加载成员列表到 peerInfoMap 缓存
     if (type == "group") {
+        chatWidget->loadingBar()->showLoading(kLoadMembers, _("loading_members"));
         ToxAPI::getGroupMembers(id);
     } else if (type == "conference") {
+        chatWidget->loadingBar()->showLoading(kLoadMembers, _("loading_members"));
         ToxAPI::getConferenceMembers(id);
     }
 }
@@ -402,6 +410,7 @@ void MainWindow::onMessageSent(const QString& message) {
         return;
     }
     
+    chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
     if (reqType == ApiSendFriendMessage) {
         ToxAPI::sendFriendMessage(currentChatId, std::string(qToUtf8(message)));
     } else if (reqType == ApiSendConferenceMessage) {
@@ -504,6 +513,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("conference_message: failed to parse JSON: %s", e.data.c_str());
             }
         } else if (e.type == "self_connection_status") {
+            chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
             ToxAPI::loadAllData();
         } else if (e.type == "group_invite") {
             cJSON* root = cJSON_Parse(e.data.c_str());
@@ -840,6 +850,7 @@ void MainWindow::onSetGroupTopicRequested(int groupId) {
 #endif
     if (ok && !topic.isEmpty()) {
         if (ToxAPI::setGroupTopicSync(groupId, qToUtf8(topic).data())) {
+            chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
             ToxAPI::loadAllData();
         } else {
             QMessageBox::warning(this, _("error"), _("set_topic.failed"));
@@ -868,6 +879,7 @@ void MainWindow::onSetConferenceTitleRequested(int conferenceId) {
 #endif
     if (ok && !title.isEmpty()) {
         if (ToxAPI::setConferenceTitleSync(conferenceId, qToUtf8(title).data())) {
+            chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
             ToxAPI::loadAllData();
         } else {
             QMessageBox::warning(this, _("error"), _("set_title.failed"));
@@ -925,6 +937,7 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
                 chatWidget->clearMessages();
             }
             // 重新加载联系人列表
+            chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
             ToxAPI::loadAllData();
         }
     }
@@ -1088,6 +1101,7 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
             if (success) {
                 QMessageBox::information(this, _("group.joined"),
                                         _A("group.joined", QStringList() << chatId));
+                chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
                 ToxAPI::loadAllData();
             } else {
                 QMessageBox::warning(this, _("group.join_failed"), _("group.join_failed"));
@@ -1104,6 +1118,7 @@ void MainWindow::onSwitchAccount() {
     LoginDialog dialog(this);
     if (dialog.exec() != QDialog::Accepted) {
         ToxAPI::startPollEvent();
+        chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
         ToxAPI::loadAllData();
         return;
     }
@@ -1122,6 +1137,7 @@ void MainWindow::onSwitchAccount() {
 
     // 重新加载数据
     ToxAPI::startPollEvent();
+    chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
     ToxAPI::loadAllData();
 }
 
