@@ -594,6 +594,13 @@ func (h *Restapi) handleEvents(w http.ResponseWriter, r *http.Request) {
 	var afterID uint64
 	fmt.Sscanf(after, "%d", &afterID)
 
+	// afterID from web/qltox = last seen event ID; add 1 to convert to
+	// "next expected ID" for PopAfter (which uses >=). Matrix stores
+	// nextID directly and calls PopAfter via Midapi.EventsPoll — unaffected.
+	if afterID > 0 {
+		afterID++
+	}
+
 	if afterID > 0 {
 		events, nextID := h.m.EventsPoll(afterID)
 		if len(events) > 0 {

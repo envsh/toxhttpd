@@ -7,5 +7,10 @@ export CGO_CFLAGS=-I/opt/oldlibc-devsys/include
 # static use more -l
 export CGO_LDFLAGS="-L/opt/oldlibc-devsys/lib -ltoxav -ltoxencryptsave -lopus -lsodium -lm"
 
+
 cd go-toxhttpd/
-CGO_ENABLED=1 go build -v
+if [ x"$1" == x"" ]; then
+    CGO_ENABLED=1 go build -v -ldflags='-extldflags=-Wl,--export-dynamic'
+else
+    CGO_ENABLED=1 go build -v -tags e1pack -ldflags='-extldflags=-Wl,--export-dynamic'
+fi
