@@ -21,7 +21,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func New(cfg Config) (*Server, error) {
+var getSaveData = func() []byte {
 	saveDataPath := "data/savedata.bin"
 	var saveData []byte
 	if data, err := os.ReadFile(saveDataPath); err == nil && len(data) > 100 {
@@ -30,6 +30,11 @@ func New(cfg Config) (*Server, error) {
 	} else {
 		log.Printf("[TOX] No save data found, creating new identity")
 	}
+	return saveData
+}
+
+func New(cfg Config) (*Server, error) {
+	saveData := getSaveData()
 
 	opts := tox.NewToxOptions()
 	opts.Udp_enabled = cfg.UDPEnabled
@@ -117,7 +122,7 @@ func (s *Server) saveLoop(ctx context.Context, wg *sync.WaitGroup) {
 func(s *Server) ToxIterate() {
 		
 		ms20 := 2 * time.Millisecond
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 150; i++ {
 				s.Tox.Iterate()
 				s.checkRebootstrap()
 				time.Sleep(ms20 + time.Millisecond * time.Duration(s.Tox.IterationInterval()))

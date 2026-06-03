@@ -49,7 +49,7 @@ var extraRelays []BootstrapNode
 
 func (ctx *ApiContext) checkRebootstrap() {
 	ctx.Rebscnter++
-	if ctx.Rebscnter < 30*5 {
+	if ctx.Rebscnter < 40*5 {
 		return
 	}
 	ctx.Rebscnter = 0
@@ -58,7 +58,7 @@ func (ctx *ApiContext) checkRebootstrap() {
 	if connected {
 		return
 	}
-	if len(extraRelays) >= 5 {
+	if len(extraRelays) >= 9 {
 		cnt := len(extraRelays)
 		idx := int(rand.Uint32()/2)%cnt
 		n := extraRelays[idx]
