@@ -141,6 +141,7 @@ MainWindow::MainWindow(QWidget* parent)
     // 异步加载初始数据
     qWarning("MainWindow: requesting initial data load (async)");
     ToxAPI::loadAllData();
+    chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
     
     // 设置 frameless 窗口
     framelessHelper = new FramelessHelper(this);
@@ -183,67 +184,105 @@ void MainWindow::customEvent(CustomEventBase* event) {
         return;
     }
     
-    // 所有数据加载完成
+    // 数据加载完成
     if (event->type() == ApiResultReadyType) {
         ApiResultEvent* e = static_cast<ApiResultEvent*>(event);
         
-        if (e->type == ApiLoadAllData) {
-            AllDataLoadedEvent* evt = static_cast<AllDataLoadedEvent*>(event);
+        // 增量数据到达（逐步展示）
+        if (e->type == ApiLoadPartialData) {
+            PartialDataEvent* evt = static_cast<PartialDataEvent*>(event);
             
-            // 更新self信息
-            selfInfoWidget->updateInfo(
-                qFromUtf8(evt->selfName.c_str()),
-                qFromUtf8(evt->selfStatusMsg.c_str()),
-                qFromUtf8(evt->selfConnStatus.c_str()),
-                qFromUtf8(evt->selfAddress.c_str()));
-            
-            // 保存自己的公钥（地址前64字符是公钥）
-            std::string addr = evt->selfAddress;
-            if (addr.length() >= 64) {
-                selfPubkey = addr.substr(0, 64);
-            }
-            
-            // 转换ContactData为Contact并更新列表
-            ContactList contacts;
-            qWarning("MainWindow: loading %d contacts", (int)evt->contacts.size());
-            for (const auto& cd : evt->contacts) {
-                Contact* c = new Contact();
-                c->id = cd.id;
-                c->name = qFromUtf8(cd.name.c_str());
-                c->type = qFromUtf8(cd.type.c_str());
-                c->status = qFromUtf8(cd.status.c_str());
-                c->chat_id = qFromUtf8(cd.chatId.c_str());
-                c->is_connected = cd.isConnected;
-                contacts.append(c);
-                //qWarning("  Contact: id=%d, name='%s', type='%s', status='%s', chat_id='%s', connected=%s",
-                 //         cd.id, cd.name.c_str(), cd.type.c_str(), cd.status.c_str(), cd.chatId.c_str(), 
-                  //        cd.isConnected ? "true" : "false");
-                
-                // 写入 peerInfoMap
-                if (cd.type == "friend") {
-                    std::string key = "friend_" + std::to_string(cd.id);
-                    peerInfoMap[key].name = cd.name;
-                    peerInfoMap[key].peerNumber = cd.id;
-                    peerInfoMap[key].publicKey = cd.chatId;
-                    peerInfoMap[key].iconUrl = cd.iconUrl;
-                    peerInfoMap[key].isSelf = false;
-                    if (cd.status == "tcp") {
-                        peerInfoMap[key].status = 1;
-                        peerInfoMap[key].statusStr = "tcp";
-                    } else if (cd.status == "udp") {
-                        peerInfoMap[key].status = 2;
-                        peerInfoMap[key].statusStr = "udp";
-                    } else {
-                        peerInfoMap[key].status = 0;
-                        peerInfoMap[key].statusStr = "none";
-                    }
+            if (evt->loadedMask & PartialDataEvent::kSelf) {
+                selfInfoWidget->updateInfo(
+                    qFromUtf8(evt->selfName.c_str()),
+                    qFromUtf8(evt->selfStatusMsg.c_str()),
+                    qFromUtf8(evt->selfConnStatus.c_str()),
+                    qFromUtf8(evt->selfAddress.c_str()));
+                std::string addr = evt->selfAddress;
+                if (addr.length() >= 64) {
+                    selfPubkey = addr.substr(0, 64);
                 }
             }
-            contactListWidget->setContacts(contacts);
             
+            if (evt->loadedMask & PartialDataEvent::kContacts) {
+                for (const auto& cd : evt->contacts) {
+                    // 按 (id, type) 匹配，原地更新已有条目（如好友占位→真实数据）
+                    bool updated = false;
+                    for (auto& existing : m_accumulatedContactData) {
+                        if (existing.id == cd.id && existing.type == cd.type) {
+                            existing = cd;
+                            updated = true;
+                            break;
+                        }
+                    }
+                    if (!updated) {
+                        m_accumulatedContactData.push_back(cd);
+                    }
+                    
+                    if (cd.type == "friend") {
+                        std::string key = "friend_" + std::to_string(cd.id);
+                        peerInfoMap[key].name = cd.name;
+                        peerInfoMap[key].peerNumber = cd.id;
+                        peerInfoMap[key].publicKey = cd.chatId;
+                        peerInfoMap[key].iconUrl = cd.iconUrl;
+                        peerInfoMap[key].isSelf = false;
+                        if (cd.status == "tcp") {
+                            peerInfoMap[key].status = 1;
+                            peerInfoMap[key].statusStr = "tcp";
+                        } else if (cd.status == "udp") {
+                            peerInfoMap[key].status = 2;
+                            peerInfoMap[key].statusStr = "udp";
+                        } else {
+                            peerInfoMap[key].status = 0;
+                            peerInfoMap[key].statusStr = "none";
+                        }
+                    }
+                }
+                ContactList cl;
+                for (const auto& cd : m_accumulatedContactData) {
+                    Contact* c = new Contact();
+                    c->id = cd.id;
+                    c->name = qFromUtf8(cd.name.c_str());
+                    c->type = qFromUtf8(cd.type.c_str());
+                    c->status = qFromUtf8(cd.status.c_str());
+                    c->chat_id = qFromUtf8(cd.chatId.c_str());
+                    c->is_connected = cd.isConnected;
+                    cl.append(c);
+                }
+                contactListWidget->setContacts(cl);
+            }
+            return;
+        }
+        
+        if (e->type == ApiLoadAllData) {
             qWarning("MainWindow: initial data load complete");
+            chatWidget->loadingBar()->hideLoading(kLoadAll);
             if (ToxAPI::onLoadAllDataComplete()) {
                 ToxAPI::loadAllData();
+            }
+            return;
+        }
+
+        // 懒加载好友详情结果
+        if (e->type == ApiLoadFriendDetail) {
+            FriendDetailEvent* evt = static_cast<FriendDetailEvent*>(event);
+            chatWidget->loadingBar()->hideLoading(kLoadFriend);
+            if (evt->success) {
+                contactListWidget->updateContact(
+                    evt->friendId, "friend",
+                    qFromUtf8(evt->name.c_str()),
+                    qFromUtf8(evt->publicKey.c_str()),
+                    qFromUtf8(evt->statusStr.c_str()));
+                std::string key = "friend_" + std::to_string(evt->friendId);
+                peerInfoMap[key].name = evt->name;
+                peerInfoMap[key].peerNumber = evt->friendId;
+                peerInfoMap[key].publicKey = evt->publicKey;
+                peerInfoMap[key].iconUrl = evt->iconUrl;
+                int s = 0;
+                if (evt->statusStr == "tcp") s = 1;
+                else if (evt->statusStr == "udp") s = 2;
+                peerInfoMap[key].status = s;
+                peerInfoMap[key].statusStr = evt->statusStr;
             }
             return;
         }
@@ -301,6 +340,15 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     // 如果已经是当前选中的聊天对象，不重新加载（避免清空消息）
     if (id == currentChatId && type == currentChatType) {
         qWarning("onContactSelected: same contact, ignoring");
+        return;
+    }
+    
+    // 好友未加载详情 → 懒加载
+    if (type == "friend" && !contactListWidget->isFriendLoaded(id)) {
+        qWarning("onContactSelected: friend %d not loaded, lazy loading", id);
+        currentChatId = -1; // reset so next click won't be ignored
+        chatWidget->loadingBar()->showLoading(kLoadFriend, _("loading_contact"));
+        ToxAPI::lazyLoadFriendDetail(id);
         return;
     }
     

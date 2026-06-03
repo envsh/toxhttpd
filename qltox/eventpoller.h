@@ -44,6 +44,8 @@ enum ApiRequestType {
     ApiSetConferenceTitle,
     ApiGetRandomName,
     ApiLoadAllData,
+    ApiLoadFriendDetail,
+    ApiLoadPartialData,
 };
 
 // ── 数据类型（事件契约）──
@@ -165,6 +167,28 @@ public:
     bool success = false;
     std::string selfName, selfStatusMsg, selfConnStatus, selfAddress;
     std::vector<ContactData> contacts;
+};
+
+class PartialDataEvent : public ApiResultEvent {
+public:
+    static const int kSelf = 1;
+    static const int kContacts = 2;
+    PartialDataEvent() : ApiResultEvent(ApiLoadPartialData) {}
+    int loadedMask = 0;
+    std::string selfName, selfStatusMsg, selfConnStatus, selfAddress;
+    std::vector<ContactData> contacts;
+};
+
+class FriendDetailEvent : public ApiResultEvent {
+public:
+    FriendDetailEvent() : ApiResultEvent(ApiLoadFriendDetail) {}
+    int friendId = 0;
+    bool success = false;
+    std::string name;
+    std::string publicKey;
+    std::string statusStr;
+    std::string statusText;
+    std::string iconUrl;
 };
 
 // ── curl_multi HTTP 引擎 ──

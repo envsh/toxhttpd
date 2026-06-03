@@ -75,6 +75,7 @@ public:
     static void getRandomName();
     static void setSelfInfo(const std::string& name, const std::string& statusMessage);
     static void translate(const std::string& text, const std::string& toLang, int msgIndex);
+    static void lazyLoadFriendDetail(int friendId);
     static std::string urlEncode(const std::string& str);
 
     // Sync helper methods for dialog contexts
@@ -113,6 +114,7 @@ private:
         std::string str1;
         std::string str2;
         int n1 = 0;
+        int step = 0;
         ApiCtx() {}
         ApiCtx(int t) : type(t) {}
         ApiCtx(int t, int i) : type(t), id(i) {}

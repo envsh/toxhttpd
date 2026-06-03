@@ -55,12 +55,12 @@ static size_t syncWriteCb(void* contents, size_t size, size_t nmemb, void* userp
 }
 
 // ── LoadAllData chain ──
+static const size_t maxBatchSize = 3;
 struct LoadChain {
-    static const int kBatchSize = 3;
     AllDataLoadedEvent* result;
     int step = 0;
     std::vector<int> friendIds;
-    int friendIdx = 0;
+    size_t detailBatchIdx = 0;
     LoadChain() : result(new AllDataLoadedEvent()) {}
 };
 
@@ -281,6 +281,12 @@ void ToxAPI::translate(const std::string& text, const std::string& toLang, int m
     auto* ctx = new ApiCtx(ApiTranslate, msgIndex, text, toLang);
     std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
     request(ApiTranslate, "/api/translate", "POST", postData, ctx);
+}
+
+void ToxAPI::lazyLoadFriendDetail(int friendId) {
+    auto* ctx = new ApiCtx(ApiLoadFriendDetail, friendId);
+    request(ApiLoadFriendDetail, "/api/friend", "POST",
+            "friend_ids=" + std::to_string(friendId), ctx);
 }
 
 std::string ToxAPI::urlEncode(const std::string& str) {
@@ -777,6 +783,42 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         break;
     }
 
+    case ApiLoadFriendDetail: {
+        auto* ev = new FriendDetailEvent();
+        ev->friendId = ctx->id;
+        if (resp.httpCode != 200 || resp.body.empty()) {
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(resp.body.c_str());
+        if (!root || !cJSON_IsArray(root) || cJSON_GetArraySize(root) == 0) {
+            if (root) cJSON_Delete(root);
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* item = cJSON_GetArrayItem(root, 0);
+        if (!item) {
+            cJSON_Delete(root);
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* err = cJSON_GetObjectItem(item, "error");
+        if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0) {
+            cJSON_Delete(root);
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        ev->success = true;
+        ev->name = jsonStr(cJSON_GetObjectItem(item, "name"));
+        ev->publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
+        ev->statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+        ev->statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+        ev->iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
     case ApiLoadGroupMembers: {
         auto* ev = new MembersLoadedEvent();
         ev->contactId = ctx->id;
@@ -887,7 +929,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         if (!chain) break;
 
         switch (chain->step) {
-        case 0: { // self
+        case 0: { // self -> partial self info
             if (resp.httpCode == 200 && !resp.body.empty()) {
                 cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
@@ -898,85 +940,137 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                     cJSON_Delete(root);
                 }
             }
+            auto* partial = new PartialDataEvent();
+            partial->loadedMask = PartialDataEvent::kSelf;
+            partial->selfName = chain->result->selfName;
+            partial->selfStatusMsg = chain->result->selfStatusMsg;
+            partial->selfConnStatus = chain->result->selfConnStatus;
+            partial->selfAddress = chain->result->selfAddress;
+            QApplication::postEvent(s_target, partial);
             chain->step = 1;
             auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
             EventPoller::addRequest(buildUrl("/api/friends"), "GET", "", onHttpDone, next, 35);
             break;
         }
-        case 1: { // friend ids
+        case 1: { // friend ids -> partial contacts + skip detail batch
+            std::vector<ContactData> batch;
             if (resp.httpCode == 200 && !resp.body.empty()) {
                 cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
                     cJSON* arr = cJSON_GetObjectItem(root, "friends");
                     if (arr && cJSON_IsArray(arr)) {
                         int n = cJSON_GetArraySize(arr);
-                        for (int i = 0; i < n; ++i)
-                            chain->friendIds.push_back(cJSON_GetArrayItem(arr, i)->valueint);
+                        for (int i = 0; i < n; ++i) {
+                            int fid = cJSON_GetArrayItem(arr, i)->valueint;
+                            chain->friendIds.push_back(fid);
+                            ContactData cd;
+                            cd.id = fid;
+                            cd.type = "friend";
+                            cd.name = "";
+                            cd.status = "offline";
+                            cd.chatId = "";
+                            chain->result->contacts.push_back(cd);
+                            batch.push_back(cd);
+                        }
                     }
                     cJSON_Delete(root);
                 }
             }
-            chain->step = 2;
-            chain->friendIdx = 0;
-            if (chain->friendIds.empty()) chain->step = 3; // skip to groups
-            auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
-            if (chain->step == 3)
-                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
-            else {
-                int end = std::min(chain->friendIdx + LoadChain::kBatchSize, (int)chain->friendIds.size());
-                std::string ids;
-                for (int i = chain->friendIdx; i < end; ++i) {
-                    if (i > chain->friendIdx) ids += ",";
-                    ids += std::to_string(chain->friendIds[i]);
+            if (!batch.empty()) {
+                auto* partial = new PartialDataEvent();
+                partial->loadedMask = PartialDataEvent::kContacts;
+                partial->contacts = batch;
+                QApplication::postEvent(s_target, partial);
+            }
+            if (!chain->friendIds.empty()) {
+                chain->step = 2;
+                chain->detailBatchIdx = 0;
+                size_t total = chain->friendIds.size();
+                size_t end = maxBatchSize < total ? maxBatchSize : total;
+                std::string idsStr;
+                for (size_t i = 0; i < end; ++i) {
+                    if (i > 0) idsStr += ",";
+                    idsStr += std::to_string(chain->friendIds[i]);
                 }
-                EventPoller::addRequest(buildUrl("/api/friend"), "POST",
-                    "friend_ids=" + urlEncode(ids), onHttpDone, next, 35);
+                chain->detailBatchIdx = end;
+                auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+                std::string postData = "friend_ids=" + idsStr;
+                EventPoller::addRequest(buildUrl("/api/friend"), "POST", postData, onHttpDone, next, 35);
+            } else {
+                chain->step = 3;
+                auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
             }
             break;
         }
-        case 2: { // batch friend info
+        case 2: { // friend detail batch -> replace placeholders with real data
+            std::vector<ContactData> batch;
             if (resp.httpCode == 200 && !resp.body.empty()) {
                 cJSON* root = cJSON_Parse(resp.body.c_str());
-                if (root && cJSON_IsArray(root)) {
-                    int n = cJSON_GetArraySize(root);
-                    for (int i = 0; i < n; ++i) {
-                        cJSON* item = cJSON_GetArrayItem(root, i);
-                        if (!item) continue;
-                        cJSON* err = cJSON_GetObjectItem(item, "error");
-                        if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0)
-                            continue;
-                        ContactData cd;
-                        cJSON* v = cJSON_GetObjectItem(item, "friendId");
-                        cd.id = v ? v->valueint : 0;
-                        cd.type = "friend";
-                        cd.name = jsonStr(cJSON_GetObjectItem(item, "name"));
-                        cd.status = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
-                        cd.chatId = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
-                        cd.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
-                        cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
-                        chain->result->contacts.push_back(cd);
+                if (root) {
+                    if (cJSON_IsArray(root)) {
+                        int n = cJSON_GetArraySize(root);
+                        for (int i = 0; i < n; ++i) {
+                            cJSON* item = cJSON_GetArrayItem(root, i);
+                            if (!item) continue;
+                            cJSON* err = cJSON_GetObjectItem(item, "error");
+                            if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0) continue;
+                            ContactData cd;
+                            cJSON* v = cJSON_GetObjectItem(item, "friendId");
+                            if (!v) continue;
+                            cd.id = v->valueint;
+                            cd.type = "friend";
+                            cd.name = jsonStr(cJSON_GetObjectItem(item, "name"));
+                            cd.chatId = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
+                            cd.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
+                            std::string s = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
+                            if (s == "tcp" || s == "udp") {
+                                cd.status = s;
+                                cd.isConnected = true;
+                            } else {
+                                cd.status = "offline";
+                                cd.isConnected = false;
+                            }
+                            for (auto& rc : chain->result->contacts) {
+                                if (rc.id == cd.id && rc.type == "friend") {
+                                    rc = cd;
+                                    break;
+                                }
+                            }
+                            batch.push_back(cd);
+                        }
                     }
                     cJSON_Delete(root);
                 }
             }
-            chain->friendIdx += LoadChain::kBatchSize;
-            auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
-            if ((size_t)chain->friendIdx >= chain->friendIds.size()) {
-                chain->step = 3;
-                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
-            } else {
-                int end = std::min(chain->friendIdx + LoadChain::kBatchSize, (int)chain->friendIds.size());
-                std::string ids;
-                for (int i = chain->friendIdx; i < end; ++i) {
-                    if (i > chain->friendIdx) ids += ",";
-                    ids += std::to_string(chain->friendIds[i]);
+            if (!batch.empty()) {
+                auto* partial = new PartialDataEvent();
+                partial->loadedMask = PartialDataEvent::kContacts;
+                partial->contacts = batch;
+                QApplication::postEvent(s_target, partial);
+            }
+            size_t total = chain->friendIds.size();
+            if (chain->detailBatchIdx < total) {
+                size_t end = chain->detailBatchIdx + maxBatchSize;
+                if (end > total) end = total;
+                std::string idsStr;
+                for (size_t i = chain->detailBatchIdx; i < end; ++i) {
+                    if (i > chain->detailBatchIdx) idsStr += ",";
+                    idsStr += std::to_string(chain->friendIds[i]);
                 }
-                EventPoller::addRequest(buildUrl("/api/friend"), "POST",
-                    "friend_ids=" + urlEncode(ids), onHttpDone, next, 35);
+                chain->detailBatchIdx = end;
+                auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+                std::string postData = "friend_ids=" + idsStr;
+                EventPoller::addRequest(buildUrl("/api/friend"), "POST", postData, onHttpDone, next, 35);
+            } else {
+                chain->step = 3;
+                auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
+                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
             }
             break;
         }
-        case 3: { // groups
+        case 3: { // groups -> partial contacts
+            std::vector<ContactData> batch;
             if (resp.httpCode == 200 && !resp.body.empty()) {
                 cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
@@ -996,17 +1090,25 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                             cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
                             cd.type = "group";
                             chain->result->contacts.push_back(cd);
+                            batch.push_back(cd);
                         }
                     }
                     cJSON_Delete(root);
                 }
+            }
+            if (!batch.empty()) {
+                auto* partial = new PartialDataEvent();
+                partial->loadedMask = PartialDataEvent::kContacts;
+                partial->contacts = batch;
+                QApplication::postEvent(s_target, partial);
             }
             chain->step = 4;
             auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
             EventPoller::addRequest(buildUrl("/api/conferences"), "GET", "", onHttpDone, next, 35);
             break;
         }
-        case 4: { // conferences -> done
+        case 4: { // conferences -> partial contacts + all done
+            std::vector<ContactData> batch;
             if (resp.httpCode == 200 && !resp.body.empty()) {
                 cJSON* root = cJSON_Parse(resp.body.c_str());
                 if (root) {
@@ -1026,10 +1128,17 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                             cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
                             cd.type = "conference";
                             chain->result->contacts.push_back(cd);
+                            batch.push_back(cd);
                         }
                     }
                     cJSON_Delete(root);
                 }
+            }
+            if (!batch.empty()) {
+                auto* partial = new PartialDataEvent();
+                partial->loadedMask = PartialDataEvent::kContacts;
+                partial->contacts = batch;
+                QApplication::postEvent(s_target, partial);
             }
             chain->result->success = true;
             QApplication::postEvent(s_target, chain->result);

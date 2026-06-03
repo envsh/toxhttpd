@@ -32,6 +32,9 @@ public:
     void clear();
     void updateFriendName(int friendId, const QString& newName);
     void updateFriendConnectionStatus(int friendId, const QString& newStatus);
+    void updateContact(int id, const QString& type, const QString& name,
+                       const QString& chatId, const QString& status);
+    bool isFriendLoaded(int friendId);
     void retranslateUi();
     
     signals:

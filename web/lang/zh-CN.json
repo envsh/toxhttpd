@@ -1,5 +1,7 @@
 {
     "app_title": "Tox Chat",
+    "loading_data": "正在加载数据",
+    "loading_contact": "正在加载联系人",
     "no_contacts": "暂无联系人",
     "chat_with_friend": "与好友 {0} 聊天",
     "group": {

@@ -130,6 +130,33 @@ void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
 #endif
 }
 
+void ContactListWidget::updateContact(int id, const QString& type, const QString& name,
+                                       const QString& chatId, const QString& status) {
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == id && c->type == type) {
+            if (!name.isEmpty()) c->name = name;
+            if (!chatId.isEmpty()) c->chat_id = chatId;
+            if (!status.isEmpty()) c->status = status;
+            break;
+        }
+    }
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
+bool ContactListWidget::isFriendLoaded(int friendId) {
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == friendId && c->type == "friend") {
+            return !c->chat_id.isEmpty();
+        }
+    }
+    return false;
+}
+
 void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString& newStatus) {
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);

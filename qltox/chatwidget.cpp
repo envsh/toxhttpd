@@ -14,7 +14,11 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     QBoxLayout* headerLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     headerText = new QLabel(_("select_chat_object"), this);
     headerLayout->addWidget(headerText, 1);
-    
+
+    // 加载状态条（语言选择器左侧）
+    m_loadingBar = new LoadingBar(this);
+    headerLayout->addWidget(m_loadingBar, 0);
+
     // 语言选择器
     langSelector = new QComboBox(this);
 #ifdef QT3_BUILD

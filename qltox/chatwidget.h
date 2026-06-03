@@ -11,6 +11,7 @@
 #include "emojiwidgets.h"
 #include "emoji_picker.h"
 #include "StyleParams.h"
+#include "loadingbar.h"
 #include <string>
 
 class ChatWidget : public QWidget {
@@ -47,7 +48,10 @@ private slots:
 public slots:
     void onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage);
 
+    LoadingBar* loadingBar() { return m_loadingBar; }
+
 private:
+    LoadingBar* m_loadingBar;
     QLabel* headerText;
     QComboBox* langSelector;
     QComboBox* m_styleSelector;

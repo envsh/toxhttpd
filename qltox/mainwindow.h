@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <map>
+#include <vector>
 #include "compat34.h"
 #include <qmainwindow.h>
 #include <qsplitter.h>
@@ -58,6 +59,13 @@ private:
     
     int currentChatId;
     QString currentChatType;
+
+    // loading ID 常量
+    static const int kLoadAll = 1;
+    static const int kLoadFriend = 2;
+
+    // 增量累积的 contacts（值类型，避免指针所有权混乱）
+    std::vector<ContactData> m_accumulatedContactData;
 };
 
 #endif // MAINWINDOW_H
