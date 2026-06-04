@@ -110,4 +110,6 @@ void qSetLabelSelectable(QLabel* label);
 // ========== 活动窗口检测 ==========
 bool qIsAppActive(const QWidget* widget = 0);
 
+void qOpenUrl(const QString& url);
+
 #endif  // COMPAT34_H

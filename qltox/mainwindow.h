@@ -46,6 +46,7 @@ public:
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void onMenu1Stub();
     void onMenu2Stub();
+    void openHomePage();
     
 private:
     FramelessHelper* framelessHelper;

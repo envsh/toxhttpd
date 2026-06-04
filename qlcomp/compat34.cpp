@@ -358,3 +358,24 @@ bool qIsAppActive(const QWidget* widget) {
     }
     return qApp->activeWindow() != 0;
 }
+
+// ========== URL 打开兼容 ==========
+#ifdef QT3_BUILD
+#include <qprocess.h>
+void qOpenUrl(const QString& url) {
+    QProcess* proc = new QProcess;
+#if defined(Q_OS_WIN32)
+    proc->launch(QString("cmd /c start \"\" \"" + url + "\""));
+#elif defined(Q_OS_MACX)
+    proc->launch(QString("open \"" + url + "\""));
+#else
+    proc->launch(QString("xdg-open \"" + url + "\""));
+#endif
+}
+#else
+#include <QDesktopServices>
+#include <QUrl>
+void qOpenUrl(const QString& url) {
+    QDesktopServices::openUrl(QUrl(url));
+}
+#endif

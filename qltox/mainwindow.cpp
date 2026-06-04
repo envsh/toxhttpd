@@ -188,6 +188,8 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
 
     MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));
+    EmbeddedMenuBar::addItem(help, _("menu.homepage"), this, SLOT(openHomePage()));
+    EmbeddedMenuBar::addItem(help, _("menu.aboutqt"), qApp, SLOT(aboutQt()));
     EmbeddedMenuBar::addItem(help, qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
 
     mb->finalize();
@@ -1281,4 +1283,8 @@ void MainWindow::onMenu1Stub() {
 
 void MainWindow::onMenu2Stub() {
     qWarning("onMenu2Stub: not implemented yet");
+}
+
+void MainWindow::openHomePage() {
+    qOpenUrl("https://github.com/envsh/toxhttpd");
 }
