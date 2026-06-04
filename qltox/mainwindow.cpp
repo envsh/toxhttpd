@@ -17,6 +17,7 @@
 #include <qinputdialog.h>
 #include "placeholderlineedit.h"
 #include "sound.h"
+#include <qfile.h>
 #include "toastwidget.h"
 
 // 读取保存的语言设置
@@ -30,6 +31,20 @@ static QString loadSavedLanguage() {
         if (!lang.isEmpty()) return lang;
     }
     return "zh-CN"; // 默认简体
+}
+
+static void playNotificationSound() {
+    const char* paths[] = {
+        "sound/notification.s16le.pcm",
+        "web/sound/notification.s16le.pcm",
+        "../web/sound/notification.s16le.pcm"
+    };
+    for (int i = 0; i < 3; i++) {
+        if (QFile::exists(paths[i])) {
+            playSoundNopcm(paths[i]);
+            return;
+        }
+    }
 }
 
 // 保存语言设置
@@ -293,9 +308,19 @@ void MainWindow::customEvent(CustomEventBase* event) {
         if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage || e->type == ApiSendGroupMessage) {
             MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);
             chatWidget->loadingBar()->hideLoading(kLoadSendMsg);
-            if (!evt->success) {
-                QMessageBox::warning(this, _("send_failed"), _("send_failed"));
+            QString targetName;
+            for (const auto& cd : m_accumulatedContactData) {
+                if (cd.id == evt->chatId && cd.type == evt->chatType) {
+                    targetName = qFromUtf8(cd.name);
+                    break;
+                }
             }
+            if (targetName.isEmpty())
+                targetName = qFromUtf8(evt->chatType) + " " + QString::number(evt->chatId);
+            if (!evt->success)
+                ToastWidget::show(chatWidget, _("send_failed").arg(targetName), 8000);
+            else
+                ToastWidget::show(chatWidget, _("send_success").arg(targetName), 2000);
             return;
         }
         
@@ -471,7 +496,7 @@ void MainWindow::handleEvents(const EventList& events) {
                                          friendId, getCurrentTime());
                     }
                     if (!qIsAppActive())
-                        playSoundNopcm("../web/sound/notification.s16le.pcm");
+                        playNotificationSound();
                 }
                 cJSON_Delete(root);
             }
@@ -534,7 +559,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
                     if (!qIsAppActive())
-                        playSoundNopcm("../web/sound/notification.s16le.pcm");
+                        playNotificationSound();
                 } else {
                     qWarning("conference_message: missing confNumber or message");
                 }
@@ -592,7 +617,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime(), "", "", ipAddress);
                     }
                     if (!qIsAppActive())
-                        playSoundNopcm("../web/sound/notification.s16le.pcm");
+                        playNotificationSound();
                 }
                 cJSON_Delete(root);
             }

@@ -17,7 +17,7 @@ ToastWidget::ToastWidget(QWidget* parent, const QString& text, int durationMs)
 #ifndef QT3_BUILD
     setAttribute(Qt::WA_DeleteOnClose);
 #endif
-    setFixedSize(200, 36);
+    setFixedSize(300, 36);
     m_timerId = startTimer(durationMs);
 }
 
