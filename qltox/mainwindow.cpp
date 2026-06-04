@@ -359,6 +359,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 ToastWidget::show(chatWidget, _("load_messages_failed").arg(formatElapsedMs(evt->elapsedMs)), 8000);
                 return;
             }
+            if (evt->messages.empty()) {
+                ToastWidget::show(chatWidget, _("load_messages_empty").arg(formatElapsedMs(evt->elapsedMs)), 2000);
+                return;
+            }
             if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
                 qWarning("MessageHistoryLoaded: %d messages for %s %d", (int)evt->messages.size(), evt->contactType.c_str(), evt->contactId);
                 chatWidget->clearMessages();

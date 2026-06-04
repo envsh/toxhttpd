@@ -93,6 +93,7 @@
     "please_wait": "请等待加载完成",
     "load_failed": "加载失败",
     "load_messages_failed": "加载消息失败（%1）",
+    "load_messages_empty": "没有历史消息（%1）",
     "load_contacts_failed": "加载联系人失败",
     "conference": {
         "invitation_received": "收到会议邀请",

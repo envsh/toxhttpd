@@ -659,6 +659,9 @@ func (m *Midapi) MessageHistory(chanid, contactType string) ([]MessageRecord, er
 
 	var chanidInt int64
 	err := m.ctx.DB.QueryRow("SELECT pkid FROM pubkey_ids WHERE pubkey = ?", chanid).Scan(&chanidInt)
+	if err == sql.ErrNoRows {
+		return make([]MessageRecord, 0), nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("invalid chanid")
 	}

@@ -93,6 +93,7 @@
     "please_wait": "Please wait for loading",
     "load_failed": "Load failed",
     "load_messages_failed": "Failed to load messages (%1)",
+    "load_messages_empty": "No messages (%1)",
     "load_contacts_failed": "Failed to load contacts",
     "conference": {
         "invitation_received": "Conference invitation received",
