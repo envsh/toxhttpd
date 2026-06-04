@@ -17,7 +17,10 @@ HEADERS = mainwindow.h restapi.h eventpoller.h \
             friendinfodialog.h memberlistdialog.h logindialog.h \
             messageinput.h sound.h loadingbar.h
             
-include(qlite.pri)
+include(../qlcomp/qlite.pri)
+
+# 使 qltox/ 中的 #include "compat34.h" 能找到 qlcomp/
+INCLUDEPATH += ../qlcomp
 
 # moc 处理
 MOC_DIR = .
