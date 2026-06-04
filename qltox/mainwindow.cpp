@@ -47,6 +47,12 @@ static void playNotificationSound() {
     }
 }
 
+static QString formatElapsedMs(int64_t ms) {
+    if (ms < 1000)
+        return QString::number((int)ms) + "ms";
+    return QString::number((int)(ms / 1000)) + "." + QString::number((int)((ms % 1000) / 100)) + "s";
+}
+
 // 保存语言设置
 static void saveLanguage(const QString& lang) {
     QString home = qGetHomePath();
@@ -318,9 +324,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
             if (targetName.isEmpty())
                 targetName = qFromUtf8(evt->chatType) + " " + QString::number(evt->chatId);
             if (!evt->success)
-                ToastWidget::show(chatWidget, _("send_failed").arg(targetName), 8000);
+                ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
             else
-                ToastWidget::show(chatWidget, _("send_success").arg(targetName), 2000);
+                ToastWidget::show(chatWidget, _("send_success").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 2000);
             return;
         }
         
@@ -350,7 +356,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
             MessageHistoryLoadedEvent* evt = static_cast<MessageHistoryLoadedEvent*>(event);
             chatWidget->loadingBar()->hideLoading(kLoadMessages);
             if (!evt->success) {
-                ToastWidget::show(chatWidget, _("load_messages_failed"), 8000);
+                ToastWidget::show(chatWidget, _("load_messages_failed").arg(formatElapsedMs(evt->elapsedMs)), 8000);
                 return;
             }
             if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
