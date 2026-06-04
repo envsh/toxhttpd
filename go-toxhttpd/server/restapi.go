@@ -591,6 +591,15 @@ func (h *Restapi) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
+		h.handleNDEvents(w, r)
+		return
+	}
+
+	h.handleHugeEvents(w, r)
+}
+
+func (h *Restapi) handleHugeEvents(w http.ResponseWriter, r *http.Request) {
 	after := r.URL.Query().Get("after")
 	var afterID uint64
 	fmt.Sscanf(after, "%d", &afterID)
