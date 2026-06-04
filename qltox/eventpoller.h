@@ -110,8 +110,9 @@ public:
 
 class ApiResultEvent : public CustomEventBase {
 public:
-    ApiResultEvent(ApiRequestType t) : CustomEventBase(ApiResultReadyType), type(t) {}
+    ApiResultEvent(ApiRequestType t) : CustomEventBase(ApiResultReadyType), type(t), elapsedMs(0) {}
     ApiRequestType type;
+    int64_t elapsedMs = 0;   // HTTP 请求耗时，单位毫秒
 };
 
 class SelfInfoResultEvent : public ApiResultEvent {
@@ -200,6 +201,7 @@ struct HttpResponse {
     std::string curlErrStr;
     std::string body;
     std::map<std::string, std::string> headers;
+    int64_t elapsedMs = 0;   // 请求耗时，单位毫秒
 };
 
 struct HttpCtx {

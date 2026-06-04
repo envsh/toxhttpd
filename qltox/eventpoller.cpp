@@ -108,6 +108,9 @@ void EventPoller::run() {
                     resp.curlErrStr = curl_easy_strerror((CURLcode)curlResult);
                 resp.body = std::move(ctx->body);
                 resp.headers = std::move(ctx->headers);
+                double totalTime = 0.0;
+                curl_easy_getinfo(msg->easy_handle, CURLINFO_TOTAL_TIME, &totalTime);
+                resp.elapsedMs = (int64_t)(totalTime * 1000);
                 ctx->done(resp, ctx->udata);
                 delete ctx;
                 curl_multi_remove_handle(multi, msg->easy_handle);

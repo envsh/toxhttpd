@@ -699,6 +699,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiGetSelf: {
         auto* ev = new SelfInfoResultEvent();
+        ev->elapsedMs = resp.elapsedMs;
         if (resp.httpCode != 200 || resp.body.empty()) {
             ev->success = false;
             QApplication::postEvent(s_target, ev);
@@ -718,6 +719,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiGetFriends: {
         auto* ev = new FriendsResultEvent();
+        ev->elapsedMs = resp.elapsedMs;
         if (resp.httpCode != 200 || resp.body.empty()) {
             QApplication::postEvent(s_target, ev);
             break;
@@ -741,6 +743,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
     case ApiSendConferenceMessage:
     case ApiSendGroupMessage: {
         auto* ev = new MessageSentResultEvent((ApiRequestType)type);
+        ev->elapsedMs = resp.elapsedMs;
         ev->success = (resp.httpCode == 200 && !resp.body.empty());
         ev->chatId = ctx->id;
         ev->message = ctx->str1;
@@ -773,18 +776,21 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiJoinConference: {
         auto* ev = new ApiResultEvent(ApiJoinConference);
+        ev->elapsedMs = resp.elapsedMs;
         QApplication::postEvent(s_target, ev);
         break;
     }
 
     case ApiGetRandomName: {
         auto* ev = new ApiResultEvent(ApiGetRandomName);
+        ev->elapsedMs = resp.elapsedMs;
         QApplication::postEvent(s_target, ev);
         break;
     }
 
     case ApiLoadFriendDetail: {
         auto* ev = new FriendDetailEvent();
+        ev->elapsedMs = resp.elapsedMs;
         ev->friendId = ctx->id;
         if (resp.httpCode != 200 || resp.body.empty()) {
             QApplication::postEvent(s_target, ev);
@@ -821,6 +827,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiLoadGroupMembers: {
         auto* ev = new MembersLoadedEvent();
+        ev->elapsedMs = resp.elapsedMs;
         ev->contactId = ctx->id;
         ev->contactType = ctx->str1;
         if (resp.httpCode != 200 || resp.body.empty()) {
@@ -865,6 +872,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiLoadMessageHistory: {
         auto* ev = new MessageHistoryLoadedEvent();
+        ev->elapsedMs = resp.elapsedMs;
         ev->contactId = ctx->id;
         ev->contactType = ctx->str1;
         if (resp.httpCode != 200 || resp.body.empty()) {
@@ -904,6 +912,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiTranslate: {
         auto* ev = new TranslateResultEvent();
+        ev->elapsedMs = resp.elapsedMs;
         ev->msgIndex = ctx->id;
         if (resp.httpCode != 200 || resp.body.empty()) {
             ev->errorMessage = "NETWORK_ERROR: cannot connect to server";
@@ -947,6 +956,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 }
             }
             auto* partial = new PartialDataEvent();
+            partial->elapsedMs = resp.elapsedMs;
             partial->loadedMask = PartialDataEvent::kSelf;
             partial->selfName = chain->result->selfName;
             partial->selfStatusMsg = chain->result->selfStatusMsg;
@@ -984,6 +994,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             }
             if (!batch.empty()) {
                 auto* partial = new PartialDataEvent();
+                partial->elapsedMs = resp.elapsedMs;
                 partial->loadedMask = PartialDataEvent::kContacts;
                 partial->contacts = batch;
                 QApplication::postEvent(s_target, partial);
@@ -1051,6 +1062,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             }
             if (!batch.empty()) {
                 auto* partial = new PartialDataEvent();
+                partial->elapsedMs = resp.elapsedMs;
                 partial->loadedMask = PartialDataEvent::kContacts;
                 partial->contacts = batch;
                 QApplication::postEvent(s_target, partial);
@@ -1104,6 +1116,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             }
             if (!batch.empty()) {
                 auto* partial = new PartialDataEvent();
+                partial->elapsedMs = resp.elapsedMs;
                 partial->loadedMask = PartialDataEvent::kContacts;
                 partial->contacts = batch;
                 QApplication::postEvent(s_target, partial);
@@ -1142,11 +1155,13 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             }
             if (!batch.empty()) {
                 auto* partial = new PartialDataEvent();
+                partial->elapsedMs = resp.elapsedMs;
                 partial->loadedMask = PartialDataEvent::kContacts;
                 partial->contacts = batch;
                 QApplication::postEvent(s_target, partial);
             }
             chain->result->success = true;
+            chain->result->elapsedMs = resp.elapsedMs;
             QApplication::postEvent(s_target, chain->result);
             delete chain;
             break;
