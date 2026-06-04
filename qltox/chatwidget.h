@@ -26,6 +26,9 @@ public:
                     const QString& avatarUrl = "",
                     const QString& ipAddress = "");
     void clearMessages();
+    int messageCount() const;
+    ChatMessage messageAt(int index) const;
+    void appendMessage(const ChatMessage& msg);
     void retranslateUi();
     
 signals:

@@ -868,11 +868,17 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->contactId = ctx->id;
         ev->contactType = ctx->str1;
         if (resp.httpCode != 200 || resp.body.empty()) {
+            ev->errorMessage = "NETWORK_ERROR";
             QApplication::postEvent(s_target, ev);
             break;
         }
         cJSON* root = cJSON_Parse(resp.body.c_str());
-        if (!root) { QApplication::postEvent(s_target, ev); break; }
+        if (!root) {
+            ev->errorMessage = "PARSE_ERROR";
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        ev->success = true;
         cJSON* msgsItem = cJSON_GetObjectItem(root, "messages");
         if (msgsItem && cJSON_IsArray(msgsItem)) {
             int n = cJSON_GetArraySize(msgsItem);

@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <utility>
 #include "compat34.h"
 #include <qmainwindow.h>
 #include <qsplitter.h>
@@ -69,6 +70,9 @@ private:
 
     // 增量累积的 contacts（值类型，避免指针所有权混乱）
     std::vector<ContactData> m_accumulatedContactData;
+
+    // 消息缓存：key=(contactId, contactType)，切换联系人时暂存/恢复
+    std::map<std::pair<int, std::string>, std::vector<ChatMessage>> m_messageCache;
 };
 
 #endif // MAINWINDOW_H

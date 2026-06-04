@@ -17,6 +17,7 @@
 #include <qinputdialog.h>
 #include "placeholderlineedit.h"
 #include "sound.h"
+#include "toastwidget.h"
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
@@ -323,8 +324,13 @@ void MainWindow::customEvent(CustomEventBase* event) {
         if (e->type == ApiLoadMessageHistory) {
             MessageHistoryLoadedEvent* evt = static_cast<MessageHistoryLoadedEvent*>(event);
             chatWidget->loadingBar()->hideLoading(kLoadMessages);
+            if (!evt->success) {
+                ToastWidget::show(chatWidget, _("load_messages_failed"), 8000);
+                return;
+            }
             if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
                 qWarning("MessageHistoryLoaded: %d messages for %s %d", (int)evt->messages.size(), evt->contactType.c_str(), evt->contactId);
+                chatWidget->clearMessages();
                 renderHistoryMessages(evt->messages);
             }
             return;
@@ -357,6 +363,16 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         return;
     }
     
+    // 保存当前联系人的消息到缓存
+    if (currentChatId != -1 && !currentChatType.isEmpty()) {
+        auto key = std::make_pair(currentChatId, std::string(qToUtf8(currentChatType).data()));
+        std::vector<ChatMessage> msgs;
+        int n = chatWidget->messageCount();
+        for (int i = 0; i < n; ++i)
+            msgs.push_back(chatWidget->messageAt(i));
+        m_messageCache[key] = std::move(msgs);
+    }
+    
     qWarning("onContactSelected: id=%d, type=%s", id, qToUtf8(type).data());
     currentChatId = id;
     currentChatType = type;
@@ -375,11 +391,25 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     }
     
     chatWidget->setHeaderText(headerText);
-    chatWidget->clearMessages();
     
-    // 异步加载历史消息
-    chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
-    ToxAPI::getMessagesHistory(id, std::string(qToUtf8(type).data()));
+    std::string typeStr = std::string(qToUtf8(type).data());
+    auto key = std::make_pair(id, typeStr);
+    auto cacheIt = m_messageCache.find(key);
+    bool hasCache = (cacheIt != m_messageCache.end());
+    
+    if (hasCache) {
+        // 缓存命中：恢复缓存消息，同时后台拉取刷新
+        chatWidget->clearMessages();
+        for (const auto& msg : cacheIt->second)
+            chatWidget->appendMessage(msg);
+        chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
+        ToxAPI::getMessagesHistory(id, typeStr);
+    } else {
+        // 缓存未命中：显示 loading 并拉取
+        chatWidget->clearMessages();
+        chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
+        ToxAPI::getMessagesHistory(id, typeStr);
+    }
     
     // 异步预加载成员列表到 peerInfoMap 缓存
     if (type == "group") {

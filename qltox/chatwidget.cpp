@@ -149,6 +149,18 @@ void ChatWidget::clearMessages() {
     messageArea->clearMessages();
 }
 
+int ChatWidget::messageCount() const {
+    return messageArea->messageCount();
+}
+
+ChatMessage ChatWidget::messageAt(int index) const {
+    return messageArea->messageAt(index);
+}
+
+void ChatWidget::appendMessage(const ChatMessage& msg) {
+    messageArea->appendMessage(msg);
+}
+
 void ChatWidget::onSendClicked() {
     if (inputEdit->placeholderText().length() > 0) {
 #ifdef QT3_BUILD

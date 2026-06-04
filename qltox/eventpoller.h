@@ -149,6 +149,8 @@ public:
     MessageHistoryLoadedEvent() : ApiResultEvent(ApiLoadMessageHistory) {}
     int contactId = 0;
     std::string contactType;
+    bool success = false;
+    std::string errorMessage;
     std::vector<HistoryMessage> messages;
 };
 
