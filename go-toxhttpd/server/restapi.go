@@ -36,6 +36,7 @@ func (h *Restapi) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/conferences/ignore", corsMiddleware(loggingMiddleware(h.handleConferenceIgnore)))
 	mux.HandleFunc("/api/bootstrap", corsMiddleware(loggingMiddleware(h.handleBootstrap)))
 	mux.HandleFunc("/api/events", corsMiddleware(loggingMiddleware(h.handleEvents)))
+	mux.HandleFunc("/api/ndevents", corsMiddleware(loggingMiddleware(h.handleNDEvents)))
 	mux.HandleFunc("/api/messages/history", corsMiddleware(loggingMiddleware(h.handleMessageHistory)))
 	mux.HandleFunc("/", corsMiddleware(loggingMiddleware(h.handleWeb)))
 	mux.HandleFunc("/api/groups/join", corsMiddleware(loggingMiddleware(h.handleGroupJoin)))
@@ -628,6 +629,61 @@ func (h *Restapi) handleEvents(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("X-Server-Next-Id", strconv.FormatUint(nextID, 10))
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(events)
+				return
+			}
+		}
+	}
+}
+
+// ── NDJSON Events (newline-delimited JSON, same long-poll logic) ──
+
+func (h *Restapi) handleNDEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	after := r.URL.Query().Get("after")
+	var afterID uint64
+	fmt.Sscanf(after, "%d", &afterID)
+	if afterID > 0 {
+		afterID++
+	}
+
+	if afterID > 0 {
+		events, nextID := h.m.EventsPoll(afterID)
+		if len(events) > 0 {
+			w.Header().Set("X-Server-Next-Id", strconv.FormatUint(nextID, 10))
+			w.Header().Set("Content-Type", "application/x-ndjson")
+			for _, e := range events {
+				b, _ := json.Marshal(e)
+				w.Write(b)
+				w.Write([]byte("\n"))
+			}
+			return
+		}
+	}
+
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	for {
+		select {
+		case <-timeout:
+			_, nextID := h.m.EventsPoll(afterID)
+			w.Header().Set("X-Server-Next-Id", strconv.FormatUint(nextID, 10))
+			return
+		case <-ticker.C:
+			events, nextID := h.m.EventsPoll(afterID)
+			if len(events) > 0 {
+				w.Header().Set("X-Server-Next-Id", strconv.FormatUint(nextID, 10))
+				for _, e := range events {
+					b, _ := json.Marshal(e)
+					w.Write(b)
+					w.Write([]byte("\n"))
+				}
 				return
 			}
 		}
