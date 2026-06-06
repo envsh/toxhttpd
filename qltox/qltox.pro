@@ -73,7 +73,7 @@ LIBS += $$system(pkg-config --libs openal 2>/dev/null)
 FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
 !isEmpty(FREETYPE_LIBS) {
     QMAKE_CXXFLAGS += $$system(pkg-config --cflags freetype2 2>/dev/null)
-    LIBS += -lcurl -lopenal $$FREETYPE_LIBS
+    LIBS += -lcurl -lopenal -ldl $$FREETYPE_LIBS
     message("FreeType2: detected via pkg-config")
 } else {
     INCLUDEPATH += /usr/include/freetype2
