@@ -204,6 +204,22 @@ struct HttpResponse {
     int64_t elapsedMs = 0;   // 请求耗时，单位毫秒
 };
 
+struct HttpRequest {
+    std::string url;
+    std::string method;
+    std::string data;
+    int timeoutSec;
+    std::map<std::string, std::string> extraHeaders;
+
+    HttpRequest() : method("GET"), timeoutSec(35) {}
+    HttpRequest(std::string url, std::string method = "GET",
+                std::string data = "", int timeoutSec = 35,
+                std::map<std::string, std::string> extraHeaders = {})
+        : url(std::move(url)), method(std::move(method)),
+          data(std::move(data)), timeoutSec(timeoutSec),
+          extraHeaders(std::move(extraHeaders)) {}
+};
+
 struct HttpCtx {
     std::string urlStr;
     std::string postData;
@@ -218,13 +234,9 @@ class EventPoller : public QThread {
 public:
     static void start();
     static void stop();
-    static void addRequest(const std::string& url,
-                           const std::string& method,
-                           const std::string& data,
+    static void addRequest(const HttpRequest& req,
                            void (*done)(const HttpResponse& resp, void* udata),
-                           void* udata = nullptr,
-                           int timeoutSec = 35,
-                           const std::map<std::string, std::string>& extraHeaders = {});
+                           void* udata = nullptr);
 
 private:
     EventPoller();

@@ -53,18 +53,15 @@ void EventPoller::stop() {
     s_instance = nullptr;
 }
 
-void EventPoller::addRequest(const std::string& url,
-                              const std::string& method,
-                              const std::string& data,
+void EventPoller::addRequest(const HttpRequest& req,
                               void (*done)(const HttpResponse& resp, void* udata),
-                              void* udata, int timeoutSec,
-                              const std::map<std::string, std::string>& extraHeaders) {
+                              void* udata) {
     if (!s_instance || !s_instance->multi) return;
 
     CURL* easy = curl_easy_init();
     if (!easy) return;
 
-    auto* ctx = new HttpCtx{std::string(url), std::string(data),
+    auto* ctx = new HttpCtx{req.url, req.data,
                              std::string(), std::map<std::string, std::string>(),
                              nullptr, done, udata};
 
@@ -74,16 +71,16 @@ void EventPoller::addRequest(const std::string& url,
     curl_easy_setopt(easy, CURLOPT_WRITEDATA, &ctx->body);
     curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, headerCb);
     curl_easy_setopt(easy, CURLOPT_HEADERDATA, &ctx->headers);
-    curl_easy_setopt(easy, CURLOPT_TIMEOUT, (long)timeoutSec);
+    curl_easy_setopt(easy, CURLOPT_TIMEOUT, (long)req.timeoutSec);
     curl_easy_setopt(easy, CURLOPT_TCP_KEEPALIVE, 1L);
 
-    if (method == "POST") {
+    if (req.method == "POST") {
         curl_easy_setopt(easy, CURLOPT_POSTFIELDS, ctx->postData.c_str());
         curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long)ctx->postData.size());
     }
 
-    if (!extraHeaders.empty()) {
-        for (const auto& h : extraHeaders) {
+    if (!req.extraHeaders.empty()) {
+        for (const auto& h : req.extraHeaders) {
             std::string hv = h.first + ": " + h.second;
             ctx->requestHeaders = curl_slist_append(ctx->requestHeaders, hv.c_str());
         }

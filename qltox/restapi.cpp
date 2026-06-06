@@ -138,12 +138,14 @@ static bool parseEventsNdjson(const std::string& body, uint64_t& lastId, std::ve
     return ok;
 }
 
-void ToxAPI::request(ApiRequestType type, const std::string& endpoint,
-                      const std::string& method, const std::string& data,
-                      ApiCtx* ctx, int timeoutSec) {
-    std::string url = buildUrl(endpoint);
-    if (!ctx) ctx = new ApiCtx(type);
-    EventPoller::addRequest(url, method, data, onHttpDone, ctx, timeoutSec);
+void ToxAPI::request(const HttpRequest& req, ApiCtx* ctx) {
+    HttpRequest r = req;
+    r.url = buildUrl(req.url);
+    EventPoller::addRequest(r, onHttpDone, ctx);
+}
+
+void ToxAPI::request(ApiRequestType type, const HttpRequest& req) {
+    request(req, new ApiCtx(type));
 }
 
 void ToxAPI::onHttpDone(const HttpResponse& resp, void* udata) {
@@ -171,9 +173,9 @@ void ToxAPI::stopPollEvent() {
 
 void ToxAPI::pollEvents() {
     EventPoller::addRequest(
-        buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-        "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
-        {{"Accept", "application/x-ndjson"}});
+        {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+         "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
+        onHttpDone, new ApiCtx(ApiPollEvents));
 }
 
 void ToxAPI::loadAllData() {
@@ -185,7 +187,7 @@ void ToxAPI::loadAllData() {
     auto* chain = new LoadChain();
     auto* ctx = new ApiCtx(ApiLoadAllData);
     ctx->ptr = chain;
-    EventPoller::addRequest(buildUrl("/api/self"), "GET", "", onHttpDone, ctx, 35);
+    EventPoller::addRequest({buildUrl("/api/self"), "GET", "", 35}, onHttpDone, ctx);
 }
 
 bool ToxAPI::onLoadAllDataComplete() {
@@ -198,87 +200,86 @@ bool ToxAPI::onLoadAllDataComplete() {
 }
 
 void ToxAPI::getSelf() {
-    request(ApiGetSelf, "/api/self", "GET");
+    request(ApiGetSelf, {"/api/self", "GET"});
 }
 
 void ToxAPI::getFriends() {
-    request(ApiGetFriends, "/api/friends", "GET");
+    request(ApiGetFriends, {"/api/friends", "GET"});
 }
 
 void ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
     auto* ctx = new ApiCtx(ApiSendFriendMessage, friendId, message);
-    request(ApiSendFriendMessage, "/api/messages", "POST",
-            "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message), ctx);
+    request({"/api/messages", "POST",
+            "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message)}, ctx);
 }
 
 void ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
     auto* ctx = new ApiCtx(ApiSendConferenceMessage, conferenceId, message);
-    request(ApiSendConferenceMessage, "/api/conference_messages", "POST",
-            "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message), ctx);
+    request({"/api/conference_messages", "POST",
+            "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message)}, ctx);
 }
 
 void ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
     auto* ctx = new ApiCtx(ApiSendGroupMessage, groupId, message);
-    request(ApiSendGroupMessage, "/api/group_messages", "POST",
-            "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message), ctx);
+    request({"/api/group_messages", "POST",
+            "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message)}, ctx);
 }
 
 void ToxAPI::addFriend(const std::string& publicKey) {
-    request(ApiAddFriend, "/api/friends", "POST",
-            "public_key=" + urlEncode(publicKey));
+    request(ApiAddFriend, {"/api/friends", "POST",
+            "public_key=" + urlEncode(publicKey)});
 }
 
 void ToxAPI::deleteFriend(int friendId) {
-    request(ApiDeleteFriend, "/api/friend_delete", "POST",
-            "friend_id=" + std::to_string(friendId));
+    request(ApiDeleteFriend, {"/api/friend_delete", "POST",
+            "friend_id=" + std::to_string(friendId)});
 }
 
 void ToxAPI::getGroupMembers(int groupId) {
     auto* ctx = new ApiCtx(ApiLoadGroupMembers, groupId, "group");
-    request(ApiLoadGroupMembers, "/api/group/members?group_number="
-            + std::to_string(groupId), "GET", "", ctx);
+    request({"/api/group/members?group_number="
+            + std::to_string(groupId), "GET", ""}, ctx);
 }
 
 void ToxAPI::getConferenceMembers(int confId) {
     auto* ctx = new ApiCtx(ApiLoadGroupMembers, confId, "conference");
-    request(ApiLoadGroupMembers, "/api/conference/members?conference_id="
-            + std::to_string(confId), "GET", "", ctx);
+    request({"/api/conference/members?conference_id="
+            + std::to_string(confId), "GET", ""}, ctx);
 }
 
 void ToxAPI::getMessagesHistory(int contactId, const std::string& contactType) {
     auto* ctx = new ApiCtx(ApiLoadMessageHistory, contactId, contactType);
-    request(ApiLoadMessageHistory,
-            "/api/messages/history?contact_id=" + std::to_string(contactId)
-            + "&contact_type=" + contactType, "GET", "", ctx);
+    request({"/api/messages/history?contact_id=" + std::to_string(contactId)
+            + "&contact_type=" + contactType, "GET", ""}, ctx);
 }
 
 void ToxAPI::joinConference(int friendNumber, const std::string& cookie) {
-    request(ApiJoinConference, "/api/conferences/join", "POST",
-            "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie);
+    request(ApiJoinConference, {"/api/conferences/join", "POST",
+            "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie});
 }
 
 void ToxAPI::rejectConference(int friendNumber) {
-    request(ApiRejectConference, "/api/conferences/reject", "POST",
-            "friend_number=" + std::to_string(friendNumber));
+    request(ApiRejectConference, {"/api/conferences/reject", "POST",
+            "friend_number=" + std::to_string(friendNumber)});
 }
 
 void ToxAPI::ignoreConference(int friendNumber) {
-    request(ApiIgnoreConference, "/api/conferences/ignore", "POST",
-            "friend_number=" + std::to_string(friendNumber));
+    request(ApiIgnoreConference, {"/api/conferences/ignore", "POST",
+            "friend_number=" + std::to_string(friendNumber)});
 }
 
 void ToxAPI::createConference() {
-    request(ApiCreateConference, "/api/conferences", "POST");
+    request(ApiCreateConference, {"/api/conferences", "POST"});
 }
 
 void ToxAPI::leaveConference(int confId) {
-    request(ApiLeaveConference, "/api/conferences/leave", "POST",
-            "conference_id=" + std::to_string(confId));
+    request(ApiLeaveConference, {"/api/conferences/leave", "POST",
+            "conference_id=" + std::to_string(confId)});
 }
 
 void ToxAPI::inviteToConference(int friendId, int confId) {
-    request(ApiInviteToConference, "/api/conference_invite", "POST",
-            "friend_id=" + std::to_string(friendId) + "&conference_id=" + std::to_string(confId));
+    request(ApiInviteToConference, {"/api/conference_invite", "POST",
+            "friend_id=" + std::to_string(friendId) + "&conference_id=" + std::to_string(confId)});
 }
 
 void ToxAPI::createGroup(const std::string& groupName, const std::string& creatorName,
@@ -286,17 +287,17 @@ void ToxAPI::createGroup(const std::string& groupName, const std::string& creato
     std::string data = "group_name=" + urlEncode(groupName) + "&name=" + urlEncode(creatorName);
     if (!password.empty()) data += "&password=" + urlEncode(password);
     if (isPrivate) data += "&privacy_state=private";
-    request(ApiCreateGroup, "/api/groups", "POST", data);
+    request(ApiCreateGroup, {"/api/groups", "POST", data});
 }
 
 void ToxAPI::leaveGroup(int groupId) {
-    request(ApiLeaveGroup, "/api/groups/leave", "POST",
-            "group_number=" + std::to_string(groupId));
+    request(ApiLeaveGroup, {"/api/groups/leave", "POST",
+            "group_number=" + std::to_string(groupId)});
 }
 
 void ToxAPI::inviteToGroup(int friendId, int groupId) {
-    request(ApiInviteToGroup, "/api/groups/invite", "POST",
-            "friend_id=" + std::to_string(friendId) + "&group_id=" + std::to_string(groupId));
+    request(ApiInviteToGroup, {"/api/groups/invite", "POST",
+            "friend_id=" + std::to_string(friendId) + "&group_id=" + std::to_string(groupId)});
 }
 
 void ToxAPI::joinGroup(int friendNumber, const std::string& chatId,
@@ -304,7 +305,7 @@ void ToxAPI::joinGroup(int friendNumber, const std::string& chatId,
     std::string data = "friend_number=" + std::to_string(friendNumber) + "&chat_id=" + chatId;
     if (!name.empty()) data += "&name=" + urlEncode(name);
     if (!password.empty()) data += "&password=" + urlEncode(password);
-    request(ApiJoinGroup, "/api/groups/join", "POST", data);
+    request(ApiJoinGroup, {"/api/groups/join", "POST", data});
 }
 
 void ToxAPI::joinGroupByChatId(const std::string& chatId,
@@ -312,26 +313,26 @@ void ToxAPI::joinGroupByChatId(const std::string& chatId,
     std::string data = "chat_id=" + chatId;
     if (!name.empty()) data += "&name=" + urlEncode(name);
     if (!password.empty()) data += "&password=" + urlEncode(password);
-    request(ApiJoinGroupByChatId, "/api/groups/join", "POST", data);
+    request(ApiJoinGroupByChatId, {"/api/groups/join", "POST", data});
 }
 
 void ToxAPI::setGroupSelfName(int groupId, const std::string& name) {
-    request(ApiSetGroupSelfName, "/api/groups/set-self-name", "POST",
-            "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name));
+    request(ApiSetGroupSelfName, {"/api/groups/set-self-name", "POST",
+            "group_number=" + std::to_string(groupId) + "&name=" + urlEncode(name)});
 }
 
 void ToxAPI::setGroupTopic(int groupId, const std::string& topic) {
-    request(ApiSetGroupTopic, "/api/groups/set-topic", "POST",
-            "group_number=" + std::to_string(groupId) + "&topic=" + urlEncode(topic));
+    request(ApiSetGroupTopic, {"/api/groups/set-topic", "POST",
+            "group_number=" + std::to_string(groupId) + "&topic=" + urlEncode(topic)});
 }
 
 void ToxAPI::setConferenceTitle(int conferenceId, const std::string& title) {
-    request(ApiSetConferenceTitle, "/api/conferences/set-title", "POST",
-            "conference_id=" + std::to_string(conferenceId) + "&title=" + urlEncode(title));
+    request(ApiSetConferenceTitle, {"/api/conferences/set-title", "POST",
+            "conference_id=" + std::to_string(conferenceId) + "&title=" + urlEncode(title)});
 }
 
 void ToxAPI::getRandomName() {
-    request(ApiGetRandomName, "/api/random-name", "GET");
+    request(ApiGetRandomName, {"/api/random-name", "GET"});
 }
 
 void ToxAPI::setSelfInfo(const std::string& name, const std::string& statusMessage) {
@@ -347,19 +348,19 @@ void ToxAPI::setSelfInfo(const std::string& name, const std::string& statusMessa
         hasParams = true;
     }
     if (!hasParams) return;
-    request(ApiSetSelfInfo, "/api/self", "POST", data);
+    request(ApiSetSelfInfo, {"/api/self", "POST", data});
 }
 
 void ToxAPI::translate(const std::string& text, const std::string& toLang, int msgIndex) {
     auto* ctx = new ApiCtx(ApiTranslate, msgIndex, text, toLang);
     std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
-    request(ApiTranslate, "/api/translate", "POST", postData, ctx);
+    request({"/api/translate", "POST", postData}, ctx);
 }
 
 void ToxAPI::lazyLoadFriendDetail(int friendId) {
     auto* ctx = new ApiCtx(ApiLoadFriendDetail, friendId);
-    request(ApiLoadFriendDetail, "/api/friend", "POST",
-            "friend_ids=" + std::to_string(friendId), ctx);
+    request({"/api/friend", "POST",
+            "friend_ids=" + std::to_string(friendId)}, ctx);
 }
 
 std::string ToxAPI::urlEncode(const std::string& str) {
@@ -722,9 +723,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             if (s_pollRunning) {
                 usleep(2000000);
                 EventPoller::addRequest(
-                    buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
-                    {{"Accept", "application/x-ndjson"}});
+                    {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                     "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
+                    onHttpDone, new ApiCtx(ApiPollEvents));
             }
             break;
         }
@@ -732,9 +733,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         if (resp.httpCode != 200) {
             if (s_pollRunning)
                 EventPoller::addRequest(
-                    buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
-                    {{"Accept", "application/x-ndjson"}});
+                    {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                     "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
+                    onHttpDone, new ApiCtx(ApiPollEvents));
             break;
         }
 
@@ -759,9 +760,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
         if (s_pollRunning)
             EventPoller::addRequest(
-                buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-                "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
-                {{"Accept", "application/x-ndjson"}});
+                {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                 "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
+                onHttpDone, new ApiCtx(ApiPollEvents));
         break;
     }
 
@@ -1033,7 +1034,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             QApplication::postEvent(s_target, partial);
             chain->step = 1;
             auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
-            EventPoller::addRequest(buildUrl("/api/friends"), "GET", "", onHttpDone, next, 35);
+            EventPoller::addRequest({buildUrl("/api/friends"), "GET", "", 35}, onHttpDone, next);
             break;
         }
         case 1: { // friend ids -> partial contacts + skip detail batch
@@ -1080,11 +1081,11 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 chain->detailBatchIdx = end;
                 auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
                 std::string postData = "friend_ids=" + idsStr;
-                EventPoller::addRequest(buildUrl("/api/friend"), "POST", postData, onHttpDone, next, 35);
+                EventPoller::addRequest({buildUrl("/api/friend"), "POST", postData, 35}, onHttpDone, next);
             } else {
                 chain->step = 3;
                 auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
-                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
+                EventPoller::addRequest({buildUrl("/api/groups"), "GET", "", 35}, onHttpDone, next);
             }
             break;
         }
@@ -1147,11 +1148,11 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 chain->detailBatchIdx = end;
                 auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
                 std::string postData = "friend_ids=" + idsStr;
-                EventPoller::addRequest(buildUrl("/api/friend"), "POST", postData, onHttpDone, next, 35);
+                EventPoller::addRequest({buildUrl("/api/friend"), "POST", postData, 35}, onHttpDone, next);
             } else {
                 chain->step = 3;
                 auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
-                EventPoller::addRequest(buildUrl("/api/groups"), "GET", "", onHttpDone, next, 35);
+                EventPoller::addRequest({buildUrl("/api/groups"), "GET", "", 35}, onHttpDone, next);
             }
             break;
         }
@@ -1191,7 +1192,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             }
             chain->step = 4;
             auto* next = new ApiCtx(ApiLoadAllData); next->ptr = chain;
-            EventPoller::addRequest(buildUrl("/api/conferences"), "GET", "", onHttpDone, next, 35);
+            EventPoller::addRequest({buildUrl("/api/conferences"), "GET", "", 35}, onHttpDone, next);
             break;
         }
         case 4: { // conferences -> partial contacts + all done

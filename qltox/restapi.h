@@ -127,9 +127,8 @@ private:
     static void dispatchResult(ApiCtx* ctx, const HttpResponse& resp);
     static std::string buildUrl(const std::string& endpoint);
     static void pollEvents();
-    static void request(ApiRequestType type, const std::string& endpoint,
-                        const std::string& method, const std::string& data = "",
-                        ApiCtx* ctx = nullptr, int timeoutSec = 35);
+    static void request(ApiRequestType type, const HttpRequest& req);
+    static void request(const HttpRequest& req, ApiCtx* ctx);
     static bool syncRequest(const std::string& endpoint,
                             const std::string& method,
                             std::string& outBody,
