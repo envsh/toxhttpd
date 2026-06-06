@@ -103,3 +103,7 @@ INSTALLS += target
 translation.path = lang
 translation.files = lang/*.json
 INSTALLS += translation
+
+# 应用图标
+QMAKE_ICON = app_icon.icns
+RC_FILE = app_icon.rc

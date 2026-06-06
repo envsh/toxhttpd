@@ -32,7 +32,8 @@
 
 
 // Helper to open URL across Qt3/Qt4
-static void qOpenUrl(const QString& url) {
+/*
+ static void qOpenUrl(const QString& url) {
 #ifdef QT3_BUILD
     // In Qt3, use system() to open URL via xdg-open
     QString cmd = QString("xdg-open \"%1\"").arg(url);
@@ -41,6 +42,7 @@ static void qOpenUrl(const QString& url) {
     QDesktopServices::openUrl(QUrl(url));
 #endif
 }
+*/
 
 ChatView::ChatView(QWidget* parent)
     : QWidget(parent)

@@ -19,6 +19,8 @@ static void saveLanguage(const QString& lang) {
     LoginDialog::setConfigValue("lang", lang);
 }
 
+#include "app_icon.xpm"
+
 int main(int argc, char* argv[]) {
 	// os.setenv('QT_IM_MODULE', "xim", true)
     // os.setenv('XMODIFIERS', '@im=fcitx', true)
@@ -26,6 +28,7 @@ int main(int argc, char* argv[]) {
     setenv("XMODIFIERS", "@im=fcitx", true);
 
     QApplication app(argc, argv);
+    app.setWindowIcon(QIcon(QPixmap(app_icon)));
 
     QtappSetup::setup(app);
         
