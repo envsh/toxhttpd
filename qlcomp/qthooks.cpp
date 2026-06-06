@@ -23,6 +23,10 @@ static const char* demangleSym(const char* raw) {
     }
     int status;
     char* dem = abi::__cxa_demangle(name, nullptr, nullptr, &status);
+    if (dem) {
+        char* p = strchr(dem, '(');
+        if (p) *p = '\0';
+    }
     return dem ? dem : name;
 }
 

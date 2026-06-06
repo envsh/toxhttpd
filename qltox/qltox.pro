@@ -29,6 +29,8 @@ OBJECTS_DIR = .
 # C++11 标准
 QMAKE_CXXFLAGS += -std=c++11 -O0
 
+!win32: QMAKE_LFLAGS += -rdynamic
+
 # Qt 版本检测：必须用同一个 .pro 文件
 # 方法：用 system() 调用 qmake -v，检测输出是否包含 "Qt 3" 或 "4."
 # Qt3 qmake (1.07a) 不支持 QT_VERSION 变量
