@@ -63,6 +63,8 @@ QStringList qSplit(const QString& str, const QString& sep);
 
 void qSetWindowTitle(QWidget* w, const QString& title);
 void qSetAppIcon(const char** xpm);
+/// qInfo 实现见 qthooks.cpp (与 qDebug/qWarning/qFatal 的 hook 放一起)
+void qInfo(const char* fmt, ...);
 void qSetMargins(QBoxLayout* layout, int left, int top, int right, int bottom);
 
 #ifdef QT3_BUILD
