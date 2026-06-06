@@ -889,6 +889,10 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
         ev->statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
         ev->iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
+        ev->userStatus = jsonStr(cJSON_GetObjectItem(item, "userStatus"));
+        ev->peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
+        cJSON* ls = cJSON_GetObjectItem(item, "lastSeen");
+        if (ls) ev->lastSeen = (uint64_t)ls->valuedouble;
         cJSON_Delete(root);
         QApplication::postEvent(s_target, ev);
         break;
@@ -1174,8 +1178,10 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                             cd.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
                             v = cJSON_GetObjectItem(item, "isConnected");
                             cd.isConnected = v ? (v->valueint == 1) : false;
-                            cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
-                            cd.type = "group";
+                             cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+                             v = cJSON_GetObjectItem(item, "memberCount");
+                             if (v) cd.memberCount = v->valueint;
+                             cd.type = "group";
                             chain->result->contacts.push_back(cd);
                             batch.push_back(cd);
                         }
@@ -1213,8 +1219,10 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                             cd.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
                             v = cJSON_GetObjectItem(item, "isConnected");
                             cd.isConnected = v ? (v->valueint == 1) : false;
-                            cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
-                            cd.type = "conference";
+                             cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
+                             v = cJSON_GetObjectItem(item, "memberCount");
+                             if (v) cd.memberCount = v->valueint;
+                             cd.type = "conference";
                             chain->result->contacts.push_back(cd);
                             batch.push_back(cd);
                         }

@@ -303,11 +303,15 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 peerInfoMap[key].peerNumber = evt->friendId;
                 peerInfoMap[key].publicKey = evt->publicKey;
                 peerInfoMap[key].iconUrl = evt->iconUrl;
+                peerInfoMap[key].statusText = evt->statusText;
                 int s = 0;
                 if (evt->statusStr == "tcp") s = 1;
                 else if (evt->statusStr == "udp") s = 2;
                 peerInfoMap[key].status = s;
                 peerInfoMap[key].statusStr = evt->statusStr;
+                peerInfoMap[key].peerIp = evt->peerIp;
+                peerInfoMap[key].userStatus = evt->userStatus;
+                peerInfoMap[key].lastSeen = evt->lastSeen;
             }
             return;
         }

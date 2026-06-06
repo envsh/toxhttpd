@@ -69,6 +69,8 @@ struct PeerInfo {
     std::string publicKey;
     bool isSelf = false;
     std::string peerIp;
+    std::string userStatus;
+    uint64_t lastSeen = 0;
 };
 
 struct HistoryMessage {
@@ -95,6 +97,7 @@ struct ContactData {
     bool isConnected;
     std::string iconUrl;
     std::string statusText;
+    int memberCount = 0;
     ContactData() : id(-1), isConnected(false) {}
 };
 
@@ -192,6 +195,9 @@ public:
     std::string statusStr;
     std::string statusText;
     std::string iconUrl;
+    std::string userStatus;
+    std::string peerIp;
+    uint64_t lastSeen = 0;
 };
 
 // ── curl_multi HTTP 引擎 ──
