@@ -172,13 +172,13 @@ void FriendInfoDialog::setInfo(int id, const QString& name, const QString& type,
 }
 
 void FriendInfoDialog::setInfo(const FriendInfo& info) {
-    setInfo(info.id, qFromUtf8(info.name.c_str()), "friend",
-            qFromUtf8(info.statusText.c_str()),
-            qFromUtf8(info.userStatus.c_str()),
-            qFromUtf8(info.statusStr.c_str()),
+    setInfo(info.id, qFromUtf8(info.name), "friend",
+            qFromUtf8(info.statusText),
+            qFromUtf8(info.userStatus),
+            qFromUtf8(info.statusStr),
             false,
-            qFromUtf8(info.publicKey.c_str()));
-    ipLabel->setText(info.peerIp.empty() ? "-" : qFromUtf8(info.peerIp.c_str()));
+            qFromUtf8(info.publicKey));
+    ipLabel->setText(info.peerIp.empty() ? "-" : qFromUtf8(info.peerIp));
     if (info.lastSeen > 0) {
         setLastSeen(qFmtTime((uint)info.lastSeen));
     } else {
