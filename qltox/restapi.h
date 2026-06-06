@@ -18,6 +18,8 @@ struct FriendInfo {
     uint64_t lastSeen = 0;
 };
 
+FriendInfo friendInfoFromPeer(const PeerInfo& peer, int id);
+
 struct GroupInfo {
     int groupNumber = 0;
     std::string groupName;
@@ -79,7 +81,6 @@ public:
     static std::string urlEncode(const std::string& str);
 
     // Sync helper methods for dialog contexts
-    static bool getFriendInfo(int id, FriendInfo& info);
     static std::vector<GroupInfo> getGroupsSync();
     static std::vector<ConferenceInfo> getConferencesSync();
     static std::vector<PeerInfo> getConferenceMembersSync(int confId);

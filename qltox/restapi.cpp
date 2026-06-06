@@ -403,35 +403,18 @@ bool ToxAPI::syncRequest(const std::string& endpoint,
     return (httpCode == 200 && !outBody.empty());
 }
 
-bool ToxAPI::getFriendInfo(int id, FriendInfo& info) {
-    std::string body;
-    if (!syncRequest("/api/friend", "POST", body,
-                     "friend_ids=" + std::to_string(id)))
-        return false;
-    cJSON* root = cJSON_Parse(body.c_str());
-    if (!root || !cJSON_IsArray(root) || cJSON_GetArraySize(root) == 0) {
-        if (root) cJSON_Delete(root);
-        return false;
-    }
-    cJSON* item = cJSON_GetArrayItem(root, 0);
-    if (!item) { cJSON_Delete(root); return false; }
-    cJSON* err = cJSON_GetObjectItem(item, "error");
-    if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0) {
-        cJSON_Delete(root);
-        return false;
-    }
+FriendInfo friendInfoFromPeer(const PeerInfo& peer, int id) {
+    FriendInfo info;
     info.id = id;
-    info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
-    info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
-    info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
-    info.userStatus = jsonStr(cJSON_GetObjectItem(item, "userStatus"));
-    info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
-    info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
-    info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
-    cJSON* ls = cJSON_GetObjectItem(item, "lastSeen");
-    if (ls) info.lastSeen = (uint64_t)ls->valuedouble;
-    cJSON_Delete(root);
-    return true;
+    info.name = peer.name;
+    info.statusStr = peer.statusStr;
+    info.statusText = peer.statusText;
+    info.userStatus = peer.userStatus;
+    info.iconUrl = peer.iconUrl;
+    info.publicKey = peer.publicKey;
+    info.peerIp = peer.peerIp;
+    info.lastSeen = peer.lastSeen;
+    return info;
 }
 
 std::vector<GroupInfo> ToxAPI::getGroupsSync() {

@@ -744,9 +744,12 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
     FriendInfoDialog dialog(this);
     
     if (type == "friend") {
-        FriendInfo info;
-        if (ToxAPI::getFriendInfo(id, info)) {
-            dialog.setInfo(info);
+        std::string key = "friend_" + std::to_string(id);
+        auto it = peerInfoMap.find(key);
+        if (it != peerInfoMap.end()) {
+            if (it->second.statusText.empty())
+                ToxAPI::lazyLoadFriendDetail(id);
+            dialog.setInfo(friendInfoFromPeer(it->second, id));
         } else {
             dialog.setInfo(id, _("no_name"), type);
         }
