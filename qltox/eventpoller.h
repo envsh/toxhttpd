@@ -209,6 +209,7 @@ struct HttpCtx {
     std::string postData;
     std::string body;
     std::map<std::string, std::string> headers;
+    curl_slist* requestHeaders;
     void (*done)(const HttpResponse& resp, void* udata);
     void* udata;
 };
@@ -222,7 +223,8 @@ public:
                            const std::string& data,
                            void (*done)(const HttpResponse& resp, void* udata),
                            void* udata = nullptr,
-                           int timeoutSec = 35);
+                           int timeoutSec = 35,
+                           const std::map<std::string, std::string>& extraHeaders = {});
 
 private:
     EventPoller();

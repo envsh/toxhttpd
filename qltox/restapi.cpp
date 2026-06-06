@@ -6,6 +6,7 @@
 #include <cctype>
 #include <unistd.h>
 #include <qapplication.h>
+#include <sstream>
 
 // ── Static members ──
 QObject* ToxAPI::s_target = nullptr;
@@ -14,6 +15,7 @@ uint64_t ToxAPI::s_lastEventId = 0;
 bool ToxAPI::s_pollRunning = false;
 bool ToxAPI::s_loadingAllData = false;
 bool ToxAPI::s_reloadPending = false;
+static bool s_useNdjson = true; // true=auto s/ Content-Type 分派; false=强制旧 JSON 数组
 
 // ── Helpers ──
 
@@ -66,6 +68,76 @@ struct LoadChain {
 
 // ── Private ──
 
+// ── 事件解析器 ──
+
+static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vector<Event>& events) {
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (!root) {
+        const char* errPos = cJSON_GetErrorPtr();
+        int offset = errPos ? (int)(errPos - body.c_str()) : -1;
+        ALOG_WARN("parseEventsJson: cJSON error at offset %d: %.60s", offset, body.c_str() + (offset >= 0 ? offset : 0));
+        return false;
+    }
+    if (!cJSON_IsArray(root)) {
+        ALOG_WARN("parseEventsJson: not an array");
+        cJSON_Delete(root);
+        return false;
+    }
+    int count = cJSON_GetArraySize(root);
+    for (int i = 0; i < count; ++i) {
+        cJSON* item = cJSON_GetArrayItem(root, i);
+        if (!item) continue;
+        Event e;
+        cJSON* v = cJSON_GetObjectItem(item, "event_id");
+        e.id = v ? (uint64_t)v->valuedouble : 0;
+        e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
+        e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
+        e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
+        if (e.id == 0 || e.type.empty()) {
+            ALOG_WARN("parseEventsJson: skip event (id=%lu type=%s)", e.id, e.type.c_str());
+            continue;
+        }
+        events.push_back(e);
+        if (e.id > lastId) lastId = e.id;
+    }
+    cJSON_Delete(root);
+    return true;
+}
+
+static bool parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vector<Event>& events) {
+    if (body.empty()) return false;
+    bool ok = true;
+    std::istringstream stream(body);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (line.empty()) continue;
+        cJSON* item = cJSON_Parse(line.c_str());
+        if (!item) {
+            const char* errPos = cJSON_GetErrorPtr();
+            int offset = errPos ? (int)(errPos - line.c_str()) : -1;
+            ALOG_WARN("parseEventsNdjson: cJSON error at offset %d: %.60s", offset, line.c_str());
+            ok = false;
+            continue;
+        }
+        Event e;
+        cJSON* v = cJSON_GetObjectItem(item, "event_id");
+        e.id = v ? (uint64_t)v->valuedouble : 0;
+        e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
+        e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
+        e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
+        if (e.id == 0 || e.type.empty()) {
+            ALOG_WARN("parseEventsNdjson: skip event (id=%lu type=%s)", e.id, e.type.c_str());
+            cJSON_Delete(item);
+            ok = false;
+            continue;
+        }
+        events.push_back(e);
+        if (e.id > lastId) lastId = e.id;
+        cJSON_Delete(item);
+    }
+    return ok;
+}
+
 void ToxAPI::request(ApiRequestType type, const std::string& endpoint,
                       const std::string& method, const std::string& data,
                       ApiCtx* ctx, int timeoutSec) {
@@ -100,7 +172,8 @@ void ToxAPI::stopPollEvent() {
 void ToxAPI::pollEvents() {
     EventPoller::addRequest(
         buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-        "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+        "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
+        {{"Accept", "application/x-ndjson"}});
 }
 
 void ToxAPI::loadAllData() {
@@ -650,7 +723,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 usleep(2000000);
                 EventPoller::addRequest(
                     buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
+                    {{"Accept", "application/x-ndjson"}});
             }
             break;
         }
@@ -659,9 +733,12 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             if (s_pollRunning)
                 EventPoller::addRequest(
                     buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+                    "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
+                    {{"Accept", "application/x-ndjson"}});
             break;
         }
+
+        bool useNdjson = s_useNdjson;
 
         std::vector<Event> events;
         if (restartDetected) {
@@ -670,30 +747,21 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             events.push_back(e);
         }
 
-        cJSON* root = cJSON_Parse(resp.body.c_str());
-        if (root && cJSON_IsArray(root)) {
-            int count = cJSON_GetArraySize(root);
-            for (int i = 0; i < count; ++i) {
-                cJSON* item = cJSON_GetArrayItem(root, i);
-                if (!item) continue;
-                Event e;
-                cJSON* v = cJSON_GetObjectItem(item, "event_id");
-                e.id = v ? (uint64_t)v->valuedouble : 0;
-                e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
-                e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
-                e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
-                events.push_back(e);
-                if (e.id > s_lastEventId) s_lastEventId = e.id;
-            }
+        if (useNdjson) {
+            if (!parseEventsNdjson(resp.body, s_lastEventId, events))
+                ALOG_WARN("parseEventsNdjson: parse errors");
+        } else {
+            if (!parseEventsJson(resp.body, s_lastEventId, events))
+                ALOG_WARN("parseEventsJson: parse failed");
         }
-        cJSON_Delete(root);
 
         QApplication::postEvent(s_target, new EventListEvent(events));
 
         if (s_pollRunning)
             EventPoller::addRequest(
                 buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
-                "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35);
+                "GET", "", onHttpDone, new ApiCtx(ApiPollEvents), 35,
+                {{"Accept", "application/x-ndjson"}});
         break;
     }
 

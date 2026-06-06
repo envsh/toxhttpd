@@ -57,7 +57,8 @@ void EventPoller::addRequest(const std::string& url,
                               const std::string& method,
                               const std::string& data,
                               void (*done)(const HttpResponse& resp, void* udata),
-                              void* udata, int timeoutSec) {
+                              void* udata, int timeoutSec,
+                              const std::map<std::string, std::string>& extraHeaders) {
     if (!s_instance || !s_instance->multi) return;
 
     CURL* easy = curl_easy_init();
@@ -65,7 +66,7 @@ void EventPoller::addRequest(const std::string& url,
 
     auto* ctx = new HttpCtx{std::string(url), std::string(data),
                              std::string(), std::map<std::string, std::string>(),
-                             done, udata};
+                             nullptr, done, udata};
 
     curl_easy_setopt(easy, CURLOPT_URL, ctx->urlStr.c_str());
     curl_easy_setopt(easy, CURLOPT_PRIVATE, ctx);
@@ -79,6 +80,14 @@ void EventPoller::addRequest(const std::string& url,
     if (method == "POST") {
         curl_easy_setopt(easy, CURLOPT_POSTFIELDS, ctx->postData.c_str());
         curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long)ctx->postData.size());
+    }
+
+    if (!extraHeaders.empty()) {
+        for (const auto& h : extraHeaders) {
+            std::string hv = h.first + ": " + h.second;
+            ctx->requestHeaders = curl_slist_append(ctx->requestHeaders, hv.c_str());
+        }
+        curl_easy_setopt(easy, CURLOPT_HTTPHEADER, ctx->requestHeaders);
     }
 
     s_instance->multiMutex.lock();
@@ -111,10 +120,15 @@ void EventPoller::run() {
                 double totalTime = 0.0;
                 curl_easy_getinfo(msg->easy_handle, CURLINFO_TOTAL_TIME, &totalTime);
                 resp.elapsedMs = (int64_t)(totalTime * 1000);
-                ctx->done(resp, ctx->udata);
-                delete ctx;
+
                 curl_multi_remove_handle(multi, msg->easy_handle);
                 curl_easy_cleanup(msg->easy_handle);
+
+                if (ctx->requestHeaders)
+                    curl_slist_free_all(ctx->requestHeaders);
+
+                ctx->done(resp, ctx->udata);
+                delete ctx;
             }
         }
     }

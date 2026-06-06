@@ -780,8 +780,61 @@ function updateSelection(id, type) {
 }
 
 // Long polling for events
+
+let useNdjsonEvents = true; // false = 旧 JSON 数组格式
+
+function parseEventsJson(text, errOut) {
+    if (!text) return [];
+    try {
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) {
+            console.warn('parseEventsJson: not an array:', text.slice(0, 120));
+            if (errOut) errOut.count++;
+            return [];
+        }
+        return parsed.filter(e => {
+            if (typeof e.event_id !== 'number' || e.event_id === 0 || !e.event_type) {
+                console.warn('skip event:', JSON.stringify(e).slice(0, 120));
+                if (errOut) errOut.count++;
+                return false;
+            }
+            return true;
+        });
+    } catch (e) {
+        console.warn('parseEventsJson:', e.message, text.slice(0, 120));
+        if (errOut) errOut.count++;
+        return [];
+    }
+}
+
+function parseEventsNdjson(text, errOut) {
+    if (!text) return [];
+    const events = [];
+    for (const raw of text.split('\n')) {
+        const t = raw.trim();
+        if (!t) continue;
+        try {
+            const e = JSON.parse(t);
+            if (typeof e.event_id !== 'number' || e.event_id === 0 || !e.event_type) {
+                console.warn('parseEventsNdjson: skip event:', JSON.stringify(e).slice(0, 120));
+                if (errOut) errOut.count++;
+                continue;
+            }
+            events.push(e);
+        } catch (e) {
+            console.warn('parseEventsNdjson:', e.message, t.slice(0, 120));
+            if (errOut) errOut.count++;
+        }
+    }
+    return events;
+}
+
 function longPollEvents() {
-    apiFetch(`/api/events?after=${lastEventId}`)
+    const opts = {};
+    if (useNdjsonEvents) {
+        opts.headers = { 'Accept': 'application/x-ndjson' };
+    }
+    apiFetch(`/api/events?after=${lastEventId}`, opts)
         .then(r => {
             // 读取 X-Server-Next-Id header，检测服务端重启
             const serverNextId = r.headers.get('X-Server-Next-Id');
@@ -792,7 +845,16 @@ function longPollEvents() {
                     lastEventId = 0;
                 }
             }
-            return r.json();
+            const isNdjson = useNdjsonEvents;
+            return r.text().then(text => {
+                const errInfo = { count: 0 };
+                const events = isNdjson
+                    ? parseEventsNdjson(text, errInfo)
+                    : parseEventsJson(text, errInfo);
+                if (errInfo.count > 0)
+                    console.warn(`event parse: ${errInfo.count} error(s)`);
+                return events;
+            });
         })
         .then(events => {
             if (events && events.length > 0) {
