@@ -172,35 +172,17 @@ void SelfInfoWidget::onEditInfo() {
         QString name = dialog.getName();
         QString status = dialog.getStatusMessage();
         
-        bool success = ToxAPI::setSelfInfoSync(
+        ToxAPI::setSelfInfo(
             std::string(qToUtf8(name).data()),
             std::string(qToUtf8(status).data())
         );
-        
-        if (success) {
-            std::string name2, statusMsg, connStatus, address;
-            if (ToxAPI::getSelfSync(name2, statusMsg, connStatus, address)) {
-                updateInfo(qFromUtf8(name2.c_str()), 
-                          qFromUtf8(statusMsg.c_str()), 
-                          qFromUtf8(connStatus.c_str()),
-                          qFromUtf8(address.c_str()));
-            }
-        } else {
-            QMessageBox::warning(this, _("save_failed"), _("save_failed"));
-        }
     }
 }
 
 void SelfInfoWidget::onBootstrap() {
     QMessageBox::information(this, "Bootstrap", _("connecting_network"));
     
-    std::string name, statusMsg, connStatus, address;
-    if (ToxAPI::getSelfSync(name, statusMsg, connStatus, address)) {
-        updateInfo(qFromUtf8(name.c_str()), 
-                  qFromUtf8(statusMsg.c_str()), 
-                  qFromUtf8(connStatus.c_str()),
-                  qFromUtf8(address.c_str()));
-    }
+    ToxAPI::getSelf();
 }
 
 void SelfInfoWidget::onShowQRCode() {

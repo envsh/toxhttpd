@@ -613,21 +613,6 @@ bool ToxAPI::setSelfInfoSync(const std::string& name, const std::string& statusM
     return syncRequest("/api/self", "POST", body, data);
 }
 
-bool ToxAPI::getSelfSync(std::string& name, std::string& statusMsg,
-                          std::string& connStatus, std::string& address) {
-    std::string body;
-    if (!syncRequest("/api/self", "GET", body))
-        return false;
-    cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return false;
-    name = jsonStr(cJSON_GetObjectItem(root, "name"));
-    statusMsg = jsonStr(cJSON_GetObjectItem(root, "status_message"));
-    connStatus = jsonStr(cJSON_GetObjectItem(root, "connection_status"));
-    address = jsonStr(cJSON_GetObjectItem(root, "address"));
-    cJSON_Delete(root);
-    return true;
-}
-
 bool ToxAPI::joinGroupSync(int friendNumber, const std::string& chatId,
                             const std::string& name, const std::string& password) {
     std::string data = "friend_number=" + std::to_string(friendNumber) + "&chat_id=" + chatId;
@@ -823,8 +808,26 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
     case ApiSetGroupSelfName:
     case ApiSetGroupTopic:
     case ApiSetConferenceTitle:
-    case ApiSetSelfInfo:
         break; // fire-and-forget
+    case ApiSetSelfInfo: {
+        auto* ev = new SelfInfoResultEvent();
+        ev->elapsedMs = resp.elapsedMs;
+        if (resp.httpCode != 200 || resp.body.empty()) {
+            ev->success = false;
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(resp.body.c_str());
+        if (!root) { ev->success = false; QApplication::postEvent(s_target, ev); break; }
+        ev->success = true;
+        ev->name = jsonStr(cJSON_GetObjectItem(root, "name"));
+        ev->statusMsg = jsonStr(cJSON_GetObjectItem(root, "status_message"));
+        ev->connStatus = jsonStr(cJSON_GetObjectItem(root, "connection_status"));
+        ev->address = jsonStr(cJSON_GetObjectItem(root, "address"));
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
 
     case ApiJoinConference: {
         auto* ev = new ApiResultEvent(ApiJoinConference);

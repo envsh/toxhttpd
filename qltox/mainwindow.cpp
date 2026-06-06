@@ -316,6 +316,21 @@ void MainWindow::customEvent(CustomEventBase* event) {
             return;
         }
         
+        // 自身信息更新结果
+        if (e->type == ApiGetSelf) {
+            SelfInfoResultEvent* evt = static_cast<SelfInfoResultEvent*>(event);
+            if (evt->success) {
+                selfInfoWidget->updateInfo(
+                    qFromUtf8(evt->name.c_str()),
+                    qFromUtf8(evt->statusMsg.c_str()),
+                    qFromUtf8(evt->connStatus.c_str()),
+                    qFromUtf8(evt->address.c_str()));
+                if (evt->address.length() >= 64)
+                    selfPubkey = evt->address.substr(0, 64);
+            }
+            return;
+        }
+        
         // 消息发送结果
         if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage || e->type == ApiSendGroupMessage) {
             MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);

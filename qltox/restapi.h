@@ -98,8 +98,6 @@ public:
     static void setGroupTopic(int groupId, const std::string& topic);
     static void setConferenceTitle(int conferenceId, const std::string& title);
     static bool setSelfInfoSync(const std::string& name, const std::string& statusMessage);
-    static bool getSelfSync(std::string& name, std::string& statusMsg,
-                            std::string& connStatus, std::string& address);
     static bool joinGroupSync(int friendNumber, const std::string& chatId,
                               const std::string& name = "", const std::string& password = "");
     static bool inviteToConferenceSync(int friendId, int confId);
