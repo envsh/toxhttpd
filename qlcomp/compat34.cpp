@@ -14,6 +14,9 @@
 #include <qtooltip.h>        // QToolTip::add
 #include <qfileinfo.h>       // QFileInfo (qAppDir)
 #include <qwidgetlist.h>     // QWidgetList (topLevelWidgets)
+#include <qimage.h>          // QImage (qX11SetWmIcon)
+#include <X11/Xlib.h>        // Display, XChangeProperty, XFlush
+#include <X11/Xatom.h>       // XA_CARDINAL (qX11SetWmIcon)
 #endif
 
 // ========== EventType34 ==========
@@ -173,6 +176,44 @@ void qSetWindowTitle(QWidget* w, const QString& title) {
 #endif
 }
 
+#ifdef QT3_BUILD
+static void qX11SetWmIcon(const QPixmap& pm) {
+    QImage img = pm.convertToImage();
+    if (img.isNull()) return;
+
+    const int iconSize = 32;
+    QImage scaled = img.smoothScale(iconSize, iconSize);
+
+    const int dataSize = 2 + iconSize * iconSize;
+    unsigned long* data = new unsigned long[dataSize];
+    data[0] = (unsigned long)iconSize;
+    data[1] = (unsigned long)iconSize;
+    for (int y = 0; y < iconSize; ++y) {
+        for (int x = 0; x < iconSize; ++x) {
+            QRgb px = scaled.pixel(x, y);
+            data[2 + y * iconSize + x] =
+                ((unsigned long)qAlpha(px) << 24) |
+                ((unsigned long)qRed(px) << 16) |
+                ((unsigned long)qGreen(px) << 8) |
+                (unsigned long)qBlue(px);
+        }
+    }
+
+    Display* dpy = QPaintDevice::x11AppDisplay();
+    if (!dpy) { delete[] data; return; }
+    Atom netWmIcon = XInternAtom(dpy, "_NET_WM_ICON", False);
+    QWidgetList* topWidgets = qApp->topLevelWidgets();
+    for (uint i = 0; i < uint(topWidgets->count()); ++i) {
+        WId wid = topWidgets->at(i)->winId();
+        if (wid)
+            XChangeProperty(dpy, wid, netWmIcon, XA_CARDINAL, 32,
+                          PropModeReplace, (unsigned char*)data, dataSize);
+    }
+    XFlush(dpy);
+    delete[] data;
+}
+#endif
+
 void qSetAppIcon(const char** xpm) {
     QPixmap pm(xpm);
 #ifdef QT3_BUILD
@@ -187,6 +228,7 @@ void qSetAppIcon(const char** xpm) {
         for (uint i = 0; i < uint(list->count()); ++i)
             list->at(i)->setIcon(pm);
     }
+    qX11SetWmIcon(pm);
 #else
     qApp->setWindowIcon(QIcon(pm));
 #endif

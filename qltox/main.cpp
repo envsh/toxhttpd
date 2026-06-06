@@ -59,6 +59,7 @@ int main(int argc, char* argv[]) {
     qSetAppIcon(app_icon);
     qSetWindowTitle(&window, _("app_title"));
     window.show();
+    qSetAppIcon(app_icon);  // show 后再设一次，触发 WM 重读 _NET_WM_ICON
     
     return app.exec();
 }
