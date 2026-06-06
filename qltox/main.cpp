@@ -28,7 +28,6 @@ int main(int argc, char* argv[]) {
     setenv("XMODIFIERS", "@im=fcitx", true);
 
     QApplication app(argc, argv);
-    app.setWindowIcon(QIcon(QPixmap(app_icon)));
 
     QtappSetup::setup(app);
         
@@ -57,6 +56,7 @@ int main(int argc, char* argv[]) {
     
     // 创建主窗口
     MainWindow window;
+    qSetAppIcon(app_icon);
     qSetWindowTitle(&window, _("app_title"));
     window.show();
     

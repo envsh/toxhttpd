@@ -13,6 +13,7 @@
 #ifdef QT3_BUILD
 #include <qtooltip.h>        // QToolTip::add
 #include <qfileinfo.h>       // QFileInfo (qAppDir)
+#include <qwidgetlist.h>     // QWidgetList (topLevelWidgets)
 #endif
 
 // ========== EventType34 ==========
@@ -169,6 +170,25 @@ void qSetWindowTitle(QWidget* w, const QString& title) {
     w->setCaption(title);
 #else
     w->setWindowTitle(title);
+#endif
+}
+
+void qSetAppIcon(const char** xpm) {
+    QPixmap pm(xpm);
+#ifdef QT3_BUILD
+    if (QWidget* mw = qApp->mainWidget()) {
+        mw->setIcon(pm);
+    } else {
+        QWidgetList* list = qApp->topLevelWidgets();
+        if (list->count() == 0) {
+            qWarning("qSetAppIcon: no top-level widgets found");
+            return;
+        }
+        for (uint i = 0; i < uint(list->count()); ++i)
+            list->at(i)->setIcon(pm);
+    }
+#else
+    qApp->setWindowIcon(QIcon(pm));
 #endif
 }
 

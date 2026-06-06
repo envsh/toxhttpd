@@ -62,6 +62,7 @@ QString qToUpper(const QString& s);
 QStringList qSplit(const QString& str, const QString& sep);
 
 void qSetWindowTitle(QWidget* w, const QString& title);
+void qSetAppIcon(const char** xpm);
 void qSetMargins(QBoxLayout* layout, int left, int top, int right, int bottom);
 
 #ifdef QT3_BUILD
