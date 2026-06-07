@@ -17,7 +17,7 @@
 #endif
 
 JsonViewWidget::JsonViewWidget(QWidget* parent)
-    : QWidget(parent), m_showRaw(false), m_maxDepth(0), m_totalNodes(0) {
+    : QWidget(parent), m_hoveredLabel(nullptr), m_showRaw(false), m_maxDepth(0), m_totalNodes(0) {
     m_mainLayout = new QVBoxLayout(this);
     qSetMargins(m_mainLayout, 4, 4, 4, 4);
     m_mainLayout->setSpacing(4);
@@ -216,7 +216,7 @@ void JsonViewWidget::rebuildTree(cJSON* root) {
     m_nodeMap.clear();
     m_toggleMap.clear();
 
-    QWidget* topRow = buildNode(root, "", "", 0, m_treeContainer);
+    QWidget* topRow = buildNode(root, "", "", 0, m_treeContainer, false, std::vector<bool>());
     if (topRow) {
         m_treeLayout->addWidget(topRow);
         m_treeLayout->addStretch();
@@ -279,7 +279,53 @@ int JsonViewWidget::childCount(cJSON* node) {
     return cnt;
 }
 
-QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QString& path, int depth, QWidget* parent) {
+static QString valuePlainText(cJSON* node) {
+    int t = node->type & 0xFF;
+    switch (t) {
+    case cJSON_String:
+        return "\"" + QString::fromUtf8(node->valuestring ? node->valuestring : "") + "\"";
+    case cJSON_Number: {
+        double d = node->valuedouble;
+        if (d == (int)d)
+            return QString::number((int)d);
+        return QString::number(d, 'g', 6);
+    }
+    case cJSON_True: return "true";
+    case cJSON_False: return "false";
+    case cJSON_NULL: return "null";
+    default: return "";
+    }
+}
+
+static QString stripHtml(const QString& html) {
+    QString plain;
+    bool inTag = false;
+    for (int i = 0; i < html.length(); ++i) {
+        if (html[i] == '<') { inTag = true; continue; }
+        if (html[i] == '>') { inTag = false; continue; }
+        if (!inTag) plain += html[i];
+    }
+    return plain;
+}
+
+static QString buildTreePrefix(int depth, bool hasNext, const std::vector<bool>& ancestors) {
+    QString p;
+    for (int d = 0; d < depth; ++d) {
+        if (d < (int)ancestors.size() && ancestors[d])
+            p += QString::fromUtf8("│   ");
+        else
+            p += "    ";
+    }
+    if (depth > 0) {
+        if (hasNext)
+            p += QString::fromUtf8("├── ");
+        else
+            p += QString::fromUtf8("└── ");
+    }
+    return p;
+}
+
+QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QString& path, int depth, QWidget* parent, bool hasNext, const std::vector<bool>& ancestors) {
     if (!node) return nullptr;
     if (depth > m_maxDepth) m_maxDepth = depth;
     ++m_totalNodes;
@@ -297,8 +343,15 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
     qSetMargins(rowLayout, 0, 0, 0, 0);
     rowLayout->setSpacing(4);
 
-    // Indentation
-    rowLayout->addSpacing(depth * 20);
+    // Tree prefix (indentation with tree lines)
+    QLabel* treeLabel = nullptr;
+    if (depth > 0) {
+        treeLabel = new QLabel(buildTreePrefix(depth, hasNext, ancestors), headerRow);
+        QFont tf("monospace", 10);
+        tf.setStyleHint(QFont::TypeWriter);
+        treeLabel->setFont(tf);
+        rowLayout->addWidget(treeLabel);
+    }
 
     QLabel* keyLabel = nullptr;
     QLabel* valueLabel = nullptr;
@@ -335,7 +388,10 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
                 while (child) {
                     QString childKey = child->string ? QString::fromUtf8(child->string) : "";
                     QString childPath = path.isEmpty() ? childKey : path + "." + childKey;
-                    QWidget* childRow = buildNode(child, childKey, childPath, depth + 1, childrenContainer);
+                    bool childHasNext = (child->next != nullptr);
+                    std::vector<bool> childAncestors = ancestors;
+                    if (depth > 0) childAncestors.push_back(hasNext);
+                    QWidget* childRow = buildNode(child, childKey, childPath, depth + 1, childrenContainer, childHasNext, childAncestors);
                     if (childRow) childLayout->addWidget(childRow);
                     child = child->next;
                 }
@@ -344,7 +400,10 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
                 while (child) {
                     QString childKey = "[" + QString::number(idx) + "]";
                     QString childPath = path + childKey;
-                    QWidget* childRow = buildNode(child, childKey, childPath, depth + 1, childrenContainer);
+                    bool childHasNext = (child->next != nullptr);
+                    std::vector<bool> childAncestors = ancestors;
+                    if (depth > 0) childAncestors.push_back(hasNext);
+                    QWidget* childRow = buildNode(child, childKey, childPath, depth + 1, childrenContainer, childHasNext, childAncestors);
                     if (childRow) childLayout->addWidget(childRow);
                     child = child->next;
                     ++idx;
@@ -377,14 +436,22 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
         NodeInfo info;
         info.depth = depth;
         info.path = path;
+        info.copyText = isContainer ? stripHtml(typeSummary(node)) : valuePlainText(node);
         m_nodeMap[valueLabel] = info;
+#ifndef QT3_BUILD
+        valueLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+#endif
     }
     if (keyLabel) {
         keyLabel->installEventFilter(this);
         NodeInfo info;
         info.depth = depth;
         info.path = path;
+        info.copyText = key;
         m_nodeMap[keyLabel] = info;
+#ifndef QT3_BUILD
+        keyLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+#endif
     }
 
     return row;
@@ -523,6 +590,7 @@ void JsonViewWidget::onPaste() {
 
 bool JsonViewWidget::eventFilter(QObject* obj, QEvent* event) {
     if (event->type() == QEvent::Enter) {
+        m_hoveredLabel = (QWidget*)obj;
         std::map<QWidget*, NodeInfo>::iterator it = m_nodeMap.find((QWidget*)obj);
         if (it != m_nodeMap.end()) {
             updateStatusBar(it->second.depth, it->second.path);
@@ -531,6 +599,23 @@ bool JsonViewWidget::eventFilter(QObject* obj, QEvent* event) {
         clearStatusBar();
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void JsonViewWidget::keyPressEvent(QKeyEvent* event) {
+#ifdef QT3_BUILD
+    if (event->key() == Qt::Key_C && (event->state() & Qt::ControlButton)) {
+#else
+    if (event->key() == Qt::Key_C && (event->modifiers() & Qt::ControlModifier)) {
+#endif
+        if (m_hoveredLabel) {
+            std::map<QWidget*, NodeInfo>::iterator it = m_nodeMap.find(m_hoveredLabel);
+            if (it != m_nodeMap.end() && !it->second.copyText.isEmpty()) {
+                QApplication::clipboard()->setText(it->second.copyText);
+                return;
+            }
+        }
+    }
+    QWidget::keyPressEvent(event);
 }
 
 void JsonViewWidget::updateStatusBar(int depth, const QString& path) {

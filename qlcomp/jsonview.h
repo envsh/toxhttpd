@@ -15,6 +15,7 @@
 #include <QScrollArea>
 #endif
 #include <map>
+#include <vector>
 
 struct cJSON;
 
@@ -40,15 +41,17 @@ private slots:
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event);
+    void keyPressEvent(QKeyEvent* event);
 
 private:
     struct NodeInfo {
         int depth;
         QString path;
+        QString copyText;
     };
 
     void rebuildTree(cJSON* root);
-    QWidget* buildNode(cJSON* node, const QString& key, const QString& path, int depth, QWidget* parent);
+    QWidget* buildNode(cJSON* node, const QString& key, const QString& path, int depth, QWidget* parent, bool hasNext, const std::vector<bool>& ancestors);
     QString valueToHtml(cJSON* node);
     QString escapeHtml(const QString& s);
     QString typeSummary(cJSON* node);
@@ -69,6 +72,7 @@ private:
     QLabel* m_pathLabel;
     QLabel* m_errorLabel;
 
+    QWidget* m_hoveredLabel;
     std::map<QWidget*, NodeInfo> m_nodeMap;
     std::map<QPushButton*, QWidget*> m_toggleMap;
 
