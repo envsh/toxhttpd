@@ -17,6 +17,18 @@
 #include <qimage.h>          // QImage (qX11SetWmIcon)
 #include <X11/Xlib.h>        // Display, XChangeProperty, XFlush
 #include <X11/Xatom.h>       // XA_CARDINAL (qX11SetWmIcon)
+// X11 的宏会污染 QEvent 的枚举值, 必须 undef
+#ifdef KeyPress
+#undef KeyPress
+#endif
+#ifdef KeyRelease
+#undef KeyRelease
+#endif
+#include <qdesktopwidget.h>  // QApplication::desktop (TipLabel::placeTip)
+#include <qtimer.h>          // QTimer::singleShot (showTempTooltip)
+#else
+#include <QToolTip>          // QToolTip::showText (showTempTooltip)
+#include <QTimer>            // QTimer::singleShot (showTempTooltip)
 #endif
 
 // ========== EventType34 ==========
@@ -443,6 +455,187 @@ void qOpenUrl(const QString& url) {
     QDesktopServices::openUrl(QUrl(url));
 }
 #endif
+
+#ifdef QT3_BUILD
+namespace {
+
+class TipLabel : public QLabel {
+public:
+    static TipLabel* instance;
+
+    TipLabel()
+        : QLabel(0, "tip_label",
+            Qt::WStyle_Customize | Qt::WStyle_Tool
+            | Qt::WStyle_NoBorder | Qt::WStyle_StaysOnTop)
+        , m_widget(0)
+        , m_expireTimerId(0)
+        , m_hideTimerId(0)
+    {
+        delete instance;
+        instance = this;
+
+        QPalette pal;
+        pal.setColor(QPalette::Active, QColorGroup::Background, QColor(255, 255, 220));
+        pal.setColor(QPalette::Disabled, QColorGroup::Background, QColor(255, 255, 220));
+        pal.setColor(QPalette::Inactive, QColorGroup::Background, QColor(255, 255, 220));
+        pal.setColor(QPalette::Active, QColorGroup::Foreground, Qt::black);
+        pal.setColor(QPalette::Disabled, QColorGroup::Foreground, Qt::black);
+        pal.setColor(QPalette::Inactive, QColorGroup::Foreground, Qt::black);
+        setPalette(pal);
+        setMargin(3);
+        setFrameStyle(QFrame::Box | QFrame::Plain);
+        setLineWidth(1);
+        setAlignment(AlignLeft);
+        setIndent(1);
+        qApp->installEventFilter(this);
+        setMouseTracking(true);
+    }
+
+    ~TipLabel() {
+        instance = 0;
+    }
+
+    void showTip(QWidget* parent, const QRect& btnRect,
+                 const QString& text, int timeoutMs) {
+        if (text.isEmpty()) {
+            hideTip();
+            return;
+        }
+
+        QRect screenRect(parent->mapToGlobal(btnRect.topLeft()), btnRect.size());
+
+        bool changed = (text != QLabel::text())
+                    || (parent != m_widget)
+                    || (m_btnRect != btnRect);
+
+        if (changed) {
+            setText(text);
+            m_widget = parent;
+            m_btnRect = btnRect;
+            m_trackingRect = screenRect;
+            adjustSize();
+            placeTip();
+            if (!isVisible())
+                show();
+            restartExpireTimer(timeoutMs);
+        } else {
+            m_trackingRect = screenRect;
+            restartExpireTimer(timeoutMs);
+        }
+    }
+
+    void hideTipImmediately() {
+        if (m_hideTimerId) { killTimer(m_hideTimerId); m_hideTimerId = 0; }
+        if (m_expireTimerId) { killTimer(m_expireTimerId); m_expireTimerId = 0; }
+        close();
+        m_btnRect = QRect();
+        m_trackingRect = QRect();
+        m_widget = 0;
+    }
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override {
+        switch (event->type()) {
+        case QEvent::MouseMove: {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (!m_btnRect.isNull() && !m_trackingRect.contains(me->globalPos()))
+                hideTip();
+            break;
+        }
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonRelease:
+        case QEvent::MouseButtonDblClick:
+        case QEvent::Wheel:
+        case QEvent::KeyPress:
+        case QEvent::KeyRelease:
+            hideTipImmediately();
+            break;
+        case QEvent::Leave:
+            hideTip();
+            break;
+        default:
+            break;
+        }
+        return false;
+    }
+
+    void timerEvent(QTimerEvent* e) override {
+        if (e->timerId() == m_hideTimerId) {
+            killTimer(m_hideTimerId);
+            m_hideTimerId = 0;
+            hideTipImmediately();
+        } else if (e->timerId() == m_expireTimerId) {
+            killTimer(m_expireTimerId);
+            m_expireTimerId = 0;
+            hideTip();
+        }
+    }
+
+    void mouseMoveEvent(QMouseEvent* e) override {
+        if (!m_btnRect.isNull()) {
+            QPoint pos = e->globalPos();
+            if (m_widget)
+                pos = m_widget->mapFromGlobal(pos);
+            if (!m_btnRect.contains(pos))
+                hideTip();
+        }
+        QLabel::mouseMoveEvent(e);
+    }
+
+private:
+    void placeTip() {
+        QPoint center = m_widget->mapToGlobal(m_btnRect.center());
+        QPoint pos2(center.x() - width() / 2, center.y() - height() - 4);
+
+        QRect screen = QApplication::desktop()->screenGeometry(center);
+        if (pos2.x() < screen.x())
+            pos2.setX(screen.x() + 2);
+        if (pos2.x() + width() > screen.x() + screen.width())
+            pos2.setX(screen.x() + screen.width() - width() - 2);
+        if (pos2.y() < screen.y())
+            pos2.setY(screen.y() + 2);
+
+        move(pos2);
+    }
+
+    void restartExpireTimer(int timeoutMs) {
+        if (m_expireTimerId) killTimer(m_expireTimerId);
+        if (m_hideTimerId) { killTimer(m_hideTimerId); m_hideTimerId = 0; }
+        m_expireTimerId = startTimer(timeoutMs > 0 ? timeoutMs : 3000);
+    }
+
+    void hideTip() {
+        if (!m_hideTimerId)
+            m_hideTimerId = startTimer(300);
+    }
+
+    QWidget* m_widget;
+    QRect m_btnRect;
+    QRect m_trackingRect;
+    int m_expireTimerId;
+    int m_hideTimerId;
+};
+
+TipLabel* TipLabel::instance = 0;
+
+} // namespace
+#endif
+
+void showTempTooltip(QWidget* parent, const QRect& btnRect,
+                     const QString& text, int timeoutMs) {
+#ifdef QT3_BUILD
+    if (text.isEmpty()) {
+        if (TipLabel::instance)
+            TipLabel::instance->hideTipImmediately();
+        return;
+    }
+    if (!TipLabel::instance)
+        new TipLabel();
+    TipLabel::instance->showTip(parent, btnRect, text, timeoutMs);
+#else
+    QToolTip::showText(parent->mapToGlobal(btnRect.center()), text, parent, btnRect);
+#endif
+}
 
 void qSleepMs(unsigned long ms) {
     usleep(ms * 1000);

@@ -66,6 +66,7 @@ ChatView::ChatView(QWidget* parent)
 #else
     setFocusPolicy(Qt::StrongFocus);
 #endif
+    setMouseTracking(true);
 }
 
 void ChatView::restoreMessages(const std::vector<ChatMessage>& msgs) {
@@ -974,16 +975,18 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     int msgIndex = findMessageAtY(event->y());
     if (msgIndex >= 0 && msgIndex < (int)m_messages.size()) {
         // Check header action buttons first
-        if (m_messages[msgIndex].translateBtnRect.contains(event->pos()) ||
-            m_messages[msgIndex].sourceBtnRect.contains(event->pos())) {
+        if (m_messages[msgIndex].translateBtnRect.contains(event->pos())) {
+            QString tip = m_messages[msgIndex].translateError.isEmpty()
+                ? qFromUtf8("Translate")
+                : m_messages[msgIndex].translateError;
+            showTempTooltip(this, m_messages[msgIndex].translateBtnRect, tip);
             setCursor(QCursor(Qt::PointingHandCursor));
-            // Show translate error tooltip if applicable
-            if (!m_messages[msgIndex].translateError.isEmpty() &&
-                m_messages[msgIndex].translateBtnRect.contains(event->pos())) {
-#ifndef QT3_BUILD
-                QToolTip::showText(event->globalPos(), m_messages[msgIndex].translateError, this);
-#endif
-            }
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+        if (m_messages[msgIndex].sourceBtnRect.contains(event->pos())) {
+            showTempTooltip(this, m_messages[msgIndex].sourceBtnRect, qFromUtf8("Source"));
+            setCursor(QCursor(Qt::PointingHandCursor));
             QWidget::mouseMoveEvent(event);
             return;
         }

@@ -119,4 +119,6 @@ void qOpenUrl(const QString& url);
 
 void qSleepMs(unsigned long ms);
 
+void showTempTooltip(QWidget* parent, const QRect& btnRect, const QString& text, int timeoutMs = 3000);
+
 #endif  // COMPAT34_H
