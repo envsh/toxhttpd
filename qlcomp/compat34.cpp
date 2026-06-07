@@ -640,3 +640,53 @@ void showTempTooltip(QWidget* parent, const QRect& btnRect,
 void qSleepMs(unsigned long ms) {
     usleep(ms * 1000);
 }
+
+QByteArray base64Decode(const std::string& b64) {
+    if (b64.empty()) return QByteArray();
+#ifdef QT3_BUILD
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    unsigned char rev[256] = {};
+    for (int i = 0; i < 64; ++i) rev[(unsigned char)alphabet[i]] = i;
+    rev[(unsigned char)'-'] = 62;
+    rev[(unsigned char)'_'] = 63;
+
+    int len = (int)b64.size();
+    int maxOut = ((len + 3) / 4) * 3;
+    QByteArray out;
+    out.resize(maxOut);
+    int wp = 0;
+    unsigned char buf[4];
+    int bufPos = 0;
+
+    for (int i = 0; i < len; ++i) {
+        unsigned char c = (unsigned char)b64[i];
+        if (c == '=') {
+            break;
+        }
+        unsigned char val = rev[c];
+        if (val == 0 && c != 'A') {
+            if (c != '\n' && c != '\r' && c != ' ' && c != '\t')
+                return QByteArray();
+            continue;
+        }
+        buf[bufPos++] = val;
+        if (bufPos == 4) {
+            out[wp++] = (char)((buf[0] << 2) | (buf[1] >> 4));
+            out[wp++] = (char)((buf[1] << 4) | (buf[2] >> 2));
+            out[wp++] = (char)((buf[2] << 6) | buf[3]);
+            bufPos = 0;
+        }
+    }
+    if (bufPos > 0) {
+        for (int i = bufPos; i < 4; ++i) buf[i] = 0;
+        if (bufPos >= 2)
+            out[wp++] = (char)((buf[0] << 2) | (buf[1] >> 4));
+        if (bufPos >= 3)
+            out[wp++] = (char)((buf[1] << 4) | (buf[2] >> 2));
+    }
+    out.resize(wp);
+    return out;
+#else
+    return QByteArray::fromBase64(QByteArray(b64.data(), (int)b64.size()));
+#endif
+}

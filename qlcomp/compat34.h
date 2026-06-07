@@ -121,4 +121,6 @@ void qSleepMs(unsigned long ms);
 
 void showTempTooltip(QWidget* parent, const QRect& btnRect, const QString& text, int timeoutMs = 3000);
 
+QByteArray base64Decode(const std::string& b64);
+
 #endif  // COMPAT34_H
