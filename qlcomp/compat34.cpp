@@ -443,3 +443,7 @@ void qOpenUrl(const QString& url) {
     QDesktopServices::openUrl(QUrl(url));
 }
 #endif
+
+void qSleepMs(unsigned long ms) {
+    usleep(ms * 1000);
+}

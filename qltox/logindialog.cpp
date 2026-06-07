@@ -1,6 +1,7 @@
 #include "logindialog.h"
 #include "translator.h"
 #include "restapi.h"
+#include "limelog.h"
 #include "cJSON.h"
 #ifdef QT3_BUILD
 #include <qtimer.h>
@@ -234,10 +235,12 @@ void LoginDialog::onConnect() {
     m_curlError = 0;
 
     std::thread([this, url]() {
+        std::string fullUrl = url + "/api/self";
+        ALOG_INFO(">> GET", fullUrl);
+
         CURL* curl = curl_easy_init();
         std::string resp;
 
-        std::string fullUrl = url + "/api/self";
         curl_easy_setopt(curl, CURLOPT_URL, fullUrl.c_str());
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 3L);
@@ -250,6 +253,7 @@ void LoginDialog::onConnect() {
         if (res == CURLE_OK) {
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
         }
+        ALOG_INFO("<<", (int)httpCode, fullUrl);
         curl_easy_cleanup(curl);
 
         m_httpResult = (int)httpCode;

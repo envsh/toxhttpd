@@ -60,6 +60,7 @@ void apiLogImpl(ApiLogLevel level, ApiLogTimeFormat timeFmt, const char* file, i
                    + QString::number(line) + " - "
                    + msg;
     
-    // 使用 qWarning（兼容 Qt3/Qt4）
-    qWarning("%s", qToUtf8(logMsg).data());
+    // 直接输出 stderr，绕过 Qt3 下 qthooks.cpp 对 qWarning 的自定义 hook（避免重复级别/时间戳）
+    fprintf(stderr, "%s\n", qToUtf8(logMsg).data());
+    fflush(stderr);
 }

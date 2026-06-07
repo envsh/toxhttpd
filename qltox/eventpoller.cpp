@@ -58,6 +58,8 @@ void EventPoller::addRequest(const HttpRequest& req,
                               void* udata) {
     if (!s_instance || !s_instance->multi) { return; }
 
+    ALOG_INFO(">>", req.method, req.url);
+
     CURL* easy = curl_easy_init();
     if (!easy) { return; }
 
@@ -118,6 +120,12 @@ void EventPoller::run() {
                 double totalTime = 0.0;
                 curl_easy_getinfo(msg->easy_handle, CURLINFO_TOTAL_TIME, &totalTime);
                 resp.elapsedMs = (int64_t)(totalTime * 1000);
+
+                if (curlResult != 0) {
+                    ALOG_WARN("!!", ctx->urlStr, resp.curlErrStr);
+                }
+                ALOG_INFO("<<", httpCode, ctx->urlStr,
+                          resp.elapsedMs, "ms", resp.body.size(), "bytes");
 
                 curl_multi_remove_handle(multi, msg->easy_handle);
                 curl_easy_cleanup(msg->easy_handle);

@@ -117,4 +117,6 @@ bool qIsAppActive(const QWidget* widget = 0);
 
 void qOpenUrl(const QString& url);
 
+void qSleepMs(unsigned long ms);
+
 #endif  // COMPAT34_H

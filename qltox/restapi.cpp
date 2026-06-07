@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include <cstdlib>
 #include <cctype>
+#include <chrono>
 #include <unistd.h>
 #include <qapplication.h>
 #include <sstream>
@@ -93,8 +94,12 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
         e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
-        if (e.id == 0 || e.type.empty()) {
-            ALOG_WARN("parseEventsJson: skip event (id=%lu type=%s)", e.id, e.type.c_str());
+        if (e.id == 0) {
+            ALOG_WARN("parseEventsJson: skip event (no event_id)");
+            continue;
+        }
+        if (e.type.empty()) {
+            ALOG_WARN("parseEventsJson: skip event (empty type)");
             continue;
         }
         events.push_back(e);
@@ -117,7 +122,7 @@ static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vec
         if (!item) {
             const char* errPos = cJSON_GetErrorPtr();
             int offset = errPos ? (int)(errPos - line.c_str()) : -1;
-            ALOG_WARN("parseEventsNdjson: cJSON error at offset %d: %.160s", offset, line.c_str());
+            ALOG_WARN("parseEventsNdjson: cJSON error at offset", offset, "line:", line);
             ++errors;
             continue;
         }
@@ -127,8 +132,14 @@ static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vec
         e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
-        if (e.id == 0 || e.type.empty()) {
-            ALOG_WARN("parseEventsNdjson: skip event (id=%lu type=%s) line: %.160s", e.id, e.type.c_str(), line.c_str());
+        if (e.id == 0) {
+            ALOG_WARN("parseEventsNdjson: skip event (no event_id) line:", line);
+            cJSON_Delete(item);
+            ++errors;
+            continue;
+        }
+        if (e.type.empty()) {
+            ALOG_WARN("parseEventsNdjson: skip event (empty type) line:", line);
             cJSON_Delete(item);
             ++errors;
             continue;
@@ -389,6 +400,7 @@ bool ToxAPI::syncRequest(const std::string& endpoint,
     CURL* curl = curl_easy_init();
     if (!curl) { return false; }
     std::string url = buildUrl(endpoint);
+    ALOG_INFO(">>", method, url);
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, syncWriteCb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outBody);
@@ -397,11 +409,15 @@ bool ToxAPI::syncRequest(const std::string& endpoint,
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)data.size());
     }
+    auto syncStart = std::chrono::steady_clock::now();
     CURLcode res = curl_easy_perform(curl);
+    auto syncEnd = std::chrono::steady_clock::now();
+    auto syncElapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(syncEnd - syncStart).count();
     long httpCode = 0;
     if (res == CURLE_OK) {
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     }
+    ALOG_INFO("<<", httpCode, url, syncElapsedMs, "ms", outBody.size(), "bytes");
     curl_easy_cleanup(curl);
     return (httpCode == 200 && !outBody.empty());
 }
@@ -692,7 +708,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         if (resp.httpCode == 0 && !resp.curlErrStr.empty()) {
             ALOG_WARN("Event poll error:", resp.curlErrStr);
             if (s_pollRunning) {
-                usleep(2000000);
+                qSleepMs(2000);
                 EventPoller::addRequest(
                     {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
                      "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
@@ -702,7 +718,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         }
 
         if (resp.httpCode != 200) {
+            ALOG_WARN("!! event poll non-200:", resp.httpCode);
             if (s_pollRunning) {
+                qSleepMs(2000);
                 EventPoller::addRequest(
                     {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
                      "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
@@ -723,7 +741,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         if (useNdjson) {
             int parseErrors = parseEventsNdjson(resp.body, s_lastEventId, events);
             if (parseErrors > 0) {
-                ALOG_WARN("parseEventsNdjson: %d/%zu lines failed", parseErrors, events.size() + parseErrors);
+                ALOG_WARN("parseEventsNdjson:", parseErrors, "/", events.size() + parseErrors, "lines failed");
             }
         } else {
             if (!parseEventsJson(resp.body, s_lastEventId, events))
