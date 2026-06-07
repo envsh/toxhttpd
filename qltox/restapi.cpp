@@ -18,6 +18,7 @@ bool ToxAPI::s_pollRunning = false;
 bool ToxAPI::s_loadingAllData = false;
 bool ToxAPI::s_reloadPending = false;
 static bool s_useNdjson = true; // true=auto s/ Content-Type 分派; false=强制旧 JSON 数组
+static const char* kEventTopic = "topic=reddit,hacknews,twitter";
 
 // ── Helpers ──
 
@@ -197,7 +198,7 @@ void ToxAPI::stopPollEvent() {
 
 void ToxAPI::pollEvents() {
     EventPoller::addRequest(
-        {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+        {buildUrl("/api/events?after=" + std::to_string(s_lastEventId) + "&" + kEventTopic),
          "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
         onHttpDone, new ApiCtx(ApiPollEvents));
 }
@@ -721,7 +722,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             if (s_pollRunning) {
                 qSleepMs(2000);
                 EventPoller::addRequest(
-                    {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                    {buildUrl("/api/events?after=" + std::to_string(s_lastEventId) + "&" + kEventTopic),
                      "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
                     onHttpDone, new ApiCtx(ApiPollEvents));
             }
@@ -733,7 +734,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             if (s_pollRunning) {
                 qSleepMs(2000);
                 EventPoller::addRequest(
-                    {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                    {buildUrl("/api/events?after=" + std::to_string(s_lastEventId) + "&" + kEventTopic),
                      "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
                     onHttpDone, new ApiCtx(ApiPollEvents));
             }
@@ -763,7 +764,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
         if (s_pollRunning) {
             EventPoller::addRequest(
-                {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
+                {buildUrl("/api/events?after=" + std::to_string(s_lastEventId) + "&" + kEventTopic),
                  "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
                 onHttpDone, new ApiCtx(ApiPollEvents));
         }
