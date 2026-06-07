@@ -21,6 +21,7 @@ const char* EMOJI_GROUP = "👥";
 const char* EMOJI_CONFERENCE = "🎙";
 const char* EMOJI_SYSEVENT = "⚙";
 const char* EMOJI_UNKNOWN = "❓";
+const char* EMOJI_TOPIC = "📌";
 const char* STATUS_ONLINE = "●";
 const char* STATUS_OFFLINE = "○";
 #else
