@@ -40,7 +40,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), current
     for (int i = 0; i < 4; ++i) {
         QPushButton* tab = new QPushButton(_(tabNames[i]), this);
         qSetCheckable(tab, true);
-        if (i == 0) qSetChecked(tab, true);
+        if (i == 0) { qSetChecked(tab, true); }
         tabButtons[i] = tab;
         connect(tab, SIGNAL(clicked()), this, SLOT(onTabClicked()));
         tabLayout->addWidget(tab);
@@ -173,7 +173,7 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
 
 void ContactListWidget::onTabClicked() {
     QPushButton* senderBtn = (QPushButton*) sender();
-    if (!senderBtn) return;
+    if (!senderBtn) { return; }
     
     // 查找是哪个按钮被点击
     for (int i = 0; i < 4; ++i) {
@@ -185,7 +185,7 @@ void ContactListWidget::onTabClicked() {
 }
 
 void ContactListWidget::setTabFilter(int index) {
-    if (index < 0 || index >= 4) return;
+    if (index < 0 || index >= 4) { return; }
     
     currentFilter = tabFilters[index];
     currentTab = index;
@@ -205,15 +205,15 @@ void ContactListWidget::onSelectionChanged() {
 #ifdef QT3_BUILD
     QListBox* lb = (QListBox*)listWidget;
     QListBoxItem* item = lb->selectedItem();
-    if (!item) return;
+    if (!item) { return; }
     int index = lb->index(item);
     int count = 0;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") continue;
-            if (currentFilter == "group" && c->type != "group") continue;
-            if (currentFilter == "conference" && c->type != "conference") continue;
+            if (currentFilter == "friend" && c->type != "friend") { continue; }
+            if (currentFilter == "group" && c->type != "group") { continue; }
+            if (currentFilter == "conference" && c->type != "conference") { continue; }
         }
         if (count == index) {
             emit contactSelected(c->id, c->type, c->name);
@@ -231,7 +231,7 @@ void ContactListWidget::onItemClicked() {
     // Qt4: get current item
     QListWidget* lw = (QListWidget*)listWidget;
     QListWidgetItem* item = lw->currentItem();
-    if (!item) return;
+    if (!item) { return; }
     int id = item->data(Qt::UserRole).toInt();
     QString type = item->data(Qt::UserRole + 1).toString();
     // find name
@@ -261,9 +261,9 @@ void ContactListWidget::updateView_v3() {
         for (uint i = 0; i < allContacts.count(); ++i) {
             Contact* c = allContacts.at(i);
             if (currentFilter != "all") {
-                if (currentFilter == "friend" && c->type != "friend") continue;
-                if (currentFilter == "group" && c->type != "group") continue;
-                if (currentFilter == "conference" && c->type != "conference") continue;
+                if (currentFilter == "friend" && c->type != "friend") { continue; }
+                if (currentFilter == "group" && c->type != "group") { continue; }
+                if (currentFilter == "conference" && c->type != "conference") { continue; }
             }
             if (count == index) {
                 selectedId = c->id;
@@ -281,9 +281,9 @@ void ContactListWidget::updateView_v3() {
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") continue;
-            if (currentFilter == "group" && c->type != "group") continue;
-            if (currentFilter == "conference" && c->type != "conference") continue;
+            if (currentFilter == "friend" && c->type != "friend") { continue; }
+            if (currentFilter == "group" && c->type != "group") { continue; }
+            if (currentFilter == "conference" && c->type != "conference") { continue; }
         }
         
         QString emoji = (c->type == "friend") ? EMOJI_FRIEND :
@@ -335,9 +335,9 @@ void ContactListWidget::updateView_v4() {
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") continue;
-            if (currentFilter == "group" && c->type != "group") continue;
-            if (currentFilter == "conference" && c->type != "conference") continue;
+            if (currentFilter == "friend" && c->type != "friend") { continue; }
+            if (currentFilter == "group" && c->type != "group") { continue; }
+            if (currentFilter == "conference" && c->type != "conference") { continue; }
         }
         
         QString emoji = (c->type == "friend") ? EMOJI_FRIEND :
@@ -378,16 +378,16 @@ void ContactListWidget::retranslateUi() {
     }
     
     // 更新添加好友输入框
-    if (addInput) addInput->setPlaceholderText(_("placeholders.add_friend"));
+    if (addInput) { addInput->setPlaceholderText(_("placeholders.add_friend")); }
     
     // 更新加入群组输入框
-    if (joinGroupInput) joinGroupInput->setPlaceholderText(_("placeholders.join_group"));
-    if (joinGroupBtn) joinGroupBtn->setText(_("buttons.join_group"));
+    if (joinGroupInput) { joinGroupInput->setPlaceholderText(_("placeholders.join_group")); }
+    if (joinGroupBtn) { joinGroupBtn->setText(_("buttons.join_group")); }
     
     // 更新底部按钮
-    if (addBtn) addBtn->setText(_("buttons.add"));
-    if (confBtn) confBtn->setText(_("buttons.create_conference"));
-    if (groupBtn) groupBtn->setText(_("buttons.create_group"));
+    if (addBtn) { addBtn->setText(_("buttons.add")); }
+    if (confBtn) { confBtn->setText(_("buttons.create_conference")); }
+    if (groupBtn) { groupBtn->setText(_("buttons.create_group")); }
     
     // 重新更新视图
     updateView_v3();
@@ -401,7 +401,7 @@ void ContactListWidget::retranslateUi() {
 void ContactListWidget::showContextMenu(QPoint pos) {
     QListWidget* lw = (QListWidget*)listWidget;
     QListWidgetItem* item = lw->itemAt(pos);
-    if (!item) return;
+    if (!item) { return; }
     
     int id = item->data(Qt::UserRole).toInt();
     QString type = item->data(Qt::UserRole + 1).toString();
@@ -420,16 +420,16 @@ bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
         if (mouseEvent->button() == Qt::RightButton) {
             QListBox* lb = (QListBox*)listWidget;
             QListBoxItem* item = lb->itemAt(mouseEvent->pos());
-            if (!item) return false;
+            if (!item) { return false; }
             int index = lb->index(item);
             // 查找对应的联系人
             int count = 0;
             for (uint i = 0; i < allContacts.count(); ++i) {
                 Contact* c = allContacts.at(i);
                 if (currentFilter != "all") {
-                    if (currentFilter == "friend" && c->type != "friend") continue;
-                    if (currentFilter == "group" && c->type != "group") continue;
-                    if (currentFilter == "conference" && c->type != "conference") continue;
+                    if (currentFilter == "friend" && c->type != "friend") { continue; }
+                    if (currentFilter == "group" && c->type != "group") { continue; }
+                    if (currentFilter == "conference" && c->type != "conference") { continue; }
                 }
                 if (count == index) {
                     contextItemId = c->id;
@@ -477,7 +477,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.insertSeparator();
         menu.insertItem(_("context_menu.delete_friend"), 3);
         int choice = menu.exec(globalPos);
-        if (choice == 0) emit viewInfoRequested(id, type);
+        if (choice == 0) { emit viewInfoRequested(id, type); }
         else if (choice == 1) emit inviteToConferenceRequested(id);
         else if (choice == 2) emit inviteToGroupRequested(id);
         else if (choice == 3) emit deleteOrLeaveRequested(id, type);
@@ -488,7 +488,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.addSeparator();
         QAction* deleteAction = menu.addAction(_("context_menu.delete_friend"));
         QAction* selected = menu.exec(globalPos);
-        if (selected == viewInfoAction) emit viewInfoRequested(id, type);
+        if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
         else if (selected == inviteConfAction) emit inviteToConferenceRequested(id);
         else if (selected == inviteGroupAction) emit inviteToGroupRequested(id);
         else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
@@ -501,7 +501,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.insertSeparator();
         menu.insertItem(_("context_menu.leave_conference"), 3);
         int choice = menu.exec(globalPos);
-        if (choice == 0) emit viewInfoRequested(id, type);
+        if (choice == 0) { emit viewInfoRequested(id, type); }
         else if (choice == 1) emit viewMembersRequested(id, type);
         else if (choice == 2) emit setConferenceTitleRequested(id);
         else if (choice == 3) emit deleteOrLeaveRequested(id, type);
@@ -511,7 +511,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_conference"));
         QAction* selected = menu.exec(globalPos);
-        if (selected == viewInfoAction) emit viewInfoRequested(id, type);
+        if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
         else if (selected == setTitleAction) emit setConferenceTitleRequested(id);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
@@ -525,7 +525,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.insertSeparator();
         menu.insertItem(_("context_menu.leave_group"), 4);
         int choice = menu.exec(globalPos);
-        if (choice == 0) emit viewInfoRequested(id, type);
+        if (choice == 0) { emit viewInfoRequested(id, type); }
         else if (choice == 1) emit viewMembersRequested(id, type);
         else if (choice == 2) emit renameNickRequested(id, name);
         else if (choice == 3) emit setGroupTopicRequested(id);
@@ -537,7 +537,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_group"));
         QAction* selected = menu.exec(globalPos);
-        if (selected == viewInfoAction) emit viewInfoRequested(id, type);
+        if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
         else if (selected == renameAction) emit renameNickRequested(id, name);
         else if (selected == setTopicAction) emit setGroupTopicRequested(id);

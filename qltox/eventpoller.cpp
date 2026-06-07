@@ -15,14 +15,14 @@ static size_t headerCb(void* contents, size_t size, size_t nmemb, void* userp) {
     auto* headers = static_cast<std::map<std::string, std::string>*>(userp);
     std::string line(static_cast<char*>(contents), total);
     size_t colon = line.find(':');
-    if (colon == std::string::npos || colon == 0) return total;
+    if (colon == std::string::npos || colon == 0) { return total; }
     std::string name = line.substr(0, colon);
     size_t vStart = colon + 1;
-    while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) vStart++;
+    while (vStart < line.size() && (line[vStart] == ' ' || line[vStart] == '\t')) { vStart++; }
     size_t vEnd = line.size();
     while (vEnd > vStart && (line[vEnd - 1] == '\r' || line[vEnd - 1] == '\n')) vEnd--;
-    if (vEnd <= vStart) return total;
-    for (char& c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    if (vEnd <= vStart) { return total; }
+    for (char& c : name) { c = static_cast<char>(tolower(static_cast<unsigned char>(c))); }
     (*headers)[name] = line.substr(vStart, vEnd - vStart);
     return total;
 }
@@ -42,7 +42,7 @@ void EventPoller::start() {
 }
 
 void EventPoller::stop() {
-    if (!s_instance) return;
+    if (!s_instance) { return; }
     s_instance->running = false;
     s_instance->wait();
     if (s_instance->multi) {
@@ -56,10 +56,10 @@ void EventPoller::stop() {
 void EventPoller::addRequest(const HttpRequest& req,
                               void (*done)(const HttpResponse& resp, void* udata),
                               void* udata) {
-    if (!s_instance || !s_instance->multi) return;
+    if (!s_instance || !s_instance->multi) { return; }
 
     CURL* easy = curl_easy_init();
-    if (!easy) return;
+    if (!easy) { return; }
 
     auto* ctx = new HttpCtx{req.url, req.data,
                              std::string(), std::map<std::string, std::string>(),
@@ -97,7 +97,7 @@ void EventPoller::run() {
         int numfds;
         curl_multi_wait(multi, NULL, 0, 50, &numfds);
         int r;
-        while (curl_multi_perform(multi, &r) == CURLM_CALL_MULTI_PERFORM);
+        while (curl_multi_perform(multi, &r) == CURLM_CALL_MULTI_PERFORM) { }
 
         CURLMsg* msg;
         int left;
@@ -110,8 +110,9 @@ void EventPoller::run() {
                 int curlResult = msg->data.result;
                 HttpResponse resp;
                 resp.httpCode = (int)httpCode;
-                if (curlResult != 0)
+                if (curlResult != 0) {
                     resp.curlErrStr = curl_easy_strerror((CURLcode)curlResult);
+                }
                 resp.body = std::move(ctx->body);
                 resp.headers = std::move(ctx->headers);
                 double totalTime = 0.0;
@@ -121,8 +122,10 @@ void EventPoller::run() {
                 curl_multi_remove_handle(multi, msg->easy_handle);
                 curl_easy_cleanup(msg->easy_handle);
 
-                if (ctx->requestHeaders)
+                if (ctx->requestHeaders) {
                     curl_slist_free_all(ctx->requestHeaders);
+
+                }
 
                 ctx->done(resp, ctx->udata);
                 delete ctx;

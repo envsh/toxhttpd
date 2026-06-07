@@ -11,7 +11,7 @@ BoolConfigItem::BoolConfigItem(const QString& key, bool defaultValue,
 BoolConfigItem::~BoolConfigItem() {}
 
 void BoolConfigItem::load() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
     m_value = m_settings->readBoolEntry(m_key, m_default);
@@ -23,7 +23,7 @@ void BoolConfigItem::load() {
 }
 
 void BoolConfigItem::save() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
     m_value = checkBox()->isChecked();
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
@@ -45,7 +45,7 @@ StringConfigItem::StringConfigItem(const QString& key, const QString& defaultVal
 StringConfigItem::~StringConfigItem() {}
 
 void StringConfigItem::load() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
     m_value = m_settings->readEntry(m_key, m_default);
@@ -57,7 +57,7 @@ void StringConfigItem::load() {
 }
 
 void StringConfigItem::save() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
     m_value = lineEdit()->text();
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
@@ -79,7 +79,7 @@ IntConfigItem::IntConfigItem(const QString& key, int defaultValue,
 IntConfigItem::~IntConfigItem() {}
 
 void IntConfigItem::load() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
     m_value = m_settings->readNumEntry(m_key, m_default);
@@ -91,7 +91,7 @@ void IntConfigItem::load() {
 }
 
 void IntConfigItem::save() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
     m_value = spinBox()->value();
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
@@ -117,7 +117,7 @@ SelectConfigItem::SelectConfigItem(const QString& key, const QString& defaultVal
 SelectConfigItem::~SelectConfigItem() {}
 
 void SelectConfigItem::load() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
     m_value = m_settings->readEntry(m_key, m_default);
@@ -141,7 +141,7 @@ void SelectConfigItem::load() {
 }
 
 void SelectConfigItem::save() {
-    if (!m_settings) return;
+    if (!m_settings) { return; }
     m_value = comboBox()->currentText();
 #ifdef QT3_BUILD
     m_settings->beginGroup("Settings");
@@ -313,7 +313,7 @@ void ConfigDialog::loadSettings() {
 }
 
 void ConfigDialog::saveSettings() {
-    if (m_settingsFile.isEmpty() || !m_settings) return;
+    if (m_settingsFile.isEmpty() || !m_settings) { return; }
     
     for (int i = 0; i < m_configItems.count(); ++i) {
         m_configItems[i]->save();
@@ -397,7 +397,7 @@ CategoryPage::~CategoryPage() {}
 
 void CategoryPage::addWidget(QWidget* widget, int stretch) {
     Q_UNUSED(stretch);
-    if (!widget) return;
+    if (!widget) { return; }
     if (m_groupBox) {
         m_groupBox->addWidget(widget);
     }
@@ -420,7 +420,7 @@ void CategoryPage::addStretch(int stretch) {
 }
 
 void CategoryPage::addLabeledControl(const QString& label, QWidget* control) {
-    if (!control) return;
+    if (!control) { return; }
     if (m_groupBox) {
         m_groupBox->addLabeledControl(label, control);
     }
@@ -447,7 +447,7 @@ ConfigGroupBox::~ConfigGroupBox() {}
 
 void ConfigGroupBox::addWidget(QWidget* widget, int stretch) {
     Q_UNUSED(stretch);
-    if (!widget) return;
+    if (!widget) { return; }
 #ifdef QT3_BUILD
     if (m_grid) {
         if (widget->isWidgetType()) {
@@ -501,7 +501,7 @@ void ConfigGroupBox::addStretch(int stretch) {
 }
 
 void ConfigGroupBox::addLabeledControl(const QString& label, QWidget* control) {
-    if (!control) return;
+    if (!control) { return; }
 #ifdef QT3_BUILD
     if (m_grid) {
         int row = m_grid->numRows();
