@@ -1452,21 +1452,22 @@ void MainWindow::onSourceClicked(int msgIndex) {
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
 
     ChatMessage msg = chatWidget->messageAt(msgIndex);
-    QDialog dlg(this);
-    dlg.resize(500, 400);
-    qSetWindowTitle(&dlg, qFromUtf8("Source"));
-    QBoxLayout* lay = qNewBoxLayout(&dlg, QBoxLayout::TopToBottom, 0, 4);
+    QDialog* dlg = new QDialog(this);
+    dlg->resize(650, 520);
+    qSetWindowTitle(dlg, qFromUtf8("Source"));
+    QBoxLayout* lay = qNewBoxLayout(dlg, QBoxLayout::TopToBottom, 0, 4);
     qSetMargins(lay, 4, 4, 4, 4);
 
-    JsonViewWidget* jv = new JsonViewWidget(&dlg);
+    JsonViewWidget* jv = new JsonViewWidget(dlg);
     jv->setJson(msg.messageText);
     lay->addWidget(jv, 1);
 
-    QPushButton* closeBtn = new QPushButton(_("buttons.close"), &dlg);
-    connect(closeBtn, SIGNAL(clicked()), &dlg, SLOT(accept()));
+    QPushButton* closeBtn = new QPushButton(_("buttons.close"), dlg);
+    connect(closeBtn, SIGNAL(clicked()), dlg, SLOT(accept()));
     lay->addWidget(closeBtn, 0, Qt::AlignRight);
 
-    dlg.exec();
+    QObject::connect(dlg, SIGNAL(finished(int)), dlg, SLOT(deleteLater()));
+    dlg->show();
 }
 
 void MainWindow::onMenu1Stub() {

@@ -325,6 +325,24 @@ static QString buildTreePrefix(int depth, bool hasNext, const std::vector<bool>&
     return p;
 }
 
+QWidget* JsonViewWidget::createLabel(const QString& html, QWidget* parent) {
+#ifdef QT3_BUILD
+    QTextEdit* te = new QTextEdit(parent);
+    te->setReadOnly(true);
+    te->setFrameStyle(QFrame::NoFrame);
+    te->setWordWrap(QTextEdit::NoWrap);
+    te->setText(html);
+    QFontMetrics fm(te->font());
+    te->setFixedHeight(fm.lineSpacing() + 4);
+    return te;
+#else
+    QLabel* label = new QLabel(html, parent);
+    label->setWordWrap(false);
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    return label;
+#endif
+}
+
 QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QString& path, int depth, QWidget* parent, bool hasNext, const std::vector<bool>& ancestors) {
     if (!node) return nullptr;
     if (depth > m_maxDepth) m_maxDepth = depth;
@@ -353,8 +371,8 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
         rowLayout->addWidget(treeLabel);
     }
 
-    QLabel* keyLabel = nullptr;
-    QLabel* valueLabel = nullptr;
+    QWidget* keyLabel = nullptr;
+    QWidget* valueLabel = nullptr;
     QWidget* childrenContainer = nullptr;
 
     if (isContainer) {
@@ -368,11 +386,11 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
         rowLayout->addWidget(toggleBtn);
 
         if (!key.isEmpty()) {
-            keyLabel = new QLabel("<b>" + escapeHtml(key) + "</b>:", headerRow);
+            keyLabel = createLabel("<b>" + escapeHtml(key) + "</b>:", headerRow);
             rowLayout->addWidget(keyLabel);
         }
 
-        valueLabel = new QLabel(typeSummary(node), headerRow);
+        valueLabel = createLabel(typeSummary(node), headerRow);
         rowLayout->addWidget(valueLabel);
         rowLayout->addStretch();
 
@@ -416,11 +434,11 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
     } else {
         // Leaf node
         if (!key.isEmpty()) {
-            keyLabel = new QLabel("<b>" + escapeHtml(key) + "</b>:", headerRow);
+            keyLabel = createLabel("<b>" + escapeHtml(key) + "</b>:", headerRow);
             rowLayout->addWidget(keyLabel);
         }
 
-        valueLabel = new QLabel(valueToHtml(node), headerRow);
+        valueLabel = createLabel(valueToHtml(node), headerRow);
         rowLayout->addWidget(valueLabel);
         rowLayout->addStretch();
     }
@@ -438,9 +456,6 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
         info.path = path;
         info.copyText = isContainer ? stripHtml(typeSummary(node)) : valuePlainText(node);
         m_nodeMap[valueLabel] = info;
-#ifndef QT3_BUILD
-        valueLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-#endif
     }
     if (keyLabel) {
         keyLabel->installEventFilter(this);
@@ -449,9 +464,6 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
         info.path = path;
         info.copyText = key;
         m_nodeMap[keyLabel] = info;
-#ifndef QT3_BUILD
-        keyLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-#endif
     }
 
     return row;
@@ -590,15 +602,63 @@ void JsonViewWidget::onPaste() {
 
 bool JsonViewWidget::eventFilter(QObject* obj, QEvent* event) {
     if (event->type() == QEvent::Enter) {
-        m_hoveredLabel = (QWidget*)obj;
-        std::map<QWidget*, NodeInfo>::iterator it = m_nodeMap.find((QWidget*)obj);
+        QWidget* w = (QWidget*)obj;
+        m_hoveredLabel = w;
+#ifdef QT3_BUILD
+        w->setPaletteBackgroundColor(QColor(230, 240, 255));
+#else
+        QPalette pal = w->palette();
+        pal.setColor(w->backgroundRole(), QColor(230, 240, 255));
+        w->setPalette(pal);
+#endif
+        std::map<QWidget*, NodeInfo>::iterator it = m_nodeMap.find(w);
         if (it != m_nodeMap.end()) {
             updateStatusBar(it->second.depth, it->second.path);
         }
     } else if (event->type() == QEvent::Leave) {
+        QWidget* w = (QWidget*)obj;
+#ifdef QT3_BUILD
+        w->unsetPalette();
+#else
+        w->setPalette(QPalette());
+#endif
         clearStatusBar();
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void JsonViewWidget::contextMenuEvent(QContextMenuEvent* event) {
+    if (!m_hoveredLabel) {
+        QWidget::contextMenuEvent(event);
+        return;
+    }
+    std::map<QWidget*, NodeInfo>::iterator it = m_nodeMap.find(m_hoveredLabel);
+    if (it == m_nodeMap.end()) {
+        QWidget::contextMenuEvent(event);
+        return;
+    }
+
+#ifdef QT3_BUILD
+    QPopupMenu menu(this);
+    int copyValueId = menu.insertItem("Copy value");
+    int copyPathId = menu.insertItem("Copy path");
+    int triggered = menu.exec(event->globalPos());
+    if (triggered == copyValueId) {
+        QApplication::clipboard()->setText(it->second.copyText);
+    } else if (triggered == copyPathId) {
+        QApplication::clipboard()->setText(it->second.path);
+    }
+#else
+    QMenu menu(this);
+    QAction* copyValue = menu.addAction("Copy value");
+    QAction* copyPath = menu.addAction("Copy path");
+    QAction* triggered = menu.exec(event->globalPos());
+    if (triggered == copyValue) {
+        QApplication::clipboard()->setText(it->second.copyText);
+    } else if (triggered == copyPath) {
+        QApplication::clipboard()->setText(it->second.path);
+    }
+#endif
 }
 
 void JsonViewWidget::keyPressEvent(QKeyEvent* event) {

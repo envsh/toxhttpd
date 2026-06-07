@@ -11,8 +11,13 @@
 #include <qlayout.h>
 #ifdef QT3_BUILD
 #include <qscrollview.h>
+#include <qpopupmenu.h>
+#include <qaction.h>
 #else
 #include <QScrollArea>
+#include <QMenu>
+#include <QAction>
+#include <QContextMenuEvent>
 #endif
 #include <map>
 #include <vector>
@@ -42,6 +47,7 @@ private slots:
 protected:
     bool eventFilter(QObject* obj, QEvent* event);
     void keyPressEvent(QKeyEvent* event);
+    void contextMenuEvent(QContextMenuEvent* event);
 
 private:
     struct NodeInfo {
@@ -57,6 +63,7 @@ private:
     QString typeSummary(cJSON* node);
     int childCount(cJSON* node);
     void cleanupTree();
+    QWidget* createLabel(const QString& html, QWidget* parent);
     void updateStatusBar(int depth, const QString& path);
     void clearStatusBar();
 
