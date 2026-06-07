@@ -208,7 +208,7 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
     if (lineCount < 1) { lineCount = 1; }
 
     int textHeight = lineCount * fm.lineSpacing();
-    int minBubbleH = 2 * kBubbleVPad + 22; // ensure button fits
+    int minBubbleH = 2 * kBubbleVPad + fm.lineSpacing();
     int bubbleHeight = 2 * kBubbleVPad + std::max(textHeight, fm.lineSpacing());
     if (bubbleHeight < minBubbleH) { bubbleHeight = minBubbleH; }
 
@@ -560,6 +560,12 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
     QRect textRect;
     QRect bubbleRect;
 
+    // Header button constants
+    const int hdrBtnSize = 18;
+    const int hdrBtnGap = 4;
+    int hdrBtnCnt = 2;
+    int hdrBtnAreaW = hdrBtnCnt * hdrBtnSize + (hdrBtnCnt - 1) * hdrBtnGap;
+
     if (msg.type == "self") {
         int ax = viewWidth - kPad - kAvatarSize;
         p.setBrush(currentPalette().surfaceBg);
@@ -580,6 +586,9 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
         int bubbleMaxW = contentRight - contentLeft;
         int bubbleW = std::min(bubbleMaxW, (bubbleMaxW * 80) / 100);
 
+        // Header action buttons
+        int hdrTextRight = contentRight - hdrBtnAreaW - kPad / 2;
+
         f.setPointSize(11);
         p.setFont(f);
         p.setPen(currentPalette().textMuted);
@@ -591,7 +600,7 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
         else
             displayName = "?";
         int nameW = fm.width(displayName) + fm.width("  ");
-        p.drawText(contentRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
+        p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
 
         int ipW = 0;
         if (!msg.ipAddress.isEmpty()) {
@@ -599,17 +608,31 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
             p.setFont(f);
             p.setPen(QColor(130, 140, 150));
             ipW = fm.width(msg.ipAddress);
-            p.drawText(contentRight - nameW - ipW - kPad/2, y + kPad,
+            p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
                        ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.ipAddress);
         }
 
         f.setPointSize(10);
         p.setFont(f);
         p.setPen(currentPalette().textMuted);
-        p.drawText(contentRight - nameW - ipW - kPad/2 - fm.width(msg.time) - kPad/2, y + kPad,
+        p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(msg.time) - kPad/2, y + kPad,
                    fm.width(msg.time), headerH, Qt::AlignRight | Qt::AlignVCenter, msg.time);
 
         p.setFont(font());
+
+        // Draw header buttons
+        {
+            int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+            int btnX0 = contentRight - hdrBtnAreaW;
+            msg.sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+            msg.translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+            p.setPen(currentPalette().textMuted);
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(msg.sourceBtnRect);
+            p.drawText(msg.sourceBtnRect, Qt::AlignCenter, qFromUtf8("📋"));
+            p.drawEllipse(msg.translateBtnRect);
+            p.drawText(msg.translateBtnRect, Qt::AlignCenter, qFromUtf8("🌐"));
+        }
 
         int bubbleX = contentRight - bubbleW;
         int bubbleY = y + kPad + headerH + kPad;
@@ -642,6 +665,12 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
 
         int contentX = 2 * kPad + kAvatarSize;
         int contentW = viewWidth - kPad - contentX;
+        int bubbleW = (contentW * 80) / 100;
+        if (bubbleW < 100) { bubbleW = contentW; }
+        int bubbleRight = contentX + bubbleW;
+
+        // Header action buttons
+        int hdrTextRight = bubbleRight - hdrBtnAreaW - kPad / 2;
 
         f.setPointSize(11);
         p.setFont(f);
@@ -653,26 +682,48 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
             displayName = QString("Peer %1").arg(msg.peerNumber);
         else
             displayName = "?";
-        p.drawText(contentX, y + kPad, contentW, headerH, Qt::AlignLeft | Qt::AlignVCenter, displayName);
+        int maxNameW = hdrTextRight - contentX;
+        if (maxNameW < 20) { maxNameW = 20; }
+        p.drawText(contentX, y + kPad, maxNameW, headerH, Qt::AlignLeft | Qt::AlignVCenter, displayName);
 
         f.setPointSize(10);
         p.setFont(f);
         int ipEnd = contentX + fm.width(displayName) + kPad;
         if (!msg.ipAddress.isEmpty()) {
             p.setPen(QColor(130, 140, 150));
-            p.drawText(ipEnd, y + kPad, fm.width(msg.ipAddress), headerH,
-                       Qt::AlignLeft | Qt::AlignVCenter, msg.ipAddress);
+            int ipW = fm.width(msg.ipAddress);
+            int ipMax = hdrTextRight - ipEnd;
+            if (ipMax > ipW) { ipMax = ipW; }
+            if (ipMax > 0) {
+                p.drawText(ipEnd, y + kPad, ipMax, headerH,
+                           Qt::AlignLeft | Qt::AlignVCenter, msg.ipAddress);
+            }
             ipEnd += fm.width(msg.ipAddress) + kPad/2;
         }
 
         p.setPen(currentPalette().textMuted);
         int timeX = ipEnd;
-        p.drawText(timeX, y + kPad, contentW - (timeX - contentX), headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.time);
+        int timeMaxW = hdrTextRight - timeX;
+        if (timeMaxW > 0) {
+            p.drawText(timeX, y + kPad, timeMaxW, headerH, Qt::AlignLeft | Qt::AlignVCenter, msg.time);
+        }
 
         p.setFont(font());
 
-        int bubbleW = (contentW * 80) / 100;
-        if (bubbleW < 100) { bubbleW = contentW; }
+        // Draw header buttons
+        {
+            int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+            int btnX0 = bubbleRight - hdrBtnAreaW;
+            msg.sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+            msg.translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+            p.setPen(currentPalette().textMuted);
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(msg.sourceBtnRect);
+            p.drawText(msg.sourceBtnRect, Qt::AlignCenter, qFromUtf8("📋"));
+            p.drawEllipse(msg.translateBtnRect);
+            p.drawText(msg.translateBtnRect, Qt::AlignCenter, qFromUtf8("🌐"));
+        }
+
         int bubbleY = y + kPad + headerH + kPad;
         int bubbleH = msg.height - (kPad + headerH + kPad) - kMsgSpacing;
         if (bubbleH < 30) { bubbleH = 30; }
@@ -721,29 +772,6 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
     p.drawText(textRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, msg.messageText);
 #endif
 #endif
-
-    // Translate button: top-right of bubble, inside padding
-    const int btnSize = 22;
-    msg.translateBtnRect = QRect(
-        bubbleRect.right() - kBubbleHPad - btnSize,
-        bubbleRect.top() + kBubbleVPad,
-        btnSize, btnSize);
-
-    if (!msg.translateError.isEmpty()) {
-        p.setPen(QPen(QColor(200, 60, 60), 2));
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(msg.translateBtnRect);
-        p.setPen(QColor(200, 60, 60));
-    } else {
-        p.setPen(currentPalette().textMuted);
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(msg.translateBtnRect);
-        p.setPen(currentPalette().textMuted);
-    }
-    f.setPointSize(11);
-    p.setFont(f);
-    p.drawText(msg.translateBtnRect, Qt::AlignCenter, qFromUtf8("\xF0\x9F\x8C\x90"));
-    p.setFont(font());
 
     // Translated text
     if (msg.showTranslation && !msg.translatedText.isEmpty()) {
@@ -876,6 +904,11 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 return;
             }
 
+            // Check source button click (stub)
+            if (m_messages[msgIndex].sourceBtnRect.contains(event->pos())) {
+                return;
+            }
+
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
             for (int i = 0; i < msgIndex; i++) { curY += m_messages[i].height; }
@@ -940,6 +973,20 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     // Set cursor based on whether over URL
     int msgIndex = findMessageAtY(event->y());
     if (msgIndex >= 0 && msgIndex < (int)m_messages.size()) {
+        // Check header action buttons first
+        if (m_messages[msgIndex].translateBtnRect.contains(event->pos()) ||
+            m_messages[msgIndex].sourceBtnRect.contains(event->pos())) {
+            setCursor(QCursor(Qt::PointingHandCursor));
+            // Show translate error tooltip if applicable
+            if (!m_messages[msgIndex].translateError.isEmpty() &&
+                m_messages[msgIndex].translateBtnRect.contains(event->pos())) {
+#ifndef QT3_BUILD
+                QToolTip::showText(event->globalPos(), m_messages[msgIndex].translateError, this);
+#endif
+            }
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
         // ... compute charPos for link detection
         int curY = kPad - m_scrollPos;
         for (int i = 0; i < msgIndex; i++) { curY += m_messages[i].height; }
@@ -968,15 +1015,6 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 #endif
     } else {
         setCursor(QCursor(Qt::ArrowCursor));
-    }
-
-    // Translate error tooltip
-    if (msgIndex >= 0 && msgIndex < (int)m_messages.size() &&
-        m_messages[msgIndex].translateBtnRect.contains(event->pos()) &&
-        !m_messages[msgIndex].translateError.isEmpty()) {
-#ifndef QT3_BUILD
-        QToolTip::showText(event->globalPos(), m_messages[msgIndex].translateError, this);
-#endif
     }
 
     QWidget::mouseMoveEvent(event);

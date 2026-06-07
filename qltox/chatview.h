@@ -26,6 +26,7 @@ struct ChatMessage {
     bool showTranslation;
     bool translationInProgress;
     QRect translateBtnRect;
+    QRect sourceBtnRect;
 
     ChatMessage() : height(0), peerNumber(-1), showTranslation(false), translationInProgress(false) {}
 };
