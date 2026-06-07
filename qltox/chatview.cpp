@@ -112,7 +112,7 @@ int ChatView::contentWidth() const {
 
 void ChatView::relayout() {
     int w = contentWidth();
-    if (w <= 0) w = 400;
+    if (w <= 0) { w = 400; }
 
     m_totalHeight = kPad;
     for (size_t i = 0; i < m_messages.size(); ++i) {
@@ -141,13 +141,13 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
     QFont f = font();
     QFontMetrics fm(f);
 
-    if (viewWidth <= 0) viewWidth = 400;
+    if (viewWidth <= 0) { viewWidth = 400; }
 
     int contentW = viewWidth - 3 * kPad - kAvatarSize;
     int bubbleW = (contentW * 80) / 100;
-    if (bubbleW < 100) bubbleW = contentW;
+    if (bubbleW < 100) { bubbleW = contentW; }
     int bubbleTextWidth = bubbleW - 2 * kBubbleHPad;
-    if (bubbleTextWidth < 20) bubbleTextWidth = 20;
+    if (bubbleTextWidth < 20) { bubbleTextWidth = 20; }
 
     int lineCount = 0;
 #ifdef EMOJI_RENDER_QT34
@@ -160,7 +160,7 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
         while (end < tLen && cps[end] != '\n') {
             int cw = isEmojiChar(cps[end]) ? emojiCharWidth(fm) : fm.width(QChar((ushort)cps[end]));
             lineWidth += cw;
-            if (cps[end] == ' ') lastSpace = end;
+            if (cps[end] == ' ') { lastSpace = end; }
             if (lineWidth >= bubbleTextWidth) {
                 if (lastSpace > pos && end - pos > 10) {
                     end = lastSpace + 1;
@@ -199,12 +199,12 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
         pos = end;
     }
 #endif
-    if (lineCount < 1) lineCount = 1;
+    if (lineCount < 1) { lineCount = 1; }
 
     int textHeight = lineCount * fm.lineSpacing();
     int minBubbleH = 2 * kBubbleVPad + 22; // ensure button fits
     int bubbleHeight = 2 * kBubbleVPad + std::max(textHeight, fm.lineSpacing());
-    if (bubbleHeight < minBubbleH) bubbleHeight = minBubbleH;
+    if (bubbleHeight < minBubbleH) { bubbleHeight = minBubbleH; }
 
     // Account for translated text
     if (msg.showTranslation && !msg.translatedText.isEmpty()) {
@@ -230,7 +230,7 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
             transLineCount++;
             tPos = end;
         }
-        if (transLineCount < 1) transLineCount = 1;
+        if (transLineCount < 1) { transLineCount = 1; }
         bubbleHeight += kBubbleVPad / 2 + transLineCount * fm.lineSpacing() + kBubbleVPad;
     }
 
@@ -255,7 +255,7 @@ std::vector<LinkSpan> ChatView::extractLinks(const QString& text) {
 #else
         pos = urlRe.indexIn(text, pos);
 #endif
-        if (pos == -1) break;
+        if (pos == -1) { break; }
         int len = urlRe.matchedLength();
         QString url = text.mid(pos, len);
         while (len > 0 && (url.right(1) == "." || url.right(1) == "," ||
@@ -282,8 +282,8 @@ static void wordBoundaries(const QString& text, int pos, int& start, int& end) {
     if (len == 0) { start = end = 0; return; }
     start = pos;
     end = pos;
-    if (pos < 0) pos = 0;
-    if (pos >= len) pos = len - 1;
+    if (pos < 0) { pos = 0; }
+    if (pos >= len) { pos = len - 1; }
     // If at whitespace, move to nearest non-space
     while (start >= 0 && text[start].isSpace()) start--;
     while (end < len && text[end].isSpace()) end++;
@@ -301,12 +301,12 @@ static void lineBoundaries(const QString& text, int pos, int& start, int& end) {
     if (len == 0) { start = end = 0; return; }
     start = pos;
     end = pos;
-    if (pos < 0) pos = 0;
-    if (pos >= len) pos = len - 1;
+    if (pos < 0) { pos = 0; }
+    if (pos >= len) { pos = len - 1; }
     // Expand left to line start
-    while (start > 0 && text[start - 1] != '\n') start--;
+    while (start > 0 && text[start - 1] != '\n') { start--; }
     // Expand right to line end
-    while (end < len && text[end] != '\n') end++;
+    while (end < len && text[end] != '\n') { end++; }
 }
 
 // Find which message is at given y coordinate (relative to widget top)
@@ -314,7 +314,7 @@ int ChatView::findMessageAtY(int y) const {
     int curY = kPad - m_scrollPos;
     for (size_t i = 0; i < m_messages.size(); ++i) {
         int h = m_messages[i].height;
-        if (y >= curY && y < curY + h) return (int)i;
+        if (y >= curY && y < curY + h) { return (int)i; }
         curY += h;
     }
     return -1;
@@ -326,7 +326,7 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
     const ChatMessage& msg = m_messages[msgIndex];
     const QString& text = msg.messageText;
     int textLen = text.length();
-    if (textLen == 0) return 0;
+    if (textLen == 0) { return 0; }
 
     QFont f = font();
     QFontMetrics fm(f);
@@ -336,9 +336,9 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
     // Compute bubble text width (same as calcMessageHeight)
     int contentW = viewW - 3 * kPad - kAvatarSize;
     int bubbleW = (contentW * 80) / 100;
-    if (bubbleW < 100) bubbleW = contentW;
+    if (bubbleW < 100) { bubbleW = contentW; }
     int bubbleTextWidth = bubbleW - 2 * kBubbleHPad;
-    if (bubbleTextWidth < 20) bubbleTextWidth = 20;
+    if (bubbleTextWidth < 20) { bubbleTextWidth = 20; }
 
     // Compute text area position
     int areaX, areaY;
@@ -353,15 +353,15 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
         int contentX = 2 * kPad + kAvatarSize;
         int contentW2 = viewW - kPad - contentX;
         int bubbleW3 = (contentW2 * 80) / 100;
-        if (bubbleW3 < 100) bubbleW3 = contentW2;
+        if (bubbleW3 < 100) { bubbleW3 = contentW2; }
         areaX = contentX + kBubbleHPad;
     }
     areaY = kPad + headerH + kPad + kBubbleVPad;
 
     localX -= areaX;
     localY -= areaY;
-    if (localX < 0) localX = 0;
-    if (localY < 0) return -1;
+    if (localX < 0) { localX = 0; }
+    if (localY < 0) { return -1; }
 
     // Compute line breaks
     std::vector<int> lineStarts;
@@ -386,14 +386,14 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
             end++;
         }
         pos = end;
-        if (pos < textLen) lineStarts.push_back(pos);
+        if (pos < textLen) { lineStarts.push_back(pos); }
     }
 
     int lineHeight = fm.lineSpacing();
     int lineIndex = localY / lineHeight;
     if (lineIndex >= (int)lineStarts.size())
         lineIndex = (int)lineStarts.size() - 1;
-    if (lineIndex < 0) lineIndex = 0;
+    if (lineIndex < 0) { lineIndex = 0; }
 
     int lineStart = lineStarts[lineIndex];
     int lineEnd = (lineIndex + 1 < (int)lineStarts.size()) ?
@@ -403,8 +403,9 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
     int xOffset = 0;
     for (int i = lineStart; i < lineEnd; i++) {
         int chW = fm.width(text[i]);
-        if (localX <= xOffset + chW / 2)
+        if (localX <= xOffset + chW / 2) {
             return i;
+        }
         xOffset += chW;
     }
     return lineEnd - 1;
@@ -413,14 +414,14 @@ int ChatView::charPosAt(int msgIndex, int localX, int localY) {
 // Get rectangles for selection in a message
 std::vector<QRect> ChatView::selectionRects(int msgIndex) {
     std::vector<QRect> rects;
-    if (msgIndex != m_selMsgIndex) return rects;
+    if (msgIndex != m_selMsgIndex) { return rects; }
     int start = std::min(m_selStart, m_selEnd);
     int end = std::max(m_selStart, m_selEnd);
-    if (start == end) return rects;
+    if (start == end) { return rects; }
 
     const ChatMessage& msg = m_messages[msgIndex];
     int textLen = msg.messageText.length();
-    if (start >= textLen || end <= 0) return rects;
+    if (start >= textLen || end <= 0) { return rects; }
 
     // Compute text rectangle
     QFont f = font();
@@ -442,7 +443,7 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
         int contentX = 2 * kPad + kAvatarSize;
         int contentW = viewW - kPad - contentX;
         int bubbleW = (contentW * 80) / 100;
-        if (bubbleW < 100) bubbleW = contentW;
+        if (bubbleW < 100) { bubbleW = contentW; }
         textRect = QRect(contentX + kBubbleHPad, kPad + headerH + kPad + kBubbleVPad,
                          bubbleW - 2 * kBubbleHPad, msg.height - (2*kPad + headerH + kMsgSpacing) - 2*kBubbleVPad);
     }
@@ -450,9 +451,9 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
     // Get line breaks
     int contentW = viewW - 3 * kPad - kAvatarSize;
     int bubbleW2 = (contentW * 80) / 100;
-    if (bubbleW2 < 100) bubbleW2 = contentW;
+    if (bubbleW2 < 100) { bubbleW2 = contentW; }
     int bubbleTextWidth = bubbleW2 - 2 * kBubbleHPad;
-    if (bubbleTextWidth < 20) bubbleTextWidth = 20;
+    if (bubbleTextWidth < 20) { bubbleTextWidth = 20; }
 
     // Get line breaks using word-wrap
     std::vector<int> lineStarts;
@@ -477,7 +478,7 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
             end++;
         }
         cpos = end;
-        if (cpos < textLen) lineStarts.push_back(cpos);
+        if (cpos < textLen) { lineStarts.push_back(cpos); }
     }
 
     int lineHeight = fm.lineSpacing();
@@ -505,7 +506,7 @@ QString ChatView::selectedText() const {
     if (m_selMsgIndex < 0 || m_selMsgIndex >= (int)m_messages.size()) return QString();
     int start = std::min(m_selStart, m_selEnd);
     int end = std::max(m_selStart, m_selEnd);
-    if (start == end) return QString();
+    if (start == end) { return QString(); }
     return m_messages[m_selMsgIndex].messageText.mid(start, end - start);
 }
 
@@ -665,10 +666,10 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
         p.setFont(font());
 
         int bubbleW = (contentW * 80) / 100;
-        if (bubbleW < 100) bubbleW = contentW;
+        if (bubbleW < 100) { bubbleW = contentW; }
         int bubbleY = y + kPad + headerH + kPad;
         int bubbleH = msg.height - (kPad + headerH + kPad) - kMsgSpacing;
-        if (bubbleH < 30) bubbleH = 30;
+        if (bubbleH < 30) { bubbleH = 30; }
         bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
         textRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                          bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
@@ -743,7 +744,7 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
         // Calculate original text line count to find where text ends
         int origLineCount = 0;
         int textW = textRect.width();
-        if (textW < 20) textW = 20;
+        if (textW < 20) { textW = 20; }
 #ifdef EMOJI_RENDER_QT34
         auto cps = toCodepoints(msg.messageText);
         int tLen = (int)cps.size();
@@ -754,7 +755,7 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
             while (end < tLen && cps[end] != '\n') {
                 int cw = isEmojiChar(cps[end]) ? emojiCharWidth(fm) : fm.width(QChar((ushort)cps[end]));
                 lineWidth += cw;
-                if (cps[end] == ' ') lastSpace = end;
+                if (cps[end] == ' ') { lastSpace = end; }
                 if (lineWidth >= textW) {
                     if (lastSpace > pos && end - pos > 10) {
                         end = lastSpace + 1;
@@ -787,7 +788,7 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
             pos = end;
         }
 #endif
-        if (origLineCount < 1) origLineCount = 1;
+        if (origLineCount < 1) { origLineCount = 1; }
 
         int origTextEndY = textRect.y() + origLineCount * fm.lineSpacing();
         int transY = origTextEndY + kBubbleVPad / 2;
@@ -871,7 +872,7 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
 
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) curY += m_messages[i].height;
+            for (int i = 0; i < msgIndex; i++) { curY += m_messages[i].height; }
             int localY = event->y() - curY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
@@ -920,7 +921,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex == m_selMsgIndex) {
             int msgY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) msgY += m_messages[i].height;
+            for (int i = 0; i < msgIndex; i++) { msgY += m_messages[i].height; }
             int localY = event->y() - msgY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
@@ -935,7 +936,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     if (msgIndex >= 0 && msgIndex < (int)m_messages.size()) {
         // ... compute charPos for link detection
         int curY = kPad - m_scrollPos;
-        for (int i = 0; i < msgIndex; i++) curY += m_messages[i].height;
+        for (int i = 0; i < msgIndex; i++) { curY += m_messages[i].height; }
         int localY = event->y() - curY;
         int localX = event->x();
         int charPos = charPosAt(msgIndex, localX, localY);
@@ -994,7 +995,7 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0) {
             int msgY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) msgY += m_messages[i].height;
+            for (int i = 0; i < msgIndex; i++) { msgY += m_messages[i].height; }
             int localY = event->y() - msgY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
