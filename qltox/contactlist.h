@@ -37,6 +37,8 @@ public:
     void updateFriendConnectionStatus(int friendId, const QString& newStatus);
     void updateContact(int id, const QString& type, const QString& name,
                        const QString& chatId, const QString& status);
+    void addContact(Contact* c);
+    void removeContact(int id, const QString& type);
     bool isFriendLoaded(int friendId);
     void retranslateUi();
     

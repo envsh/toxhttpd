@@ -152,6 +152,33 @@ void ContactListWidget::updateContact(int id, const QString& type, const QString
 #endif
 }
 
+void ContactListWidget::addContact(Contact* c) {
+    allContacts.append(c);
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
+void ContactListWidget::removeContact(int id, const QString& type) {
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == id && c->type == type) {
+#ifdef QT3_BUILD
+            allContacts.remove(i);
+#else
+            allContacts.removeAt(i);
+#endif
+            delete c;
+            break;
+        }
+    }
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
 bool ContactListWidget::isFriendLoaded(int friendId) {
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
