@@ -75,7 +75,7 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
     if (!root) {
         const char* errPos = cJSON_GetErrorPtr();
         int offset = errPos ? (int)(errPos - body.c_str()) : -1;
-        ALOG_WARN("parseEventsJson: cJSON error at offset %d: %.60s", offset, body.c_str() + (offset >= 0 ? offset : 0));
+        ALOG_WARN("parseEventsJson: cJSON error at offset %d: %.160s", offset, body.c_str() + (offset >= 0 ? offset : 0));
         return false;
     }
     if (!cJSON_IsArray(root)) {
@@ -104,19 +104,21 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
     return true;
 }
 
-static bool parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vector<Event>& events) {
-    if (body.empty()) return false;
-    bool ok = true;
+static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vector<Event>& events) {
+    if (body.empty()) return 0;
+    int errors = 0;
+    size_t total = 0;
     std::istringstream stream(body);
     std::string line;
     while (std::getline(stream, line)) {
         if (line.empty()) continue;
+        ++total;
         cJSON* item = cJSON_Parse(line.c_str());
         if (!item) {
             const char* errPos = cJSON_GetErrorPtr();
             int offset = errPos ? (int)(errPos - line.c_str()) : -1;
-            ALOG_WARN("parseEventsNdjson: cJSON error at offset %d: %.60s", offset, line.c_str());
-            ok = false;
+            ALOG_WARN("parseEventsNdjson: cJSON error at offset %d: %.160s", offset, line.c_str());
+            ++errors;
             continue;
         }
         Event e;
@@ -126,16 +128,16 @@ static bool parseEventsNdjson(const std::string& body, uint64_t& lastId, std::ve
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
         if (e.id == 0 || e.type.empty()) {
-            ALOG_WARN("parseEventsNdjson: skip event (id=%lu type=%s)", e.id, e.type.c_str());
+            ALOG_WARN("parseEventsNdjson: skip event (id=%lu type=%s) line: %.160s", e.id, e.type.c_str(), line.c_str());
             cJSON_Delete(item);
-            ok = false;
+            ++errors;
             continue;
         }
         events.push_back(e);
         if (e.id > lastId) lastId = e.id;
         cJSON_Delete(item);
     }
-    return ok;
+    return errors;
 }
 
 void ToxAPI::request(const HttpRequest& req, ApiCtx* ctx) {
@@ -717,8 +719,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         }
 
         if (useNdjson) {
-            if (!parseEventsNdjson(resp.body, s_lastEventId, events))
-                ALOG_WARN("parseEventsNdjson: parse errors");
+            int parseErrors = parseEventsNdjson(resp.body, s_lastEventId, events);
+            if (parseErrors > 0)
+                ALOG_WARN("parseEventsNdjson: %d/%zu lines failed", parseErrors, events.size() + parseErrors);
         } else {
             if (!parseEventsJson(resp.body, s_lastEventId, events))
                 ALOG_WARN("parseEventsJson: parse failed");
