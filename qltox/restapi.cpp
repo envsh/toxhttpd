@@ -86,7 +86,7 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
     int count = cJSON_GetArraySize(root);
     for (int i = 0; i < count; ++i) {
         cJSON* item = cJSON_GetArrayItem(root, i);
-        if (!item) continue;
+        if (!item) { continue; }
         Event e;
         cJSON* v = cJSON_GetObjectItem(item, "event_id");
         e.id = v ? (uint64_t)v->valuedouble : 0;
@@ -98,7 +98,7 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
             continue;
         }
         events.push_back(e);
-        if (e.id > lastId) lastId = e.id;
+        if (e.id > lastId) { lastId = e.id; }
     }
     cJSON_Delete(root);
     return true;
@@ -134,7 +134,7 @@ static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vec
             continue;
         }
         events.push_back(e);
-        if (e.id > lastId) lastId = e.id;
+        if (e.id > lastId) { lastId = e.id; }
         cJSON_Delete(item);
     }
     return errors;
@@ -288,7 +288,7 @@ void ToxAPI::createGroup(const std::string& groupName, const std::string& creato
                           const std::string& password, bool isPrivate) {
     std::string data = "group_name=" + urlEncode(groupName) + "&name=" + urlEncode(creatorName);
     if (!password.empty()) data += "&password=" + urlEncode(password);
-    if (isPrivate) data += "&privacy_state=private";
+    if (isPrivate) { data += "&privacy_state=private"; }
     request(ApiCreateGroup, {"/api/groups", "POST", data});
 }
 
@@ -345,11 +345,11 @@ void ToxAPI::setSelfInfo(const std::string& name, const std::string& statusMessa
         hasParams = true;
     }
     if (!statusMessage.empty()) {
-        if (hasParams) data += "&";
+        if (hasParams) { data += "&"; }
         data += "status_message=" + urlEncode(statusMessage);
         hasParams = true;
     }
-    if (!hasParams) return;
+    if (!hasParams) { return; }
     request(ApiSetSelfInfo, {"/api/self", "POST", data});
 }
 
@@ -367,10 +367,10 @@ void ToxAPI::lazyLoadFriendDetail(int friendId) {
 
 std::string ToxAPI::urlEncode(const std::string& str) {
     CURL* curl = curl_easy_init();
-    if (!curl) return str;
+    if (!curl) { return str; }
     char* encoded = curl_easy_escape(curl, str.c_str(), (int)str.length());
     std::string result = encoded ? encoded : str;
-    if (encoded) curl_free(encoded);
+    if (encoded) { curl_free(encoded); }
     curl_easy_cleanup(curl);
     return result;
 }
@@ -387,7 +387,7 @@ bool ToxAPI::syncRequest(const std::string& endpoint,
                           const std::string& data,
                           int timeoutSec) {
     CURL* curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) { return false; }
     std::string url = buildUrl(endpoint);
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, syncWriteCb);
@@ -399,8 +399,9 @@ bool ToxAPI::syncRequest(const std::string& endpoint,
     }
     CURLcode res = curl_easy_perform(curl);
     long httpCode = 0;
-    if (res == CURLE_OK)
+    if (res == CURLE_OK) {
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    }
     curl_easy_cleanup(curl);
     return (httpCode == 200 && !outBody.empty());
 }
@@ -425,23 +426,23 @@ std::vector<GroupInfo> ToxAPI::getGroupsSync() {
     if (!syncRequest("/api/groups", "GET", body))
         return groups;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return groups;
+    if (!root) { return groups; }
     cJSON* arr = cJSON_GetObjectItem(root, "groups");
     if (arr && cJSON_IsArray(arr)) {
         int n = cJSON_GetArraySize(arr);
         for (int i = 0; i < n; ++i) {
             cJSON* item = cJSON_GetArrayItem(arr, i);
-            if (!item) continue;
+            if (!item) { continue; }
             GroupInfo g;
             cJSON* v = cJSON_GetObjectItem(item, "groupNumber");
-            if (v) g.groupNumber = v->valueint;
+            if (v) { g.groupNumber = v->valueint; }
             g.groupName = jsonStr(cJSON_GetObjectItem(item, "groupName"));
             g.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
             v = cJSON_GetObjectItem(item, "isConnected");
             g.isConnected = v ? (v->valueint == 1) : false;
             g.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
             cJSON* mc = cJSON_GetObjectItem(item, "memberCount");
-            if (mc) g.memberCount = mc->valueint;
+            if (mc) { g.memberCount = mc->valueint; }
             groups.push_back(g);
         }
     }
@@ -455,23 +456,23 @@ std::vector<ConferenceInfo> ToxAPI::getConferencesSync() {
     if (!syncRequest("/api/conferences", "GET", body))
         return conferences;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return conferences;
+    if (!root) { return conferences; }
     cJSON* arr = cJSON_GetObjectItem(root, "conferences");
     if (arr && cJSON_IsArray(arr)) {
         int n = cJSON_GetArraySize(arr);
         for (int i = 0; i < n; ++i) {
             cJSON* item = cJSON_GetArrayItem(arr, i);
-            if (!item) continue;
+            if (!item) { continue; }
             ConferenceInfo c;
             cJSON* v = cJSON_GetObjectItem(item, "conferenceNumber");
-            if (v) c.conferenceNumber = v->valueint;
+            if (v) { c.conferenceNumber = v->valueint; }
             c.conferenceName = jsonStr(cJSON_GetObjectItem(item, "conferenceName"));
             c.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
             v = cJSON_GetObjectItem(item, "isConnected");
             c.isConnected = v ? (v->valueint == 1) : false;
             c.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
             cJSON* mc = cJSON_GetObjectItem(item, "memberCount");
-            if (mc) c.memberCount = mc->valueint;
+            if (mc) { c.memberCount = mc->valueint; }
             conferences.push_back(c);
         }
     }
@@ -482,7 +483,7 @@ std::vector<ConferenceInfo> ToxAPI::getConferencesSync() {
 static std::vector<PeerInfo> parseMembersResponse(const std::string& body) {
     std::vector<PeerInfo> members;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return members;
+    if (!root) { return members; }
     cJSON* selfPpItem = cJSON_GetObjectItem(root, "selfPeerNumber");
     int selfPeerNumber = selfPpItem ? selfPpItem->valueint : -1;
     cJSON* membersItem = cJSON_GetObjectItem(root, "members");
@@ -490,19 +491,19 @@ static std::vector<PeerInfo> parseMembersResponse(const std::string& body) {
         int n = cJSON_GetArraySize(membersItem);
         for (int i = 0; i < n; ++i) {
             cJSON* item = cJSON_GetArrayItem(membersItem, i);
-            if (!item) continue;
+            if (!item) { continue; }
             PeerInfo info;
             cJSON* v;
             v = cJSON_GetObjectItem(item, "peerNumber");
-            if (v) info.peerNumber = v->valueint;
+            if (v) { info.peerNumber = v->valueint; }
             info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
             v = cJSON_GetObjectItem(item, "status");
-            if (v) info.status = v->valueint;
+            if (v) { info.status = v->valueint; }
             info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
             info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
             info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
             v = cJSON_GetObjectItem(item, "role");
-            if (v) info.role = v->valueint;
+            if (v) { info.role = v->valueint; }
             info.roleStr = jsonStr(cJSON_GetObjectItem(item, "roleStr"));
             info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
             info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
@@ -533,7 +534,7 @@ std::string ToxAPI::getRandomNameSync() {
     if (!syncRequest("/api/random-name", "GET", body))
         return "";
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return "";
+    if (!root) { return ""; }
     std::string name = jsonStr(cJSON_GetObjectItem(root, "name"));
     cJSON_Delete(root);
     return name;
@@ -545,7 +546,7 @@ int ToxAPI::addFriendSync(const std::string& publicKey) {
                      "public_key=" + urlEncode(publicKey)))
         return -1;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return -1;
+    if (!root) { return -1; }
     cJSON* v = cJSON_GetObjectItem(root, "friend_id");
     int id = v ? v->valueint : -1;
     cJSON_Delete(root);
@@ -557,7 +558,7 @@ int ToxAPI::createConferenceSync() {
     if (!syncRequest("/api/conferences", "POST", body))
         return -1;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return -1;
+    if (!root) { return -1; }
     cJSON* v = cJSON_GetObjectItem(root, "conference_id");
     int id = v ? v->valueint : -1;
     cJSON_Delete(root);
@@ -568,12 +569,12 @@ int ToxAPI::createGroupSync(const std::string& groupName, const std::string& cre
                              const std::string& password, bool isPrivate) {
     std::string data = "group_name=" + urlEncode(groupName) + "&name=" + urlEncode(creatorName);
     if (!password.empty()) data += "&password=" + urlEncode(password);
-    if (isPrivate) data += "&privacy_state=private";
+    if (isPrivate) { data += "&privacy_state=private"; }
     std::string body;
     if (!syncRequest("/api/groups", "POST", body, data))
         return -1;
     cJSON* root = cJSON_Parse(body.c_str());
-    if (!root) return -1;
+    if (!root) { return -1; }
     cJSON* v = cJSON_GetObjectItem(root, "group_number");
     int id = v ? v->valueint : -1;
     cJSON_Delete(root);
@@ -606,11 +607,11 @@ bool ToxAPI::setSelfInfoSync(const std::string& name, const std::string& statusM
         hasParams = true;
     }
     if (!statusMessage.empty()) {
-        if (hasParams) data += "&";
+        if (hasParams) { data += "&"; }
         data += "status_message=" + urlEncode(statusMessage);
         hasParams = true;
     }
-    if (!hasParams) return true;
+    if (!hasParams) { return true; }
     std::string body;
     return syncRequest("/api/self", "POST", body, data);
 }
@@ -671,7 +672,7 @@ bool ToxAPI::joinGroupByChatIdSync(const std::string& chatId,
 // ── dispatchResult ──
 
 void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
-    if (!s_target) return;
+    if (!s_target) { return; }
     int type = ctx->type;
 
     switch (type) {
@@ -701,11 +702,12 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         }
 
         if (resp.httpCode != 200) {
-            if (s_pollRunning)
+            if (s_pollRunning) {
                 EventPoller::addRequest(
                     {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
                      "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
                     onHttpDone, new ApiCtx(ApiPollEvents));
+            }
             break;
         }
 
@@ -720,8 +722,9 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
         if (useNdjson) {
             int parseErrors = parseEventsNdjson(resp.body, s_lastEventId, events);
-            if (parseErrors > 0)
+            if (parseErrors > 0) {
                 ALOG_WARN("parseEventsNdjson: %d/%zu lines failed", parseErrors, events.size() + parseErrors);
+            }
         } else {
             if (!parseEventsJson(resp.body, s_lastEventId, events))
                 ALOG_WARN("parseEventsJson: parse failed");
@@ -729,11 +732,12 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
         QApplication::postEvent(s_target, new EventListEvent(events));
 
-        if (s_pollRunning)
+        if (s_pollRunning) {
             EventPoller::addRequest(
                 {buildUrl("/api/events?after=" + std::to_string(s_lastEventId)),
                  "GET", "", 35, {{"Accept", "application/x-ndjson"}}},
                 onHttpDone, new ApiCtx(ApiPollEvents));
+        }
         break;
     }
 
@@ -771,7 +775,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             int n = cJSON_GetArraySize(arr);
             for (int i = 0; i < n; ++i) {
                 cJSON* item = cJSON_GetArrayItem(arr, i);
-                if (item) ev->friendIds.push_back(item->valueint);
+                if (item) { ev->friendIds.push_back(item->valueint); }
             }
         }
         cJSON_Delete(root);
@@ -856,7 +860,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         }
         cJSON* root = cJSON_Parse(resp.body.c_str());
         if (!root || !cJSON_IsArray(root) || cJSON_GetArraySize(root) == 0) {
-            if (root) cJSON_Delete(root);
+            if (root) { cJSON_Delete(root); }
             QApplication::postEvent(s_target, ev);
             break;
         }
@@ -881,7 +885,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->userStatus = jsonStr(cJSON_GetObjectItem(item, "userStatus"));
         ev->peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
         cJSON* ls = cJSON_GetObjectItem(item, "lastSeen");
-        if (ls) ev->lastSeen = (uint64_t)ls->valuedouble;
+        if (ls) { ev->lastSeen = (uint64_t)ls->valuedouble; }
         cJSON_Delete(root);
         QApplication::postEvent(s_target, ev);
         break;
@@ -907,19 +911,19 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             int n = cJSON_GetArraySize(membersItem);
             for (int i = 0; i < n; ++i) {
                 cJSON* item = cJSON_GetArrayItem(membersItem, i);
-                if (!item) continue;
+                if (!item) { continue; }
                 PeerInfo info;
                 cJSON* v;
                 v = cJSON_GetObjectItem(item, "peerNumber");
-                if (v) info.peerNumber = v->valueint;
+                if (v) { info.peerNumber = v->valueint; }
                 info.name = jsonStr(cJSON_GetObjectItem(item, "name"));
                 v = cJSON_GetObjectItem(item, "status");
-                if (v) info.status = v->valueint;
+                if (v) { info.status = v->valueint; }
                 info.statusStr = jsonStr(cJSON_GetObjectItem(item, "statusStr"));
                 info.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
                 info.iconUrl = jsonStr(cJSON_GetObjectItem(item, "iconUrl"));
                 v = cJSON_GetObjectItem(item, "role");
-                if (v) info.role = v->valueint;
+                if (v) { info.role = v->valueint; }
                 info.roleStr = jsonStr(cJSON_GetObjectItem(item, "roleStr"));
                 info.publicKey = jsonStr(cJSON_GetObjectItem(item, "publicKey"));
                 info.peerIp = jsonStr(cJSON_GetObjectItem(item, "peerIp"));
@@ -954,14 +958,14 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             int n = cJSON_GetArraySize(msgsItem);
             for (int i = 0; i < n; ++i) {
                 cJSON* msg = cJSON_GetArrayItem(msgsItem, i);
-                if (!msg) continue;
+                if (!msg) { continue; }
                 HistoryMessage hm;
                 cJSON* v = cJSON_GetObjectItem(msg, "rowid");
-                if (v) hm.rowid = (int64_t)v->valuedouble;
+                if (v) { hm.rowid = (int64_t)v->valuedouble; }
                 hm.message = jsonStr(cJSON_GetObjectItem(msg, "message"));
                 hm.sender_pubkey = jsonStr(cJSON_GetObjectItem(msg, "sender_pubkey"));
                 v = cJSON_GetObjectItem(msg, "sender_number");
-                if (v) hm.sender_number = (uint32_t)v->valuedouble;
+                if (v) { hm.sender_number = (uint32_t)v->valuedouble; }
                 hm.direction = jsonStr(cJSON_GetObjectItem(msg, "direction"));
                 hm.created_at = jsonStr(cJSON_GetObjectItem(msg, "created_at"));
                 ev->messages.push_back(hm);
@@ -1003,7 +1007,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
 
     case ApiLoadAllData: {
         auto* chain = static_cast<LoadChain*>(ctx->ptr);
-        if (!chain) break;
+        if (!chain) { break; }
 
         switch (chain->step) {
         case 0: { // self -> partial self info
@@ -1068,7 +1072,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 size_t end = maxBatchSize < total ? maxBatchSize : total;
                 std::string idsStr;
                 for (size_t i = 0; i < end; ++i) {
-                    if (i > 0) idsStr += ",";
+                    if (i > 0) { idsStr += ","; }
                     idsStr += std::to_string(chain->friendIds[i]);
                 }
                 chain->detailBatchIdx = end;
@@ -1091,12 +1095,12 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                         int n = cJSON_GetArraySize(root);
                         for (int i = 0; i < n; ++i) {
                             cJSON* item = cJSON_GetArrayItem(root, i);
-                            if (!item) continue;
+                            if (!item) { continue; }
                             cJSON* err = cJSON_GetObjectItem(item, "error");
-                            if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0) continue;
+                            if (err && cJSON_IsString(err) && strlen(cJSON_GetStringValue(err)) > 0) { continue; }
                             ContactData cd;
                             cJSON* v = cJSON_GetObjectItem(item, "friendId");
-                            if (!v) continue;
+                            if (!v) { continue; }
                             cd.id = v->valueint;
                             cd.type = "friend";
                             cd.name = jsonStr(cJSON_GetObjectItem(item, "name"));
@@ -1132,10 +1136,10 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             size_t total = chain->friendIds.size();
             if (chain->detailBatchIdx < total) {
                 size_t end = chain->detailBatchIdx + maxBatchSize;
-                if (end > total) end = total;
+                if (end > total) { end = total; }
                 std::string idsStr;
                 for (size_t i = chain->detailBatchIdx; i < end; ++i) {
-                    if (i > chain->detailBatchIdx) idsStr += ",";
+                    if (i > chain->detailBatchIdx) { idsStr += ","; }
                     idsStr += std::to_string(chain->friendIds[i]);
                 }
                 chain->detailBatchIdx = end;
@@ -1159,17 +1163,17 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                         int n = cJSON_GetArraySize(arr);
                         for (int i = 0; i < n; ++i) {
                             cJSON* item = cJSON_GetArrayItem(arr, i);
-                            if (!item) continue;
+                            if (!item) { continue; }
                             ContactData cd;
                             cJSON* v = cJSON_GetObjectItem(item, "groupNumber");
-                            if (v) cd.id = v->valueint;
+                            if (v) { cd.id = v->valueint; }
                             cd.name = jsonStr(cJSON_GetObjectItem(item, "groupName"));
                             cd.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
                             v = cJSON_GetObjectItem(item, "isConnected");
                             cd.isConnected = v ? (v->valueint == 1) : false;
                              cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
                              v = cJSON_GetObjectItem(item, "memberCount");
-                             if (v) cd.memberCount = v->valueint;
+                             if (v) { cd.memberCount = v->valueint; }
                              cd.type = "group";
                             chain->result->contacts.push_back(cd);
                             batch.push_back(cd);
@@ -1200,17 +1204,17 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                         int n = cJSON_GetArraySize(arr);
                         for (int i = 0; i < n; ++i) {
                             cJSON* item = cJSON_GetArrayItem(arr, i);
-                            if (!item) continue;
+                            if (!item) { continue; }
                             ContactData cd;
                             cJSON* v = cJSON_GetObjectItem(item, "conferenceNumber");
-                            if (v) cd.id = v->valueint;
+                            if (v) { cd.id = v->valueint; }
                             cd.name = jsonStr(cJSON_GetObjectItem(item, "conferenceName"));
                             cd.chatId = jsonStr(cJSON_GetObjectItem(item, "chatId"));
                             v = cJSON_GetObjectItem(item, "isConnected");
                             cd.isConnected = v ? (v->valueint == 1) : false;
                              cd.statusText = jsonStr(cJSON_GetObjectItem(item, "statusText"));
                              v = cJSON_GetObjectItem(item, "memberCount");
-                             if (v) cd.memberCount = v->valueint;
+                             if (v) { cd.memberCount = v->valueint; }
                              cd.type = "conference";
                             chain->result->contacts.push_back(cd);
                             batch.push_back(cd);

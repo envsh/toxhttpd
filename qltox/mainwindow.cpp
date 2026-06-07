@@ -48,8 +48,9 @@ static void playNotificationSound() {
 }
 
 static QString formatElapsedMs(int64_t ms) {
-    if (ms < 1000)
+    if (ms < 1000) {
         return QString::number((int)ms) + "ms";
+    }
     return QString::number((int)(ms / 1000)) + "." + QString::number((int)((ms % 1000) / 100)) + "s";
 }
 
@@ -305,7 +306,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 peerInfoMap[key].iconUrl = evt->iconUrl;
                 peerInfoMap[key].statusText = evt->statusText;
                 int s = 0;
-                if (evt->statusStr == "tcp") s = 1;
+                if (evt->statusStr == "tcp") { s = 1; }
                 else if (evt->statusStr == "udp") s = 2;
                 peerInfoMap[key].status = s;
                 peerInfoMap[key].statusStr = evt->statusStr;
@@ -325,8 +326,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     qFromUtf8(evt->statusMsg),
                     qFromUtf8(evt->connStatus),
                     qFromUtf8(evt->address));
-                if (evt->address.length() >= 64)
+                if (evt->address.length() >= 64) {
                     selfPubkey = evt->address.substr(0, 64);
+                }
             }
             return;
         }
@@ -344,8 +346,9 @@ void MainWindow::customEvent(CustomEventBase* event) {
             }
             if (targetName.isEmpty())
                 targetName = qFromUtf8(evt->chatType) + " " + QString::number(evt->chatId);
-            if (!evt->success)
+            if (!evt->success) {
                 ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
+            }
             else
                 ToastWidget::show(chatWidget, _("send_success").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 2000);
             return;
@@ -424,8 +427,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         auto key = std::make_pair(currentChatId, std::string(qToUtf8(currentChatType).data()));
         std::vector<ChatMessage> msgs;
         int n = chatWidget->messageCount();
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < n; ++i) {
             msgs.push_back(chatWidget->messageAt(i));
+        }
         m_messageCache[key] = std::move(msgs);
     }
     
@@ -456,8 +460,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     if (hasCache) {
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
         chatWidget->clearMessages();
-        for (const auto& msg : cacheIt->second)
+        for (const auto& msg : cacheIt->second) {
             chatWidget->appendMessage(msg);
+        }
         chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
         ToxAPI::getMessagesHistory(id, typeStr);
     } else {
@@ -584,8 +589,9 @@ void MainWindow::handleEvents(const EventList& events) {
                         std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
                         auto it = peerInfoMap.find(key);
                         QString senderName;
-                        if (it != peerInfoMap.end() && !it->second.name.empty())
+                        if (it != peerInfoMap.end() && !it->second.name.empty()) {
                             senderName = qFromUtf8(it->second.name);
+                        }
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
                     }
@@ -736,9 +742,9 @@ void MainWindow::retranslateUi() {
     qSetWindowTitle(this, _("app_title"));
     
     // 更新子控件
-    if (selfInfoWidget) selfInfoWidget->retranslateUi();
-    if (contactListWidget) contactListWidget->retranslateUi();
-    if (chatWidget) chatWidget->retranslateUi();
+    if (selfInfoWidget) { selfInfoWidget->retranslateUi(); }
+    if (contactListWidget) { contactListWidget->retranslateUi(); }
+    if (chatWidget) { chatWidget->retranslateUi(); }
     
     if (currentChatId == -1) {
         chatWidget->setHeaderText(_("select_chat_object"));
@@ -1097,7 +1103,7 @@ void MainWindow::onInviteToConferenceRequested(int friendId) {
         QVariant data = confCombo->itemData(confCombo->currentIndex());
         confId = data.toInt();
 #endif
-        if (confId == -1) return;
+        if (confId == -1) { return; }
         bool success = ToxAPI::inviteToConferenceSync(friendId, confId);
         if (success) {
             QMessageBox::information(this, _("invite_success"), _("invite_success"));
