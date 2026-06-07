@@ -13,6 +13,7 @@ extern const char* EMOJI_GROUP;
 extern const char* EMOJI_CONFERENCE;
 extern const char* EMOJI_SYSEVENT;
 extern const char* EMOJI_UNKNOWN;
+extern const char* EMOJI_TOPIC;
 
 struct Contact {
     int id;

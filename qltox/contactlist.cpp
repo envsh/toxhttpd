@@ -30,6 +30,7 @@ const char* EMOJI_GROUP = "G";
 const char* EMOJI_CONFERENCE = "C";
 const char* EMOJI_SYSEVENT = "S";
 const char* EMOJI_UNKNOWN = "?";
+const char* EMOJI_TOPIC = "T";
 const char* STATUS_ONLINE = "O";
 const char* STATUS_OFFLINE = "N";
 #endif
@@ -296,6 +297,7 @@ void ContactListWidget::updateView_v3() {
         else if (c->type == "conference") emoji = EMOJI_CONFERENCE;
         else if (c->type == "sysevent")   emoji = EMOJI_SYSEVENT;
         else if (c->type == "unknown")    emoji = EMOJI_UNKNOWN;
+        else if (c->type == "topic")      emoji = EMOJI_TOPIC;
         else emoji = EMOJI_CONFERENCE;
         // 群组使用真实连接状态，好友使用原有逻辑，会议保持硬编码
         QString statusDot;
@@ -355,6 +357,7 @@ void ContactListWidget::updateView_v4() {
         else if (c->type == "conference") emoji = EMOJI_CONFERENCE;
         else if (c->type == "sysevent")   emoji = EMOJI_SYSEVENT;
         else if (c->type == "unknown")    emoji = EMOJI_UNKNOWN;
+        else if (c->type == "topic")      emoji = EMOJI_TOPIC;
         else emoji = EMOJI_CONFERENCE;
         QString statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
         

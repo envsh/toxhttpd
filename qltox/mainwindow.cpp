@@ -2,6 +2,7 @@
 #include "CustomTitleBar.h"
 #include "restapi.h"
 #include "eventpoller.h"
+#include "unknownparser.h"
 #include "translator.h"
 #include "logindialog.h"
 #include "conferenceinvitedialog.h"
@@ -23,6 +24,7 @@
 // 虚拟联系人 ID（使用 <-100 的负数避免与服务器 ID 及 "未选择" 哨兵值 -1 冲突）
 static const int VIRTUAL_UNKNOWN_ID = -100;
 static const int VIRTUAL_SYSEVENT_ID = -101;
+static const int VIRTUAL_REDDIT_ID = -102;
 
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
@@ -178,6 +180,11 @@ MainWindow::MainWindow(QWidget* parent)
         c->type = "sysevent"; c->status = "online";
         c->chat_id = ""; c->is_connected = false;
         seedList.append(c);
+        c = new Contact();
+        c->id = VIRTUAL_REDDIT_ID; c->name = "Reddit";
+        c->type = "topic"; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
         contactListWidget->setContacts(seedList);
     }
     
@@ -310,6 +317,17 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->id = VIRTUAL_SYSEVENT_ID;
                     c->name = "Sysevent";
                     c->type = "sysevent";
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
+                    cl.append(c);
+                }
+                // 追加固定虚拟联系人
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_REDDIT_ID;
+                    c->name = "Reddit";
+                    c->type = "topic";
                     c->status = "online";
                     c->chat_id = "";
                     c->is_connected = false;
@@ -494,6 +512,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         headerText = emoji + " " + name;
     } else if (type == "sysevent") {
         emoji = EMOJI_SYSEVENT;
+        headerText = emoji + " " + name;
+    } else if (type == "topic") {
+        emoji = EMOJI_TOPIC;
         headerText = emoji + " " + name;
     }
     
@@ -779,6 +800,21 @@ void MainWindow::handleEvents(const EventList& events) {
                 }
                 cJSON_Delete(root);
             }
+        } else if (e.data.find("\"Type\":\"event.Evt") != std::string::npos) {
+            // System event with Type field — 归入 sysevent
+            {
+                ChatMessage msg;
+                msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
+                msg.type = "other";
+                msg.senderName = "Sysevent";
+                msg.peerNumber = VIRTUAL_SYSEVENT_ID;
+                msg.time = getCurrentTime();
+                qWarning("Cache PUSH to sysevent %d: type=%s (event.Evt)", VIRTUAL_SYSEVENT_ID, e.type.c_str());
+                m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
+                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
+                    chatWidget->appendMessage(msg);
+                }
+            }
         } else if (!e.type.empty() && e.type[0] == '_') {
             // System event — 始终缓存到 Sysevent，正在查看时也追加到界面
             {
@@ -799,16 +835,31 @@ void MainWindow::handleEvents(const EventList& events) {
                 }
             }
         } else {
-            // 未处理的事件类型 — 始终缓存到 Unknown，正在查看时也追加到界面
-            qWarning("Unhandled event type: %s, data: %.160s", e.type.c_str(), e.data.c_str());
-            {
-                ChatMessage msg;
-                msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
-                msg.type = "other";
-                msg.senderName = "Unknown";
+            ParseResult pr = UnknownParser::parse(e.type, e.data);
+            ChatMessage msg;
+            msg.type = "other";
+            msg.time = getCurrentTime();
+            if (pr.handled && pr.contactName == "reddit") {
+                msg.messageText = pr.messageText;
+                msg.senderName = pr.senderName;
+                msg.peerNumber = VIRTUAL_REDDIT_ID;
+                qWarning("Cache PUSH to reddit %d: sender=%s",
+                         VIRTUAL_REDDIT_ID, qToUtf8(msg.senderName).data());
+                m_messageCache[{VIRTUAL_REDDIT_ID, "topic"}].push_back(msg);
+                if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == "topic") {
+                    chatWidget->appendMessage(msg);
+                }
+            } else {
+                if (pr.handled) {
+                    msg.messageText = pr.messageText;
+                    msg.senderName = pr.senderName;
+                } else {
+                    msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
+                    msg.senderName = "Unknown";
+                }
                 msg.peerNumber = VIRTUAL_UNKNOWN_ID;
-                msg.time = getCurrentTime();
-                qWarning("Cache PUSH to unknown %d: type=%s", VIRTUAL_UNKNOWN_ID, e.type.c_str());
+                qWarning("Cache PUSH to unknown %d: type=%s, handled=%d, sender=%s",
+                         VIRTUAL_UNKNOWN_ID, e.type.c_str(), pr.handled, qToUtf8(msg.senderName).data());
                 m_messageCache[{VIRTUAL_UNKNOWN_ID, "unknown"}].push_back(msg);
                 if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == "unknown") {
                     chatWidget->appendMessage(msg);
