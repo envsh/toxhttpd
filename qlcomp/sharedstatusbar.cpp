@@ -87,8 +87,9 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
         return false;
     }
     if (event->type() == QEvent::WindowDeactivate) {
-        if (!qApp->activeWindow())
+        if (!qApp->activeWindow()) {
             hide();
+        }
         return false;
     }
     if ((event->type() == QEvent::Move ||
@@ -108,7 +109,7 @@ bool SharedStatusBar::isInGripArea(const QPoint &localPos) const
 
 void SharedStatusBar::handleGripPress(const QPoint &globalPos)
 {
-    if (!isVisible() || !m_activeWindow) return;
+    if (!isVisible() || !m_activeWindow) { return; }
     m_dragging = true;
     m_dragStartGlobal = globalPos;
     m_windowStartGeo = m_activeWindow->geometry();
@@ -116,7 +117,7 @@ void SharedStatusBar::handleGripPress(const QPoint &globalPos)
 
 void SharedStatusBar::handleGripDrag(const QPoint &globalPos)
 {
-    if (!m_dragging || !m_activeWindow) return;
+    if (!m_dragging || !m_activeWindow) { return; }
     int dx = globalPos.x() - m_dragStartGlobal.x();
     int dy = globalPos.y() - m_dragStartGlobal.y();
     QRect g = m_windowStartGeo;
@@ -144,7 +145,7 @@ void SharedStatusBar::reposition()
         QPoint(0, m_activeWindow->height()));
     move(bl.x(), bl.y());
     resize(m_activeWindow->width(), height());
-    if (!isVisible()) show();
+    if (!isVisible()) { show(); }
 }
 
 bool SharedStatusBar::event(QEvent *e)

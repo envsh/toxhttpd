@@ -13,7 +13,7 @@
 
 bool isEmojiChar(uint32_t cp) {
     if (cp >= 0x1F000 && cp <= 0x1FFFF) {
-        if (cp >= 0x1F100 && cp <= 0x1FAFF) return true;
+        if (cp >= 0x1F100 && cp <= 0x1FAFF) { return true; }
         return false;
     }
     return (cp == 0x00A9 || cp == 0x00AE ||
@@ -61,8 +61,9 @@ std::vector<uint32_t> toCodepoints(const QString& text) {
 
 bool textHasEmoji(const QString& text) {
     auto cps = toCodepoints(text);
-    for (size_t i = 0; i < cps.size(); i++)
-        if (isEmojiChar(cps[i])) return true;
+    for (size_t i = 0; i < cps.size(); i++) {
+        if (isEmojiChar(cps[i])) { return true; }
+    }
     return false;
 }
 
@@ -115,8 +116,8 @@ EmojiRenderer::EmojiRenderer() : m_lib(0), m_face(0), m_ok(false) {
 }
 
 EmojiRenderer::~EmojiRenderer() {
-    if (m_face) FT_Done_Face((FT_Face)m_face);
-    if (m_lib) FT_Done_FreeType((FT_Library)m_lib);
+    if (m_face) { FT_Done_Face((FT_Face)m_face); }
+    if (m_lib) { FT_Done_FreeType((FT_Library)m_lib); }
 }
 
 EmojiRenderer& EmojiRenderer::instance() {
@@ -126,7 +127,7 @@ EmojiRenderer& EmojiRenderer::instance() {
 
 QPixmap EmojiRenderer::loadEmoji(uint32_t codepoint, int size) {
     auto it = m_cache.find(codepoint);
-    if (it != m_cache.end()) return it->second;
+    if (it != m_cache.end()) { return it->second; }
 
     QPixmap pm;
     FT_Face face = (FT_Face)m_face;
@@ -152,8 +153,9 @@ QPixmap EmojiRenderer::loadEmoji(uint32_t codepoint, int size) {
     }
 
     FT_GlyphSlot slot = face->glyph;
-    if (slot && slot->bitmap.buffer && slot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA)
+    if (slot && slot->bitmap.buffer && slot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
         pm = rawBytesToQPixmap(slot->bitmap.buffer, slot->bitmap.width, slot->bitmap.rows);
+    }
 
     if (!pm.isNull() && (pm.width() != size || pm.height() != size)) {
 #ifdef QT3_BUILD
@@ -181,8 +183,9 @@ void EmojiRenderer::drawText(QPainter& p, const QRect& textRect, const QString& 
     auto cps = toCodepoints(text);
     {
         int emojiCount = 0;
-        for (size_t i = 0; i < cps.size(); i++)
-            if (isEmojiChar(cps[i])) emojiCount++;
+        for (size_t i = 0; i < cps.size(); i++) {
+            if (isEmojiChar(cps[i])) { emojiCount++; }
+        }
         if (emojiCount > 0) {
          //   fprintf(stderr, "EmojiRenderer: msg has %d emoji / %zu cps | font: %s | ok=%d\n",
            //         emojiCount, cps.size(), m_fontPath.c_str(), (int)m_ok);
@@ -205,14 +208,14 @@ void EmojiRenderer::drawText(QPainter& p, const QRect& textRect, const QString& 
         for (int j = i; j < n && cps[j] != '\n'; j++) {
             int cw = isEmojiChar(cps[j]) ? fm.height() : fm.width(QChar((ushort)cps[j]));
             lineWidth += cw;
-            if (cps[j] == ' ') lastSpace = j;
+            if (cps[j] == ' ') { lastSpace = j; }
             if (lineWidth >= maxW) {
-                if (lastSpace > i && j - i > 10) lineEnd = lastSpace + 1;
+                if (lastSpace > i && j - i > 10) { lineEnd = lastSpace + 1; }
                 break;
             }
             lineEnd = j + 1;
         }
-        if (lineEnd <= i) lineEnd = i + 1;
+        if (lineEnd <= i) { lineEnd = i + 1; }
 
         int lx = x;
         for (int j = i; j < lineEnd; j++) {
@@ -222,16 +225,18 @@ void EmojiRenderer::drawText(QPainter& p, const QRect& textRect, const QString& 
                     int ey = y + (lh - pm.height()) / 2;
                     p.drawPixmap(lx, ey, pm);
                 } else {
-                    if (cps[j] <= 0xFFFF)
+                    if (cps[j] <= 0xFFFF) {
                         p.drawText(lx, y + fm.ascent(), QChar((ushort)cps[j]));
+                    }
                 }
                 lx += fm.height();
             } else {
                 int s = j;
                 QString seg;
                 while (j < lineEnd && !isEmojiChar(cps[j])) {
-                    if (cps[j] <= 0xFFFF)
+                    if (cps[j] <= 0xFFFF) {
                         seg += QChar((ushort)cps[j]);
+                    }
                     else {
                         uint32_t cp = cps[j] - 0x10000;
                         seg += QChar((ushort)(0xD800 + (cp >> 10)));

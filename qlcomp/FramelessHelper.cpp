@@ -308,10 +308,10 @@ int FramelessHelper::getResizeRegion(const QPoint& pos) const {
     bool onBottom = (y >= bottom - bw && y < bottom + bw);
 
     int region = 0;
-    if (onLeft) region |= 1;
-    if (onTop) region |= 2;
-    if (onRight) region |= 4;
-    if (onBottom) region |= 8;
+    if (onLeft) { region |= 1; }
+    if (onTop) { region |= 2; }
+    if (onRight) { region |= 4; }
+    if (onBottom) { region |= 8; }
 
     return region;
 }

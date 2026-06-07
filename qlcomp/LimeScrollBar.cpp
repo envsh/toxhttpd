@@ -55,7 +55,7 @@ LimeScrollBar::LimeScrollBar(Qt::Orientation orientation, QWidget* parent)
 
 void LimeScrollBar::updateStyle() {
     const StyleParams* p = g_activeParams;
-    if (!p) return;
+    if (!p) { return; }
 
     if (p->scrollbarMode == StyleParams::AlwaysFaint) {
         m_animRatio = kAlwaysFaintRatio;
@@ -75,8 +75,9 @@ void LimeScrollBar::updateStyle() {
 // ========== Fade animation ==========
 
 void LimeScrollBar::startFadeIn() {
-    if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint)
+    if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
         return;
+    }
 
     if (g_activeParams && g_activeParams->compositingMode == JumpCut) {
         m_isVisible = true;
@@ -92,8 +93,9 @@ void LimeScrollBar::startFadeIn() {
 }
 
 void LimeScrollBar::startFadeOut() {
-    if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint)
+    if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
         return;
+    }
 
     if (g_activeParams && g_activeParams->compositingMode == JumpCut) {
         m_isVisible = false;
@@ -133,8 +135,9 @@ void LimeScrollBar::onHideTimeout() {
 }
 
 void LimeScrollBar::showTemporarily() {
-    if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint)
+    if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
         return;
+    }
 
     if (m_fadeState == Hidden || m_fadeState == FadeOut) {
         startFadeIn();
@@ -155,7 +158,7 @@ QColor LimeScrollBar::sliderColor(bool hovered) const {
         pal = dark ? &g_activeParams->dark : &g_activeParams->light;
     }
     static StyleParams::Palette fallback;
-    if (!pal) pal = &fallback;
+    if (!pal) { pal = &fallback; }
 
     QColor fg = hovered ? pal->scrollbarHover : pal->scrollbarSlider;
     QColor bg = pal->windowBg;
@@ -200,14 +203,14 @@ void LimeScrollBar::paintEvent(QPaintEvent* event) {
     if (g_activeParams && g_activeParams->scrollbarMode == StyleParams::AlwaysFaint) {
         // AlwaysFaint: always draw
     } else if (g_activeParams && g_activeParams->compositingMode == JumpCut) {
-        if (!m_isVisible) return;
+        if (!m_isVisible) { return; }
     } else {
-        if (m_fadeState == Hidden && m_animRatio <= 0.0f) return;
+        if (m_fadeState == Hidden && m_animRatio <= 0.0f) { return; }
     }
 
     // compute thumb rect
     int sliderSize = 8;
-    if (g_activeParams) sliderSize = g_activeParams->scrollbarWidth;
+    if (g_activeParams) { sliderSize = g_activeParams->scrollbarWidth; }
 
 #ifdef QT3_BUILD
     int min = minValue();
@@ -219,7 +222,7 @@ void LimeScrollBar::paintEvent(QPaintEvent* event) {
     int val = value();
 #endif
 
-    if (min >= max) return;
+    if (min >= max) { return; }
 
     int totalLen, widgetSize;
     if (orientation() == Qt::Vertical) {

@@ -54,7 +54,7 @@ QString qFormatTime(const QString& createdAt) {
 
 // 解析 ISO8601 时间字符串，返回 "hh:mm" 格式（与 Web 版一致）
 QString qFormatISO8601(const QString& iso8601Str) {
-    if (iso8601Str.isEmpty()) return QString();
+    if (iso8601Str.isEmpty()) { return QString(); }
     
 #ifdef QT3_BUILD
     // Qt3: 手动解析 ISO8601 "yyyy-MM-ddThh:mm:ssZ" 或 "yyyy-MM-ddThh:mm:ss+08:00"
@@ -66,7 +66,7 @@ QString qFormatISO8601(const QString& iso8601Str) {
     }
     // 移除时区后缀：'+' 或 '-'（排除日期中的 '-')
     int zonePos = str.find('+');
-    if (zonePos < 0) zonePos = str.find('-', 10);
+    if (zonePos < 0) { zonePos = str.find('-', 10); }
     if (zonePos >= 0) {
         str = str.left(zonePos);
     }
@@ -179,7 +179,7 @@ void qSetWindowTitle(QWidget* w, const QString& title) {
 #ifdef QT3_BUILD
 static void qX11SetWmIcon(const QPixmap& pm) {
     QImage img = pm.convertToImage();
-    if (img.isNull()) return;
+    if (img.isNull()) { return; }
 
     const int iconSize = 32;
     QImage scaled = img.smoothScale(iconSize, iconSize);
@@ -205,9 +205,10 @@ static void qX11SetWmIcon(const QPixmap& pm) {
     QWidgetList* topWidgets = qApp->topLevelWidgets();
     for (uint i = 0; i < uint(topWidgets->count()); ++i) {
         WId wid = topWidgets->at(i)->winId();
-        if (wid)
+        if (wid) {
             XChangeProperty(dpy, wid, netWmIcon, XA_CARDINAL, 32,
                           PropModeReplace, (unsigned char*)data, dataSize);
+        }
     }
     XFlush(dpy);
     delete[] data;
@@ -225,8 +226,9 @@ void qSetAppIcon(const char** xpm) {
             qWarning("qSetAppIcon: no top-level widgets found");
             return;
         }
-        for (uint i = 0; i < uint(list->count()); ++i)
+        for (uint i = 0; i < uint(list->count()); ++i) {
             list->at(i)->setIcon(pm);
+        }
     }
     qX11SetWmIcon(pm);
 #else
@@ -332,8 +334,8 @@ QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border
     return new QBoxLayout(parent, dir, border, autoresize, 0);
 #else
     QBoxLayout* layout = new QBoxLayout(dir, parent);
-    if (border != 0) layout->setContentsMargins(border, border, border, border);
-    if (autoresize != -1) layout->setSpacing(autoresize);
+    if (border != 0) { layout->setContentsMargins(border, border, border, border); }
+    if (autoresize != -1) { layout->setSpacing(autoresize); }
     return layout;
 #endif
 }
