@@ -20,6 +20,10 @@
 #include <qfile.h>
 #include "toastwidget.h"
 
+// 虚拟联系人 ID（使用 <-100 的负数避免与服务器 ID 及 "未选择" 哨兵值 -1 冲突）
+static const int VIRTUAL_UNKNOWN_ID = -100;
+static const int VIRTUAL_SYSEVENT_ID = -101;
+
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
     QString home = qGetHomePath();
@@ -161,6 +165,22 @@ MainWindow::MainWindow(QWidget* parent)
     ToxAPI::setEventTarget(this);
     ToxAPI::startPollEvent();
     
+    // 先填充虚拟联系人，确保即使 API 未加载也能看到 Unknown/Sysevent
+    {
+        ContactList seedList;
+        Contact* c = new Contact();
+        c->id = VIRTUAL_UNKNOWN_ID; c->name = "Unknown";
+        c->type = "unknown"; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
+        c = new Contact();
+        c->id = VIRTUAL_SYSEVENT_ID; c->name = "Sysevent";
+        c->type = "sysevent"; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
+        contactListWidget->setContacts(seedList);
+    }
+    
     // 异步加载初始数据
     qWarning("MainWindow: requesting initial data load (async)");
     ToxAPI::loadAllData();
@@ -272,6 +292,27 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->status = qFromUtf8(cd.status);
                     c->chat_id = qFromUtf8(cd.chatId);
                     c->is_connected = cd.isConnected;
+                    cl.append(c);
+                }
+                // 追加虚拟联系人（始终在列表底部）
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_UNKNOWN_ID;
+                    c->name = "Unknown";
+                    c->type = "unknown";
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
+                    cl.append(c);
+                }
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_SYSEVENT_ID;
+                    c->name = "Sysevent";
+                    c->type = "sysevent";
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
                     cl.append(c);
                 }
                 contactListWidget->setContacts(cl);
@@ -448,6 +489,12 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     } else if (type == "conference") {
         emoji = EMOJI_CONFERENCE;
         headerText = emoji + " " + name;
+    } else if (type == "unknown") {
+        emoji = EMOJI_UNKNOWN;
+        headerText = emoji + " " + name;
+    } else if (type == "sysevent") {
+        emoji = EMOJI_SYSEVENT;
+        headerText = emoji + " " + name;
     }
     
     chatWidget->setHeaderText(headerText);
@@ -463,16 +510,21 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         for (const auto& msg : cacheIt->second) {
             chatWidget->appendMessage(msg);
         }
-        chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
-        ToxAPI::getMessagesHistory(id, typeStr);
+        if (id >= 0) {
+            chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
+            ToxAPI::getMessagesHistory(id, typeStr);
+        }
     } else {
         // 缓存未命中：显示 loading 并拉取
         chatWidget->clearMessages();
-        chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
-        ToxAPI::getMessagesHistory(id, typeStr);
+        if (id >= 0) {
+            chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
+            ToxAPI::getMessagesHistory(id, typeStr);
+        }
     }
     
-    // 异步预加载成员列表到 peerInfoMap 缓存
+    // 异步预加载成员列表到 peerInfoMap 缓存（虚拟联系人跳过）
+    if (id < 0) return;
     if (type == "group") {
         chatWidget->loadingBar()->showLoading(kLoadMembers, _("loading_members"));
         ToxAPI::getGroupMembers(id);
@@ -728,6 +780,39 @@ void MainWindow::handleEvents(const EventList& events) {
                 }
                 cJSON_Delete(root);
             }
+        } else if (!e.type.empty() && e.type[0] == '_') {
+            // System event — 始终缓存到 Sysevent，正在查看时也追加到界面
+            {
+                ChatMessage msg;
+                if (e.type == "_server_restart") {
+                    msg.messageText = "[Server restart detected]";
+                } else {
+                    msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
+                }
+                msg.type = "other";
+                msg.senderName = "Sysevent";
+                msg.peerNumber = VIRTUAL_SYSEVENT_ID;
+                msg.time = getCurrentTime();
+                m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
+                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
+                    chatWidget->appendMessage(msg);
+                }
+            }
+        } else {
+            // 未处理的事件类型 — 始终缓存到 Unknown，正在查看时也追加到界面
+            qWarning("Unhandled event type: %s, data: %.160s", e.type.c_str(), e.data.c_str());
+            {
+                ChatMessage msg;
+                msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
+                msg.type = "other";
+                msg.senderName = "Unknown";
+                msg.peerNumber = VIRTUAL_UNKNOWN_ID;
+                msg.time = getCurrentTime();
+                m_messageCache[{VIRTUAL_UNKNOWN_ID, "unknown"}].push_back(msg);
+                if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == "unknown") {
+                    chatWidget->appendMessage(msg);
+                }
+            }
         }
     }
 }
@@ -756,6 +841,10 @@ void MainWindow::retranslateUi() {
             headerText = _("group") + " " + QString::number(currentChatId);
         } else if (currentChatType == "conference") {
             headerText = _("conference_item") + " " + QString::number(currentChatId);
+        } else if (currentChatType == "unknown") {
+            headerText = QString(_("unknown")) + " " + QString::number(currentChatId);
+        } else if (currentChatType == "sysevent") {
+            headerText = QString("System Events") + " " + QString::number(currentChatId);
         }
         chatWidget->setHeaderText(headerText);
     }
