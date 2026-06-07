@@ -9,6 +9,11 @@
 #include <qlineedit.h>
 #include <qapplication.h>
 #include <qlayout.h>
+#ifdef QT3_BUILD
+#include <qscrollview.h>
+#else
+#include <QScrollArea>
+#endif
 #include <map>
 
 struct cJSON;
@@ -71,6 +76,7 @@ private:
     QTextEdit* m_rawEdit;
     QPushButton* m_btnRaw;
     bool m_showRaw;
+    QWidget* m_treeScroll;
     QWidget* m_treeContainer;
     QVBoxLayout* m_treeLayout;
 

@@ -37,6 +37,7 @@ signals:
     void languageChanged(const QString& langCode);
     void fileSendRequested(const QString& filePath);
     void translateRequested(int msgIndex, const QString& text, const QString& targetLang);
+    void sourceClicked(int msgIndex);
 
 private slots:
     void onSendClicked();

@@ -84,13 +84,24 @@ JsonViewWidget::JsonViewWidget(QWidget* parent)
     m_errorLabel->hide();
     m_contentLayout->addWidget(m_errorLabel);
 
-    // Tree container — holds tree widgets
-    m_treeContainer = new QWidget(m_contentArea);
-    m_treeContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // Tree container — wrapped in scroll area
+#ifdef QT3_BUILD
+    QScrollView* scroll = new QScrollView(m_contentArea);
+    scroll->setResizePolicy(QScrollView::AutoOneFit);
+    m_treeScroll = scroll;
+    m_treeContainer = new QWidget();
+    scroll->addChild(m_treeContainer);
+#else
+    QScrollArea* scroll = new QScrollArea(m_contentArea);
+    m_treeScroll = scroll;
+    scroll->setWidgetResizable(true);
+    m_treeContainer = new QWidget();
+    scroll->setWidget(m_treeContainer);
+#endif
     m_treeLayout = new QVBoxLayout(m_treeContainer);
     qSetMargins(m_treeLayout, 0, 0, 0, 0);
     m_treeLayout->setSpacing(2);
-    m_contentLayout->addWidget(m_treeContainer, 1);
+    m_contentLayout->addWidget(m_treeScroll, 1);
 
     // Raw text edit (hidden by default)
     m_rawEdit = new QTextEdit(m_contentArea);
@@ -297,7 +308,7 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
         int cnt = childCount(node);
         bool hasChildren = (cnt > 0);
 
-        QPushButton* toggleBtn = new QPushButton(hasChildren ? "[+]" : "", headerRow);
+        QPushButton* toggleBtn = new QPushButton(hasChildren ? (depth > 0 ? "[+]" : "[-]") : "", headerRow);
         toggleBtn->setFlat(true);
         toggleBtn->setFixedWidth(20);
         toggleBtn->setEnabled(hasChildren);
@@ -314,7 +325,7 @@ QWidget* JsonViewWidget::buildNode(cJSON* node, const QString& key, const QStrin
 
         if (hasChildren) {
             childrenContainer = new QWidget(row);
-            childrenContainer->hide();
+            if (depth > 0) { childrenContainer->hide(); }
             QVBoxLayout* childLayout = new QVBoxLayout(childrenContainer);
             qSetMargins(childLayout, 0, 0, 0, 0);
             childLayout->setSpacing(2);
@@ -399,6 +410,12 @@ void JsonViewWidget::cleanupTree() {
         delete static_cast<QWidget*>(child);
     }
 #endif
+    // Recreate layout to clear leftover spacer items (stretches that accumulate on repeated setJson calls)
+    delete m_treeLayout;
+    m_treeLayout = new QVBoxLayout(m_treeContainer);
+    qSetMargins(m_treeLayout, 0, 0, 0, 0);
+    m_treeLayout->setSpacing(2);
+
     m_nodeMap.clear();
     m_toggleMap.clear();
     m_maxDepth = 0;

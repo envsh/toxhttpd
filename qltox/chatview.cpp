@@ -905,8 +905,9 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 return;
             }
 
-            // Check source button click (stub)
+            // Check source button click
             if (m_messages[msgIndex].sourceBtnRect.contains(event->pos())) {
+                emit sourceClicked(msgIndex);
                 return;
             }
 

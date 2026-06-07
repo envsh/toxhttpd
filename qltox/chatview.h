@@ -65,6 +65,7 @@ protected:
 
 signals:
     void translateClicked(int msgIndex);
+    void sourceClicked(int msgIndex);
 
 private slots:
     void onScrollChanged(int value);

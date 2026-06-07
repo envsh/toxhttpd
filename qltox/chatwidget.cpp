@@ -70,6 +70,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     messageArea = new ChatView(this);
     mainLayout->addWidget(messageArea, 1);
     connect(messageArea, SIGNAL(translateClicked(int)), this, SLOT(onTranslateClicked(int)));
+    connect(messageArea, SIGNAL(sourceClicked(int)), this, SIGNAL(sourceClicked(int)));
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD

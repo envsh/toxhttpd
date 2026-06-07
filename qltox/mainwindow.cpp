@@ -10,6 +10,7 @@
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"
 #include "cJSON.h"
+#include "jsonview.h"
 #include "appsetup.h"
 #include <qmessagebox.h>
 #include <qtextcodec.h>
@@ -160,6 +161,7 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onLanguageChanged(const QString&)));
     connect(chatWidget, SIGNAL(translateRequested(int, const QString&, const QString&)),
             this, SLOT(onTranslateRequested(int, const QString&, const QString&)));
+    connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 启动事件轮询引擎
@@ -1444,6 +1446,27 @@ void MainWindow::loadMessageHistory() {
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
     ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)), msgIndex);
+}
+
+void MainWindow::onSourceClicked(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+
+    ChatMessage msg = chatWidget->messageAt(msgIndex);
+    QDialog dlg(this);
+    dlg.resize(500, 400);
+    qSetWindowTitle(&dlg, qFromUtf8("Source"));
+    QBoxLayout* lay = qNewBoxLayout(&dlg, QBoxLayout::TopToBottom, 0, 4);
+    qSetMargins(lay, 4, 4, 4, 4);
+
+    JsonViewWidget* jv = new JsonViewWidget(&dlg);
+    jv->setJson(msg.messageText);
+    lay->addWidget(jv, 1);
+
+    QPushButton* closeBtn = new QPushButton(_("buttons.close"), &dlg);
+    connect(closeBtn, SIGNAL(clicked()), &dlg, SLOT(accept()));
+    lay->addWidget(closeBtn, 0, Qt::AlignRight);
+
+    dlg.exec();
 }
 
 void MainWindow::onMenu1Stub() {
