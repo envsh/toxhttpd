@@ -29,6 +29,7 @@ public:
     int messageCount() const;
     ChatMessage messageAt(int index) const;
     void appendMessage(const ChatMessage& msg);
+    void restoreMessages(const std::vector<ChatMessage>& msgs);
     void retranslateUi();
     
 signals:

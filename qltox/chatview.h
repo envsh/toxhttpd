@@ -44,6 +44,7 @@ public:
     ChatView(QWidget* parent = 0);
 
     void appendMessage(const ChatMessage& msg);
+    void restoreMessages(const std::vector<ChatMessage>& msgs);
     void clearMessages();
     void scrollToBottom();
     ChatMessage& messageAt(int index);

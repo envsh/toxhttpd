@@ -161,6 +161,10 @@ void ChatWidget::appendMessage(const ChatMessage& msg) {
     messageArea->appendMessage(msg);
 }
 
+void ChatWidget::restoreMessages(const std::vector<ChatMessage>& msgs) {
+    messageArea->restoreMessages(msgs);
+}
+
 void ChatWidget::onSendClicked() {
     if (inputEdit->placeholderText().length() > 0) {
 #ifdef QT3_BUILD

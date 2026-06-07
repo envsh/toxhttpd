@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <qapplication.h>
 #include <sstream>
+#include <unordered_set>
 
 // ── Static members ──
 QObject* ToxAPI::s_target = nullptr;
@@ -94,12 +95,20 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
         e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
-        if (e.id == 0) {
-            ALOG_WARN("parseEventsJson: skip event (no event_id)");
-            continue;
-        }
-        if (e.type.empty()) {
-            ALOG_WARN("parseEventsJson: skip event (empty type)");
+        if (e.id == 0 || e.type.empty()) {
+            char* raw = cJSON_PrintUnformatted(item);
+            std::string lineStr = raw ? std::string(raw) : "{}";
+            free(raw);
+            static std::unordered_set<std::string> seen;
+            if (seen.insert(lineStr).second) {
+                Event synth;
+                synth.id = 0;
+                synth.type = "unknown";
+                synth.data = lineStr;
+                synth.timestamp = "";
+                events.push_back(synth);
+                ALOG_WARN("parseEventsJson: wrapped unparsed item as unknown");
+            }
             continue;
         }
         events.push_back(e);
@@ -132,16 +141,18 @@ static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vec
         e.type = jsonStr(cJSON_GetObjectItem(item, "event_type"));
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
-        if (e.id == 0) {
-            ALOG_WARN("parseEventsNdjson: skip event (no event_id) line:", line);
+        if (e.id == 0 || e.type.empty()) {
+            static std::unordered_set<std::string> seen;
+            if (seen.insert(line).second) {
+                Event synth;
+                synth.id = 0;
+                synth.type = "unknown";
+                synth.data = line;
+                synth.timestamp = "";
+                events.push_back(synth);
+                ALOG_WARN("parseEventsNdjson: wrapped unparsed line as unknown");
+            }
             cJSON_Delete(item);
-            ++errors;
-            continue;
-        }
-        if (e.type.empty()) {
-            ALOG_WARN("parseEventsNdjson: skip event (empty type) line:", line);
-            cJSON_Delete(item);
-            ++errors;
             continue;
         }
         events.push_back(e);

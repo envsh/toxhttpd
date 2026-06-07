@@ -506,16 +506,15 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     
     if (hasCache) {
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
-        chatWidget->clearMessages();
-        for (const auto& msg : cacheIt->second) {
-            chatWidget->appendMessage(msg);
-        }
+        qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
+        chatWidget->restoreMessages(cacheIt->second);
         if (id >= 0) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
     } else {
-        // 缓存未命中：显示 loading 并拉取
+        // 缓存未命中
+        qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
         chatWidget->clearMessages();
         if (id >= 0) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
@@ -793,6 +792,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.senderName = "Sysevent";
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
+                qWarning("Cache PUSH to sysevent %d: type=%s", VIRTUAL_SYSEVENT_ID, e.type.c_str());
                 m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
                     chatWidget->appendMessage(msg);
@@ -808,6 +808,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.senderName = "Unknown";
                 msg.peerNumber = VIRTUAL_UNKNOWN_ID;
                 msg.time = getCurrentTime();
+                qWarning("Cache PUSH to unknown %d: type=%s", VIRTUAL_UNKNOWN_ID, e.type.c_str());
                 m_messageCache[{VIRTUAL_UNKNOWN_ID, "unknown"}].push_back(msg);
                 if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == "unknown") {
                     chatWidget->appendMessage(msg);

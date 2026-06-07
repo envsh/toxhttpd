@@ -68,6 +68,12 @@ ChatView::ChatView(QWidget* parent)
 #endif
 }
 
+void ChatView::restoreMessages(const std::vector<ChatMessage>& msgs) {
+    m_messages = msgs;
+    relayout();
+    scrollToBottom();
+}
+
 void ChatView::appendMessage(const ChatMessage& msg) {
     m_messages.push_back(msg);
     relayout();
