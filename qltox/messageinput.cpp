@@ -158,10 +158,10 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
             QString uris = qFromUtf8(ba.data());
             uris = uris.stripWhiteSpace();
             int idx = uris.find('\n');
-            if (idx >= 0) uris = uris.left(idx);
+            if (idx >= 0) { uris = uris.left(idx); }
             QString path = uris;
             if (path.startsWith("file://")) path = path.mid(7);
-            if (path.isEmpty() || !QFile::exists(path)) return false;
+            if (path.isEmpty() || !QFile::exists(path)) { return false; }
             int ret = QMessageBox::question(this, _("confirm"),
                         _("confirm_send_file").arg(path),
                         QMessageBox::Yes, QMessageBox::No);

@@ -51,7 +51,7 @@ static bool saveConfig(cJSON* root) {
     char* jsonStr = cJSON_Print(root);
     std::ofstream ofs(path);
     bool ok = ofs.is_open();
-    if (ok) ofs << jsonStr;
+    if (ok) { ofs << jsonStr; }
     free(jsonStr);
     return ok;
 }
@@ -82,8 +82,9 @@ static void qComboSetCurrent(QComboBox* combo, int index) {
 
 static int qComboFindText(QComboBox* combo, const QString& text) {
     for (int i = 0; i < combo->count(); ++i) {
-        if (qComboText(combo, i) == text)
+        if (qComboText(combo, i) == text) {
             return i;
+        }
     }
     return -1;
 }
@@ -142,8 +143,9 @@ void LoginDialog::loadHistory() {
         int count = cJSON_GetArraySize(hist);
         for (int i = 0; i < count; ++i) {
             cJSON* item = cJSON_GetArrayItem(hist, i);
-            if (item && item->valuestring)
+            if (item && item->valuestring) {
                 qComboAddItem(m_urlCombo, qFromUtf8(item->valuestring));
+            }
         }
     }
 
@@ -151,19 +153,21 @@ void LoginDialog::loadHistory() {
     if (last && last->valuestring) {
         QString lastStr = qFromUtf8(last->valuestring);
         int idx = qComboFindText(m_urlCombo, lastStr);
-        if (idx >= 0)
+        if (idx >= 0) {
             qComboSetCurrent(m_urlCombo, idx);
+        }
     }
 
     cJSON_Delete(root);
 
-    if (m_urlCombo->count() == 0)
+    if (m_urlCombo->count() == 0) {
         qComboAddItem(m_urlCombo, "http://localhost:8181");
+    }
 }
 
 void LoginDialog::saveHistory(const std::string& url) {
     cJSON* root = loadConfig();
-    if (!root) root = cJSON_CreateObject();
+    if (!root) { root = cJSON_CreateObject(); }
 
     cJSON_DeleteItemFromObject(root, "last_server");
     cJSON_AddStringToObject(root, "last_server", url.c_str());
@@ -173,8 +177,9 @@ void LoginDialog::saveHistory(const std::string& url) {
     cJSON_AddItemToArray(hist, cJSON_CreateString(url.c_str()));
     for (int i = 0; i < m_urlCombo->count(); ++i) {
         std::string item = qStrToStd(qComboText(m_urlCombo, i));
-        if (item != url)
+        if (item != url) {
             cJSON_AddItemToArray(hist, cJSON_CreateString(item.c_str()));
+        }
     }
     if (cJSON_GetArraySize(hist) > 20) {
         cJSON* truncated = cJSON_CreateArray();
@@ -191,7 +196,7 @@ void LoginDialog::saveHistory(const std::string& url) {
 
 QString LoginDialog::configValue(const QString& key) {
     cJSON* root = loadConfig();
-    if (!root) return QString();
+    if (!root) { return QString(); }
     cJSON* item = cJSON_GetObjectItem(root, qToUtf8(key).data());
     QString val = (item && cJSON_IsString(item)) ? qFromUtf8(item->valuestring) : QString();
     cJSON_Delete(root);
@@ -200,7 +205,7 @@ QString LoginDialog::configValue(const QString& key) {
 
 bool LoginDialog::setConfigValue(const QString& key, const QString& value) {
     cJSON* root = loadConfig();
-    if (!root) root = cJSON_CreateObject();
+    if (!root) { root = cJSON_CreateObject(); }
     cJSON_DeleteItemFromObject(root, qToUtf8(key).data());
     cJSON_AddStringToObject(root, qToUtf8(key).data(), qToUtf8(value).data());
     bool ok = saveConfig(root);
@@ -242,8 +247,9 @@ void LoginDialog::onConnect() {
 
         CURLcode res = curl_easy_perform(curl);
         long httpCode = 0;
-        if (res == CURLE_OK)
+        if (res == CURLE_OK) {
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+        }
         curl_easy_cleanup(curl);
 
         m_httpResult = (int)httpCode;
@@ -254,7 +260,7 @@ void LoginDialog::onConnect() {
 }
 
 void LoginDialog::checkHttpResult() {
-    if (m_httpResult == -1) return;
+    if (m_httpResult == -1) { return; }
 
     m_pollTimer->stop();
 

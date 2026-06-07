@@ -164,9 +164,9 @@ void ChatWidget::appendMessage(const ChatMessage& msg) {
 void ChatWidget::onSendClicked() {
     if (inputEdit->placeholderText().length() > 0) {
 #ifdef QT3_BUILD
-        if (inputEdit->text() == inputEdit->placeholderText()) return;
+        if (inputEdit->text() == inputEdit->placeholderText()) { return; }
 #else
-        if (inputEdit->toPlainText() == inputEdit->placeholderText()) return;
+        if (inputEdit->toPlainText() == inputEdit->placeholderText()) { return; }
 #endif
     }
 #ifdef QT3_BUILD
@@ -185,10 +185,10 @@ void ChatWidget::retranslateUi() {
     // 注意：headerText 的更新由 MainWindow::retranslateUi() 处理
     
     // 更新按钮文字
-    if (sendBtn) sendBtn->setText(_("buttons.send"));
+    if (sendBtn) { sendBtn->setText(_("buttons.send")); }
     
     // 更新主题复选框文本
-    if (themeCheckBox) themeCheckBox->setText(_("theme_dark"));
+    if (themeCheckBox) { themeCheckBox->setText(_("theme_dark")); }
     
     // 更新风格选择器文字
     if (m_styleSelector) {
@@ -210,7 +210,7 @@ void ChatWidget::retranslateUi() {
 
 void ChatWidget::onLanguageChanged(int index) {
     QString langCode;
-    if (index == 0) langCode = "zh-CN";
+    if (index == 0) { langCode = "zh-CN"; }
     else if (index == 1) langCode = "zh-TW";
     else if (index == 2) langCode = "en-US";
     else langCode = "zh-CN"; // 默认
@@ -221,7 +221,7 @@ void ChatWidget::onLanguageChanged(int index) {
 
 void ChatWidget::onTranslateClicked(int msgIndex) {
     ChatMessage& msg = messageArea->messageAt(msgIndex);
-    if (msg.translationInProgress) return;
+    if (msg.translationInProgress) { return; }
 
     // Toggle: if already translated, just toggle display
     if (!msg.translatedText.isEmpty()) {
@@ -269,7 +269,7 @@ void ChatWidget::onEmojiClicked() {
     int pickerH = emojiPicker->height();
     int x = btnPos.x() + emojiBtn->width() - pickerW;
     int y = btnPos.y() - pickerH;
-    if (y < 0) y = btnPos.y() + emojiBtn->height();
+    if (y < 0) { y = btnPos.y() + emojiBtn->height(); }
     emojiPicker->showAt(QPoint(x, y));
 }
 

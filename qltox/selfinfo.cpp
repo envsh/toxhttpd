@@ -223,11 +223,11 @@ void SelfInfoWidget::onShowQRCode() {
 
 void SelfInfoWidget::retranslateUi() {
     // 更新按钮文字
-    if (switchBtn) switchBtn->setText(qFromUtf8("⇄"));
-    if (editBtn) editBtn->setText(_("buttons.edit_info"));
-    if (connectBtn) connectBtn->setText(_("buttons.connect_network"));
-    if (qrBtn) qrBtn->setText(_("buttons.qrcode"));
-    if (copyBtn) copyBtn->setText(qFromUtf8("📋"));
+    if (switchBtn) { switchBtn->setText(qFromUtf8("⇄")); }
+    if (editBtn) { editBtn->setText(_("buttons.edit_info")); }
+    if (connectBtn) { connectBtn->setText(_("buttons.connect_network")); }
+    if (qrBtn) { qrBtn->setText(_("buttons.qrcode")); }
+    if (copyBtn) { copyBtn->setText(qFromUtf8("📋")); }
     
     // 更新状态标签（如果当前显示的是默认值）
     QString currentStatus = statusBadge->text();
