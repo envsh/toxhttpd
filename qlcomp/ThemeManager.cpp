@@ -19,7 +19,7 @@ const char* ThemeManager::m_styleId = "qtFusion";
 #ifdef QT3_BUILD
 static void applyPaletteChildren(QWidget *parent, const QPalette &qpal) {
     QObjectList *children = const_cast<QObjectList*>(parent->children());
-    if (!children) return;
+    if (!children) { return; }
     QObject *obj = children->first();
     while (obj) {
         if (obj->isWidgetType()) {

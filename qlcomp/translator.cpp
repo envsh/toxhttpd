@@ -19,8 +19,9 @@ Translator::Translator() : m_root(nullptr), m_currentLang("zh-CN") {
     appPath = QCoreApplication::applicationFilePath();
 #endif
     int lastSlash = qLastIndexOf(appPath, "/");
-    if (lastSlash >= 0)
+    if (lastSlash >= 0) {
         m_searchPaths.append(appPath.left(lastSlash + 1) + "lang");
+    }
 
     // 2. 当前工作目录
     m_searchPaths.append("lang");
@@ -32,8 +33,9 @@ Translator::Translator() : m_root(nullptr), m_currentLang("zh-CN") {
             m_searchPaths.append(appPath.left(secondSlash + 1) + "qltox/lang");
             // 4. 项目根目录的 lang/（exe=build3/qltox → ../../lang/）
             int thirdSlash = qLastIndexOf(appPath.left(secondSlash), "/");
-            if (thirdSlash >= 0)
+            if (thirdSlash >= 0) {
                 m_searchPaths.append(appPath.left(thirdSlash + 1) + "lang");
+            }
         }
     }
 
@@ -46,7 +48,7 @@ void Translator::addTranslationPath(const QString& path) {
 }
 
 Translator::~Translator() {
-    if (m_root) cJSON_Delete((cJSON*)m_root);
+    if (m_root) { cJSON_Delete((cJSON*)m_root); }
 }
 
 bool Translator::loadLanguage(const QString& langCode) {
@@ -91,7 +93,7 @@ bool Translator::loadLanguage(const QString& langCode) {
         return false;
     }
     
-    if (m_root) cJSON_Delete((cJSON*)m_root);
+    if (m_root) { cJSON_Delete((cJSON*)m_root); }
     m_root = newRoot;
     m_currentLang = langCode;
     

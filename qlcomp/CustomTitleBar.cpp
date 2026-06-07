@@ -47,7 +47,7 @@ CustomTitleBar::CustomTitleBar(QWidget* parent)
 }
 
 void CustomTitleBar::connectFramelessHelper(FramelessHelper* helper) {
-    if (!helper) return;
+    if (!helper) { return; }
     helper->setTitleBar(this);
 #ifdef QT3_BUILD
     QObject::connect(sysMenuBtn, SIGNAL(clicked()), helper, SLOT(showSystemMenuFromSys()));
@@ -64,14 +64,14 @@ void CustomTitleBar::connectFramelessHelper(FramelessHelper* helper) {
 
 void CustomTitleBar::toggleMenu() {
     m_menuVisible = !m_menuVisible;
-    if (m_menuVisible)
+    if (m_menuVisible) {
         menubar->show();
-    else
+    } else
         menubar->hide();
 }
 
 void CustomTitleBar::setLabel(const QString& text) {
-    if (titleLabel) titleLabel->setText(text);
+    if (titleLabel) { titleLabel->setText(text); }
 }
 
 QString CustomTitleBar::label() const {

@@ -98,7 +98,7 @@ public:
     ALogStream& operator<<(const std::vector<T>& vec) {
         m_buffer += "[";
         for (size_t i = 0; i < vec.size(); ++i) {
-            if (i > 0) m_buffer += ", ";
+            if (i > 0) { m_buffer += ", "; }
             *this << vec[i];
         }
         m_buffer += "] ";

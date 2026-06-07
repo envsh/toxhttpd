@@ -42,8 +42,9 @@ void EmojiTableItem::paint(QPainter* p, const QColorGroup& cg,
                            const QRect& cr, bool selected) {
     if (!textHasEmoji(text())) { QTableItem::paint(p, cg, cr, selected); return; }
     p->save();
-    if (selected)
+    if (selected) {
         p->fillRect(cr, cg.highlight());
+    }
     p->setPen(selected ? cg.highlightedText() : cg.text());
     EmojiRenderer::instance().drawText(*p, cr, text());
     p->restore();

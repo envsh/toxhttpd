@@ -29,8 +29,9 @@ const std::vector<StyleParams::Definition>& StyleParams::registeredStyles() {
 
 StyleParams StyleParams::make(const char* id, bool dark) {
     for (const auto& def : styleRegistry()) {
-        if (std::strcmp(def.id, id) == 0)
+        if (std::strcmp(def.id, id) == 0) {
             return def.factory(dark);
+        }
     }
     return styleRegistry().front().factory(dark);
 }

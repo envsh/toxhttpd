@@ -10,7 +10,7 @@
 #ifdef QT3_BUILD
 
 static const char* demangleSym(const char* raw) {
-    if (!raw) return "??";
+    if (!raw) { return "??"; }
     const char* paren = strchr(raw, '(');
     const char* plus  = strchr(raw, '+');
     const char* name = raw;
@@ -25,7 +25,7 @@ static const char* demangleSym(const char* raw) {
     char* dem = abi::__cxa_demangle(name, nullptr, nullptr, &status);
     if (dem) {
         char* p = strchr(dem, '(');
-        if (p) *p = '\0';
+        if (p) { *p = '\0'; }
     }
     return dem ? dem : name;
 }
@@ -42,8 +42,9 @@ static const char* callerBacktrace() {
 static const char* callerRetaddr() {
     void* addr = __builtin_return_address(2);
     Dl_info info;
-    if (dladdr(addr, &info) && info.dli_sname)
+    if (dladdr(addr, &info) && info.dli_sname) {
         return demangleSym(info.dli_sname);
+    }
     return "??";
 }
 

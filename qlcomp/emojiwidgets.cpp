@@ -69,7 +69,7 @@ void EmojiPushButton::drawButtonLabel(QPainter* p) {
         QRect cr = style().subRect(QStyle::SR_PushButtonContents, this);
         QFont f = p->font();
         int px = cr.width() < cr.height() ? cr.width() : cr.height();
-        if (px > 0) f.setPixelSize(px);
+        if (px > 0) { f.setPixelSize(px); }
         p->setFont(f);
         QFontMetrics fm = p->fontMetrics();
         int ew = fm.height();
@@ -98,7 +98,7 @@ void EmojiPushButton::paintEvent(QPaintEvent* event) {
     QRect cr = style()->subElementRect(QStyle::SE_PushButtonContents, &opt, this);
     QFont f = p.font();
     int px = cr.width() < cr.height() ? cr.width() : cr.height();
-    if (px > 0) f.setPixelSize(px);
+    if (px > 0) { f.setPixelSize(px); }
     p.setFont(f);
     QFontMetrics fm = p.fontMetrics();
     int ew = fm.height();

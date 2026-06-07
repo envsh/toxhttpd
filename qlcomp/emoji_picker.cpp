@@ -373,15 +373,16 @@ void EmojiPicker::rebuildRecentSection() {
 
     bool hasRecent = !m_recentEmojis.isEmpty();
 #ifdef QT3_BUILD
-    if (hasRecent)
+    if (hasRecent) {
         m_recentLabel->show();
-    else
+    } else {
         m_recentLabel->hide();
+    }
 #else
     m_recentLabel->setVisible(hasRecent);
 #endif
 
-    if (!hasRecent) return;
+    if (!hasRecent) { return; }
 
     m_recentSection = new QWidget(m_gridArea);
 #ifdef QT3_BUILD
