@@ -9,8 +9,8 @@
 #include <qclipboard.h>
 
 SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("") {
-    QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 12, 10);
-    qSetMargins(mainLayout, 12, 12, 12, 12);
+    QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 6, 5);
+    qSetMargins(mainLayout, 6, 6, 6, 6);
     
     // 头部区域：头像 + 信息
     QBoxLayout* headerLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
@@ -66,14 +66,17 @@ SelfInfoWidget::SelfInfoWidget(QWidget* parent) : QWidget(parent), selfAddress("
     QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     
     editBtn = new QPushButton(_("buttons.edit_info"), this);
+    editBtn->setFixedHeight(24);
     connect(editBtn, SIGNAL(clicked()), this, SLOT(onEditInfo()));
     btnLayout->addWidget(editBtn);
     
     connectBtn = new QPushButton(_("buttons.connect_network"), this);
+    connectBtn->setFixedHeight(24);
     connect(connectBtn, SIGNAL(clicked()), this, SLOT(onBootstrap()));
     btnLayout->addWidget(connectBtn);
     
     qrBtn = new QPushButton(_("buttons.qrcode"), this);
+    qrBtn->setFixedHeight(24);
     connect(qrBtn, SIGNAL(clicked()), this, SLOT(onShowQRCode()));
     btnLayout->addWidget(qrBtn);
     

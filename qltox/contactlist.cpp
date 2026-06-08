@@ -36,8 +36,8 @@ const char* STATUS_OFFLINE = "N";
 #endif
 
 ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), contextItemId(-1), contextItemType(""), m_scrollBar(nullptr) {
-    QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 8, 2);
-    qSetMargins(layout, 8, 8, 8, 8);
+    QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 4, 1);
+    qSetMargins(layout, 4, 2, 4, 2);
     
     // 搜索行：计数 + 搜索框 + 排序按钮
     QBoxLayout* searchRow = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
@@ -82,6 +82,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), context
     addLayout->addWidget(addInput, 1);
     
     addBtn = new QPushButton(_("buttons.add"), this);
+    addBtn->setFixedHeight(24);
     connect(addBtn, SIGNAL(clicked()), this, SLOT(onAddFriendClicked()));
     addLayout->addWidget(addBtn);
     layout->addLayout(addLayout);
@@ -92,6 +93,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), context
     joinGroupLayout->addWidget(joinGroupInput, 1);
 
     joinGroupBtn = new QPushButton(_("buttons.join_group"), this);
+    joinGroupBtn->setFixedHeight(24);
     connect(joinGroupBtn, SIGNAL(clicked()), this, SLOT(onJoinGroupClicked()));
     joinGroupLayout->addWidget(joinGroupBtn);
     layout->addLayout(joinGroupLayout);
@@ -99,10 +101,12 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), context
     // 创建按钮行（第3行）
     QBoxLayout* btnLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     confBtn = new QPushButton(_("buttons.create_conference"), this);
+    confBtn->setFixedHeight(24);
     connect(confBtn, SIGNAL(clicked()), this, SLOT(onCreateConferenceClicked()));
     btnLayout->addWidget(confBtn);
     
     groupBtn = new QPushButton(_("buttons.create_group"), this);
+    groupBtn->setFixedHeight(24);
     connect(groupBtn, SIGNAL(clicked()), this, SLOT(onCreateGroupClicked()));
     btnLayout->addWidget(groupBtn);
     layout->addLayout(btnLayout);

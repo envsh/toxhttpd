@@ -95,6 +95,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 主分割器（左右布局）
     splitter = new QSplitter(Qt::Horizontal, centralContainer);
+    splitter->setOpaqueResize(true);
     
     // ===== 左侧边栏 =====
     QWidget* sidebar = new QWidget(splitter);
