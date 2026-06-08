@@ -1558,7 +1558,11 @@ void MainWindow::onSourceClicked(int msgIndex) {
     connect(closeBtn, SIGNAL(clicked()), dlg, SLOT(accept()));
     lay->addWidget(closeBtn, 0, Qt::AlignRight);
 
+#ifdef QT3_BUILD
+    // QDialog::finished(int) 在 Qt3 不存在；dialog 是 MainWindow 子对象，自动清理
+#else
     QObject::connect(dlg, SIGNAL(finished(int)), dlg, SLOT(deleteLater()));
+#endif
     dlg->show();
 }
 

@@ -49,6 +49,7 @@ private:
     void handleGripRelease();
     void reposition();
 
+    void paintEvent(QPaintEvent *e) override;
     bool event(QEvent *e) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 

@@ -1,4 +1,11 @@
 #include "sharedstatusbar.h"
+#ifdef QT3_BUILD
+#include <qpainter.h>
+#include <qpen.h>
+#include <qcursor.h>
+#else
+#include <QPainter>
+#endif
 
 SharedStatusBar *SharedStatusBar::s_instance = nullptr;
 
@@ -7,7 +14,7 @@ static const int GRIP_SIZE = 16;
 SharedStatusBar::SharedStatusBar()
 #ifdef QT3_BUILD
     : QWidget(nullptr, "sharedstatusbar",
-              WStyle_Customize | WStyle_NoBorder | WStyle_StaysOnTop)
+              WStyle_Customize | WStyle_Tool | WStyle_NoBorder | WStyle_StaysOnTop)
 #else
     : QWidget(nullptr,
               Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
@@ -30,7 +37,8 @@ SharedStatusBar::SharedStatusBar()
     m_bar = new QStatusBar(this);
     m_bar->setObjectName("innerbar");
 #endif
-    m_bar->setSizeGripEnabled(true);
+    m_bar->setSizeGripEnabled(false);
+    setMouseTracking(true);
 
 #ifdef QT3_BUILD
     QBoxLayout *lay = new QBoxLayout(this, QBoxLayout::TopToBottom, 0, 0);
@@ -116,10 +124,16 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
 #endif
         if (!watched->isWidgetType()) return false;
         QWidget *tw = static_cast<QWidget*>(watched)->topLevelWidget();
-        if (tw && tw != this) {
-            m_activeWindow = tw;
-            reposition();
-        }
+        if (!tw || tw == this) return false;
+#ifdef QT3_BUILD
+        // TipLabel 是顶层 QLabel — 跳过，不跟踪
+        if (tw->inherits("QLabel")) return false;
+#else
+        // Qt4 tooltips/popups 不跟踪
+        if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return false;
+#endif
+        m_activeWindow = tw;
+        reposition();
         return false;
     }
 
@@ -161,9 +175,28 @@ void SharedStatusBar::onDebounceTimeout()
 {
     // 100ms 内没有新的 WindowActivate → 真切换到外部应用 → 隐藏
     m_pendingHide = false;
-    hide();
+    // hide();
 }
 #endif
+
+void SharedStatusBar::paintEvent(QPaintEvent *)
+{
+#ifdef QT3_BUILD
+    QPainter p(this);
+    p.setPen(QPen(Qt::gray, 1));
+#else
+    QPainter p(this);
+    p.setPen(QColor(160, 160, 160));
+#endif
+    int x = width() - GRIP_SIZE;
+    int y = height() - GRIP_SIZE;
+    for (int i = 0; i < 4; i++) {
+        int x1 = x + GRIP_SIZE - 3 - i * 4;
+        int y1 = y + GRIP_SIZE - i * 4;
+        p.drawLine(x1,     y1 + 4, x1 + 4, y1);
+        p.drawLine(x1 + 4, y1 + 4, x1 + 8, y1);
+    }
+}
 
 bool SharedStatusBar::isInGripArea(const QPoint &localPos) const
 {
@@ -232,6 +265,13 @@ bool SharedStatusBar::event(QEvent *e)
             handleGripDrag(me->globalPos());
             return true;
         }
+#ifdef QT3_BUILD
+        setCursor(QCursor(isInGripArea(me->pos())
+                          ? SizeFDiagCursor : ArrowCursor));
+#else
+        setCursor(isInGripArea(me->pos())
+                  ? Qt::SizeFDiagCursor : Qt::ArrowCursor);
+#endif
     }
     if (e->type() == QEvent::MouseButtonRelease) {
         QMouseEvent *me = static_cast<QMouseEvent*>(e);
