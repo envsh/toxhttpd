@@ -933,6 +933,8 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 // Check if clicked on a URL
                 auto links = extractLinks(m_messages[msgIndex].messageText);
                 for (const LinkSpan& link : links) {
+                    qWarning("  PRESS link [%d,%d): %s",
+                             link.start, link.end, qToUtf8(link.url).data());
                     if (charPos >= link.start && charPos < link.end) {
                         qOpenUrl(link.url);
                         return;

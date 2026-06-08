@@ -437,15 +437,14 @@ bool qIsAppActive(const QWidget* widget) {
 
 // ========== URL 打开兼容 ==========
 #ifdef QT3_BUILD
-#include <qprocess.h>
+#include <stdlib.h>
 void qOpenUrl(const QString& url) {
-    QProcess* proc = new QProcess;
 #if defined(Q_OS_WIN32)
-    proc->launch(QString("cmd /c start \"\" \"" + url + "\""));
+    system(QString("cmd /c start \"\" \"" + url + "\"").local8Bit().data());
 #elif defined(Q_OS_MACX)
-    proc->launch(QString("open \"" + url + "\""));
+    system(QString("open \"" + url + "\"").local8Bit().data());
 #else
-    proc->launch(QString("xdg-open \"" + url + "\""));
+    system(QString("xdg-open '" + url + "'").local8Bit().data());
 #endif
 }
 #else
