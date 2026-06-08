@@ -112,16 +112,75 @@ static bool tryParseMatrixSync(const std::string& rawStr, ParseResult& ret) {
         parseMatrixEvents(r, roomId, ret);
     }
 
+    // ret.handled = !ret.contacts.empty() || !ret.peers.empty() || !ret.messages.empty();
     cJSON_Delete(root);
     return true;
 }
 
-// ── [预留] Tox 消息事件解析 ──
+// ── Tox 消息事件解析 ──
 
 static bool tryParseToxMessage(const std::string& rawStr, ParseResult& ret) {
-    (void)rawStr;
-    (void)ret;
-    return false;
+    cJSON* root = cJSON_Parse(rawStr.c_str());
+    if (!root) return false;
+
+    std::string timestamp = jsonGetString(root, "timestamp");
+    std::string eventType = jsonGetString(root, "event_type");
+
+    std::string innerDataStr = jsonGetString(root, "data");
+    if (!innerDataStr.empty()) {
+        cJSON* inner = cJSON_Parse(innerDataStr.c_str());
+        if (inner) {
+            ContactData cd;
+            cd.isConnected = true;
+            cd.status = "online";
+
+            if (eventType == "friend_message") {
+                int64_t friendId = jsonGetInt64(inner, "friend_id");
+                cd.id     = (int)friendId;
+                cd.name   = "friend_" + std::to_string(friendId);
+                cd.type   = "unktox_friend";
+                cd.chatId = std::to_string(friendId);
+            } else if (eventType == "conference_message") {
+                int64_t confNum = jsonGetInt64(inner, "conference_number");
+                cd.id     = (int)confNum;
+                cd.name   = "conf_" + std::to_string(confNum);
+                cd.type   = "unktox_conference";
+                cd.chatId = std::to_string(confNum);
+            } else if (eventType == "group_message") {
+                int64_t groupNum = jsonGetInt64(inner, "group_number");
+                cd.id     = (int)groupNum;
+                cd.name   = "group_" + std::to_string(groupNum);
+                cd.type   = "unktox_group";
+                cd.chatId = std::to_string(groupNum);
+            }
+
+            if (!cd.chatId.empty()) {
+                ret.contactName = qFromUtf8(cd.name);
+                ret.contacts.push_back(cd);
+            }
+
+            HistoryMessage hm;
+            hm.message       = jsonGetString(inner, "message");
+            hm.sender_pubkey = jsonGetString(inner, "sender_pubkey");
+            hm.sender_number = (uint32_t)jsonGetInt64(inner, "sender");
+            hm.direction     = jsonGetString(inner, "direction");
+            hm.created_at    = timestamp;
+            hm.roomId        = cd.chatId;
+
+            std::string peerName = jsonGetString(inner, "peer_name");
+            if (!peerName.empty())
+                hm.message = peerName + ": " + hm.message;
+
+            if (!hm.message.empty())
+                ret.messages.push_back(hm);
+
+            cJSON_Delete(inner);
+        }
+    }
+
+    ret.handled = !ret.contacts.empty() || !ret.peers.empty() || !ret.messages.empty();
+    cJSON_Delete(root);
+    return true;
 }
 
 // ── 旧逻辑：纯文本降级 ──
@@ -175,7 +234,7 @@ static void fallbackAsPlainText(cJSON* valueItem, ParseResult& ret) {
 // ── 主流程 ──
 
 ParseResult UnknownParser::parse(const std::string& eventType, const std::string& jsonData) {
-    qWarning("UnknownParser::parse: type=[%s] data=[%.160s]", eventType.c_str(), jsonData.c_str());
+    qWarning("UnknownParser::parse: type=[%s] data=[%.480s]", eventType.c_str(), jsonData.c_str());
 
     if (eventType != "pubsub" && eventType != "unknown") {
         return {false, QString(), QString(), QString()};
@@ -229,9 +288,6 @@ ParseResult UnknownParser::parse(const std::string& eventType, const std::string
     }
 
 done:
-    if (!ret.contactName.isEmpty())
-        ret.handled = true;
-
     qWarning("UnknownParser: parse done (handled=%d contacts=%zu peers=%zu messages=%zu)",
              ret.handled, ret.contacts.size(), ret.peers.size(), ret.messages.size());
 

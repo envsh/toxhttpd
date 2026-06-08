@@ -558,6 +558,15 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     } else if (type == "matrix_room") {
         emoji = EMOJI_MATRIX;
         headerText = emoji + " " + name;
+    } else if (type == "unktox_friend") {
+        emoji = EMOJI_FRIEND;
+        headerText = emoji + " " + name;
+    } else if (type == "unktox_conference") {
+        emoji = EMOJI_CONFERENCE;
+        headerText = emoji + " " + name;
+    } else if (type == "unktox_group") {
+        emoji = EMOJI_GROUP;
+        headerText = emoji + " " + name;
     }
     
     chatWidget->setHeaderText(headerText);
@@ -571,7 +580,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
         chatWidget->restoreMessages(cacheIt->second);
-        if (id >= 0 && type != "matrix_room") {
+        if (id >= 0 && type != "matrix_room" && type != "unktox_friend"
+            && type != "unktox_conference" && type != "unktox_group") {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -579,7 +589,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存未命中
         qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
         chatWidget->clearMessages();
-        if (id >= 0 && type != "matrix_room") {
+        if (id >= 0 && type != "matrix_room" && type != "unktox_friend"
+            && type != "unktox_conference" && type != "unktox_group") {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
