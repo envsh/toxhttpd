@@ -200,6 +200,33 @@ bool ContactListWidget::isFriendLoaded(int friendId) {
     return false;
 }
 
+void ContactListWidget::incrementUnread(int id, const QString& type, int count) {
+    auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+    m_unreadCounts[key] += count;
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
+void ContactListWidget::resetUnread(int id, const QString& type) {
+    auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+    m_unreadCounts[key] = 0;
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
+int ContactListWidget::unreadCount(int id, const QString& type) const {
+    auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+    auto it = m_unreadCounts.find(key);
+    if (it != m_unreadCounts.end()) {
+        return it->second;
+    }
+    return 0;
+}
+
 void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString& newStatus) {
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
@@ -403,7 +430,13 @@ void ContactListWidget::updateView_v3() {
         }
         
         // emoji和名字之间加空格（web端使用CSS margin-right，这里用字符串空格）
-        lb->insertItem(QString("%1 %2  %3").arg(statusDot, emoji, displayName));
+        QString itemText = QString("%1 %2  %3").arg(statusDot, emoji, displayName);
+        auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
+        auto uit = m_unreadCounts.find(key);
+        if (uit != m_unreadCounts.end() && uit->second > 0) {
+            itemText += QString("  (%1)").arg(uit->second);
+        }
+        lb->insertItem(itemText);
         
         if (c->id == selectedId && c->type == selectedType) {
             targetIndex = newIndex;
@@ -468,9 +501,13 @@ void ContactListWidget::updateView_v4() {
         }
         
         // emoji和名字之间加空格
-        QListWidgetItem* item = new QListWidgetItem(
-            QString("%1 %2  %3").arg(statusDot, emoji, displayName)
-        );
+        QString itemText = QString("%1 %2  %3").arg(statusDot, emoji, displayName);
+        auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
+        auto uit = m_unreadCounts.find(key);
+        if (uit != m_unreadCounts.end() && uit->second > 0) {
+            itemText += QString("  (%1)").arg(uit->second);
+        }
+        QListWidgetItem* item = new QListWidgetItem(itemText);
         item->setData(Qt::UserRole, c->id);
         item->setData(Qt::UserRole + 1, c->type);
         lw->addItem(item);

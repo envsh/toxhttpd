@@ -534,6 +534,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     qWarning("onContactSelected: id=%d, type=%s", id, qToUtf8(type).data());
     currentChatId = id;
     currentChatType = type;
+    contactListWidget->resetUnread(id, type);
     
     QString headerText;
     QString emoji;
@@ -655,6 +656,8 @@ void MainWindow::handleEvents(const EventList& events) {
                     if (friendId == currentChatId && currentChatType == "friend") {
                         chatWidget->appendMessage(message, "other", QString(),
                                          friendId, getCurrentTime());
+                    } else {
+                        contactListWidget->incrementUnread(friendId, "friend");
                     }
                     if (!qIsAppActive())
                         playNotificationSound();
@@ -719,6 +722,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
+                    } else {
+                        contactListWidget->incrementUnread(confNumber, "conference");
                     }
                     if (!qIsAppActive())
                         playNotificationSound();
@@ -777,6 +782,8 @@ void MainWindow::handleEvents(const EventList& events) {
                             ipAddress = qFromUtf8(it->second.peerIp);
                         }
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime(), "", "", ipAddress);
+                    } else {
+                        contactListWidget->incrementUnread(groupNumber, "group");
                     }
                     if (!qIsAppActive())
                         playNotificationSound();
@@ -866,6 +873,8 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
                     chatWidget->appendMessage(msg);
+                } else {
+                    contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, "sysevent");
                 }
             }
         } else if (!e.type.empty() && e.type[0] == '_') {
@@ -885,6 +894,8 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
                     chatWidget->appendMessage(msg);
+                } else {
+                    contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, "sysevent");
                 }
             }
         } else {
@@ -968,6 +979,8 @@ void MainWindow::handleEvents(const EventList& events) {
                     m_messageCache[{chatId, chatType}].push_back(msg);
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
                         chatWidget->appendMessage(msg);
+                    } else {
+                        contactListWidget->incrementUnread(chatId, qFromUtf8(chatType));
                     }
                 }
             } else if (pr.handled && pr.contactName == "reddit") {
@@ -982,6 +995,8 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_messageCache[{VIRTUAL_REDDIT_ID, "topic"}].push_back(msg);
                 if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == "topic") {
                     chatWidget->appendMessage(msg);
+                } else {
+                    contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, "topic");
                 }
             } else {
                 ChatMessage msg;
@@ -1000,6 +1015,8 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_messageCache[{VIRTUAL_UNKNOWN_ID, "unknown"}].push_back(msg);
                 if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == "unknown") {
                     chatWidget->appendMessage(msg);
+                } else {
+                    contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, "unknown");
                 }
             }
         }

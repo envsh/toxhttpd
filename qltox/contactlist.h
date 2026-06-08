@@ -6,6 +6,7 @@
 #include "LimeScrollBar.h"
 #include <qwidget.h>
 #include <qpoint.h>
+#include <map>
 #include <vector>
 
 // Emoji constants defined in contactlist.cpp
@@ -43,6 +44,11 @@ public:
     void removeContact(int id, const QString& type);
     bool isFriendLoaded(int friendId);
     void retranslateUi();
+    
+    // 未读消息数
+    void incrementUnread(int id, const QString& type, int count = 1);
+    void resetUnread(int id, const QString& type);
+    int unreadCount(int id, const QString& type) const;
     
 signals:
     void contactSelected(int id, const QString& type, const QString& name);
@@ -87,6 +93,9 @@ private:
     QPushButton* groupBtn;      // 创建群组按钮
     PlaceholderLineEdit* joinGroupInput;  // 加入群组输入框
     QPushButton* joinGroupBtn;  // 加入群组按钮
+    
+    // 未读消息数 map: key=(id, type)
+    std::map<std::pair<int, std::string>, int> m_unreadCounts;
     
     // 搜索与排序
     PlaceholderLineEdit* searchInput;
