@@ -396,6 +396,13 @@ void ContactListWidget::updateView_v3() {
         }
     }
     
+    // 保存滚动位置（顶部可见项索引）
+    int scrollIndex = -1;
+    int scrollTopIdx = lb->topItem();
+    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < visible.size()) {
+        scrollIndex = scrollTopIdx;
+    }
+    
     lb->clear();
     
     int newIndex = 0;
@@ -449,6 +456,11 @@ void ContactListWidget::updateView_v3() {
     } else if (targetIndex >= 0) {
         lb->setSelected(targetIndex, TRUE);
     }
+    
+    // 恢复滚动位置
+    if (scrollIndex >= 0 && scrollIndex < (int)lb->count()) {
+        lb->setTopItem(scrollIndex);
+    }
 #endif
 }
 
@@ -475,6 +487,8 @@ void ContactListWidget::updateView_v4() {
         selectedId = selItem->data(Qt::UserRole).toInt();
         selectedType = selItem->data(Qt::UserRole + 1).toString();
     }
+    
+    int scrollPos = lw->verticalScrollBar()->value();
     
     lw->clear();
     for (uint i = 0; i < visible.size(); ++i) {
@@ -520,6 +534,8 @@ void ContactListWidget::updateView_v4() {
     if (lw->count() == 0) {
         lw->addItem(new QListWidgetItem(_("no_contacts")));
     }
+    
+    lw->verticalScrollBar()->setValue(scrollPos);
 #endif
 }
 
