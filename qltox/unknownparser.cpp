@@ -38,9 +38,9 @@ static int64_t jsonGetInt64(cJSON* root, const char* path) {
     return (item && cJSON_IsNumber(item)) ? (int64_t)item->valuedouble : 0;
 }
 
-// ── Matrix sync_complete 解析 ──
+// ── Matrix/gomuks sync_complete 解析 ──
 
-static void parseMatrixEvents(cJSON* roomObj, const std::string& roomId, ParseResult& ret) {
+static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseResult& ret) {
     cJSON* events = jsonPath(roomObj, "events");
     if (!events) return;
     int n = cJSON_GetArraySize(events);
@@ -75,7 +75,7 @@ static void parseMatrixEvents(cJSON* roomObj, const std::string& roomId, ParseRe
     }
 }
 
-static bool tryParseMatrixSync(const std::string& rawStr, ParseResult& ret) {
+static bool tryParseGomuksSync(const std::string& rawStr, ParseResult& ret) {
     if (rawStr.empty()) return false;
 
     cJSON* root = cJSON_Parse(rawStr.c_str());
@@ -104,12 +104,12 @@ static bool tryParseMatrixSync(const std::string& rawStr, ParseResult& ret) {
         if (cd.name.empty())
             cd.name    = roomId;
         cd.chatId      = roomId;
-        cd.type        = "matrix_room";
+        cd.type        = "gomuks_room";
         cd.status      = "online";
         cd.isConnected = true;
         ret.contacts.push_back(cd);
 
-        parseMatrixEvents(r, roomId, ret);
+        parseGomuksEvents(r, roomId, ret);
     }
 
     // ret.handled = !ret.contacts.empty() || !ret.peers.empty() || !ret.messages.empty();
@@ -277,7 +277,7 @@ ParseResult UnknownParser::parse(const std::string& eventType, const std::string
         cJSON* dataItem = cJSON_GetObjectItem(valueItem, "data");
         if (dataItem && cJSON_IsString(dataItem)) {
             const char* dataStr = cJSON_GetStringValue(dataItem);
-            if (tryParseMatrixSync(dataStr, ret))
+            if (tryParseGomuksSync(dataStr, ret))
                 goto done;
             if (tryParseToxMessage(dataStr, ret))
                 goto done;

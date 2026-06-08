@@ -417,7 +417,7 @@ void ContactListWidget::updateView_v3() {
         else if (c->type == "sysevent")   emoji = EMOJI_SYSEVENT;
         else if (c->type == "unknown")    emoji = EMOJI_UNKNOWN;
         else if (c->type == "topic")      emoji = EMOJI_TOPIC;
-        else if (c->type == "matrix_room") emoji = EMOJI_MATRIX;
+        else if (c->type == "gomuks_room") emoji = EMOJI_MATRIX;
         else if (c->type == "unktox_friend") emoji = EMOJI_FRIEND;
         else if (c->type == "unktox_conference") emoji = EMOJI_CONFERENCE;
         else if (c->type == "unktox_group") emoji = EMOJI_GROUP;
@@ -501,7 +501,7 @@ void ContactListWidget::updateView_v4() {
         else if (c->type == "sysevent")   emoji = EMOJI_SYSEVENT;
         else if (c->type == "unknown")    emoji = EMOJI_UNKNOWN;
         else if (c->type == "topic")      emoji = EMOJI_TOPIC;
-        else if (c->type == "matrix_room") emoji = EMOJI_MATRIX;
+        else if (c->type == "gomuks_room") emoji = EMOJI_MATRIX;
         else if (c->type == "unktox_friend") emoji = EMOJI_FRIEND;
         else if (c->type == "unktox_conference") emoji = EMOJI_CONFERENCE;
         else if (c->type == "unktox_group") emoji = EMOJI_GROUP;
