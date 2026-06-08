@@ -4,15 +4,12 @@
 #include "restapi.h"
 #include "placeholderlineedit.h"
 #include <qmessagebox.h>
+#include <algorithm>
 #ifdef QT3_BUILD
 #include <qlistbox.h>
 #else
 #include <qlistwidget.h>
 #endif
-
-// 静态数组定义
-const char* ContactListWidget::tabFilters[4] = {"all", "friend", "group", "conference"};
-const char* ContactListWidget::tabNames[4] = {"tabs.all", "tabs.friends", "tabs.groups", "tabs.conferences"};
 
 // Emoji 和状态点常量
 #if QT_VERSION >= 0x050000
@@ -38,22 +35,29 @@ const char* STATUS_ONLINE = "O";
 const char* STATUS_OFFLINE = "N";
 #endif
 
-ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), currentFilter("all"), currentTab(0), contextItemId(-1), contextItemType(""), m_scrollBar(nullptr) {
+ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), contextItemId(-1), contextItemType(""), m_scrollBar(nullptr) {
     QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 8, 2);
     qSetMargins(layout, 8, 8, 8, 8);
     
-    // Tab 标签
-    QBoxLayout* tabLayout = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
+    // 搜索行：计数 + 搜索框 + 排序按钮
+    QBoxLayout* searchRow = qNewBoxLayout(nullptr, QBoxLayout::LeftToRight, 0, 0);
     
-    for (int i = 0; i < 4; ++i) {
-        QPushButton* tab = new QPushButton(_(tabNames[i]), this);
-        qSetCheckable(tab, true);
-        if (i == 0) { qSetChecked(tab, true); }
-        tabButtons[i] = tab;
-        connect(tab, SIGNAL(clicked()), this, SLOT(onTabClicked()));
-        tabLayout->addWidget(tab);
-    }
-    layout->addLayout(tabLayout);
+    countLabel = new QLabel("0", this);
+    searchRow->addWidget(countLabel);
+    searchRow->addSpacing(4);
+    
+    searchInput = new PlaceholderLineEdit(_("placeholders.search_contact"), this);
+    connect(searchInput, SIGNAL(textChanged(const QString&)), this, SLOT(onSearchTextChanged(const QString&)));
+    searchRow->addWidget(searchInput, 1);
+    
+    sortBtn = new QPushButton(_("sort.button"), this);
+    connect(sortBtn, SIGNAL(clicked()), this, SLOT(onSortMenuClicked()));
+    searchRow->addWidget(sortBtn);
+    
+    layout->addLayout(searchRow);
+    
+    // 默认排序：在线优先
+    m_sortCriteria.push_back("online_first");
     
     // 联系人列表
 #ifdef QT3_BUILD
@@ -206,29 +210,84 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
 #endif
 }
 
-void ContactListWidget::onTabClicked() {
-    QPushButton* senderBtn = (QPushButton*) sender();
-    if (!senderBtn) { return; }
-    
-    // 查找是哪个按钮被点击
-    for (int i = 0; i < 4; ++i) {
-        if (tabButtons[i] == senderBtn) {
-            setTabFilter(i);
-            break;
-        }
-    }
+void ContactListWidget::onSearchTextChanged(const QString& text) {
+    m_searchText = text;
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
 }
 
-void ContactListWidget::setTabFilter(int index) {
-    if (index < 0 || index >= 4) { return; }
+void ContactListWidget::onSortMenuClicked() {
+#ifdef QT3_BUILD
+    QPopupMenu menu(this);
+#else
+    QMenu menu(this);
+#endif
+    menu.setMinimumWidth(200);
     
-    currentFilter = tabFilters[index];
-    currentTab = index;
+    struct SortItem { const char* key; const char* labelKey; };
+    SortItem items[] = {
+        {"name_asc",    "sort.name_asc"},
+        {"name_desc",   "sort.name_desc"},
+        {"online_first","sort.online_first"},
+        {"by_type",     "sort.by_type"},
+    };
+    const int itemCount = sizeof(items) / sizeof(items[0]);
     
-    // 更新按钮状态
-    for (int i = 0; i < 4; ++i) {
-        qSetChecked(tabButtons[i], i == index);
+#ifdef QT3_BUILD
+    for (int i = 0; i < itemCount; ++i) {
+        QString label = _(items[i].labelKey);
+        int id = menu.insertItem(label, i);
+        bool checked = false;
+        for (uint j = 0; j < m_sortCriteria.size(); ++j) {
+            if (m_sortCriteria[j] == items[i].key) { checked = true; break; }
+        }
+        menu.setItemChecked(id, checked);
     }
+    menu.setCheckable(true);
+    int choice = menu.exec(sortBtn->mapToGlobal(QPoint(0, sortBtn->height())));
+    if (choice < 0 || choice >= itemCount) { return; }
+    
+    QString key = items[choice].key;
+    {
+        auto it = m_sortCriteria.begin();
+        for (; it != m_sortCriteria.end(); ++it) {
+            if (*it == key) { break; }
+        }
+        if (it != m_sortCriteria.end()) {
+            m_sortCriteria.erase(it);
+        } else {
+            m_sortCriteria.push_back(key);
+        }
+    }
+#else
+    for (int i = 0; i < itemCount; ++i) {
+        QAction* action = menu.addAction(_(items[i].labelKey));
+        action->setCheckable(true);
+        bool checked = false;
+        for (uint j = 0; j < m_sortCriteria.size(); ++j) {
+            if (m_sortCriteria[j] == items[i].key) { checked = true; break; }
+        }
+        action->setChecked(checked);
+        action->setData(QString(items[i].key));
+    }
+    QAction* selected = menu.exec(sortBtn->mapToGlobal(QPoint(0, sortBtn->height())));
+    if (!selected) { return; }
+    
+    QString key = selected->data().toString();
+    {
+        auto it = m_sortCriteria.begin();
+        for (; it != m_sortCriteria.end(); ++it) {
+            if (*it == key) { break; }
+        }
+        if (it != m_sortCriteria.end()) {
+            m_sortCriteria.erase(it);
+        } else {
+            m_sortCriteria.push_back(key);
+        }
+    }
+#endif
     
     updateView_v3();
 #ifndef QT3_BUILD
@@ -245,11 +304,7 @@ void ContactListWidget::onSelectionChanged() {
     int count = 0;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
-        if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") { continue; }
-            if (currentFilter == "group" && c->type != "group") { continue; }
-            if (currentFilter == "conference" && c->type != "conference") { continue; }
-        }
+        if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
         if (count == index) {
             emit contactSelected(c->id, c->type, c->name);
             return;
@@ -286,26 +341,27 @@ void ContactListWidget::updateView_v3() {
 #ifdef QT3_BUILD
     QListBox* lb = (QListBox*)listWidget;
     
+    // 收集并过滤联系人
+    std::vector<Contact*> visible;
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
+        visible.push_back(c);
+    }
+    sortVisible(visible);
+    
+    // 更新计数标签
+    countLabel->setText(QString::number(visible.size()));
+    
     // 保存当前选中的联系人信息
     int selectedId = -1;
     QString selectedType;
     QListBoxItem* selItem = lb->selectedItem();
     if (selItem) {
         int index = lb->index(selItem);
-        int count = 0;
-        for (uint i = 0; i < allContacts.count(); ++i) {
-            Contact* c = allContacts.at(i);
-            if (currentFilter != "all") {
-                if (currentFilter == "friend" && c->type != "friend") { continue; }
-                if (currentFilter == "group" && c->type != "group") { continue; }
-                if (currentFilter == "conference" && c->type != "conference") { continue; }
-            }
-            if (count == index) {
-                selectedId = c->id;
-                selectedType = c->type;
-                break;
-            }
-            ++count;
+        if (index >= 0 && (uint)index < visible.size()) {
+            selectedId = visible[index]->id;
+            selectedType = visible[index]->type;
         }
     }
     
@@ -313,13 +369,8 @@ void ContactListWidget::updateView_v3() {
     
     int newIndex = 0;
     int targetIndex = -1;
-    for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact* c = allContacts.at(i);
-        if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") { continue; }
-            if (currentFilter == "group" && c->type != "group") { continue; }
-            if (currentFilter == "conference" && c->type != "conference") { continue; }
-        }
+    for (uint i = 0; i < visible.size(); ++i) {
+        Contact* c = visible[i];
         
         QString emoji;
         if (c->type == "friend")       emoji = EMOJI_FRIEND;
@@ -365,6 +416,18 @@ void ContactListWidget::updateView_v4() {
 #ifndef QT3_BUILD
     QListWidget* lw = (QListWidget*)listWidget;
     
+    // 收集并过滤联系人
+    std::vector<Contact*> visible;
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
+        visible.push_back(c);
+    }
+    sortVisible(visible);
+    
+    // 更新计数标签
+    countLabel->setText(QString::number(visible.size()));
+    
     int selectedId = -1;
     QString selectedType;
     QListWidgetItem* selItem = lw->currentItem();
@@ -374,13 +437,8 @@ void ContactListWidget::updateView_v4() {
     }
     
     lw->clear();
-    for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact* c = allContacts.at(i);
-        if (currentFilter != "all") {
-            if (currentFilter == "friend" && c->type != "friend") { continue; }
-            if (currentFilter == "group" && c->type != "group") { continue; }
-            if (currentFilter == "conference" && c->type != "conference") { continue; }
-        }
+    for (uint i = 0; i < visible.size(); ++i) {
+        Contact* c = visible[i];
         
         QString emoji;
         if (c->type == "friend")       emoji = EMOJI_FRIEND;
@@ -418,13 +476,36 @@ void ContactListWidget::updateView_v4() {
 #endif
 }
 
-void ContactListWidget::retranslateUi() {
-    // 更新Tab按钮文字
-    for (int i = 0; i < 4; ++i) {
-        if (tabButtons[i]) {
-            tabButtons[i]->setText(_(tabNames[i]));
+void ContactListWidget::sortVisible(std::vector<Contact*>& visible) {
+    // 反向迭代：低优先级先排，高优先级后排
+    for (int i = (int)m_sortCriteria.size() - 1; i >= 0; --i) {
+        const QString& criterion = m_sortCriteria[i];
+        if (criterion == "name_asc") {
+            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
+                return qToUpper(a->name) < qToUpper(b->name);
+            });
+        } else if (criterion == "name_desc") {
+            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
+                return qToUpper(a->name) > qToUpper(b->name);
+            });
+        } else if (criterion == "online_first") {
+            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
+                bool aOnline = (a->status == "online" || a->status == "tcp" || a->status == "udp");
+                bool bOnline = (b->status == "online" || b->status == "tcp" || b->status == "udp");
+                return aOnline && !bOnline;
+            });
+        } else if (criterion == "by_type") {
+            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
+                return a->type < b->type;
+            });
         }
     }
+}
+
+void ContactListWidget::retranslateUi() {
+    // 更新搜索框
+    if (searchInput) { searchInput->setPlaceholderText(_("placeholders.search_contact")); }
+    if (sortBtn) { sortBtn->setText(_("sort.button")); }
     
     // 更新添加好友输入框
     if (addInput) { addInput->setPlaceholderText(_("placeholders.add_friend")); }
@@ -475,11 +556,7 @@ bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
             int count = 0;
             for (uint i = 0; i < allContacts.count(); ++i) {
                 Contact* c = allContacts.at(i);
-                if (currentFilter != "all") {
-                    if (currentFilter == "friend" && c->type != "friend") { continue; }
-                    if (currentFilter == "group" && c->type != "group") { continue; }
-                    if (currentFilter == "conference" && c->type != "conference") { continue; }
-                }
+                if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
                 if (count == index) {
                     contextItemId = c->id;
                     contextItemType = c->type;

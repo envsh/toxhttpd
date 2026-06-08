@@ -49,7 +49,8 @@
     "placeholders": {
         "add_friend": "输入 Tox ID 添加好友",
         "join_group": "群组chat_id",
-        "type_message": "输入消息..."
+        "type_message": "输入消息...",
+        "search_contact": "搜索联系人..."
     },
     "modals": {
         "labels": {
@@ -227,6 +228,13 @@
         "invalid_url": "请输入有效的 URL（以 http:// 或 https:// 开头）",
         "timeout": "连接超时",
         "failed": "连接失败"
+    },
+    "sort": {
+        "button": "排序",
+        "name_asc": "名称 A-Z",
+        "name_desc": "名称 Z-A",
+        "online_first": "在线优先",
+        "by_type": "按类型"
     },
     "style": {
         "fusion": "Fusion",

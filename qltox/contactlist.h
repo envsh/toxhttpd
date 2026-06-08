@@ -6,6 +6,7 @@
 #include "LimeScrollBar.h"
 #include <qwidget.h>
 #include <qpoint.h>
+#include <vector>
 
 // Emoji constants defined in contactlist.cpp
 extern const char* EMOJI_FRIEND;
@@ -43,7 +44,7 @@ public:
     bool isFriendLoaded(int friendId);
     void retranslateUi();
     
-    signals:
+signals:
     void contactSelected(int id, const QString& type, const QString& name);
     void viewInfoRequested(int id, const QString& type);
     void deleteOrLeaveRequested(int id, const QString& type);
@@ -55,7 +56,8 @@ public:
     void setConferenceTitleRequested(int conferenceId);
     
 private slots:
-    void onTabClicked();
+    void onSearchTextChanged(const QString& text);
+    void onSortMenuClicked();
     void onItemClicked();  // Qt3: QListBox selectionChanged -> call this
                                // Qt4: QListWidget itemClicked -> call this
     void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
@@ -72,26 +74,26 @@ private:
 private:
     void updateView_v3();
     void updateView_v4();
-    void setTabFilter(int index);
+    void sortVisible(std::vector<Contact*>& visible);
     
     void* listWidget;  // QListBox* (Qt3) or QListWidget* (Qt4)
     LimeScrollBar* m_scrollBar;
     ContactList allContacts;
-    QString currentFilter;
-    int currentTab;
     int contextItemId;           // 右键选中的联系人ID
     QString contextItemType;     // 右键选中的联系人类型
-     PlaceholderLineEdit* addInput;
+    PlaceholderLineEdit* addInput;
     QPushButton* addBtn;        // 添加好友按钮
     QPushButton* confBtn;       // 创建会议按钮
     QPushButton* groupBtn;      // 创建群组按钮
     PlaceholderLineEdit* joinGroupInput;  // 加入群组输入框
     QPushButton* joinGroupBtn;  // 加入群组按钮
     
-    // Tab 按钮和过滤器映射
-    QPushButton* tabButtons[4];
-    static const char* tabFilters[4];
-    static const char* tabNames[4];
+    // 搜索与排序
+    PlaceholderLineEdit* searchInput;
+    QLabel* countLabel;
+    QPushButton* sortBtn;
+    QString m_searchText;
+    std::vector<QString> m_sortCriteria;
 };
 
 #endif // CONTACTLIST_H

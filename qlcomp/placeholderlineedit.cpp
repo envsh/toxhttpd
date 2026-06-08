@@ -25,7 +25,9 @@ void PlaceholderLineEdit::focusOutEvent(QFocusEvent* event) {
 }
 
 void PlaceholderLineEdit::showPlaceholder() {
+    blockSignals(true);
     setText(m_placeholder);
+    blockSignals(false);
     m_showingPlaceholder = true;
 }
 

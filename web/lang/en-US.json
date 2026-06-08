@@ -49,7 +49,8 @@
     "placeholders": {
         "add_friend": "Enter Tox ID to add friend",
         "join_group": "Group chat_id",
-        "type_message": "Type your message here..."
+        "type_message": "Type your message here...",
+        "search_contact": "Search contacts..."
     },
     "modals": {
         "labels": {
@@ -231,6 +232,13 @@
         "invalid_url": "Please enter a valid URL starting with http:// or https://",
         "timeout": "Connection timed out",
         "failed": "Connection failed"
+    },
+    "sort": {
+        "button": "Sort",
+        "name_asc": "Name A-Z",
+        "name_desc": "Name Z-A",
+        "online_first": "Online First",
+        "by_type": "By Type"
     },
     "style": {
         "fusion": "Fusion",
