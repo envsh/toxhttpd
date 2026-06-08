@@ -22,6 +22,9 @@
 #include <qfile.h>
 #include "toastwidget.h"
 #include "sharedstatusbar.h"
+#include <qlabel.h>
+#include <qpushbutton.h>
+#include <qlineedit.h>
 
 // 虚拟联系人 ID（使用 <-100 的负数避免与服务器 ID 及 "未选择" 哨兵值 -1 冲突）
 static const int VIRTUAL_UNKNOWN_ID = -100;
@@ -73,6 +76,34 @@ static void saveLanguage(const QString& lang) {
     }
 }
 
+static void initDemoWidgets() {
+    // Left side (addWidget)
+    QLabel *leftLabel = new QLabel(qFromUtf8("Left"), SharedStatusBar::instance());
+    SharedStatusBar::instance()->addWidget(leftLabel);
+
+    QPushButton *leftBtn = new QPushButton(qFromUtf8("LBtn"), SharedStatusBar::instance());
+    leftBtn->setFixedWidth(36);
+    SharedStatusBar::instance()->addWidget(leftBtn);
+
+    // Right side permanent (addPermanentWidget)
+    QLabel *rightLabel = new QLabel(qFromUtf8("Right"), SharedStatusBar::instance());
+    SharedStatusBar::instance()->addPermanentWidget(rightLabel);
+
+    QPushButton *rightBtn = new QPushButton(qFromUtf8("RBtn"), SharedStatusBar::instance());
+    rightBtn->setFixedWidth(36);
+    SharedStatusBar::instance()->addPermanentWidget(rightBtn);
+
+    QLineEdit *demoEdit = new QLineEdit(SharedStatusBar::instance());
+    demoEdit->setFixedWidth(100);
+#ifndef QT3_BUILD
+    demoEdit->setPlaceholderText(qFromUtf8("input..."));
+#endif
+    SharedStatusBar::instance()->addPermanentWidget(demoEdit);
+
+    SharedStatusBar::instance()->showMessage(
+        qFromUtf8("Demo: 左端 widgets 隐藏中..."), 3000);
+}
+
 MainWindow::MainWindow(QWidget* parent) 
     : QMainWindow(parent
 #ifdef QT3_BUILD
@@ -86,13 +117,14 @@ MainWindow::MainWindow(QWidget* parent)
     
     // 设置窗口
     qSetWindowTitle(this, _("app_title"));
-    setGeometry(100, 100, 1100, 700);
+    setGeometry(100, 50, 1100, 680);
     
     // 设置 UTF-8 编解码器
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     
     // 底部状态栏浮窗
     SharedStatusBar::instance()->show();
+    initDemoWidgets();
     
     QWidget* centralContainer = new QWidget(this);
     QBoxLayout* mainLayout = qNewBoxLayout(centralContainer, QBoxLayout::TopToBottom, 0, 0);
