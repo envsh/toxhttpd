@@ -518,6 +518,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     } else if (type == "topic") {
         emoji = EMOJI_TOPIC;
         headerText = emoji + " " + name;
+    } else if (type == "matrix_room") {
+        emoji = EMOJI_MATRIX;
+        headerText = emoji + " " + name;
     }
     
     chatWidget->setHeaderText(headerText);
@@ -531,7 +534,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
         chatWidget->restoreMessages(cacheIt->second);
-        if (id >= 0) {
+        if (id >= 0 && type != "matrix_room") {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -539,7 +542,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存未命中
         qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
         chatWidget->clearMessages();
-        if (id >= 0) {
+        if (id >= 0 && type != "matrix_room") {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -838,10 +841,91 @@ void MainWindow::handleEvents(const EventList& events) {
             }
         } else {
             ParseResult pr = UnknownParser::parse(e.type, e.data);
-            ChatMessage msg;
-            msg.type = "other";
-            msg.time = getCurrentTime();
-            if (pr.handled && pr.contactName == "reddit") {
+
+            // ── 更新 peers ──
+            if (!pr.peers.empty()) {
+                for (const auto& p : pr.peers) {
+                    std::string key = "unknown_" + p.publicKey;
+                    peerInfoMap[key] = p;
+                }
+            }
+
+            // ── 更新 contacts ──
+            if (!pr.contacts.empty()) {
+                for (const auto& cd : pr.contacts) {
+                    bool updated = false;
+                    for (auto& existing : m_accumulatedContactData) {
+                        if (existing.id == cd.id && existing.type == cd.type) {
+                            existing = cd;
+                            updated = true;
+                            break;
+                        }
+                    }
+                    if (!updated) {
+                        m_accumulatedContactData.push_back(cd);
+
+                        Contact* c = new Contact();
+                        c->id = cd.id;
+                        c->name = qFromUtf8(cd.name);
+                        c->type = qFromUtf8(cd.type);
+                        c->status = qFromUtf8(cd.status);
+                        c->chat_id = qFromUtf8(cd.chatId);
+                        c->is_connected = cd.isConnected;
+                        contactListWidget->addContact(c);
+                    } else {
+                        contactListWidget->updateContact(cd.id, qFromUtf8(cd.type),
+                            qFromUtf8(cd.name), qFromUtf8(cd.chatId), qFromUtf8(cd.status));
+                    }
+                }
+            }
+
+            // ── 消息处理 ──
+            if (!pr.messages.empty()) {
+                for (const auto& hm : pr.messages) {
+                    ChatMessage msg;
+                    msg.messageText = qFromUtf8(hm.message);
+                    msg.type = "other";
+                    msg.time = getCurrentTime();
+
+                    QString senderLabel;
+                    if (!hm.sender_pubkey.empty()) {
+                        for (const auto& p : pr.peers) {
+                            if (p.publicKey == hm.sender_pubkey) {
+                                senderLabel = qFromUtf8(p.name);
+                                break;
+                            }
+                        }
+                        if (senderLabel.isEmpty()) {
+                            std::string key = "unknown_" + hm.sender_pubkey;
+                            auto it = peerInfoMap.find(key);
+                            if (it != peerInfoMap.end())
+                                senderLabel = qFromUtf8(it->second.name);
+                        }
+                    }
+                    msg.senderName = senderLabel;
+                    msg.peerNumber = (int)hm.sender_number;
+
+                    int chatId = VIRTUAL_REDDIT_ID;
+                    std::string chatType = "topic";
+                    for (const auto& cd : pr.contacts) {
+                        if (cd.chatId == hm.roomId) {
+                            chatId = cd.id;
+                            chatType = cd.type;
+                            break;
+                        }
+                    }
+
+                    qWarning("Cache PUSH to %s %d: sender=%s",
+                             chatType.c_str(), chatId, qToUtf8(msg.senderName).data());
+                    m_messageCache[{chatId, chatType}].push_back(msg);
+                    if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
+                        chatWidget->appendMessage(msg);
+                    }
+                }
+            } else if (pr.handled && pr.contactName == "reddit") {
+                ChatMessage msg;
+                msg.type = "other";
+                msg.time = getCurrentTime();
                 msg.messageText = pr.messageText;
                 msg.senderName = pr.senderName;
                 msg.peerNumber = VIRTUAL_REDDIT_ID;
@@ -852,6 +936,9 @@ void MainWindow::handleEvents(const EventList& events) {
                     chatWidget->appendMessage(msg);
                 }
             } else {
+                ChatMessage msg;
+                msg.type = "other";
+                msg.time = getCurrentTime();
                 if (pr.handled) {
                     msg.messageText = pr.messageText;
                     msg.senderName = pr.senderName;

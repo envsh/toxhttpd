@@ -40,8 +40,7 @@ static int64_t jsonGetInt64(cJSON* root, const char* path) {
 
 // ── Matrix sync_complete 解析 ──
 
-static void parseMatrixEvents(cJSON* roomObj, int roomIdx, ParseResult& ret) {
-    (void)roomIdx;
+static void parseMatrixEvents(cJSON* roomObj, const std::string& roomId, ParseResult& ret) {
     cJSON* events = jsonPath(roomObj, "events");
     if (!events) return;
     int n = cJSON_GetArraySize(events);
@@ -56,6 +55,7 @@ static void parseMatrixEvents(cJSON* roomObj, int roomIdx, ParseResult& ret) {
         hm.sender_number = i;
         hm.direction     = "received";
         hm.created_at    = std::to_string(jsonGetInt64(ev, "timestamp"));
+        hm.roomId        = roomId;
         ret.messages.push_back(hm);
 
         bool found = false;
@@ -92,25 +92,24 @@ static bool tryParseMatrixSync(const std::string& rawStr, ParseResult& ret) {
         return false;
     }
 
-    int roomIdx = 0;
     for (cJSON* r = rooms->child; r; r = r->next) {
         if (r->type != cJSON_Object) continue;
 
+        std::string roomId = r->string ? r->string : "";
         ContactData cd;
-        cd.id          = roomIdx;
+        cd.id          = (int)(std::hash<std::string>{}(roomId) & 0x7fffffff);
         cd.name        = jsonGetString(r, "meta.name");
         if (cd.name.empty())
             cd.name    = jsonGetString(r, "meta.canonical_alias");
         if (cd.name.empty())
-            cd.name    = r->string ? r->string : "";
-        cd.chatId      = r->string ? r->string : "";
+            cd.name    = roomId;
+        cd.chatId      = roomId;
         cd.type        = "matrix_room";
         cd.status      = "online";
         cd.isConnected = true;
         ret.contacts.push_back(cd);
 
-        parseMatrixEvents(r, roomIdx, ret);
-        roomIdx++;
+        parseMatrixEvents(r, roomId, ret);
     }
 
     cJSON_Delete(root);

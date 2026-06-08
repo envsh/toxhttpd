@@ -80,6 +80,7 @@ struct HistoryMessage {
     uint32_t sender_number;
     std::string direction;
     std::string created_at;
+    std::string roomId;
 };
 
 struct TranslateApiResult {
