@@ -2,13 +2,17 @@
 #define UNKNOWNPARSER_H
 
 #include <string>
-#include <qstring.h>
+#include <vector>
+#include "eventpoller.h"
 
 struct ParseResult {
     bool handled;
     QString contactName;
     QString senderName;
     QString messageText;
+    std::vector<ContactData> contacts;
+    std::vector<PeerInfo> peers;
+    std::vector<HistoryMessage> messages;
 };
 
 class UnknownParser {
