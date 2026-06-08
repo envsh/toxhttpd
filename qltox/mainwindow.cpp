@@ -21,6 +21,7 @@
 #include "sound.h"
 #include <qfile.h>
 #include "toastwidget.h"
+#include "sharedstatusbar.h"
 
 // 虚拟联系人 ID（使用 <-100 的负数避免与服务器 ID 及 "未选择" 哨兵值 -1 冲突）
 static const int VIRTUAL_UNKNOWN_ID = -100;
@@ -89,6 +90,9 @@ MainWindow::MainWindow(QWidget* parent)
     
     // 设置 UTF-8 编解码器
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
+    
+    // 底部状态栏浮窗
+    SharedStatusBar::instance()->show();
     
     QWidget* centralContainer = new QWidget(this);
     QBoxLayout* mainLayout = qNewBoxLayout(centralContainer, QBoxLayout::TopToBottom, 0, 0);

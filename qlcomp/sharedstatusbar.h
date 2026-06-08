@@ -9,11 +9,14 @@
 #include <qapplication.h>
 #include <qrect.h>
 #include <qpoint.h>
+#include <qlayout.h>
+#include <qtimer.h>
 #else
 #include <QWidget>
 #include <QStatusBar>
 #include <QMouseEvent>
 #include <QApplication>
+#include <QVBoxLayout>
 #endif
 
 class SharedStatusBar : public QWidget
@@ -36,6 +39,7 @@ private:
     QStatusBar *m_bar;
     QWidget    *m_activeWindow;
     bool        m_dragging;
+    bool        m_repositioning;
     QPoint      m_dragStartGlobal;
     QRect       m_windowStartGeo;
 
@@ -47,6 +51,15 @@ private:
 
     bool event(QEvent *e) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+
+#ifdef QT3_BUILD
+private slots:
+    void onDebounceTimeout();
+
+private:
+    QTimer *m_debounceTimer;
+    bool m_pendingHide;
+#endif
 };
 
 #endif
