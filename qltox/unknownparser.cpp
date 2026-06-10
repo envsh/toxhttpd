@@ -191,10 +191,11 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
 
     std::string subject    = jsonGetString(root, "subject");
     std::string from       = jsonGetString(root, "from");
+    std::string toRecip    = jsonGetString(root, "toRecipients.0");
     std::string bodyB64    = jsonGetString(root, "bodyPreview");
     std::string receivedAt = jsonGetString(root, "receivedDateTime");
 
-    if (subject.empty() && from.empty()) {
+    if (subject.empty() && from.empty() && toRecip.empty()) {
         cJSON_Delete(root);
         return false;
     }
@@ -224,10 +225,10 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     }
 
     ContactData cd;
-    cd.id          = (int)(std::hash<std::string>{}(from + "imap_mail") & 0x7fffffff);
-    cd.name        = from;
+    cd.id          = (int)(std::hash<std::string>{}(toRecip + "imap_mail") & 0x7fffffff);
+    cd.name        = toRecip;
     cd.type        = "imap_mail";
-    cd.chatId      = from;
+    cd.chatId      = toRecip;
     cd.status      = "online";
     cd.isConnected = true;
     ret.contacts.push_back(cd);
@@ -240,6 +241,13 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     hm.created_at    = receivedAt;
     hm.roomId        = cd.chatId;
     ret.messages.push_back(hm);
+
+    // 加入 sender peer 供 ChatView 查找显示名称
+    PeerInfo pi;
+    pi.publicKey  = from;
+    pi.name       = from;
+    pi.peerNumber = 0;
+    ret.peers.push_back(pi);
 
     ret.senderName  = qFromUtf8(from);
     if (ret.contactName.isEmpty())
