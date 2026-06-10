@@ -14,12 +14,14 @@
 #include <qpopupmenu.h>      // QPopupMenu
 #include <qwidgetstack.h>    // QWidgetStack
 #include <qptrlist.h>        // Qt3 原生 QPtrList<T>
+#include <qtextcodec.h>      // QTextCodec
 #else
 #include <qpushbutton.h>     // QPushButton
 #include <QMenuBar>          // QMenuBar
 #include <qmenu.h>           // QMenu
 #include <qstackedwidget.h>  // QStackedWidget
 #include <qstyleoption.h>    // QStyleOption* (Qt4 only)
+#include <QTextCodec>        // QTextCodec
 #endif
 
 // ========== 核心 Qt 头文件（被 qlite.pri 继承，无法前向声明） ==========

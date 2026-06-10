@@ -210,7 +210,13 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     std::string fullText = subject;
     QByteArray decoded = base64Decode(cleanB64);
     if (!decoded.isEmpty()) {
-        std::string body(decoded.data(), decoded.size());
+        QTextCodec* gbk = QTextCodec::codecForName("GBK");
+        QString text;
+        if (gbk)
+            text = gbk->toUnicode(decoded);
+        if (text.isEmpty())
+            text = qFromUtf8(decoded.data(), decoded.size());
+        std::string body(qToUtf8(text).data());
         fullText += "\n" + std::to_string(body.size()) + ": " + body;
     } else if (!cleanB64.empty()) {
         // base64 数据存在但解码后为空 → 解码失败，附上原始 base64 文本
