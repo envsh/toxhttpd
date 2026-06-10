@@ -180,6 +180,67 @@ static bool tryParseToxMessage(const std::string& rawStr, ParseResult& ret) {
 
     ret.handled = !ret.contacts.empty() || !ret.peers.empty() || !ret.messages.empty();
     cJSON_Delete(root);
+    return ret.handled;
+}
+
+// ── IMAP 邮件解析 ──
+
+static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
+    cJSON* root = cJSON_Parse(rawStr.c_str());
+    if (!root) return false;
+
+    std::string subject    = jsonGetString(root, "subject");
+    std::string from       = jsonGetString(root, "from");
+    std::string bodyB64    = jsonGetString(root, "bodyPreview");
+    std::string receivedAt = jsonGetString(root, "receivedDateTime");
+
+    if (subject.empty() && from.empty()) {
+        cJSON_Delete(root);
+        return false;
+    }
+
+    std::string cleanB64;
+    for (unsigned char c : bodyB64) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9') || c == '+' || c == '/' ||
+            c == '=' || c == '-' || c == '_')
+            cleanB64 += c;
+    }
+
+    std::string fullText = subject;
+    QByteArray decoded = base64Decode(cleanB64);
+    if (!decoded.isEmpty()) {
+        std::string body(decoded.data(), decoded.size());
+        fullText += "\n" + std::to_string(body.size()) + ": " + body;
+    } else if (!cleanB64.empty()) {
+        // base64 数据存在但解码后为空 → 解码失败，附上原始 base64 文本
+        fullText += "\n(dcode failed, raw: " + cleanB64 + ")";
+    }
+
+    ContactData cd;
+    cd.id          = (int)(std::hash<std::string>{}(from + "imap_mail") & 0x7fffffff);
+    cd.name        = from;
+    cd.type        = "imap_mail";
+    cd.chatId      = from;
+    cd.status      = "online";
+    cd.isConnected = true;
+    ret.contacts.push_back(cd);
+
+    HistoryMessage hm;
+    hm.message       = fullText;
+    hm.sender_pubkey = from;
+    hm.sender_number = 0;
+    hm.direction     = "received";
+    hm.created_at    = receivedAt;
+    hm.roomId        = cd.chatId;
+    ret.messages.push_back(hm);
+
+    ret.senderName  = qFromUtf8(from);
+    if (ret.contactName.isEmpty())
+        ret.contactName = qFromUtf8(cd.name);
+
+    ret.handled = true;
+    cJSON_Delete(root);
     return true;
 }
 
@@ -234,7 +295,7 @@ static void fallbackAsPlainText(cJSON* valueItem, ParseResult& ret) {
 // ── 主流程 ──
 
 ParseResult UnknownParser::parse(const std::string& eventType, const std::string& jsonData) {
-    qWarning("UnknownParser::parse: type=[%s] data=[%.480s]", eventType.c_str(), jsonData.c_str());
+    qWarning("UnknownParser::parse: type=[%s] data=[%.980s]", eventType.c_str(), jsonData.c_str());
 
     if (eventType != "pubsub" && eventType != "unknown") {
         return {false, QString(), QString(), QString()};
@@ -280,6 +341,8 @@ ParseResult UnknownParser::parse(const std::string& eventType, const std::string
             if (tryParseGomuksSync(dataStr, ret))
                 goto done;
             if (tryParseToxMessage(dataStr, ret))
+                goto done;
+            if (tryParseImapMessage(dataStr, ret))
                 goto done;
         }
         fallbackAsPlainText(valueItem, ret);

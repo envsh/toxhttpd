@@ -421,6 +421,7 @@ void ContactListWidget::updateView_v3() {
         else if (c->type == "unktox_friend") emoji = EMOJI_FRIEND;
         else if (c->type == "unktox_conference") emoji = EMOJI_CONFERENCE;
         else if (c->type == "unktox_group") emoji = EMOJI_GROUP;
+        else if (c->type == "imap_mail") emoji = "E";
         else emoji = EMOJI_CONFERENCE;
         // 群组使用真实连接状态，好友使用原有逻辑，会议保持硬编码
         QString statusDot;
@@ -505,6 +506,7 @@ void ContactListWidget::updateView_v4() {
         else if (c->type == "unktox_friend") emoji = EMOJI_FRIEND;
         else if (c->type == "unktox_conference") emoji = EMOJI_CONFERENCE;
         else if (c->type == "unktox_group") emoji = EMOJI_GROUP;
+        else if (c->type == "imap_mail") emoji = "E";
         else emoji = EMOJI_CONFERENCE;
         QString statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
         

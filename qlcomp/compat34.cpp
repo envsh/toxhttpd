@@ -664,8 +664,11 @@ QByteArray base64Decode(const std::string& b64) {
         }
         unsigned char val = rev[c];
         if (val == 0 && c != 'A') {
-            if (c != '\n' && c != '\r' && c != ' ' && c != '\t')
-                return QByteArray();
+            if (c != '\n' && c != '\r' && c != ' ' && c != '\t') {
+                qWarning("base64Decode: skipping invalid char 0x%02x at pos %d",
+                         (unsigned char)b64[i], i);
+                continue;
+            }
             continue;
         }
         buf[bufPos++] = val;

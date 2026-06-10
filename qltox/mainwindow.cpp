@@ -568,6 +568,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     } else if (type == "unktox_group") {
         emoji = EMOJI_GROUP;
         headerText = emoji + " " + name;
+    } else if (type == "imap_mail") {
+        emoji = "E";
+        headerText = emoji + " " + name;
     }
     
     chatWidget->setHeaderText(headerText);
@@ -582,7 +585,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
         chatWidget->restoreMessages(cacheIt->second);
         if (id >= 0 && type != "gomuks_room" && type != "unktox_friend"
-            && type != "unktox_conference" && type != "unktox_group") {
+            && type != "unktox_conference" && type != "unktox_group" && type != "imap_mail") {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -591,7 +594,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
         chatWidget->clearMessages();
         if (id >= 0 && type != "gomuks_room" && type != "unktox_friend"
-            && type != "unktox_conference" && type != "unktox_group") {
+            && type != "unktox_conference" && type != "unktox_group" && type != "imap_mail") {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
