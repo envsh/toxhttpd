@@ -31,6 +31,7 @@ MessageInput::MessageInput(QWidget* parent)
     : QTextEdit(parent), m_isPlaceholderActive(false), m_historyIndex(-1) {
 #ifdef QT3_BUILD
     setTextFormat(Qt::PlainText);
+    setUndoDepth(32);
 #else
     setAcceptRichText(false);
 #endif

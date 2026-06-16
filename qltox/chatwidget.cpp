@@ -183,7 +183,15 @@ void ChatWidget::onSendClicked() {
     
     inputEdit->saveToHistory(msg);
     emit messageSent(msg);
-    inputEdit->clear();
+#ifdef QT3_BUILD
+    inputEdit->selectAll();
+    inputEdit->removeSelectedText();
+#else
+    QTextCursor cursor = inputEdit->textCursor();
+    cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+    cursor.removeSelectedText();
+#endif
 }
 
 void ChatWidget::retranslateUi() {
