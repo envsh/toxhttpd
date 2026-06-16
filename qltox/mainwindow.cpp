@@ -628,8 +628,21 @@ void MainWindow::onMessageSending(const QString& message) {
         qWarning("Empty chat type");
         return;
     }
+
+    // 虚拟类型使用 chatId 字符串（如 gomuks room ID）而非 numeric contactId
+    std::string idOverride;
+    if (type == kGomuksRoomType || type == kUnktoxConferenceType
+        || type == kUnktoxFriendType || type == kUnktoxGroupType) {
+        for (const auto& cd : m_accumulatedContactData) {
+            if (cd.id == currentChatId && cd.type == type) {
+                idOverride = cd.chatId;
+                break;
+            }
+        }
+    }
+
     chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
-    ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)));
+    ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
 #else
     // ✅ 改为异步请求
     ApiRequestType reqType;

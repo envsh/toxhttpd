@@ -250,10 +250,12 @@ void ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
             "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message)}, ctx);
 }
 
-void ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message) {
+void ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message,
+                          const std::string& idOverride) {
     auto* ctx = new ApiCtx(ApiSendMessage, chatId, message, type);
+    std::string idStr = idOverride.empty() ? std::to_string(chatId) : idOverride;
     request({"/api/messages/send", "POST",
-            "type=" + type + "&id=" + std::to_string(chatId) + "&message=" + urlEncode(message)}, ctx);
+            "type=" + type + "&id=" + urlEncode(idStr) + "&message=" + urlEncode(message)}, ctx);
 }
 
 void ToxAPI::addFriend(const std::string& publicKey) {
