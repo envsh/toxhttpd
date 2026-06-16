@@ -8,7 +8,7 @@
 ToastWidget::ToastWidget(QWidget* parent, const QString& text, int durationMs)
     : QWidget(parent
 #ifdef QT3_BUILD
-      , 0, WType_Popup | WStyle_StaysOnTop | WDestructiveClose
+      , 0, WStyle_StaysOnTop
 #else
       , Qt::ToolTip | Qt::FramelessWindowHint
 #endif
@@ -30,10 +30,16 @@ void ToastWidget::show(QWidget* parent, const QString& text, int durationMs) {
 void ToastWidget::positionAtBottom() {
     if (!parentWidget()) return;
     QRect pr = parentWidget()->rect();
+#ifdef QT3_BUILD
+    int x = (pr.width() - width()) / 2;
+    int y = pr.height() - height() - 60;
+    move(x, y);
+#else
     QPoint pg = parentWidget()->mapToGlobal(QPoint(0, 0));
     int x = pg.x() + (pr.width() - width()) / 2;
     int y = pg.y() + pr.height() - height() - 60;
     move(x, y);
+#endif
 }
 
 void ToastWidget::paintEvent(QPaintEvent*) {
@@ -54,9 +60,9 @@ void ToastWidget::paintEvent(QPaintEvent*) {
 }
 
 void ToastWidget::timerEvent(QTimerEvent*) {
-    close();
+    deleteLater();
 }
 
 void ToastWidget::mousePressEvent(QMouseEvent*) {
-    close();
+    deleteLater();
 }
