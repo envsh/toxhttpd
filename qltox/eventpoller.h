@@ -22,6 +22,7 @@ enum ApiRequestType {
     ApiLoadGroupMembers,
     ApiLoadMessageHistory,
     ApiSendFriendMessage,
+    ApiSendMessage,
     ApiSendConferenceMessage,
     ApiSendGroupMessage,
     ApiAddFriend,

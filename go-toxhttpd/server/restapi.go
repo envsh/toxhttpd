@@ -37,6 +37,7 @@ func (h *Restapi) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/bootstrap", corsMiddleware(loggingMiddleware(h.handleBootstrap)))
 	mux.HandleFunc("/api/events", corsMiddleware(loggingMiddleware(h.handleEvents)))
 	mux.HandleFunc("/api/ndevents", corsMiddleware(loggingMiddleware(h.handleNDEvents)))
+	mux.HandleFunc("/api/messages/send", corsMiddleware(loggingMiddleware(h.handleMessageSend)))
 	mux.HandleFunc("/api/messages/history", corsMiddleware(loggingMiddleware(h.handleMessageHistory)))
 	mux.HandleFunc("/", corsMiddleware(loggingMiddleware(h.handleWeb)))
 	mux.HandleFunc("/api/groups/join", corsMiddleware(loggingMiddleware(h.handleGroupJoin)))
@@ -165,6 +166,7 @@ func (h *Restapi) handleFriendInfo(w http.ResponseWriter, r *http.Request) {
 // ── Messages ──
 
 func (h *Restapi) handleSendMessage(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[DEPRECATED] POST /api/messages is deprecated, use POST /api/messages/send instead")
 	if r.Method != http.MethodPost {
 		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -185,6 +187,7 @@ func (h *Restapi) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Restapi) handleGroupSendMessage(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[DEPRECATED] POST /api/group_messages is deprecated, use POST /api/messages/send instead")
 	if r.Method != http.MethodPost {
 		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -214,6 +217,7 @@ func (h *Restapi) handleGroupSendMessage(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Restapi) handleConferenceMessages(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[DEPRECATED] POST /api/conference_messages is deprecated, use POST /api/messages/send instead")
 	if r.Method != http.MethodPost {
 		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -233,6 +237,60 @@ func (h *Restapi) handleConferenceMessages(w http.ResponseWriter, r *http.Reques
 		"conference_id": confID,
 		"message":       "sent",
 	})
+}
+
+func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	params, err := getRequestParams(r)
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	chatType := params.Get("type")
+	idStr := params.Get("id")
+	message := params.Get("message")
+
+	if chatType == "" || idStr == "" || message == "" {
+		writeErr(w, "missing required parameters: type, id, message", http.StatusBadRequest)
+		return
+	}
+
+	var id uint32
+	fmt.Sscanf(idStr, "%d", &id)
+
+	switch chatType {
+	case "friend":
+		msgID, err := h.m.SendFriendMessage(id, message)
+		if err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"message_id": msgID})
+
+	case "conference":
+		err := h.m.SendConferenceMessage(id, message)
+		if err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"message": "sent"})
+
+	case "group":
+		messageType := params.Get("message_type")
+		msgId, err := h.m.SendGroupMessage(id, messageType, message)
+		if err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"message_id": msgId})
+
+	default:
+		writeErr(w, "unknown type: "+chatType, http.StatusBadRequest)
+	}
 }
 
 // ── Groups ──

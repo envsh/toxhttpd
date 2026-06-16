@@ -27,7 +27,7 @@ public:
     
     public slots:
     void onContactSelected(int id, const QString& type, const QString& name);
-    void onMessageSent(const QString& message);
+    void onMessageSending(const QString& message);
     void onLanguageChanged(const QString& langCode);
     void retranslateUi();
     void handleEvents(const EventList& events);

@@ -250,6 +250,12 @@ void ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
             "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message)}, ctx);
 }
 
+void ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message) {
+    auto* ctx = new ApiCtx(ApiSendMessage, chatId, message, type);
+    request({"/api/messages/send", "POST",
+            "type=" + type + "&id=" + std::to_string(chatId) + "&message=" + urlEncode(message)}, ctx);
+}
+
 void ToxAPI::addFriend(const std::string& publicKey) {
     request(ApiAddFriend, {"/api/friends", "POST",
             "public_key=" + urlEncode(publicKey)});
@@ -813,6 +819,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         break;
     }
 
+    case ApiSendMessage:
     case ApiSendFriendMessage:
     case ApiSendConferenceMessage:
     case ApiSendGroupMessage: {
@@ -822,6 +829,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->chatId = ctx->id;
         ev->message = ctx->str1;
         switch (ctx->type) {
+            case ApiSendMessage: ev->chatType = ctx->str2; break;
             case ApiSendFriendMessage: ev->chatType = "friend"; break;
             case ApiSendConferenceMessage: ev->chatType = "conference"; break;
             case ApiSendGroupMessage: ev->chatType = "group"; break;

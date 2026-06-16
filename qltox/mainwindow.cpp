@@ -193,7 +193,7 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onSetConferenceTitleRequested(int)));
     connect(contactListWidget, SIGNAL(inviteToConferenceRequested(int)),
             this, SLOT(onInviteToConferenceRequested(int)));
-    connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSent(const QString&)));
+    connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSending(const QString&)));
     connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
             this, SLOT(onLanguageChanged(const QString&)));
     connect(chatWidget, SIGNAL(translateRequested(int, const QString&, const QString&)),
@@ -611,7 +611,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     }
 }
 
-void MainWindow::onMessageSent(const QString& message) {
+void MainWindow::onMessageSending(const QString& message) {
+    qWarning("onMessageSending: id=%d type=%s msg=[%.60s]",
+             currentChatId, qToUtf8(currentChatType).data(), qToUtf8(message).data());
     if (currentChatId == -1 || currentChatType.isEmpty()) {
         QMessageBox::warning(this, _("select_chat_first"), _("select_chat_first"));
         return;
