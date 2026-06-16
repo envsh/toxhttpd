@@ -432,7 +432,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
         }
         
         // 消息发送结果
-        if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage || e->type == ApiSendGroupMessage) {
+        if (e->type == ApiSendFriendMessage || e->type == ApiSendConferenceMessage || e->type == ApiSendGroupMessage || e->type == ApiSendMessage) {
             MessageSentResultEvent* evt = static_cast<MessageSentResultEvent*>(event);
             chatWidget->loadingBar()->hideLoading(kLoadSendMsg);
             QString targetName;
@@ -612,13 +612,25 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
 }
 
 void MainWindow::onMessageSending(const QString& message) {
+    // ── 统一发送 API ──
+    // 注释掉下面这行可切回旧的三条独立端点
+#define USE_UNIFIED_SEND_API
     qWarning("onMessageSending: id=%d type=%s msg=[%.60s]",
              currentChatId, qToUtf8(currentChatType).data(), qToUtf8(message).data());
     if (currentChatId == -1 || currentChatType.isEmpty()) {
         QMessageBox::warning(this, _("select_chat_first"), _("select_chat_first"));
         return;
     }
-    
+
+#ifdef USE_UNIFIED_SEND_API
+    std::string type = std::string(qToUtf8(currentChatType).data());
+    if (type != "friend" && type != "group" && type != "conference") {
+        qWarning("Unknown chat type: %s", type.c_str());
+        return;
+    }
+    chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
+    ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)));
+#else
     // ✅ 改为异步请求
     ApiRequestType reqType;
     if (currentChatType == "friend") {
@@ -631,7 +643,7 @@ void MainWindow::onMessageSending(const QString& message) {
         qWarning("Unknown chat type: %s", qToUtf8(currentChatType).data());
         return;
     }
-    
+
     chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
     if (reqType == ApiSendFriendMessage) {
         ToxAPI::sendFriendMessage(currentChatId, std::string(qToUtf8(message)));
@@ -640,7 +652,8 @@ void MainWindow::onMessageSending(const QString& message) {
     } else if (reqType == ApiSendGroupMessage) {
         ToxAPI::sendGroupMessage(currentChatId, std::string(qToUtf8(message)));
     }
-    
+#endif
+
     // 乐观更新：先显示在界面
     chatWidget->appendMessage(message, "self", "Me", -1, getCurrentTime());
 }
