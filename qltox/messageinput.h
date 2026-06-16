@@ -11,6 +11,7 @@ public:
     void setPlaceholderText(const QString& t);
     QString placeholderText() const;
     void clearPlaceholder();
+    void saveToHistory(const QString& text);
 
 signals:
     void sendRequested();
@@ -34,6 +35,9 @@ private:
     static int s_pasteCounter;
     QString m_placeholder;
     bool m_isPlaceholderActive;
+    QStringList m_sentHistory;
+    int m_historyIndex;
+    QString m_savedDraft;
 };
 
 #endif

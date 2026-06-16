@@ -181,6 +181,7 @@ void ChatWidget::onSendClicked() {
 #endif
     if (msg.isEmpty()) return;
     
+    inputEdit->saveToHistory(msg);
     emit messageSent(msg);
     inputEdit->clear();
 }

@@ -176,8 +176,18 @@ func (h *Restapi) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	hexID := params.Get("hexid")
 	var friendID uint32
-	fmt.Sscanf(params.Get("friend_id"), "%d", &friendID)
+	if hexID != "" {
+		fn, err := h.m.ctx.Tox.FriendByPublicKey(hexID)
+		if err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		friendID = fn
+	} else {
+		fmt.Sscanf(params.Get("friend_id"), "%d", &friendID)
+	}
 	msgID, err := h.m.SendFriendMessage(friendID, params.Get("message"))
 	if err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
@@ -199,12 +209,22 @@ func (h *Restapi) handleGroupSendMessage(w http.ResponseWriter, r *http.Request)
 	}
 	gnStr := params.Get("group_number")
 	message := params.Get("message")
-	if gnStr == "" || message == "" {
+	hexID := params.Get("hexid")
+	if (gnStr == "" && hexID == "") || message == "" {
 		writeErr(w, "missing required parameters", http.StatusBadRequest)
 		return
 	}
 	var gn uint32
-	fmt.Sscanf(gnStr, "%d", &gn)
+	if hexID != "" {
+		g, err := h.m.ctx.Tox.GroupByChatId(hexID)
+		if err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		gn = uint32(g)
+	} else {
+		fmt.Sscanf(gnStr, "%d", &gn)
+	}
 	msgId, err := h.m.SendGroupMessage(gn, params.Get("message_type"), message)
 	if err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
@@ -227,8 +247,18 @@ func (h *Restapi) handleConferenceMessages(w http.ResponseWriter, r *http.Reques
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	hexID := params.Get("hexid")
 	var confID uint32
-	fmt.Sscanf(params.Get("conference_id"), "%d", &confID)
+	if hexID != "" {
+		c, err := h.m.ctx.Tox.ConferenceByIdentifier(hexID)
+		if err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		confID = c
+	} else {
+		fmt.Sscanf(params.Get("conference_id"), "%d", &confID)
+	}
 	if err := h.m.SendConferenceMessage(confID, params.Get("message")); err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
@@ -253,14 +283,45 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 	chatType := params.Get("type")
 	idStr := params.Get("id")
 	message := params.Get("message")
+	hexID := params.Get("hexid")
 
-	if chatType == "" || idStr == "" || message == "" {
+	if chatType == "" || message == "" {
+		writeErr(w, "missing required parameters", http.StatusBadRequest)
+		return
+	}
+	if idStr == "" && hexID == "" {
 		writeErr(w, "missing required parameters: type, id, message", http.StatusBadRequest)
 		return
 	}
 
 	var id uint32
-	fmt.Sscanf(idStr, "%d", &id)
+	if hexID != "" {
+		switch chatType {
+		case "friend":
+			fn, err := h.m.ctx.Tox.FriendByPublicKey(hexID)
+			if err != nil {
+				writeErr(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			id = fn
+		case "group":
+			gn, err := h.m.ctx.Tox.GroupByChatId(hexID)
+			if err != nil {
+				writeErr(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			id = uint32(gn)
+		case "conference":
+			cn, err := h.m.ctx.Tox.ConferenceByIdentifier(hexID)
+			if err != nil {
+				writeErr(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			id = cn
+		}
+	} else {
+		fmt.Sscanf(idStr, "%d", &id)
+	}
 
 	switch chatType {
 	case "friend":

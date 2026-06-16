@@ -28,7 +28,7 @@
 int MessageInput::s_pasteCounter = 0;
 
 MessageInput::MessageInput(QWidget* parent)
-    : QTextEdit(parent), m_isPlaceholderActive(false) {
+    : QTextEdit(parent), m_isPlaceholderActive(false), m_historyIndex(-1) {
 #ifdef QT3_BUILD
     setTextFormat(Qt::PlainText);
 #else
@@ -102,14 +102,56 @@ void MessageInput::keyPressEvent(QKeyEvent* e) {
     uint mod = e->state();
     uint ctrl = Qt::ControlButton;
     uint shift = Qt::ShiftButton;
+    uint alt = Qt::AltButton;
 #else
     Qt::KeyboardModifiers mod = e->modifiers();
     Qt::KeyboardModifiers ctrl = Qt::ControlModifier;
     Qt::KeyboardModifiers shift = Qt::ShiftModifier;
+    Qt::KeyboardModifiers alt = Qt::AltModifier;
 #endif
 
     if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && !(mod & shift)) {
         emit sendRequested();
+        return;
+    }
+
+    // Alt+↑ / Alt+↓ 浏览发送历史
+    if (e->key() == Qt::Key_Up && (mod & alt)) {
+        if (m_sentHistory.isEmpty()) return;
+        if (m_historyIndex == -1) {
+#ifdef QT3_BUILD
+            m_savedDraft = text();
+#else
+            m_savedDraft = toPlainText();
+#endif
+        }
+        if (m_historyIndex < m_sentHistory.size() - 1) {
+            m_historyIndex++;
+#ifdef QT3_BUILD
+            QTextEdit::setText(m_sentHistory[m_historyIndex]);
+#else
+            QTextEdit::setPlainText(m_sentHistory[m_historyIndex]);
+#endif
+        }
+        return;
+    }
+    if (e->key() == Qt::Key_Down && (mod & alt)) {
+        if (m_sentHistory.isEmpty()) return;
+        if (m_historyIndex > 0) {
+            m_historyIndex--;
+#ifdef QT3_BUILD
+            QTextEdit::setText(m_sentHistory[m_historyIndex]);
+#else
+            QTextEdit::setPlainText(m_sentHistory[m_historyIndex]);
+#endif
+        } else {
+            m_historyIndex = -1;
+#ifdef QT3_BUILD
+            QTextEdit::setText(m_savedDraft);
+#else
+            QTextEdit::setPlainText(m_savedDraft);
+#endif
+        }
         return;
     }
 
@@ -246,3 +288,13 @@ bool MessageInput::handleMimeData(const QMimeData* data) {
 }
 
 #endif
+
+void MessageInput::saveToHistory(const QString& text) {
+    if (text.isEmpty()) return;
+    if (!m_sentHistory.isEmpty() && m_sentHistory.first() == text) return;
+    m_sentHistory.prepend(text);
+    while (m_sentHistory.size() > 10)
+        m_sentHistory.erase(m_sentHistory.fromLast());
+    m_historyIndex = -1;
+    m_savedDraft = QString();
+}
