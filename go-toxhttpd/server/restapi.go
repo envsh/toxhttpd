@@ -250,7 +250,7 @@ func (h *Restapi) handleConferenceMessages(w http.ResponseWriter, r *http.Reques
 	hexID := params.Get("hexid")
 	var confID uint32
 	if hexID != "" {
-		c, err := h.m.ctx.Tox.ConferenceByIdentifier(hexID)
+		c, err := h.m.ConferenceByIdentifier(hexID)
 		if err != nil {
 			writeErr(w, err.Error(), http.StatusBadRequest)
 			return
@@ -312,7 +312,7 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 			}
 			id = uint32(gn)
 		case "conference":
-			cn, err := h.m.ctx.Tox.ConferenceByIdentifier(hexID)
+			cn, err := h.m.ConferenceByIdentifier(hexID)
 			if err != nil {
 				writeErr(w, err.Error(), http.StatusBadRequest)
 				return

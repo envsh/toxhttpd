@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -182,6 +183,23 @@ func (m *Midapi) GroupGetChatId(gn tox.GroupNumber) (string, error) {
 
 func (m *Midapi) ConferenceGetIdentifier(cid uint32) (string, error) {
 	return m.ctx.Tox.ConferenceGetIdentifier(cid)
+}
+
+func (m *Midapi) ConferenceByIdentifier(chatId string) (uint32, error) {
+	if chatId == "" {
+		return 0, errors.New("empty identifier")
+	}
+	chatId = strings.ToUpper(chatId)
+	for _, confID := range m.ctx.Tox.ConferenceGetChatlist() {
+		id, err := m.ctx.Tox.ConferenceGetIdentifier(confID)
+		if err != nil {
+			continue
+		}
+		if id == chatId {
+			return confID, nil
+		}
+	}
+	return 0, errors.New("conference not found: " + chatId)
 }
 
 func (m *Midapi) FriendDelete(friendID uint32) error {
