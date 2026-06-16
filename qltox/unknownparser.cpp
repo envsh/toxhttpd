@@ -104,7 +104,7 @@ static bool tryParseGomuksSync(const std::string& rawStr, ParseResult& ret) {
         if (cd.name.empty())
             cd.name    = roomId;
         cd.chatId      = roomId;
-        cd.type        = "gomuks_room";
+        cd.type        = kGomuksRoomType;
         cd.status      = "online";
         cd.isConnected = true;
         ret.contacts.push_back(cd);
@@ -138,19 +138,19 @@ static bool tryParseToxMessage(const std::string& rawStr, ParseResult& ret) {
                 int64_t friendId = jsonGetInt64(inner, "friend_id");
                 cd.id     = (int)friendId;
                 cd.name   = "friend_" + std::to_string(friendId);
-                cd.type   = "unktox_friend";
+                cd.type   = kUnktoxFriendType;
                 cd.chatId = std::to_string(friendId);
             } else if (eventType == "conference_message") {
                 int64_t confNum = jsonGetInt64(inner, "conference_number");
                 cd.id     = (int)confNum;
                 cd.name   = "conf_" + std::to_string(confNum);
-                cd.type   = "unktox_conference";
+                cd.type   = kUnktoxConferenceType;
                 cd.chatId = std::to_string(confNum);
             } else if (eventType == "group_message") {
                 int64_t groupNum = jsonGetInt64(inner, "group_number");
                 cd.id     = (int)groupNum;
                 cd.name   = "group_" + std::to_string(groupNum);
-                cd.type   = "unktox_group";
+                cd.type   = kUnktoxGroupType;
                 cd.chatId = std::to_string(groupNum);
             }
 
@@ -225,9 +225,9 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     }
 
     ContactData cd;
-    cd.id          = (int)(std::hash<std::string>{}(toRecip + "imap_mail") & 0x7fffffff);
+    cd.id          = (int)(std::hash<std::string>{}(toRecip + kImapMailType) & 0x7fffffff);
     cd.name        = toRecip;
-    cd.type        = "imap_mail";
+    cd.type        = kImapMailType;
     cd.chatId      = toRecip;
     cd.status      = "online";
     cd.isConnected = true;

@@ -10,6 +10,16 @@
 #include <qthread.h>
 #include <qmutex.h>
 
+// ── 联系人类型常量 ──
+extern const char* const kImapMailType;
+extern const char* const kGomuksRoomType;
+extern const char* const kUnktoxFriendType;
+extern const char* const kUnktoxConferenceType;
+extern const char* const kUnktoxGroupType;
+extern const char* const kSyseventType;
+extern const char* const kTopicType;
+extern const char* const kUnknownType;
+
 // ── 事件类型常量 ──
 const EventType34 EventListReadyType = toEventType34(QEvent::User + 100);
 const EventType34 ApiResultReadyType = toEventType34(QEvent::User + 102);

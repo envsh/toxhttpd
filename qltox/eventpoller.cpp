@@ -1,5 +1,14 @@
 #include "eventpoller.h"
 #include "limelog.h"
+
+const char* const kImapMailType       = "imap_mail";
+const char* const kGomuksRoomType     = "gomuks_room";
+const char* const kUnktoxFriendType   = "unktox_friend";
+const char* const kUnktoxConferenceType = "unktox_conference";
+const char* const kUnktoxGroupType    = "unktox_group";
+const char* const kSyseventType       = "sysevent";
+const char* const kTopicType          = "topic";
+const char* const kUnknownType        = "unknown";
 #include <unistd.h>
 
 EventPoller* EventPoller::s_instance = nullptr;

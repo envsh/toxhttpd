@@ -211,17 +211,17 @@ MainWindow::MainWindow(QWidget* parent)
         ContactList seedList;
         Contact* c = new Contact();
         c->id = VIRTUAL_UNKNOWN_ID; c->name = "Unknown";
-        c->type = "unknown"; c->status = "online";
+        c->type = kUnknownType; c->status = "online";
         c->chat_id = ""; c->is_connected = false;
         seedList.append(c);
         c = new Contact();
         c->id = VIRTUAL_SYSEVENT_ID; c->name = "Sysevent";
-        c->type = "sysevent"; c->status = "online";
+        c->type = kSyseventType; c->status = "online";
         c->chat_id = ""; c->is_connected = false;
         seedList.append(c);
         c = new Contact();
         c->id = VIRTUAL_REDDIT_ID; c->name = "Reddit";
-        c->type = "topic"; c->status = "online";
+        c->type = kTopicType; c->status = "online";
         c->chat_id = ""; c->is_connected = false;
         seedList.append(c);
         contactListWidget->setContacts(seedList);
@@ -345,7 +345,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     Contact* c = new Contact();
                     c->id = VIRTUAL_UNKNOWN_ID;
                     c->name = "Unknown";
-                    c->type = "unknown";
+                    c->type = kUnknownType;
                     c->status = "online";
                     c->chat_id = "";
                     c->is_connected = false;
@@ -355,7 +355,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     Contact* c = new Contact();
                     c->id = VIRTUAL_SYSEVENT_ID;
                     c->name = "Sysevent";
-                    c->type = "sysevent";
+                    c->type = kSyseventType;
                     c->status = "online";
                     c->chat_id = "";
                     c->is_connected = false;
@@ -366,7 +366,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     Contact* c = new Contact();
                     c->id = VIRTUAL_REDDIT_ID;
                     c->name = "Reddit";
-                    c->type = "topic";
+                    c->type = kTopicType;
                     c->status = "online";
                     c->chat_id = "";
                     c->is_connected = false;
@@ -547,28 +547,28 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     } else if (type == "conference") {
         emoji = EMOJI_CONFERENCE;
         headerText = emoji + " " + name;
-    } else if (type == "unknown") {
+    } else if (type == kUnknownType) {
         emoji = EMOJI_UNKNOWN;
         headerText = emoji + " " + name;
-    } else if (type == "sysevent") {
+    } else if (type == kSyseventType) {
         emoji = EMOJI_SYSEVENT;
         headerText = emoji + " " + name;
-    } else if (type == "topic") {
+    } else if (type == kTopicType) {
         emoji = EMOJI_TOPIC;
         headerText = emoji + " " + name;
-    } else if (type == "gomuks_room") {
+    } else if (type == kGomuksRoomType) {
         emoji = EMOJI_MATRIX;
         headerText = emoji + " " + name;
-    } else if (type == "unktox_friend") {
+    } else if (type == kUnktoxFriendType) {
         emoji = EMOJI_FRIEND;
         headerText = emoji + " " + name;
-    } else if (type == "unktox_conference") {
+    } else if (type == kUnktoxConferenceType) {
         emoji = EMOJI_CONFERENCE;
         headerText = emoji + " " + name;
-    } else if (type == "unktox_group") {
+    } else if (type == kUnktoxGroupType) {
         emoji = EMOJI_GROUP;
         headerText = emoji + " " + name;
-    } else if (type == "imap_mail") {
+    } else if (type == kImapMailType) {
         emoji = "E";
         headerText = emoji + " " + name;
     }
@@ -584,8 +584,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
         chatWidget->restoreMessages(cacheIt->second);
-        if (id >= 0 && type != "gomuks_room" && type != "unktox_friend"
-            && type != "unktox_conference" && type != "unktox_group" && type != "imap_mail") {
+        if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
+            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -593,8 +593,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存未命中
         qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
         chatWidget->clearMessages();
-        if (id >= 0 && type != "gomuks_room" && type != "unktox_friend"
-            && type != "unktox_conference" && type != "unktox_group" && type != "imap_mail") {
+        if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
+            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -888,11 +888,11 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
                 qWarning("Cache PUSH to sysevent %d: type=%s (event.Evt)", VIRTUAL_SYSEVENT_ID, e.type.c_str());
-                m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
-                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
+                m_messageCache[{VIRTUAL_SYSEVENT_ID, kSyseventType}].push_back(msg);
+                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
                     chatWidget->appendMessage(msg);
                 } else {
-                    contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, "sysevent");
+                    contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
                 }
             }
         } else if (!e.type.empty() && e.type[0] == '_') {
@@ -909,11 +909,11 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
                 qWarning("Cache PUSH to sysevent %d: type=%s", VIRTUAL_SYSEVENT_ID, e.type.c_str());
-                m_messageCache[{VIRTUAL_SYSEVENT_ID, "sysevent"}].push_back(msg);
-                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == "sysevent") {
+                m_messageCache[{VIRTUAL_SYSEVENT_ID, kSyseventType}].push_back(msg);
+                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
                     chatWidget->appendMessage(msg);
                 } else {
-                    contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, "sysevent");
+                    contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
                 }
             }
         } else {
@@ -983,7 +983,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     msg.peerNumber = (int)hm.sender_number;
 
                     int chatId = VIRTUAL_REDDIT_ID;
-                    std::string chatType = "topic";
+                    std::string chatType = kTopicType;
                     for (const auto& cd : pr.contacts) {
                         if (cd.chatId == hm.roomId) {
                             chatId = cd.id;
@@ -1010,11 +1010,11 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_REDDIT_ID;
                 qWarning("Cache PUSH to reddit %d: sender=%s",
                          VIRTUAL_REDDIT_ID, qToUtf8(msg.senderName).data());
-                m_messageCache[{VIRTUAL_REDDIT_ID, "topic"}].push_back(msg);
-                if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == "topic") {
+                m_messageCache[{VIRTUAL_REDDIT_ID, kTopicType}].push_back(msg);
+                if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType) {
                     chatWidget->appendMessage(msg);
                 } else {
-                    contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, "topic");
+                    contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
                 }
             } else {
                 ChatMessage msg;
@@ -1030,11 +1030,11 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_UNKNOWN_ID;
                 qWarning("Cache PUSH to unknown %d: type=%s, handled=%d, sender=%s",
                          VIRTUAL_UNKNOWN_ID, e.type.c_str(), pr.handled, qToUtf8(msg.senderName).data());
-                m_messageCache[{VIRTUAL_UNKNOWN_ID, "unknown"}].push_back(msg);
-                if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == "unknown") {
+                m_messageCache[{VIRTUAL_UNKNOWN_ID, kUnknownType}].push_back(msg);
+                if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType) {
                     chatWidget->appendMessage(msg);
                 } else {
-                    contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, "unknown");
+                    contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, kUnknownType);
                 }
             }
         }
@@ -1065,9 +1065,9 @@ void MainWindow::retranslateUi() {
             headerText = _("group") + " " + QString::number(currentChatId);
         } else if (currentChatType == "conference") {
             headerText = _("conference_item") + " " + QString::number(currentChatId);
-        } else if (currentChatType == "unknown") {
+        } else if (currentChatType == kUnknownType) {
             headerText = QString(_("unknown")) + " " + QString::number(currentChatId);
-        } else if (currentChatType == "sysevent") {
+        } else if (currentChatType == kSyseventType) {
             headerText = QString("System Events") + " " + QString::number(currentChatId);
         }
         chatWidget->setHeaderText(headerText);

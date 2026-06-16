@@ -414,14 +414,14 @@ void ContactListWidget::updateView_v3() {
         if (c->type == "friend")       emoji = EMOJI_FRIEND;
         else if (c->type == "group")   emoji = EMOJI_GROUP;
         else if (c->type == "conference") emoji = EMOJI_CONFERENCE;
-        else if (c->type == "sysevent")   emoji = EMOJI_SYSEVENT;
-        else if (c->type == "unknown")    emoji = EMOJI_UNKNOWN;
-        else if (c->type == "topic")      emoji = EMOJI_TOPIC;
-        else if (c->type == "gomuks_room") emoji = EMOJI_MATRIX;
-        else if (c->type == "unktox_friend") emoji = EMOJI_FRIEND;
-        else if (c->type == "unktox_conference") emoji = EMOJI_CONFERENCE;
-        else if (c->type == "unktox_group") emoji = EMOJI_GROUP;
-        else if (c->type == "imap_mail") emoji = "E";
+        else if (c->type == kSyseventType)   emoji = EMOJI_SYSEVENT;
+        else if (c->type == kUnknownType)    emoji = EMOJI_UNKNOWN;
+        else if (c->type == kTopicType)      emoji = EMOJI_TOPIC;
+        else if (c->type == kGomuksRoomType) emoji = EMOJI_MATRIX;
+        else if (c->type == kUnktoxFriendType) emoji = EMOJI_FRIEND;
+        else if (c->type == kUnktoxConferenceType) emoji = EMOJI_CONFERENCE;
+        else if (c->type == kUnktoxGroupType) emoji = EMOJI_GROUP;
+        else if (c->type == kImapMailType) emoji = "E";
         else emoji = EMOJI_CONFERENCE;
         // 群组使用真实连接状态，好友使用原有逻辑，会议保持硬编码
         QString statusDot;
@@ -499,14 +499,14 @@ void ContactListWidget::updateView_v4() {
         if (c->type == "friend")       emoji = EMOJI_FRIEND;
         else if (c->type == "group")   emoji = EMOJI_GROUP;
         else if (c->type == "conference") emoji = EMOJI_CONFERENCE;
-        else if (c->type == "sysevent")   emoji = EMOJI_SYSEVENT;
-        else if (c->type == "unknown")    emoji = EMOJI_UNKNOWN;
-        else if (c->type == "topic")      emoji = EMOJI_TOPIC;
-        else if (c->type == "gomuks_room") emoji = EMOJI_MATRIX;
-        else if (c->type == "unktox_friend") emoji = EMOJI_FRIEND;
-        else if (c->type == "unktox_conference") emoji = EMOJI_CONFERENCE;
-        else if (c->type == "unktox_group") emoji = EMOJI_GROUP;
-        else if (c->type == "imap_mail") emoji = "E";
+        else if (c->type == kSyseventType)   emoji = EMOJI_SYSEVENT;
+        else if (c->type == kUnknownType)    emoji = EMOJI_UNKNOWN;
+        else if (c->type == kTopicType)      emoji = EMOJI_TOPIC;
+        else if (c->type == kGomuksRoomType) emoji = EMOJI_MATRIX;
+        else if (c->type == kUnktoxFriendType) emoji = EMOJI_FRIEND;
+        else if (c->type == kUnktoxConferenceType) emoji = EMOJI_CONFERENCE;
+        else if (c->type == kUnktoxGroupType) emoji = EMOJI_GROUP;
+        else if (c->type == kImapMailType) emoji = "E";
         else emoji = EMOJI_CONFERENCE;
         QString statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
         
