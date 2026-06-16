@@ -294,7 +294,7 @@ void MessageInput::saveToHistory(const QString& text) {
     if (!m_sentHistory.isEmpty() && m_sentHistory.first() == text) return;
     m_sentHistory.prepend(text);
     while (m_sentHistory.size() > 10)
-        m_sentHistory.erase(m_sentHistory.fromLast());
+        m_sentHistory.pop_back();
     m_historyIndex = -1;
     m_savedDraft = QString();
 }
