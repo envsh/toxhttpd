@@ -289,7 +289,8 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{"message_id": msgId})
 
 	default:
-		writeErr(w, "unknown type: "+chatType, http.StatusBadRequest)
+		// 通用接受：gomuks_room / imap_mail 等虚拟类型统一确认
+		writeJSON(w, map[string]interface{}{"message": "accepted"})
 	}
 }
 

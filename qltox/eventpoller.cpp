@@ -69,6 +69,8 @@ void EventPoller::addRequest(const HttpRequest& req,
 
     ALOG_INFO(">>", req.method, req.url);
 
+    auto t0 = timeNow();
+
     CURL* easy = curl_easy_init();
     if (!easy) { return; }
 
@@ -101,6 +103,8 @@ void EventPoller::addRequest(const HttpRequest& req,
     s_instance->multiMutex.lock();
     curl_multi_add_handle(s_instance->multi, easy);
     s_instance->multiMutex.unlock();
+
+    ALOG_INFO("addRequest setup took", timeSince(t0), "for", ctx->urlStr);
 }
 
 void EventPoller::run() {

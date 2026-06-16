@@ -3,6 +3,7 @@
 
 // ========== 跨 Qt3/Qt4 通用头文件 ==========
 #include <qstring.h>         // QString, QByteArray, QStringList
+#include <ctime>             // timespec, clock_gettime
 #include <qevent.h>          // QEvent (Qt4), QCustomEvent (Qt3)
 #include <qlayout.h>         // QBoxLayout, QBoxLayout::Direction
 #include <qlist.h>           // QList — for QPtrList
@@ -124,5 +125,28 @@ void qSleepMs(unsigned long ms);
 void showTempTooltip(QWidget* parent, const QRect& btnRect, const QString& text, int timeoutMs = 3000);
 
 QByteArray base64Decode(const std::string& b64);
+
+// ── 计时工具（类 Go time.Since）──
+using TimePoint = struct timespec;
+
+inline TimePoint timeNow() {
+    TimePoint tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return tp;
+}
+
+inline std::string timeSince(const TimePoint& start) {
+    TimePoint now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long long ns = (now.tv_sec - start.tv_sec) * 1000000000LL
+                 + (now.tv_nsec - start.tv_nsec);
+    if (ns < 1000)       return std::to_string(ns) + "ns";
+    if (ns < 1000000)    return std::to_string(ns / 1000) + "us";
+    auto ms = ns / 1000000;
+    if (ms < 1000)       return std::to_string(ms) + "ms";
+    auto sec = ms / 1000;
+    if (sec < 60)        return std::to_string(sec) + "." + std::to_string((ms % 1000) / 100) + "s";
+    return std::to_string(sec / 60) + "m" + std::to_string(sec % 60) + "s";
+}
 
 #endif  // COMPAT34_H

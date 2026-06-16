@@ -624,8 +624,8 @@ void MainWindow::onMessageSending(const QString& message) {
 
 #ifdef USE_UNIFIED_SEND_API
     std::string type = std::string(qToUtf8(currentChatType).data());
-    if (type != "friend" && type != "group" && type != "conference") {
-        qWarning("Unknown chat type: %s", type.c_str());
+    if (type.empty()) {
+        qWarning("Empty chat type");
         return;
     }
     chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
