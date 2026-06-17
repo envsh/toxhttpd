@@ -67,18 +67,35 @@ ChatView::ChatView(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
 #endif
     setMouseTracking(true);
+    m_scrollDownPill.setCallback([this]() {
+        m_scrollDownPill.setCount(0);
+        scrollToBottom();
+    });
 }
 
 void ChatView::restoreMessages(const std::vector<ChatMessage>& msgs) {
+    m_scrollDownPill.setCount(0);
     m_messages = msgs;
     relayout();
     scrollToBottom();
 }
 
 void ChatView::appendMessage(const ChatMessage& msg) {
+    int curVal = m_vScrollBar->value();
+#ifdef QT3_BUILD
+    int maxVal = m_vScrollBar->maxValue();
+#else
+    int maxVal = m_vScrollBar->maximum();
+#endif
+    bool atBottom = (maxVal - curVal) <= 20;
+
     m_messages.push_back(msg);
     relayout();
-    scrollToBottom();
+    if (atBottom) {
+        scrollToBottom();
+    } else {
+        m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
+    }
 }
 
 void ChatView::clearMessages() {
@@ -88,6 +105,7 @@ void ChatView::clearMessages() {
     m_vScrollBar->setRange(0, 0);
     m_selMsgIndex = -1;
     m_selStart = m_selEnd = 0;
+    m_scrollDownPill.setCount(0);
     update();
 }
 
@@ -894,6 +912,9 @@ void ChatView::keyPressEvent(QKeyEvent* event) {
 }
 
 void ChatView::mousePressEvent(QMouseEvent* event) {
+    if (m_scrollDownPill.handleClick(event->pos())) {
+        return;
+    }
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0 && msgIndex < (int)m_messages.size()) {
@@ -960,6 +981,17 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
 }
 
 void ChatView::mouseMoveEvent(QMouseEvent* event) {
+    bool overPill = m_scrollDownPill.count() > 0
+        && m_scrollDownPill.rect().contains(event->pos());
+    if (overPill != m_scrollDownPill.isHovered()) {
+        m_scrollDownPill.setHovered(overPill);
+        update();
+    }
+    if (overPill) {
+        setCursor(QCursor(Qt::PointingHandCursor));
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
     if (m_selecting && m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_messages.size()) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex == m_selMsgIndex) {
@@ -1116,6 +1148,7 @@ void ChatView::paintEvent(QPaintEvent* event) {
         }
         y += h;
     }
+    m_scrollDownPill.paint(p, rect(), currentPalette().windowBg, currentPalette().textPrimary);
 }
 
 void ChatView::resizeEvent(QResizeEvent* event) {
@@ -1127,6 +1160,14 @@ void ChatView::resizeEvent(QResizeEvent* event) {
 
 void ChatView::onScrollChanged(int value) {
     m_scrollPos = value;
+#ifdef QT3_BUILD
+    int maxVal = m_vScrollBar->maxValue();
+#else
+    int maxVal = m_vScrollBar->maximum();
+#endif
+    if (maxVal - value <= 20 && m_scrollDownPill.count() > 0) {
+        m_scrollDownPill.setCount(0);
+    }
     m_vScrollBar->showTemporarily();
     update();
 }

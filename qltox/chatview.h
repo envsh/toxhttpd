@@ -2,6 +2,7 @@
 #define CHATVIEW_H
 
 #include "compat34.h"
+#include "floatingpill.h"
 #include <string>
 #include <vector>
 #include <qdatetime.h>
@@ -102,6 +103,7 @@ private:
     int m_totalHeight;
     int m_scrollPos;
     LimeScrollBar* m_vScrollBar;
+    FloatingPill m_scrollDownPill;
 
     static const int kAvatarSize = 48;
     static const int kPad = 8;
