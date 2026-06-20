@@ -143,11 +143,15 @@ protected:
             QListBoxItem* qitem = itemAt(e->pos());
             if (!qitem) { return; }
             ContactListItem* item = dynamic_cast<ContactListItem*>(qitem);
-            if (!item) { return; }
+            if (!item) { e->accept(); return; }
             m_widget->showContextMenuAt(
                 item->itemId(), item->itemType(), item->itemName(),
                 e->globalPos());
+            e->accept();
         }
+    }
+    void contentsContextMenuEvent(QContextMenuEvent* e) {
+        e->accept();
     }
 private:
     ContactListWidget* m_widget;
@@ -810,6 +814,15 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         else if (selected == renameAction) emit renameNickRequested(id, name);
         else if (selected == setTopicAction) emit setGroupTopicRequested(id);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
+#endif
+    } else {
+        // 其他类型（unknown, sysevent, topic 等）：只有查看信息
+#ifdef QT3_BUILD
+        int choice = menu.exec(globalPos);
+        if (choice == 0) { emit viewInfoRequested(id, type); }
+#else
+        QAction* selected = menu.exec(globalPos);
+        if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
 #endif
     }
 }
