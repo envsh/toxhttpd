@@ -2,6 +2,11 @@
 #include "translator.h"
 #include "compat34.h"
 #include "restapi.h"
+#ifdef QT3_BUILD
+#include <qtimer.h>
+#else
+#include <QTimer>
+#endif
 
 #include "ThemeManager.h"
 
@@ -66,6 +71,13 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     
     mainLayout->addLayout(headerLayout);
     
+    // ── 未读消息横幅 ──
+    m_unreadBanner = new QLabel(this);
+    m_unreadBanner->setAlignment(Qt::AlignCenter);
+    m_unreadBanner->setFixedHeight(26);
+    m_unreadBanner->hide();
+    mainLayout->addWidget(m_unreadBanner);
+    
     // 消息区域（虚拟化列表）
     messageArea = new ChatView(this);
     mainLayout->addWidget(messageArea, 1);
@@ -126,7 +138,39 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
 }
 
 void ChatWidget::setHeaderText(const QString& text) {
-    headerText->setText(text);
+    m_baseHeader = text;
+    int cnt = messageArea->messageCount();
+    if (cnt > 0)
+        headerText->setText(text + QString(" (%1)").arg(cnt));
+    else
+        headerText->setText(text);
+}
+
+void ChatWidget::showUnreadBanner(int count) {
+    if (count <= 0) { hideUnreadBanner(); return; }
+    QColor bg(200, 220, 255);
+    QColor fg(30, 30, 30);
+#ifdef QT3_BUILD
+    m_unreadBanner->setPaletteBackgroundColor(bg);
+    m_unreadBanner->setPaletteForegroundColor(fg);
+#else
+    QPalette p;
+    p.setColor(QPalette::Window, bg);
+    p.setColor(QPalette::WindowText, fg);
+    m_unreadBanner->setPalette(p);
+    m_unreadBanner->setAutoFillBackground(true);
+#endif
+    m_unreadBanner->setText(QString("  %1  ").arg(_("n_new_messages").arg(count)));
+    m_unreadBanner->show();
+    QTimer::singleShot(5000, this, SLOT(hideUnreadBanner()));
+}
+
+void ChatWidget::hideUnreadBanner() {
+    m_unreadBanner->hide();
+}
+
+void ChatWidget::updateHeaderCount() {
+    setHeaderText(m_baseHeader);
 }
 
 void ChatWidget::appendMessage(const QString& message, const QString& type, 
@@ -144,10 +188,12 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
     msg.avatarUrl = avatarUrl;
     msg.ipAddress = ipAddress;
     messageArea->appendMessage(msg);
+    updateHeaderCount();
 }
 
 void ChatWidget::clearMessages() {
     messageArea->clearMessages();
+    updateHeaderCount();
 }
 
 int ChatWidget::messageCount() const {
@@ -160,10 +206,12 @@ ChatElement ChatWidget::messageAt(int index) const {
 
 void ChatWidget::appendMessage(const ChatElement& msg) {
     messageArea->appendMessage(msg);
+    updateHeaderCount();
 }
 
 void ChatWidget::restoreMessages(const std::vector<ChatElement>& msgs) {
     messageArea->restoreMessages(msgs);
+    updateHeaderCount();
 }
 
 void ChatWidget::onSendClicked() {

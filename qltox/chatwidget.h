@@ -31,6 +31,7 @@ public:
     void appendMessage(const ChatElement& msg);
     void restoreMessages(const std::vector<ChatElement>& msgs);
     void retranslateUi();
+    void showUnreadBanner(int count);
     
 signals:
     void messageSent(const QString& message);
@@ -49,6 +50,7 @@ private slots:
     void onFileClicked();
     void onFilePaste(const QString& filePath);
     void onTranslateClicked(int msgIndex);
+    void hideUnreadBanner();
 
 public slots:
     void onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage);
@@ -58,6 +60,9 @@ public slots:
 private:
     LoadingBar* m_loadingBar;
     QLabel* headerText;
+    QLabel* m_unreadBanner;
+    QString m_baseHeader;
+    void updateHeaderCount();
     QComboBox* langSelector;
     QComboBox* m_styleSelector;
     QCheckBox* themeCheckBox;

@@ -554,6 +554,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     qWarning("onContactSelected: id=%d, type=%s", id, qToUtf8(type).data());
     currentChatId = id;
     currentChatType = type;
+    int prevUnread = contactListWidget->unreadCount(id, type);
     contactListWidget->resetUnread(id, type);
     
     QString headerText;
@@ -594,6 +595,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     }
     
     chatWidget->setHeaderText(headerText);
+    if (prevUnread > 0)
+        chatWidget->showUnreadBanner(prevUnread);
     
     std::string typeStr = std::string(qToUtf8(type).data());
     auto key = std::make_pair(id, typeStr);

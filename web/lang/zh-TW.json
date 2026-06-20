@@ -227,5 +227,6 @@
         "windows": "Windows 11",
         "material": "Material You",
         "github": "GitHub"
-    }
+    },
+    "n_new_messages": "%1 條新訊息"
 }
