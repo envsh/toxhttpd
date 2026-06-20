@@ -58,6 +58,26 @@ static void playNotificationSound() {
     }
 }
 
+static bool unknownShouldPlaySound(const std::string& type,
+                                   const std::string& message,
+                                   const std::vector<std::string>& selfNames)
+{
+    if (type == kUnktoxFriendType || type == kUnktoxConferenceType || type == kUnktoxGroupType)
+        return true;
+    if (type == kImapMailType)
+        return true;
+
+    std::string lowerMsg = message;
+    for (size_t i = 0; i < lowerMsg.size(); i++) { lowerMsg[i] = tolower((unsigned char)lowerMsg[i]); }
+    for (size_t ni = 0; ni < selfNames.size(); ++ni) {
+        std::string lowerName = selfNames[ni];
+        for (size_t i = 0; i < lowerName.size(); i++) { lowerName[i] = tolower((unsigned char)lowerName[i]); }
+        if (lowerMsg.find("@" + lowerName) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
 static QString formatElapsedMs(int64_t ms) {
     if (ms < 1000) {
         return QString::number((int)ms) + "ms";
@@ -1038,6 +1058,16 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(msg);
                     } else {
                         contactListWidget->incrementUnread(chatId, qFromUtf8(chatType));
+                    }
+
+                    // 声音通知
+                    if (!qIsAppActive()) {
+                        std::vector<std::string> names;
+                        QString self = selfInfoWidget->selfName();
+                        if (!self.isEmpty())
+                            names.push_back(qToUtf8(self).data());
+                        if (unknownShouldPlaySound(chatType, hm.message, names))
+                            playNotificationSound();
                     }
                 }
             } else if (pr.handled && pr.contactName == "reddit") {
