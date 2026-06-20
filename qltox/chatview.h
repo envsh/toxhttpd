@@ -5,6 +5,7 @@
 #include "floatingpill.h"
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <qdatetime.h>
 #include <qrect.h>
 #include <qwidget.h>
@@ -44,6 +45,7 @@ class ChatView : public QWidget {
     Q_OBJECT
 public:
     ChatView(QWidget* parent = 0);
+    ~ChatView();
 
     void appendMessage(const ChatMessage& msg);
     void restoreMessages(const std::vector<ChatMessage>& msgs);
@@ -75,7 +77,8 @@ private:
     void relayout();
     int contentWidth() const;
     void drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth);
-    int calcMessageHeight(const ChatMessage& msg, int viewWidth) const;
+    int calcMessageHeight(const ChatMessage& msg, int viewWidth);
+    int charWidth(uint32_t cp);
 
     // Selection and link helpers
     int findMessageAtY(int y) const;
@@ -104,6 +107,11 @@ private:
     int m_scrollPos;
     LimeScrollBar* m_vScrollBar;
     FloatingPill m_scrollDownPill;
+
+    QFontMetrics m_fm;
+    int m_emojiW;
+    uint8_t m_ascW[128];
+    uint8_t* m_bmpW;
 
     static const int kAvatarSize = 48;
     static const int kPad = 8;

@@ -48,9 +48,14 @@ ChatView::ChatView(QWidget* parent)
     : QWidget(parent)
     , m_clickCount(0), m_clickMsgIndex(-1)
     , m_selMsgIndex(-1), m_selStart(0), m_selEnd(0), m_selecting(false)
+    , m_fm(font()), m_emojiW(0), m_bmpW(NULL)
 {
     m_totalHeight = 0;
     m_scrollPos = 0;
+    for (int i = 0; i < 128; i++) {
+        m_ascW[i] = (uint8_t)std::min(m_fm.width(QChar(i)), 255);
+    }
+    m_emojiW = emojiCharWidth(m_fm);
 
     m_vScrollBar = new LimeScrollBar(Qt::Vertical, this);
 #ifdef QT3_BUILD
@@ -71,6 +76,10 @@ ChatView::ChatView(QWidget* parent)
         m_scrollDownPill.setCount(0);
         scrollToBottom();
     });
+}
+
+ChatView::~ChatView() {
+    delete[] m_bmpW;
 }
 
 void ChatView::restoreMessages(const std::vector<ChatMessage>& msgs) {
@@ -162,10 +171,8 @@ void ChatView::relayout() {
     update();
 }
 
-int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
-    QFont f = font();
-    QFontMetrics fm(f);
-
+int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) {
+    const QFontMetrics& fm = m_fm;
     if (viewWidth <= 0) { viewWidth = 400; }
 
     int contentW = viewWidth - 3 * kPad - kAvatarSize;
@@ -183,7 +190,7 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
         if (cps[pos] == '\n') { lineCount++; pos++; continue; }
         int lineWidth = 0, lastSpace = -1, end = pos;
         while (end < tLen && cps[end] != '\n') {
-            int cw = isEmojiChar(cps[end]) ? emojiCharWidth(fm) : fm.width(QChar((ushort)cps[end]));
+            int cw = isEmojiChar(cps[end]) ? m_emojiW : charWidth(cps[end]);
             lineWidth += cw;
             if (cps[end] == ' ') { lastSpace = end; }
             if (lineWidth >= bubbleTextWidth) {
@@ -198,19 +205,17 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
         pos = end;
     }
 #else
-    int textLen = msg.messageText.length();
-    int pos = 0;
-    while (pos < textLen) {
-        if (msg.messageText[pos] == '\n') {
+    for (int i = 0; i < textLen; ) {
+        if (msg.messageText[i] == '\n') {
             lineCount++;
-            pos++;
+            i++;
             continue;
         }
         int lineWidth = 0;
         int lastSpace = -1;
-        int end = pos;
+        int end = i;
         while (end < textLen && msg.messageText[end] != '\n') {
-            lineWidth += fm.width(msg.messageText[end]);
+            int cw = m_fm.width(msg.messageText[end].unicode());
             if (msg.messageText[end].isSpace()) lastSpace = end;
             if (lineWidth >= bubbleTextWidth) {
                 if (lastSpace > pos && end - pos > 10) {
@@ -263,6 +268,18 @@ int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) const {
     int contentHeight = kPad + headerHeight + bubbleHeight;
     int avatarTotal = kPad + kAvatarSize;
     return std::max(contentHeight, avatarTotal) + kMsgSpacing;
+}
+
+int ChatView::charWidth(uint32_t cp) {
+    if (cp < 128) return m_ascW[cp];
+    if (cp < 0x10000) {
+        if (!m_bmpW) m_bmpW = new uint8_t[65536]();
+        if (!m_bmpW[cp]) {
+            m_bmpW[cp] = (uint8_t)std::min(m_fm.width(QChar((ushort)cp)), 255);
+        }
+        return m_bmpW[cp];
+    }
+    return m_fm.width(QChar((ushort)cp));
 }
 
 // Extract URLs from text
@@ -806,7 +823,7 @@ void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) 
             if (cps[pos] == '\n') { origLineCount++; pos++; continue; }
             int lineWidth = 0, lastSpace = -1, end = pos;
             while (end < tLen && cps[end] != '\n') {
-                int cw = isEmojiChar(cps[end]) ? emojiCharWidth(fm) : fm.width(QChar((ushort)cps[end]));
+            int cw = isEmojiChar(cps[end]) ? m_emojiW : charWidth(cps[end]);
                 lineWidth += cw;
                 if (cps[end] == ' ') { lastSpace = end; }
                 if (lineWidth >= textW) {
