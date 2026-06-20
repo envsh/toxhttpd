@@ -417,6 +417,8 @@ void ContactListWidget::updateView_v3() {
         else if (c->type == kSyseventType)   emoji = EMOJI_SYSEVENT;
         else if (c->type == kUnknownType)    emoji = EMOJI_UNKNOWN;
         else if (c->type == kTopicType)      emoji = EMOJI_TOPIC;
+        else if (c->type == kFilesyncType)   emoji = "📁";
+        else if (c->type == kClipboardType)  emoji = "📋";
         else if (c->type == kGomuksRoomType) emoji = EMOJI_MATRIX;
         else if (c->type == kUnktoxFriendType) emoji = EMOJI_FRIEND;
         else if (c->type == kUnktoxConferenceType) emoji = EMOJI_CONFERENCE;
@@ -502,6 +504,8 @@ void ContactListWidget::updateView_v4() {
         else if (c->type == kSyseventType)   emoji = EMOJI_SYSEVENT;
         else if (c->type == kUnknownType)    emoji = EMOJI_UNKNOWN;
         else if (c->type == kTopicType)      emoji = EMOJI_TOPIC;
+        else if (c->type == kFilesyncType)   emoji = "📁";
+        else if (c->type == kClipboardType)  emoji = "📋";
         else if (c->type == kGomuksRoomType) emoji = EMOJI_MATRIX;
         else if (c->type == kUnktoxFriendType) emoji = EMOJI_FRIEND;
         else if (c->type == kUnktoxConferenceType) emoji = EMOJI_CONFERENCE;

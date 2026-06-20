@@ -585,7 +585,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
         chatWidget->restoreMessages(cacheIt->second);
         if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
-            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType) {
+            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
+            && type != kFilesyncType && type != kClipboardType) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -594,7 +595,8 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
         chatWidget->clearMessages();
         if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
-            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType) {
+            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
+            && type != kFilesyncType && type != kClipboardType) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }

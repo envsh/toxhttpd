@@ -18,6 +18,8 @@ extern const char* const kUnktoxConferenceType;
 extern const char* const kUnktoxGroupType;
 extern const char* const kSyseventType;
 extern const char* const kTopicType;
+extern const char* const kFilesyncType;
+extern const char* const kClipboardType;
 extern const char* const kUnknownType;
 
 // ── 事件类型常量 ──

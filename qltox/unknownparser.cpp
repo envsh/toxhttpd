@@ -258,6 +258,76 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     return true;
 }
 
+// ── filesync 事件解析 ──
+
+static bool tryParseFilesyncEvent(const std::string& rawStr, ParseResult& ret) {
+    cJSON* root = cJSON_Parse(rawStr.c_str());
+    if (!root) return false;
+
+    std::string type   = jsonGetString(root, "type");
+    std::string event  = jsonGetString(root, "event");
+    std::string path   = jsonGetString(root, "path");
+    cJSON_Delete(root);
+
+    if (type != "filesync") return false;
+
+    std::string topic = qToUtf8(ret.contactName).data();
+    if (topic.empty()) return false;
+
+    ContactData cd;
+    cd.id          = (int)(std::hash<std::string>{}(topic + kFilesyncType) & 0x7fffffff);
+    cd.name        = "filesync";
+    cd.type        = kFilesyncType;
+    cd.chatId      = topic;
+    cd.status      = "online";
+    cd.isConnected = true;
+    ret.contacts.push_back(cd);
+
+    HistoryMessage hm;
+    hm.message    = event + ": " + path;
+    hm.direction  = "received";
+    hm.roomId     = topic;
+    ret.messages.push_back(hm);
+
+    ret.handled = true;
+    return true;
+}
+
+// ── clipboard 事件解析 ──
+
+static bool tryParseClipboardEvent(const std::string& rawStr, ParseResult& ret) {
+    cJSON* root = cJSON_Parse(rawStr.c_str());
+    if (!root) return false;
+
+    std::string type = jsonGetString(root, "type");
+    std::string fmt  = jsonGetString(root, "format");
+    std::string data = jsonGetString(root, "data");
+    cJSON_Delete(root);
+
+    if (type != "clipboard") return false;
+
+    std::string topic = qToUtf8(ret.contactName).data();
+    if (topic.empty()) return false;
+
+    ContactData cd;
+    cd.id          = (int)(std::hash<std::string>{}(topic + kClipboardType) & 0x7fffffff);
+    cd.name        = "clipboard";
+    cd.type        = kClipboardType;
+    cd.chatId      = topic;
+    cd.status      = "online";
+    cd.isConnected = true;
+    ret.contacts.push_back(cd);
+
+    HistoryMessage hm;
+    hm.message    = data;
+    hm.direction  = "received";
+    hm.roomId     = topic;
+    ret.messages.push_back(hm);
+
+    ret.handled = true;
+    return true;
+}
+
 // ── 旧逻辑：纯文本降级 ──
 
 static void extractSender(cJSON* valueItem, ParseResult& ret) {
@@ -357,6 +427,10 @@ ParseResult UnknownParser::parse(const std::string& eventType, const std::string
             if (tryParseToxMessage(dataStr, ret))
                 goto done;
             if (tryParseImapMessage(dataStr, ret))
+                goto done;
+            if (tryParseFilesyncEvent(dataStr, ret))
+                goto done;
+            if (tryParseClipboardEvent(dataStr, ret))
                 goto done;
         }
         fallbackAsPlainText(valueItem, ret);
