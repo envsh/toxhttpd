@@ -3,6 +3,7 @@
 
 #include "compat34.h"
 #include "floatingpill.h"
+#include "StyleParams.h"
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -11,9 +12,18 @@
 #include <qwidget.h>
 #include <qpainter.h>
 
+#if defined(QT3_BUILD)
+#include <qmovie.h>
+#else
+#include <QMovie>
+#endif
+
 struct ChatElement {
-    QString messageText;
-    QString type;
+    enum ElementType { Text, Image, File, Video, Gif };
+
+    ElementType etype;
+
+    // Common
     QString senderName;
     int     peerNumber;
     QString avatarText;
@@ -21,7 +31,11 @@ struct ChatElement {
     QString time;
     QString ipAddress;
 
-    // Translation support
+    // Text only
+    QString messageText;
+    QString category;          // "self" / "other" / "friend"
+
+    // Translation (Text only)
     QString translatedText;
     QString translateError;
     bool showTranslation;
@@ -29,11 +43,42 @@ struct ChatElement {
     QRect translateBtnRect;
     QRect sourceBtnRect;
 
-    // Layout cache (TG-style per-element)
-    short cachedWidth = -1;   // -1 = not computed
-    short height = 0;
+    // Shared media fields (Image / Gif / Video)
+    QPixmap thumbnail;
+    QString caption;
+    int mediaWidth;
+    int mediaHeight;
 
-    ChatElement() : peerNumber(-1), showTranslation(false), translationInProgress(false) {}
+    // File only
+    QString fileName;
+    int fileSize;
+    int progress;
+    QString localPath;
+
+    // Video only
+    int durationSec;
+
+    // Gif only
+    QString gifPath;
+    QMovie* movie;
+
+    // Layout cache (TG-style per-element)
+    short cachedWidth;
+    short height;
+
+    ChatElement()
+        : etype(Text), peerNumber(-1), showTranslation(false)
+        , translationInProgress(false), mediaWidth(0), mediaHeight(0)
+        , fileSize(0), progress(0), durationSec(0), movie(nullptr)
+        , cachedWidth(-1), height(0) {}
+
+    int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW);
+    void paint(QPainter& p, int y, int viewWidth, bool isSelected,
+               const std::vector<QRect>& selRects,
+               const QFontMetrics& fm, int emojiW,
+               const QFont& baseFont, const StyleParams::Palette& pal);
+    void startAnimation(QWidget* parent);
+    void stopAnimation();
 };
 
 struct LinkSpan {
@@ -79,9 +124,8 @@ private slots:
 private:
     void relayout();
     int contentWidth() const;
-    void drawMessage(QPainter& p, ChatElement& msg, int y, int viewWidth);
-    int calcMessageHeight(const ChatElement& msg, int viewWidth);
     int charWidth(uint32_t cp);
+    void manageAnimations();
 
     // Selection and link helpers
     int findMessageAtY(int y) const;
@@ -105,7 +149,7 @@ private:
     int m_selEnd;
     bool m_selecting;
 
-    std::vector<ChatElement> m_messages;
+    std::vector<ChatElement> m_items;
     int m_totalHeight;
     int m_scrollPos;
     LimeScrollBar* m_vScrollBar;

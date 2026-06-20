@@ -136,7 +136,7 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
                               const QString& ipAddress) {
     ChatElement msg;
     msg.messageText = message;
-    msg.type = type;
+    msg.category = type;
     msg.senderName = senderName;
     msg.peerNumber = peerNumber;
     msg.time = time;

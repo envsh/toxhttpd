@@ -898,7 +898,7 @@ void MainWindow::handleEvents(const EventList& events) {
             {
                 ChatElement msg;
                 msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
-                msg.type = "other";
+                msg.category = "other";
                 msg.senderName = "Sysevent";
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
@@ -919,7 +919,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 } else {
                     msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
                 }
-                msg.type = "other";
+                msg.category = "other";
                 msg.senderName = "Sysevent";
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
@@ -976,7 +976,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 for (const auto& hm : pr.messages) {
                     ChatElement msg;
                     msg.messageText = qFromUtf8(hm.message);
-                    msg.type = "other";
+                    msg.category = "other";
                     msg.time = getCurrentTime();
 
                     QString senderLabel;
@@ -1018,7 +1018,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 }
             } else if (pr.handled && pr.contactName == "reddit") {
                 ChatElement msg;
-                msg.type = "other";
+                msg.category = "other";
                 msg.time = getCurrentTime();
                 msg.messageText = pr.messageText;
                 msg.senderName = pr.senderName;
@@ -1033,7 +1033,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 }
             } else {
                 ChatElement msg;
-                msg.type = "other";
+                msg.category = "other";
                 msg.time = getCurrentTime();
                 if (pr.handled) {
                     msg.messageText = pr.messageText;
