@@ -75,6 +75,7 @@ private slots:
     
 private:
     bool eventFilter(QObject* obj, QEvent* event);
+public:
     void showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos);
     
 private:

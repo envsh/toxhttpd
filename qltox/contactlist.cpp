@@ -3,16 +3,18 @@
 #include "compat34.h"
 #include "restapi.h"
 #include "placeholderlineedit.h"
+#include "emojiutil.h"
 #include <qmessagebox.h>
 #include <algorithm>
+#include <qpainter.h>
 #ifdef QT3_BUILD
 #include <qlistbox.h>
 #else
 #include <qlistwidget.h>
+#include <QStyledItemDelegate>
 #endif
 
-// Emoji 和状态点常量
-#if QT_VERSION >= 0x050000
+// Emoji 和状态点常量（所有构建统一使用 UTF-8 emoji）
 const char* EMOJI_FRIEND = "👤";
 const char* EMOJI_GROUP = "👥";
 const char* EMOJI_CONFERENCE = "🎙";
@@ -22,18 +24,165 @@ const char* EMOJI_TOPIC = "📌";
 const char* EMOJI_MATRIX = "🧮";
 const char* STATUS_ONLINE = "●";
 const char* STATUS_OFFLINE = "○";
+
+// ---- 公共辅助函数 ----
+
+static int kRowH() { return 36; }
+static int kPad() { return 8; }
+static int kDotR() { return 5; }
+static int kIconSz() { return 20; }
+
+static uint32_t typeToEmojiCp(const QString& type) {
+    if (type == "friend" || type == kUnktoxFriendType)       return 0x1F464;
+    if (type == "group" || type == kUnktoxGroupType)         return 0x1F465;
+    if (type == "conference" || type == kUnktoxConferenceType) return 0x1F399;
+    if (type == kSyseventType)  return 0x2699;
+    if (type == kUnknownType)   return 0x2753;
+    if (type == kTopicType)     return 0x1F4CC;
+    if (type == kFilesyncType)  return 0x1F4C1;
+    if (type == kClipboardType) return 0x1F4CB;
+    if (type == kGomuksRoomType) return 0x1F9EE;
+    if (type == kImapMailType)  return 0x2709;
+    return 0x1F464;
+}
+
+// 公共绘制函数（Qt3/Qt4 共用）
+static void paintContactRow(QPainter& p, int x, int y, int w, int h,
+    bool selected, const QString& type, const QString& name,
+    const QString& status, bool isConnected, int unread)
+{
+    int rh = kRowH();
+    int rp = kPad();
+
+    int cx = x + rp;
+    int cy = y + (h - kDotR() * 2) / 2;
+
+    // 2. Status dot
+    bool online = (status == "online" || status == "tcp" || status == "udp");
+    if (type == "group") { online = isConnected; }
+    p.save();
+    p.setBrush(online ? QColor(76, 175, 80) : QColor(158, 158, 158));
+    p.setPen(Qt::NoPen);
+    p.drawEllipse(cx, cy, kDotR() * 2, kDotR() * 2);
+    p.restore();
+    cx += kDotR() * 2 + rp;
+
+    // 3. Type emoji icon
+    uint32_t cp = typeToEmojiCp(type);
+    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kIconSz());
+    if (!pm.isNull()) {
+        int iy = y + (h - pm.height()) / 2;
+        p.drawPixmap(cx, iy, pm);
+        cx += pm.width() + rp;
+    } else {
+        cx += kIconSz() + rp;
+    }
+
+    // 4. Name text（支持 emoji 渲染）
+    int remainingW = w - (cx - x) - rp - 50;
+    if (remainingW < 20) { remainingW = 20; }
+    QRect nameRect(cx, y + (h - p.fontMetrics().lineSpacing()) / 2,
+                   remainingW, p.fontMetrics().lineSpacing());
+    QString displayName = name.isEmpty() ? _("no_name") : name;
+    if (displayName.length() > 20) { displayName = displayName.left(20) + "..."; }
+    EmojiRenderer::instance().drawText(p, nameRect, displayName);
+
+    // 5. Unread badge
+    if (unread > 0) {
+        QString badge = QString("(%1)").arg(unread);
+        int bw = p.fontMetrics().width(badge);
+        int bx = x + w - rp - bw;
+        p.setPen(QColor(100, 100, 100));
+        p.drawText(bx, y + (h - p.fontMetrics().lineSpacing()) / 2,
+                   bw, p.fontMetrics().lineSpacing(), Qt::AlignLeft, badge);
+    }
+}
+
+#ifdef QT3_BUILD
+// ---- Qt3: ContactListItem ----
+
+class ContactListItem : public QListBoxItem {
+public:
+    ContactListItem(QListBox* lb, int id, const QString& type,
+                    const QString& name, const QString& status,
+                    bool isConnected, int unread);
+    void paint(QPainter* p);
+    int height(const QListBox*) const { return 36; }
+    int itemId() const { return m_id; }
+    const QString& itemType() const { return m_type; }
+    const QString& itemName() const { return m_name; }
+private:
+    int m_id, m_unread;
+    QString m_type, m_name, m_status;
+    bool m_isConnected;
+    QListBox* m_lb;
+};
+
+ContactListItem::ContactListItem(QListBox* lb, int id, const QString& type,
+    const QString& name, const QString& status,
+    bool isConnected, int unread)
+    : QListBoxItem(lb), m_id(id), m_unread(unread),
+      m_type(type), m_name(name), m_status(status),
+      m_isConnected(isConnected), m_lb(lb) {}
+
+void ContactListItem::paint(QPainter* p) {
+    bool sel = m_lb->isSelected(this);
+    paintContactRow(*p, 0, 0, m_lb->width(), kRowH(),
+                    sel, m_type, m_name, m_status, m_isConnected, m_unread);
+}
+
+// ---- Qt3: ContactListBox（右键菜单由 contentsMousePressEvent 直接处理）----
+
+class ContactListBox : public QListBox {
+public:
+    ContactListBox(ContactListWidget* w) : QListBox(w), m_widget(w) {}
+protected:
+    void contentsMousePressEvent(QMouseEvent* e) {
+        QListBox::contentsMousePressEvent(e);
+        if (e->button() == Qt::RightButton) {
+            QListBoxItem* qitem = itemAt(e->pos());
+            if (!qitem) { return; }
+            ContactListItem* item = dynamic_cast<ContactListItem*>(qitem);
+            if (!item) { return; }
+            m_widget->showContextMenuAt(
+                item->itemId(), item->itemType(), item->itemName(),
+                e->globalPos());
+        }
+    }
+private:
+    ContactListWidget* m_widget;
+};
+
 #else
-// qt3/qt4 not support emoji
-const char* EMOJI_FRIEND = "F";
-const char* EMOJI_GROUP = "G";
-const char* EMOJI_CONFERENCE = "C";
-const char* EMOJI_SYSEVENT = "S";
-const char* EMOJI_UNKNOWN = "?";
-const char* EMOJI_TOPIC = "T";
-const char* EMOJI_MATRIX = "M";
-const char* STATUS_ONLINE = "O";
-const char* STATUS_OFFLINE = "N";
+// ---- Qt4: ContactListDelegate ----
+
+class ContactListDelegate : public QStyledItemDelegate {
+public:
+    ContactListDelegate(QObject* parent = 0) : QStyledItemDelegate(parent) {}
+    void paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const;
+    QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const {
+        return QSize(100, 36);
+    }
+};
+
+void ContactListDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt,
+                                 const QModelIndex& idx) const {
+    QString type = idx.data(Qt::UserRole + 1).toString();
+    QString name = idx.data(Qt::UserRole + 2).toString();
+    int unread = idx.data(Qt::UserRole + 3).toInt();
+    bool conn  = idx.data(Qt::UserRole + 4).toBool();
+    QString status = idx.data(Qt::UserRole + 5).toString();
+    bool sel = (opt.state & QStyle::State_Selected);
+    // Qt4 delegate 需自己绘制选中背景
+    if (sel) {
+        p->fillRect(opt.rect, opt.palette.brush(QPalette::Highlight));
+    }
+    paintContactRow(*p, opt.rect.x(), opt.rect.y(), opt.rect.width(), opt.rect.height(),
+                    sel, type, name, status, conn, unread);
+}
 #endif
+
+// ---- ContactListWidget 实现 ----
 
 ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), contextItemId(-1), contextItemType(""), m_scrollBar(nullptr) {
     QBoxLayout* layout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 4, 1);
@@ -61,9 +210,9 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), context
     
     // 联系人列表
 #ifdef QT3_BUILD
-    listWidget = new QListBox(this);
-    ((QListBox*)listWidget)->setSelectionMode(QListBox::Single);
-    connect(((QListBox*)listWidget), SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
+    listWidget = new ContactListBox(this);
+    ((ContactListBox*)listWidget)->setSelectionMode(QListBox::Single);
+    connect(((ContactListBox*)listWidget), SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
     ((QListBox*)listWidget)->installEventFilter(this);
 #else
     listWidget = new QListWidget(this);
@@ -73,6 +222,7 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), context
     connect(((QListWidget*)listWidget), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showContextMenu(QPoint)));
     m_scrollBar = new LimeScrollBar(Qt::Vertical, (QListWidget*)listWidget);
     ((QListWidget*)listWidget)->setVerticalScrollBar(m_scrollBar);
+    ((QListWidget*)listWidget)->setItemDelegate(new ContactListDelegate((QListWidget*)listWidget));
 #endif
     layout->addWidget((QWidget*)listWidget, 1); // stretch
     
@@ -405,59 +555,26 @@ void ContactListWidget::updateView_v3() {
     
     lb->clear();
     
-    int newIndex = 0;
-    int targetIndex = -1;
+    ContactListItem* targetItem = NULL;
     for (uint i = 0; i < visible.size(); ++i) {
         Contact* c = visible[i];
         
-        QString emoji;
-        if (c->type == "friend")       emoji = EMOJI_FRIEND;
-        else if (c->type == "group")   emoji = EMOJI_GROUP;
-        else if (c->type == "conference") emoji = EMOJI_CONFERENCE;
-        else if (c->type == kSyseventType)   emoji = EMOJI_SYSEVENT;
-        else if (c->type == kUnknownType)    emoji = EMOJI_UNKNOWN;
-        else if (c->type == kTopicType)      emoji = EMOJI_TOPIC;
-        else if (c->type == kFilesyncType)   emoji = "📁";
-        else if (c->type == kClipboardType)  emoji = "📋";
-        else if (c->type == kGomuksRoomType) emoji = EMOJI_MATRIX;
-        else if (c->type == kUnktoxFriendType) emoji = EMOJI_FRIEND;
-        else if (c->type == kUnktoxConferenceType) emoji = EMOJI_CONFERENCE;
-        else if (c->type == kUnktoxGroupType) emoji = EMOJI_GROUP;
-        else if (c->type == kImapMailType) emoji = "E";
-        else emoji = EMOJI_CONFERENCE;
-        // 群组使用真实连接状态，好友使用原有逻辑，会议保持硬编码
-        QString statusDot;
-        if (c->type == "group") {
-            statusDot = c->is_connected ? STATUS_ONLINE : STATUS_OFFLINE;
-        } else {
-            statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
-        }
-        
-        QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
-        // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）
-        if (displayName.length() > 20) {
-            displayName = displayName.left(20) + "...";
-        }
-        
-        // emoji和名字之间加空格（web端使用CSS margin-right，这里用字符串空格）
-        QString itemText = QString("%1 %2  %3").arg(statusDot, emoji, displayName);
         auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
         auto uit = m_unreadCounts.find(key);
-        if (uit != m_unreadCounts.end() && uit->second > 0) {
-            itemText += QString("  (%1)").arg(uit->second);
-        }
-        lb->insertItem(itemText);
+        int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
+        
+        ContactListItem* item = new ContactListItem(lb, c->id, c->type,
+            c->name, c->status, c->is_connected, unread);
         
         if (c->id == selectedId && c->type == selectedType) {
-            targetIndex = newIndex;
+            targetItem = item;
         }
-        ++newIndex;
     }
     
     if (lb->count() == 0) {
         lb->insertItem(_("no_contacts"));
-    } else if (targetIndex >= 0) {
-        lb->setSelected(targetIndex, TRUE);
+    } else if (targetItem) {
+        lb->setSelected(targetItem, TRUE);
     }
     
     // 恢复滚动位置
@@ -497,39 +614,17 @@ void ContactListWidget::updateView_v4() {
     for (uint i = 0; i < visible.size(); ++i) {
         Contact* c = visible[i];
         
-        QString emoji;
-        if (c->type == "friend")       emoji = EMOJI_FRIEND;
-        else if (c->type == "group")   emoji = EMOJI_GROUP;
-        else if (c->type == "conference") emoji = EMOJI_CONFERENCE;
-        else if (c->type == kSyseventType)   emoji = EMOJI_SYSEVENT;
-        else if (c->type == kUnknownType)    emoji = EMOJI_UNKNOWN;
-        else if (c->type == kTopicType)      emoji = EMOJI_TOPIC;
-        else if (c->type == kFilesyncType)   emoji = "📁";
-        else if (c->type == kClipboardType)  emoji = "📋";
-        else if (c->type == kGomuksRoomType) emoji = EMOJI_MATRIX;
-        else if (c->type == kUnktoxFriendType) emoji = EMOJI_FRIEND;
-        else if (c->type == kUnktoxConferenceType) emoji = EMOJI_CONFERENCE;
-        else if (c->type == kUnktoxGroupType) emoji = EMOJI_GROUP;
-        else if (c->type == kImapMailType) emoji = "E";
-        else emoji = EMOJI_CONFERENCE;
-        QString statusDot = (c->status == "online" || c->status == "tcp" || c->status == "udp") ? STATUS_ONLINE : STATUS_OFFLINE;
-        
-        QString displayName = c->name.isEmpty() ? _("no_name") : c->name;
-        // 对于群组和会议，如果名称为空，使用降级策略（已在eventpoller中处理）
-        if (displayName.length() > 20) {
-            displayName = displayName.left(20) + "...";
-        }
-        
-        // emoji和名字之间加空格
-        QString itemText = QString("%1 %2  %3").arg(statusDot, emoji, displayName);
         auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
         auto uit = m_unreadCounts.find(key);
-        if (uit != m_unreadCounts.end() && uit->second > 0) {
-            itemText += QString("  (%1)").arg(uit->second);
-        }
-        QListWidgetItem* item = new QListWidgetItem(itemText);
-        item->setData(Qt::UserRole, c->id);
+        int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
+        
+        QListWidgetItem* item = new QListWidgetItem();
+        item->setData(Qt::UserRole,     c->id);
         item->setData(Qt::UserRole + 1, c->type);
+        item->setData(Qt::UserRole + 2, c->name);
+        item->setData(Qt::UserRole + 3, unread);
+        item->setData(Qt::UserRole + 4, c->is_connected);
+        item->setData(Qt::UserRole + 5, c->status);
         lw->addItem(item);
         
         if (c->id == selectedId && c->type == selectedType) {
@@ -604,44 +699,22 @@ void ContactListWidget::showContextMenu(QPoint pos) {
     
     int id = item->data(Qt::UserRole).toInt();
     QString type = item->data(Qt::UserRole + 1).toString();
+    QString name = item->data(Qt::UserRole + 2).toString();
     QPoint globalPos = lw->mapToGlobal(pos);
-    showContextMenuAt(id, type, item->text(), globalPos);
+    showContextMenuAt(id, type, name, globalPos);
 }
 
 bool ContactListWidget::eventFilter(QObject*, QEvent*) {
     return false;
 }
 #else
-// Qt3: 事件过滤器处理右键
-bool ContactListWidget::eventFilter(QObject* obj, QEvent* event) {
-    if (obj == (QListBox*)listWidget && event->type() == QEvent::MouseButtonPress) {
-        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-        if (mouseEvent->button() == Qt::RightButton) {
-            QListBox* lb = (QListBox*)listWidget;
-            QListBoxItem* item = lb->itemAt(mouseEvent->pos());
-            if (!item) { return false; }
-            int index = lb->index(item);
-            // 查找对应的联系人
-            int count = 0;
-            for (uint i = 0; i < allContacts.count(); ++i) {
-                Contact* c = allContacts.at(i);
-                if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
-                if (count == index) {
-                    contextItemId = c->id;
-                    contextItemType = c->type;
-                    QPoint globalPos = lb->viewport()->mapToGlobal(mouseEvent->pos());
-                    showContextMenuAt(c->id, c->type, c->name, globalPos);
-                    return true;
-                }
-                ++count;
-            }
-        }
-    }
-    return QWidget::eventFilter(obj, event);
+// Qt3: 事件过滤器—透传（右键由 ContactListBox 处理）
+bool ContactListWidget::eventFilter(QObject*, QEvent*) {
+    return false;
 }
 
 void ContactListWidget::showContextMenu(QPoint) {
-    // Qt3 通过 eventFilter 处理，此函数不使用
+    // Qt3 通过 ContactListBox 处理，此函数不使用
 }
 #endif
 
