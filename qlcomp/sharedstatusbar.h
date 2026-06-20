@@ -17,6 +17,7 @@
 #include <QMouseEvent>
 #include <QApplication>
 #include <QVBoxLayout>
+#include <QTimer>
 #endif
 
 class SharedStatusBar : public QWidget
@@ -61,6 +62,9 @@ private:
     QTimer *m_debounceTimer;
     bool m_pendingHide;
 #endif
+
+private slots:
+    void retrack();
 };
 
 #endif

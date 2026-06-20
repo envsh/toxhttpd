@@ -156,6 +156,17 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
     }
 #endif
 
+    if (event->type() == QEvent::Hide) {
+        if (watched == m_activeWindow && watched->isWidgetType()) {
+            QWidget *w = static_cast<QWidget*>(watched);
+            if (w->isTopLevel()) {
+                QTimer::singleShot(50, this, SLOT(retrack()));
+                return false;
+            }
+        }
+        return false;
+    }
+
     if (event->type() == QEvent::Close && watched == m_activeWindow) {
         m_activeWindow = nullptr;
         hide();
@@ -178,6 +189,20 @@ void SharedStatusBar::onDebounceTimeout()
     // hide();
 }
 #endif
+
+void SharedStatusBar::retrack()
+{
+    QWidget *aw = qApp->activeWindow();
+    if (!aw || aw == this) {
+        hide();
+        m_activeWindow = nullptr;
+        return;
+    }
+    if (aw != m_activeWindow) {
+        m_activeWindow = aw;
+        reposition();
+    }
+}
 
 void SharedStatusBar::paintEvent(QPaintEvent *)
 {
