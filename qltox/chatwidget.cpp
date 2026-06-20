@@ -240,13 +240,13 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
     // Toggle: if already translated, just toggle display
     if (!msg.translatedText.isEmpty()) {
         msg.showTranslation = !msg.showTranslation;
-        messageArea->triggerRelayout();
+        messageArea->triggerRelayout(msgIndex);
         return;
     }
 
     msg.translateError = QString();
     msg.translationInProgress = true;
-    messageArea->triggerRelayout();
+    messageArea->triggerRelayout(msgIndex);
     emit translateRequested(msgIndex, msg.messageText,
                             qFromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
 }
@@ -262,7 +262,7 @@ void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& tr
     } else {
         msg.translateError = errorMessage;
     }
-    messageArea->triggerRelayout();
+    messageArea->triggerRelayout(msgIndex);
 }
 
 void ChatWidget::onThemeToggled(bool checked) {

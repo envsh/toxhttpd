@@ -92,19 +92,34 @@ void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
 void ChatView::appendMessage(const ChatElement& msg) {
     int curVal = m_vScrollBar->value();
 #ifdef QT3_BUILD
-    int maxVal = m_vScrollBar->maxValue();
+    int oldMax = m_vScrollBar->maxValue();
 #else
-    int maxVal = m_vScrollBar->maximum();
+    int oldMax = m_vScrollBar->maximum();
 #endif
-    bool atBottom = (maxVal - curVal) <= 20;
+    bool atBottom = (oldMax - curVal) <= 20;
 
+    int w = contentWidth();
+    if (w <= 0) { w = 400; }
     m_messages.push_back(msg);
-    relayout();
+    ChatElement& el = m_messages.back();
+    el.height = calcMessageHeight(el, w);
+    el.cachedWidth = (short)w;
+    m_totalHeight += el.height;
+
+    int vpH = height();
+    int maxScroll = std::max(0, m_totalHeight - vpH);
+    m_vScrollBar->setRange(0, maxScroll);
+    m_vScrollBar->setPageStep(vpH);
+    if (curVal == oldMax && oldMax > 0) {
+        m_vScrollBar->setValue(maxScroll);
+    }
+
     if (atBottom) {
         scrollToBottom();
     } else {
         m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
     }
+    update();
 }
 
 void ChatView::clearMessages() {
@@ -135,7 +150,16 @@ int ChatView::messageCount() const {
     return (int)m_messages.size();
 }
 
-void ChatView::triggerRelayout() {
+void ChatView::triggerRelayout(int msgIndex) {
+    if (msgIndex >= 0 && msgIndex < (int)m_messages.size()) {
+        m_messages[msgIndex].cachedWidth = -1;
+        m_messages[msgIndex].height = 0;
+    } else {
+        for (auto& el : m_messages) {
+            el.cachedWidth = -1;
+            el.height = 0;
+        }
+    }
     relayout();
 }
 
@@ -150,7 +174,10 @@ void ChatView::relayout() {
 
     m_totalHeight = kPad;
     for (size_t i = 0; i < m_messages.size(); ++i) {
-        m_messages[i].height = calcMessageHeight(m_messages[i], w);
+        if (m_messages[i].cachedWidth != w) {
+            m_messages[i].height = calcMessageHeight(m_messages[i], w);
+            m_messages[i].cachedWidth = (short)w;
+        }
         m_totalHeight += m_messages[i].height;
     }
 

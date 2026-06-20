@@ -20,7 +20,6 @@ struct ChatElement {
     QString avatarUrl;
     QString time;
     QString ipAddress;
-    int height;
 
     // Translation support
     QString translatedText;
@@ -30,7 +29,11 @@ struct ChatElement {
     QRect translateBtnRect;
     QRect sourceBtnRect;
 
-    ChatElement() : height(0), peerNumber(-1), showTranslation(false), translationInProgress(false) {}
+    // Layout cache (TG-style per-element)
+    short cachedWidth = -1;   // -1 = not computed
+    short height = 0;
+
+    ChatElement() : peerNumber(-1), showTranslation(false), translationInProgress(false) {}
 };
 
 struct LinkSpan {
@@ -53,7 +56,7 @@ public:
     void scrollToBottom();
     ChatElement& messageAt(int index);
     int messageCount() const;
-    void triggerRelayout();
+    void triggerRelayout(int msgIndex = -1);
 
 protected:
     void paintEvent(QPaintEvent* event);
