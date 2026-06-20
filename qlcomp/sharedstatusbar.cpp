@@ -132,6 +132,18 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
         // Qt4 tooltips/popups 不跟踪
         if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return false;
 #endif
+		// 窗口宽或高小于 350px 时不跟随
+		if (tw->width() < 350) {
+			return false;
+		}
+        // 状态栏最小宽度大于活动窗口宽度时不跟随
+        if (minimumWidth() > tw->width()) {
+            return false;
+        }		
+        // 状态栏可见且新窗口不遮挡当前位置时，不跟随
+        if (isVisible() && !geometry().intersects(tw->frameGeometry())) {
+            // return false;
+        }
         m_activeWindow = tw;
         reposition();
         return false;
@@ -199,6 +211,10 @@ void SharedStatusBar::retrack()
         return;
     }
     if (aw != m_activeWindow) {
+		if (minimumWidth() > aw->width()) { return; }
+        if (isVisible() && !geometry().intersects(aw->frameGeometry())) {
+            // return;
+        }
         m_activeWindow = aw;
         reposition();
     }
@@ -271,6 +287,7 @@ void SharedStatusBar::reposition()
     move(bl.x(), bl.y());
     resize(m_activeWindow->width(), m_bar->sizeHint().height());
     if (!isVisible()) show();
+    if (minimumWidth() > m_activeWindow->width()) { m_repositioning = false; return; }
 
     m_repositioning = false;
 }
