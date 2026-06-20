@@ -1007,6 +1007,30 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                     }
 
+                    if (chatType == kFilesyncType) {
+                        msg.etype = ChatElement::File;
+                        QString raw = qFromUtf8(hm.message);
+                        int colonPos = -1;
+                        for (int i = 0; i < raw.length() - 1; i++) {
+                            if (raw[i] == ':' && raw[i+1] == ' ') {
+                                colonPos = i; break;
+                            }
+                        }
+                        if (colonPos >= 0) {
+                            msg.messageText = raw.left(colonPos);
+                            msg.fileName    = raw.mid(colonPos + 2);
+                        } else {
+                            msg.messageText = QString();
+                            msg.fileName    = raw;
+                        }
+                        int slashPos = -1;
+                        for (int i = 0; i < msg.fileName.length(); i++) {
+                            if (msg.fileName[i] == '/') { slashPos = i; }
+                        }
+                        msg.caption = (slashPos >= 0)
+                            ? msg.fileName.mid(slashPos + 1) : msg.fileName;
+                    }
+
                     qWarning("Cache PUSH to %s %d: sender=%s",
                              chatType.c_str(), chatId, qToUtf8(msg.senderName).data());
                     m_messageCache[{chatId, chatType}].push_back(msg);

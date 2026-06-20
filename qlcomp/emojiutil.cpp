@@ -170,6 +170,11 @@ QPixmap EmojiRenderer::loadEmoji(uint32_t codepoint, int size) {
     return pm;
 }
 
+QPixmap EmojiRenderer::renderEmoji(uint32_t codepoint, int size) {
+    if (!m_ok) { return QPixmap(); }
+    return loadEmoji(codepoint, size);
+}
+
 void EmojiRenderer::drawText(QPainter& p, const QRect& textRect, const QString& text) {
     if (!m_ok) {
 #ifdef QT3_BUILD

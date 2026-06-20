@@ -29,6 +29,57 @@
 #include <QToolTip>
 #endif
 
+#ifdef EMOJI_RENDER_QT34
+// ───── Emoji icon helpers ─────
+static uint32_t fileIconForName(const QString& name) {
+    QString ext;
+    int dot = -1;
+    for (int i = 0; i < name.length(); i++) {
+        if (name[i] == '.') { dot = i; }
+    }
+    if (dot >= 0) {
+        for (int i = dot + 1; i < name.length(); i++) {
+#ifdef QT3_BUILD
+            ext += name[i].lower();
+#else
+            ext += name[i].toLower();
+#endif
+        }
+    }
+    if (ext == "jpg" || ext == "jpeg" || ext == "png" ||
+        ext == "gif" || ext == "webp" || ext == "svg")
+        return 0x1F5BC;   // 🖼
+    if (ext == "mp3" || ext == "wav" || ext == "flac" ||
+        ext == "ogg" || ext == "m4a" || ext == "wma")
+        return 0x1F3B5;   // 🎵
+    if (ext == "mp4" || ext == "mkv" || ext == "avi" ||
+        ext == "mov" || ext == "webm")
+        return 0x1F3AC;   // 🎬
+    if (ext == "zip" || ext == "tar" || ext == "gz" ||
+        ext == "bz2" || ext == "xz" || ext == "7z" || ext == "rar")
+        return 0x1F4E6;   // 📦
+    if (ext == "pdf")          return 0x1F4D5;   // 📕
+    if (ext == "doc" || ext == "docx")  return 0x1F4DD;   // 📝
+    if (ext == "xls" || ext == "xlsx")  return 0x1F4CA;   // 📊
+    if (ext == "txt" || ext == "json" || ext == "xml" ||
+        ext == "html" || ext == "js" || ext == "ts" ||
+        ext == "css" || ext == "py" || ext == "go")
+        return 0x1F4C4;   // 📄
+    return 0x1F4C4;       // 📄 default
+}
+
+static void drawEmojiIcon(QPainter& p, const QRect& rect, uint32_t cp, const char* fallback) {
+    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, rect.height() - 2);
+    if (!pm.isNull()) {
+        int cx = rect.x() + (rect.width() - pm.width()) / 2;
+        int cy = rect.y() + (rect.height() - pm.height()) / 2;
+        p.drawPixmap(cx, cy, pm);
+    } else {
+        p.drawText(rect, Qt::AlignCenter, qFromUtf8(fallback));
+    }
+}
+#endif
+
 // ───── ChatElement methods ─────
 
 int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
@@ -139,8 +190,65 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
     case Image:
     case Gif:
     case Video:
-    case File:
         return 0;
+    case File: {
+        int kAvatarSize = 48;
+        int kPad = 8;
+        int kBubbleHPad = 12;
+        int kBubbleVPad = 8;
+        int kMsgSpacing = 8;
+
+        if (viewWidth <= 0) { viewWidth = 400; }
+
+        int contentW = viewWidth - 3 * kPad - kAvatarSize;
+        int bubbleW = (contentW * 80) / 100;
+        if (bubbleW < 100) { bubbleW = contentW; }
+        int innerW = bubbleW - 2 * kBubbleHPad;
+
+        int iconSize = 48;
+        int textW = innerW - iconSize - kPad;
+        if (textW < 20) { textW = 20; }
+
+        int nameLines = 0;
+        QString displayText = !caption.isEmpty() ? caption : fileName;
+        {
+            int tLen = displayText.length();
+            int pos = 0;
+            while (pos < tLen) {
+                if (displayText[pos] == '\n') { nameLines++; pos++; continue; }
+                int lineWidth = 0, lastSpace = -1, end = pos;
+                while (end < tLen && displayText[end] != '\n') {
+                    lineWidth += fm.width(displayText[end]);
+                    if (displayText[end] == ' ') { lastSpace = end; }
+                    if (lineWidth >= textW) {
+                        if (lastSpace > pos && end - pos > 3) {
+                            end = lastSpace + 1;
+                        }
+                        break;
+                    }
+                    end++;
+                }
+                nameLines++;
+                pos = end;
+            }
+        }
+        if (nameLines < 1) { nameLines = 1; }
+
+        int subLines = messageText.isEmpty() ? 0 : 1;
+        int textHeight = nameLines * fm.lineSpacing()
+                       + (subLines > 0 ? kPad/2 + subLines * fm.lineSpacing() : 0);
+
+        int bubbleHeight = 2 * kBubbleVPad
+                         + std::max(textHeight + kPad, iconSize);
+        if (bubbleHeight < 2 * kBubbleVPad + iconSize) {
+            bubbleHeight = 2 * kBubbleVPad + iconSize;
+        }
+
+        int headerHeight = fm.lineSpacing() + kPad;
+        int contentHeight = kPad + headerHeight + bubbleHeight;
+        int avatarTotal = kPad + kAvatarSize;
+        return std::max(contentHeight, avatarTotal) + kMsgSpacing;
+    }
     }
     return 0;
 }
@@ -221,7 +329,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
             p.setFont(baseFont);
 
-            {
+            if (etype != ChatElement::File) {
                 int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
                 int btnX0 = contentRight - hdrBtnAreaW;
                 sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
@@ -229,9 +337,9 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 p.setPen(pal.textMuted);
                 p.setBrush(Qt::NoBrush);
                 p.drawEllipse(sourceBtnRect);
-                p.drawText(sourceBtnRect, Qt::AlignCenter, qFromUtf8("📋"));
+                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
                 p.drawEllipse(translateBtnRect);
-                p.drawText(translateBtnRect, Qt::AlignCenter, qFromUtf8("🌐"));
+                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
             }
 
             int bubbleX = contentRight - bubbleW;
@@ -309,7 +417,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
             p.setFont(baseFont);
 
-            {
+            if (etype != ChatElement::File) {
                 int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
                 int btnX0 = bubbleRight - hdrBtnAreaW;
                 sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
@@ -317,9 +425,9 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 p.setPen(pal.textMuted);
                 p.setBrush(Qt::NoBrush);
                 p.drawEllipse(sourceBtnRect);
-                p.drawText(sourceBtnRect, Qt::AlignCenter, qFromUtf8("📋"));
+                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
                 p.drawEllipse(translateBtnRect);
-                p.drawText(translateBtnRect, Qt::AlignCenter, qFromUtf8("🌐"));
+                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
             }
 
             int bubbleY = y + kPad + headerH + kPad;
@@ -442,8 +550,319 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
     case Image:
     case Gif:
     case Video:
-    case File:
         break;
+    case File: {
+        QFont f = baseFont;
+        int headerH = fm.lineSpacing();
+        QRect bubbleRect;
+
+        int kAvatarSize = 48;
+        int kPad = 8;
+        int kBubbleHPad = 12;
+        int kBubbleVPad = 8;
+        int kBubbleRadius = 8;
+        int kMsgSpacing = 8;
+
+        const int hdrBtnSize = 18;
+        const int hdrBtnGap = 4;
+        int hdrBtnAreaW = 2 * hdrBtnSize + hdrBtnGap;
+
+        if (category == "self") {
+            // ── self ──
+            int ax = viewWidth - kPad - kAvatarSize;
+            p.setBrush(pal.surfaceBg);
+            p.setPen(Qt::NoPen);
+            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
+            if (!avatarText.isEmpty()) {
+                p.setPen(pal.textMuted);
+                f.setPointSize(18);
+                f.setBold(true);
+                p.setFont(f);
+                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
+                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                p.setFont(baseFont);
+            }
+
+            int contentRight = viewWidth - 2 * kPad - kAvatarSize;
+            int contentLeft = kPad;
+            int bubbleMaxW = contentRight - contentLeft;
+            int bubbleW = std::min(bubbleMaxW, (bubbleMaxW * 80) / 100);
+            int hdrTextRight = contentRight - kPad / 2;
+
+            // sender name
+            f.setPointSize(11);
+            p.setFont(f);
+            p.setPen(pal.textMuted);
+            QString dname = !senderName.isEmpty() ? senderName
+                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+            int nameW = fm.width(dname);
+            p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
+                       Qt::AlignRight | Qt::AlignVCenter, dname);
+
+            // IP
+            int ipW = 0;
+            if (!ipAddress.isEmpty()) {
+                f.setPointSize(10); p.setFont(f);
+                p.setPen(QColor(130, 140, 150));
+                ipW = fm.width(ipAddress);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
+                           ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+            }
+            // time
+            f.setPointSize(10); p.setFont(f);
+            p.setPen(pal.textMuted);
+            p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
+                       y + kPad, fm.width(time), headerH,
+                       Qt::AlignRight | Qt::AlignVCenter, time);
+            p.setFont(baseFont);
+
+            // header buttons
+            if (etype != ChatElement::File) {
+                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                int btnX0 = contentRight - hdrBtnAreaW;
+                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                p.drawEllipse(sourceBtnRect);
+                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                p.drawEllipse(translateBtnRect);
+                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+            }
+
+            // bubble background
+            int bubbleX = contentRight - bubbleW;
+            int bubbleY = y + kPad + headerH + kPad;
+            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            if (bubbleH < 30) { bubbleH = 30; }
+            bubbleRect = QRect(bubbleX, bubbleY, bubbleW, bubbleH);
+            p.setBrush(pal.baseBg);
+            p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+            p.drawRoundRect(bubbleRect, 4, 4);
+#else
+            p.drawRoundedRect(bubbleRect, kBubbleRadius, kBubbleRadius);
+#endif
+
+            // ── file content ──
+            int iconSize = 48;
+            int iconX = bubbleRect.x() + kBubbleHPad;
+            int iconY = bubbleRect.y() + kBubbleVPad;
+            p.setBrush(pal.surfaceBg);
+            p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+            p.drawRoundRect(iconX, iconY, iconSize, iconSize, 8, 8);
+#else
+            p.drawRoundedRect(iconX, iconY, iconSize, iconSize, 8, 8);
+#endif
+            uint32_t fileCp = fileIconForName(!caption.isEmpty() ? caption : fileName);
+            QPixmap pm = EmojiRenderer::instance().renderEmoji(fileCp, iconSize - 4);
+            if (!pm.isNull()) {
+                int cx = iconX + (iconSize - pm.width()) / 2;
+                int cy = iconY + (iconSize - pm.height()) / 2;
+                p.drawPixmap(cx, cy, pm);
+            } else {
+                f.setPointSize(24);
+                p.setFont(f);
+                p.setPen(pal.textMuted);
+                p.drawText(iconX, iconY, iconSize, iconSize, Qt::AlignCenter, qFromUtf8("📄"));
+                p.setFont(baseFont);
+            }
+
+            int textX = iconX + iconSize + kPad;
+            int textW = bubbleRect.right() - kBubbleHPad - textX;
+            if (textW < 20) { textW = 20; }
+            QString displayName = !caption.isEmpty() ? caption : fileName;
+            if (!displayName.isEmpty()) {
+                p.setPen(pal.textPrimary);
+                f.setPointSize(12);
+                p.setFont(f);
+#ifdef QT3_BUILD
+                // Qt3 手动 elide
+                QString elide = displayName;
+                if (fm.width(elide) > textW) {
+                    for (int ei = elide.length(); ei > 0; ei--) {
+                        if (fm.width(elide.left(ei) + "...") <= textW) {
+                            elide = elide.left(ei) + "..."; break;
+                        }
+                    }
+                    if (fm.width(elide) > textW) { elide = "..."; }
+                }
+                p.drawText(textX, iconY, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter, elide);
+#else
+                p.drawText(textX, iconY, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter,
+                           fm.elidedText(displayName, Qt::ElideRight, textW));
+#endif
+                p.setFont(baseFont);
+            }
+            if (!messageText.isEmpty()) {
+                p.setPen(pal.textMuted);
+                f.setPointSize(10);
+                p.setFont(f);
+                p.drawText(textX, iconY + fm.lineSpacing() + kPad/2, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter, messageText);
+                p.setFont(baseFont);
+            }
+        } else {
+            // ── other ──
+            int ax = kPad;
+            p.setBrush(pal.surfaceBg);
+            p.setPen(Qt::NoPen);
+            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
+            if (!avatarText.isEmpty()) {
+                p.setPen(pal.textMuted);
+                f.setPointSize(18); f.setBold(true); p.setFont(f);
+                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
+                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                p.setFont(baseFont);
+            }
+
+            int contentX = 2 * kPad + kAvatarSize;
+            int contentW = viewWidth - kPad - contentX;
+            int bubbleW = (contentW * 80) / 100;
+            if (bubbleW < 100) { bubbleW = contentW; }
+            int bubbleRight = contentX + bubbleW;
+            int hdrTextRight = bubbleRight - kPad / 2;
+
+            // sender name
+            f.setPointSize(11); p.setFont(f);
+            p.setPen(pal.textMuted);
+            QString dname = !senderName.isEmpty() ? senderName
+                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+            int maxNameW = hdrTextRight - contentX;
+            if (maxNameW < 20) { maxNameW = 20; }
+            p.drawText(contentX, y + kPad, maxNameW, headerH,
+                       Qt::AlignLeft | Qt::AlignVCenter, dname);
+
+            // IP
+            f.setPointSize(10); p.setFont(f);
+            int ipEnd = contentX + fm.width(dname) + kPad;
+            if (!ipAddress.isEmpty()) {
+                p.setPen(QColor(130, 140, 150));
+                int ipW = fm.width(ipAddress);
+                int ipMax = hdrTextRight - ipEnd;
+                if (ipMax > ipW) { ipMax = ipW; }
+                if (ipMax > 0) {
+                    p.drawText(ipEnd, y + kPad, ipMax, headerH,
+                               Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                }
+                ipEnd += fm.width(ipAddress) + kPad/2;
+            }
+            // time
+            p.setPen(pal.textMuted);
+            int timeMaxW = hdrTextRight - ipEnd;
+            if (timeMaxW > 0) {
+                p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
+                           Qt::AlignLeft | Qt::AlignVCenter, time);
+            }
+            p.setFont(baseFont);
+
+            // header buttons
+            if (etype != ChatElement::File) {
+                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                int btnX0 = bubbleRight - hdrBtnAreaW;
+                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                p.drawEllipse(sourceBtnRect);
+                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                p.drawEllipse(translateBtnRect);
+                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+            }
+
+            // bubble background
+            int bubbleY = y + kPad + headerH + kPad;
+            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            if (bubbleH < 30) { bubbleH = 30; }
+            bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
+            p.setBrush(pal.baseBg);
+            p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+            p.drawRoundRect(bubbleRect, 4, 4);
+#else
+            p.drawRoundedRect(bubbleRect, kBubbleRadius, kBubbleRadius);
+#endif
+
+            // ── file content ──
+            int iconSize = 48;
+            int iconX = bubbleRect.x() + kBubbleHPad;
+            int iconY = bubbleRect.y() + kBubbleVPad;
+            p.setBrush(pal.surfaceBg);
+            p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+            p.drawRoundRect(iconX, iconY, iconSize, iconSize, 8, 8);
+#else
+            p.drawRoundedRect(iconX, iconY, iconSize, iconSize, 8, 8);
+#endif
+            uint32_t fileCp = fileIconForName(!caption.isEmpty() ? caption : fileName);
+            QPixmap pm = EmojiRenderer::instance().renderEmoji(fileCp, iconSize - 4);
+            if (!pm.isNull()) {
+                int cx = iconX + (iconSize - pm.width()) / 2;
+                int cy = iconY + (iconSize - pm.height()) / 2;
+                p.drawPixmap(cx, cy, pm);
+            } else {
+                f.setPointSize(24);
+                p.setFont(f);
+                p.setPen(pal.textMuted);
+                p.drawText(iconX, iconY, iconSize, iconSize, Qt::AlignCenter, qFromUtf8("📄"));
+                p.setFont(baseFont);
+            }
+
+            int textX = iconX + iconSize + kPad;
+            int textW = bubbleRect.right() - kBubbleHPad - textX;
+            if (textW < 20) { textW = 20; }
+            QString displayName = !caption.isEmpty() ? caption : fileName;
+            if (!displayName.isEmpty()) {
+                p.setPen(pal.textPrimary);
+                f.setPointSize(12);
+                p.setFont(f);
+#ifdef QT3_BUILD
+                QString elide = displayName;
+                if (fm.width(elide) > textW) {
+                    for (int ei = elide.length(); ei > 0; ei--) {
+                        if (fm.width(elide.left(ei) + "...") <= textW) {
+                            elide = elide.left(ei) + "..."; break;
+                        }
+                    }
+                    if (fm.width(elide) > textW) { elide = "..."; }
+                }
+                p.drawText(textX, iconY, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter, elide);
+#else
+                p.drawText(textX, iconY, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter,
+                           fm.elidedText(displayName, Qt::ElideRight, textW));
+#endif
+                p.setFont(baseFont);
+            }
+            if (!messageText.isEmpty()) {
+                p.setPen(pal.textMuted);
+                f.setPointSize(10);
+                p.setFont(f);
+                p.drawText(textX, iconY + fm.lineSpacing() + kPad/2, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter, messageText);
+                p.setFont(baseFont);
+            }
+        }
+
+        // ── selection highlight ──
+        if (isSelected && !selRects.empty()) {
+            QColor selColor = lerpColor(pal.baseBg, pal.accent, 0.25f);
+            p.setPen(Qt::NoPen);
+            p.setBrush(selColor);
+            for (size_t ri = 0; ri < selRects.size(); ++ri) {
+                QRect r = selRects[ri];
+#ifdef QT3_BUILD
+                r.moveBy(0, y);
+#else
+                r.translate(0, y);
+#endif
+                p.drawRect(r);
+            }
+        }
+        break;
+    }
     }
 }
 
