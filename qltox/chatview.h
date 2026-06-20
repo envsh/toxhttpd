@@ -11,7 +11,7 @@
 #include <qwidget.h>
 #include <qpainter.h>
 
-struct ChatMessage {
+struct ChatElement {
     QString messageText;
     QString type;
     QString senderName;
@@ -30,7 +30,7 @@ struct ChatMessage {
     QRect translateBtnRect;
     QRect sourceBtnRect;
 
-    ChatMessage() : height(0), peerNumber(-1), showTranslation(false), translationInProgress(false) {}
+    ChatElement() : height(0), peerNumber(-1), showTranslation(false), translationInProgress(false) {}
 };
 
 struct LinkSpan {
@@ -47,11 +47,11 @@ public:
     ChatView(QWidget* parent = 0);
     ~ChatView();
 
-    void appendMessage(const ChatMessage& msg);
-    void restoreMessages(const std::vector<ChatMessage>& msgs);
+    void appendMessage(const ChatElement& msg);
+    void restoreMessages(const std::vector<ChatElement>& msgs);
     void clearMessages();
     void scrollToBottom();
-    ChatMessage& messageAt(int index);
+    ChatElement& messageAt(int index);
     int messageCount() const;
     void triggerRelayout();
 
@@ -76,8 +76,8 @@ private slots:
 private:
     void relayout();
     int contentWidth() const;
-    void drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth);
-    int calcMessageHeight(const ChatMessage& msg, int viewWidth);
+    void drawMessage(QPainter& p, ChatElement& msg, int y, int viewWidth);
+    int calcMessageHeight(const ChatElement& msg, int viewWidth);
     int charWidth(uint32_t cp);
 
     // Selection and link helpers
@@ -102,7 +102,7 @@ private:
     int m_selEnd;
     bool m_selecting;
 
-    std::vector<ChatMessage> m_messages;
+    std::vector<ChatElement> m_messages;
     int m_totalHeight;
     int m_scrollPos;
     LimeScrollBar* m_vScrollBar;

@@ -74,7 +74,7 @@ private:
     std::vector<ContactData> m_accumulatedContactData;
 
     // 消息缓存：key=(contactId, contactType)，切换联系人时暂存/恢复
-    std::map<std::pair<int, std::string>, std::vector<ChatMessage>> m_messageCache;
+    std::map<std::pair<int, std::string>, std::vector<ChatElement>> m_messageCache;
 };
 
 #endif // MAINWINDOW_H

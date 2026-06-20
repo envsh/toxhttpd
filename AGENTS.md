@@ -11,6 +11,10 @@
 
 - **Go server** (`go-toxhttpd/`): `server.go` is the real entrypoint (1848 lines, all logic). `main.go` is just `package main` (2 lines). Web static files live in `web/` at repo root.
 - **qltox client** (`qltox/`): `mainwindow.cpp` is the hub. `chatview.cpp` replaced QTextEdit with a virtualized `QWidget+QScrollBar` (see ChatView class). `api.cpp` wraps REST calls via libcurl.
+- **ChatElement** (`chatview.h`, formerly `ChatMessage`): per-message data + layout cache, phased evolution:
+  **Phase 2** (current target) — add `cachedWidth`/`height` fields + `calcHeight(viewWidth)` for incremental layout.
+  **Phase 3** — replace manual word-wrap with `QTextLayout`, add `paint()` for rich text rendering.
+  **Phase 4** — add `MediaItem*` for embedded image/file/video. ChatView becomes thin container (scrollbar + list of Elements).
 - **go-toxcore-c** is a local fork with NGC support (`groupchat.go` = NGC Group*, `group.go` = legacy Conference*). `go.mod` replaces `github.com/TokTok/go-toxcore-c`.
 
 # Qt3/Qt4 compatibility

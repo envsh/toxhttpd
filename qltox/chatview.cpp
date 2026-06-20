@@ -82,14 +82,14 @@ ChatView::~ChatView() {
     delete[] m_bmpW;
 }
 
-void ChatView::restoreMessages(const std::vector<ChatMessage>& msgs) {
+void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
     m_scrollDownPill.setCount(0);
     m_messages = msgs;
     relayout();
     scrollToBottom();
 }
 
-void ChatView::appendMessage(const ChatMessage& msg) {
+void ChatView::appendMessage(const ChatElement& msg) {
     int curVal = m_vScrollBar->value();
 #ifdef QT3_BUILD
     int maxVal = m_vScrollBar->maxValue();
@@ -127,7 +127,7 @@ void ChatView::scrollToBottom() {
     m_vScrollBar->setValue(maxScroll);
 }
 
-ChatMessage& ChatView::messageAt(int index) {
+ChatElement& ChatView::messageAt(int index) {
     return m_messages[index];
 }
 
@@ -171,7 +171,7 @@ void ChatView::relayout() {
     update();
 }
 
-int ChatView::calcMessageHeight(const ChatMessage& msg, int viewWidth) {
+int ChatView::calcMessageHeight(const ChatElement& msg, int viewWidth) {
     const QFontMetrics& fm = m_fm;
     if (viewWidth <= 0) { viewWidth = 400; }
 
@@ -365,7 +365,7 @@ int ChatView::findMessageAtY(int y) const {
 // Get character position in a message from local coordinates
 int ChatView::charPosAt(int msgIndex, int localX, int localY) {
     if (msgIndex < 0 || msgIndex >= (int)m_messages.size()) return -1;
-    const ChatMessage& msg = m_messages[msgIndex];
+    const ChatElement& msg = m_messages[msgIndex];
     const QString& text = msg.messageText;
     int textLen = text.length();
     if (textLen == 0) { return 0; }
@@ -461,7 +461,7 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
     int end = std::max(m_selStart, m_selEnd);
     if (start == end) { return rects; }
 
-    const ChatMessage& msg = m_messages[msgIndex];
+    const ChatElement& msg = m_messages[msgIndex];
     int textLen = msg.messageText.length();
     if (start >= textLen || end <= 0) { return rects; }
 
@@ -589,7 +589,7 @@ void ChatView::copyFullMessage(int msgIndex) {
     }
 }
 
-void ChatView::drawMessage(QPainter& p, ChatMessage& msg, int y, int viewWidth) {
+void ChatView::drawMessage(QPainter& p, ChatElement& msg, int y, int viewWidth) {
     QFont f = font();
     QFontMetrics fm(f);
     int headerH = fm.lineSpacing();

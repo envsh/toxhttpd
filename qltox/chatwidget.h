@@ -27,9 +27,9 @@ public:
                     const QString& ipAddress = "");
     void clearMessages();
     int messageCount() const;
-    ChatMessage messageAt(int index) const;
-    void appendMessage(const ChatMessage& msg);
-    void restoreMessages(const std::vector<ChatMessage>& msgs);
+    ChatElement messageAt(int index) const;
+    void appendMessage(const ChatElement& msg);
+    void restoreMessages(const std::vector<ChatElement>& msgs);
     void retranslateUi();
     
 signals:

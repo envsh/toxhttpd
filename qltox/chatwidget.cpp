@@ -134,7 +134,7 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
                               const QString& time, const QString& avatarText,
                               const QString& avatarUrl,
                               const QString& ipAddress) {
-    ChatMessage msg;
+    ChatElement msg;
     msg.messageText = message;
     msg.type = type;
     msg.senderName = senderName;
@@ -154,15 +154,15 @@ int ChatWidget::messageCount() const {
     return messageArea->messageCount();
 }
 
-ChatMessage ChatWidget::messageAt(int index) const {
+ChatElement ChatWidget::messageAt(int index) const {
     return messageArea->messageAt(index);
 }
 
-void ChatWidget::appendMessage(const ChatMessage& msg) {
+void ChatWidget::appendMessage(const ChatElement& msg) {
     messageArea->appendMessage(msg);
 }
 
-void ChatWidget::restoreMessages(const std::vector<ChatMessage>& msgs) {
+void ChatWidget::restoreMessages(const std::vector<ChatElement>& msgs) {
     messageArea->restoreMessages(msgs);
 }
 
@@ -234,7 +234,7 @@ void ChatWidget::onLanguageChanged(int index) {
 }
 
 void ChatWidget::onTranslateClicked(int msgIndex) {
-    ChatMessage& msg = messageArea->messageAt(msgIndex);
+    ChatElement& msg = messageArea->messageAt(msgIndex);
     if (msg.translationInProgress) { return; }
 
     // Toggle: if already translated, just toggle display
@@ -253,7 +253,7 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
 
 void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage) {
     if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) return;
-    ChatMessage& msg = messageArea->messageAt(msgIndex);
+    ChatElement& msg = messageArea->messageAt(msgIndex);
     msg.translationInProgress = false;
     if (success) {
         msg.translatedText = translatedText;

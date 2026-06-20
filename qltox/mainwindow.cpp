@@ -523,7 +523,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     // 保存当前联系人的消息到缓存
     if (currentChatId != -1 && !currentChatType.isEmpty()) {
         auto key = std::make_pair(currentChatId, std::string(qToUtf8(currentChatType).data()));
-        std::vector<ChatMessage> msgs;
+        std::vector<ChatElement> msgs;
         int n = chatWidget->messageCount();
         for (int i = 0; i < n; ++i) {
             msgs.push_back(chatWidget->messageAt(i));
@@ -896,7 +896,7 @@ void MainWindow::handleEvents(const EventList& events) {
         } else if (e.data.find("\"Type\":\"event.Evt") != std::string::npos) {
             // System event with Type field — 归入 sysevent
             {
-                ChatMessage msg;
+                ChatElement msg;
                 msg.messageText = qFromUtf8("[" + e.type + "]\n" + e.data);
                 msg.type = "other";
                 msg.senderName = "Sysevent";
@@ -913,7 +913,7 @@ void MainWindow::handleEvents(const EventList& events) {
         } else if (!e.type.empty() && e.type[0] == '_') {
             // System event — 始终缓存到 Sysevent，正在查看时也追加到界面
             {
-                ChatMessage msg;
+                ChatElement msg;
                 if (e.type == "_server_restart") {
                     msg.messageText = "[Server restart detected]";
                 } else {
@@ -974,7 +974,7 @@ void MainWindow::handleEvents(const EventList& events) {
             // ── 消息处理 ──
             if (!pr.messages.empty()) {
                 for (const auto& hm : pr.messages) {
-                    ChatMessage msg;
+                    ChatElement msg;
                     msg.messageText = qFromUtf8(hm.message);
                     msg.type = "other";
                     msg.time = getCurrentTime();
@@ -1017,7 +1017,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     }
                 }
             } else if (pr.handled && pr.contactName == "reddit") {
-                ChatMessage msg;
+                ChatElement msg;
                 msg.type = "other";
                 msg.time = getCurrentTime();
                 msg.messageText = pr.messageText;
@@ -1032,7 +1032,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
                 }
             } else {
-                ChatMessage msg;
+                ChatElement msg;
                 msg.type = "other";
                 msg.time = getCurrentTime();
                 if (pr.handled) {
@@ -1636,7 +1636,7 @@ void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const Q
 void MainWindow::onSourceClicked(int msgIndex) {
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
 
-    ChatMessage msg = chatWidget->messageAt(msgIndex);
+    ChatElement msg = chatWidget->messageAt(msgIndex);
     QDialog* dlg = new QDialog(this);
     dlg->resize(650, 520);
     qSetWindowTitle(dlg, qFromUtf8("Source"));
