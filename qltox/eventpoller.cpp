@@ -88,6 +88,9 @@ void EventPoller::addRequest(const HttpRequest& req,
     curl_easy_setopt(easy, CURLOPT_HEADERDATA, &ctx->headers);
     curl_easy_setopt(easy, CURLOPT_TIMEOUT, (long)req.timeoutSec);
     curl_easy_setopt(easy, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(easy, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(easy, CURLOPT_FRESH_CONNECT, 1L);
+    curl_easy_setopt(easy, CURLOPT_SSL_SESSIONID_CACHE, 0L);
 
     if (req.method == "POST") {
         curl_easy_setopt(easy, CURLOPT_POSTFIELDS, ctx->postData.c_str());
