@@ -1616,6 +1616,21 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
 
 void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     int msgIndex = findMessageAtY(event->y());
+    // 检测是否在名字区域上
+    bool onName = false;
+    QString displayName;
+    if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+        const ChatElement& item = m_items[msgIndex];
+        displayName = item.senderNickname.isEmpty() ? item.senderName : item.senderNickname;
+        int msgY = kPad - m_scrollPos;
+        for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
+        QFont nf;
+        nf.setPointSize(11);
+        QFontMetrics nfm(nf);
+        int headerH = nfm.lineSpacing();
+        QRect nameRect(kPad, msgY + kPad, width() - 2*kPad, headerH);
+        onName = nameRect.contains(event->pos());
+    }
 #ifdef QT3_BUILD
     QPopupMenu menu(this);
 #else
@@ -1625,9 +1640,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
 #ifdef QT3_BUILD
     int copyMsgId = menu.insertItem(_("context.copy_message"));
     int selectAllId = menu.insertItem(_("context.select_all"));
+    int copyNickId = -1, mentionId = -1;
+    if (onName) {
+        copyNickId = menu.insertItem(qFromUtf8("复制昵称"));
+        mentionId = menu.insertItem(qFromUtf8("@ TA"));
+    }
 #else
     QAction* copyMsgAction = menu.addAction(_("context.copy_message"));
     QAction* selectAllAction = menu.addAction(_("context.select_all"));
+    QAction* copyNickAction = nullptr;
+    QAction* mentionAction = nullptr;
+    if (onName) {
+        copyNickAction = menu.addAction(qFromUtf8("复制昵称"));
+        mentionAction = menu.addAction(qFromUtf8("@ TA"));
+    }
 #endif
 #ifdef QT3_BUILD
     int choice = menu.exec(event->globalPos());
@@ -1639,6 +1665,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selStart = 0;
         m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
         update();
+    } else if (choice == copyNickId) {
+        QApplication::clipboard()->setText(displayName);
+    } else if (choice == mentionId) {
+        emit mentionClicked(m_items[msgIndex].senderName);
     }
 #else
     QAction* chosen = menu.exec(event->globalPos());
@@ -1649,6 +1679,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selStart = 0;
         m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
         update();
+    } else if (chosen == copyNickAction) {
+        QApplication::clipboard()->setText(displayName);
+    } else if (chosen == mentionAction) {
+        emit mentionClicked(m_items[msgIndex].senderName);
     }
 #endif
 }

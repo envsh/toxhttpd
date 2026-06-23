@@ -83,6 +83,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     mainLayout->addWidget(messageArea, 1);
     connect(messageArea, SIGNAL(translateClicked(int)), this, SLOT(onTranslateClicked(int)));
     connect(messageArea, SIGNAL(sourceClicked(int)), this, SIGNAL(sourceClicked(int)));
+    connect(messageArea, SIGNAL(mentionClicked(const QString&)), this, SLOT(onMentionClicked(const QString&)));
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD
@@ -357,4 +358,15 @@ void ChatWidget::onFileClicked() {
 void ChatWidget::onFilePaste(const QString& filePath) {
     // TODO: actually send the file
     qWarning("onFilePaste: %s", qToUtf8(filePath).data());
+}
+
+void ChatWidget::onMentionClicked(const QString& username) {
+    QString mention = "@" + username + " ";
+    inputEdit->clearPlaceholder();
+#ifdef QT3_BUILD
+    inputEdit->insert(mention);
+#else
+    inputEdit->insertPlainText(mention);
+#endif
+    inputEdit->setFocus();
 }

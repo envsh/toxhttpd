@@ -52,6 +52,7 @@ private slots:
     void onFileClicked();
     void onFilePaste(const QString& filePath);
     void onTranslateClicked(int msgIndex);
+    void onMentionClicked(const QString& username);
     void hideUnreadBanner();
 
 public slots:

@@ -118,6 +118,7 @@ protected:
 signals:
     void translateClicked(int msgIndex);
     void sourceClicked(int msgIndex);
+    void mentionClicked(const QString& username);
 
 private slots:
     void onScrollChanged(int value);
