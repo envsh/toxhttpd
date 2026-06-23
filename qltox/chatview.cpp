@@ -310,6 +310,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 displayName = QString("Peer %1").arg(peerNumber);
             else
                 displayName = "?";
+            displayName = qElideChars(displayName, 23, ElideMiddle);
             int nameW = fm.width(displayName) + fm.width("  ");
             p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
 
@@ -393,6 +394,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 displayName = QString("Peer %1").arg(peerNumber);
             else
                 displayName = "?";
+            displayName = qElideChars(displayName, 23, ElideMiddle);
             int maxNameW = hdrTextRight - contentX;
             if (maxNameW < 20) { maxNameW = 20; }
             p.drawText(contentX, y + kPad, maxNameW, headerH, Qt::AlignLeft | Qt::AlignVCenter, displayName);
@@ -600,6 +602,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             QString dname = !senderNickname.isEmpty() ? senderNickname
                           : !senderName.isEmpty() ? senderName
                           : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+            dname = qElideChars(dname, 23, ElideMiddle);
             int nameW = fm.width(dname);
             p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
                        Qt::AlignRight | Qt::AlignVCenter, dname);
@@ -736,6 +739,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             QString dname = !senderNickname.isEmpty() ? senderNickname
                           : !senderName.isEmpty() ? senderName
                           : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+            dname = qElideChars(dname, 23, ElideMiddle);
             int maxNameW = hdrTextRight - contentX;
             if (maxNameW < 20) { maxNameW = 20; }
             p.drawText(contentX, y + kPad, maxNameW, headerH,

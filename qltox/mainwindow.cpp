@@ -272,6 +272,8 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(edit, qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
 
     MenuWidget34* tool = mb->addMenu(qFromUtf8("工具(&T)"));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("统计(&T)..."), this, SLOT(onMenu1Stub()));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("日志(&L)..."), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
 
     MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));

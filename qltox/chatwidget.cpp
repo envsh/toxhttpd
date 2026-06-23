@@ -18,6 +18,12 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     // 聊天头部
     QBoxLayout* headerLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     headerText = new QLabel(_("select_chat_object"), this);
+    {
+        QFont hf = headerText->font();
+        hf.setPointSize(hf.pointSize() + 2);
+        hf.setBold(true);
+        headerText->setFont(hf);
+    }
     headerLayout->addWidget(headerText, 1);
 
     // 加载状态条（语言选择器左侧）

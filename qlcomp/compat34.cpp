@@ -352,6 +352,26 @@ QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border
 #endif
 }
 
+QString qElideChars(const QString& text, int maxLen,
+                    ElidePos pos, const QString& ellipsis) {
+    if (text.length() <= maxLen) return text;
+    int ellen = ellipsis.length();
+    if (maxLen <= ellen) return ellipsis.left(maxLen);
+    int keep = maxLen - ellen;
+    switch (pos) {
+    case ElideRight:
+        return text.left(keep) + ellipsis;
+    case ElideLeft:
+        return ellipsis + text.right(keep);
+    case ElideMiddle: {
+        int left = keep / 2 + keep % 2;
+        int right = keep / 2;
+        return text.left(left) + ellipsis + text.right(right);
+    }
+    }
+    return text;
+}
+
 QString qFmtTime(uint timestamp) {
 #ifdef QT3_BUILD
     QDateTime dt;

@@ -83,6 +83,37 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
 
         HistoryMessage hm;
         hm.message       = jsonGetString(ev, "content.body");
+        {
+            cJSON* content = cJSON_GetObjectItem(ev, "content");
+            if (content) {
+                cJSON* rt = cJSON_GetObjectItem(content, "m.relates_to");
+                if (rt) {
+                    cJSON* ir = cJSON_GetObjectItem(rt, "m.in_reply_to");
+                    if (ir) {
+                        cJSON* eid = cJSON_GetObjectItem(ir, "event_id");
+                        if (eid && cJSON_IsString(eid))
+                            hm.message += " -- Re: " + std::string(cJSON_GetStringValue(eid));
+                    }
+                }
+                cJSON* mt = cJSON_GetObjectItem(content, "m.mentions");
+                if (mt) {
+                    cJSON* uids = cJSON_GetObjectItem(mt, "user_ids");
+                    if (uids && cJSON_IsArray(uids)) {
+                        std::string ms;
+                        int n = cJSON_GetArraySize(uids);
+                        for (int j = 0; j < n; j++) {
+                            cJSON* uid = cJSON_GetArrayItem(uids, j);
+                            if (uid && cJSON_IsString(uid)) {
+                                if (!ms.empty()) ms += " ";
+                                ms += cJSON_GetStringValue(uid);
+                            }
+                        }
+                        if (!ms.empty())
+                            hm.message += " -- Re: " + ms;
+                    }
+                }
+            }
+        }
         hm.sender_pubkey = jsonGetString(ev, "sender");
         hm.sender_number = i;
         hm.direction     = "received";

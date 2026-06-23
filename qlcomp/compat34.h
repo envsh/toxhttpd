@@ -89,6 +89,15 @@ void qInsertHtml(QTextEdit* edit, const QString& html);
 void qClearTextEdit(QTextEdit* edit);
 QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border = 0, int autoresize = -1);
 
+enum ElidePos {
+    ElideRight,
+    ElideLeft,
+    ElideMiddle
+};
+QString qElideChars(const QString& text, int maxLen,
+                    ElidePos pos = ElideMiddle,
+                    const QString& ellipsis = "...");
+
 QString qFormatTime(const QString& createdAt);
 QString qFormatISO8601(const QString& iso8601Str);
 QString qFmtTime(uint timestamp);
