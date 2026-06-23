@@ -21,7 +21,9 @@ public:
     
     void setHeaderText(const QString& text);
     void appendMessage(const QString& message, const QString& type, 
-                    const QString& senderName = QString(), int peerNumber = -1,
+                    const QString& senderName = QString(),
+                    const QString& senderNickname = QString(),
+                    int peerNumber = -1,
                     const QString& time = "", const QString& avatarText = "",
                     const QString& avatarUrl = "",
                     const QString& ipAddress = "");

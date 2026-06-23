@@ -1528,6 +1528,24 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
             QWidget::mouseMoveEvent(event);
             return;
         }
+        // Nickname tooltip: 显示 nickname 时，hover 名字区域显示 username
+        {
+            const auto& item = m_items[msgIndex];
+            if (!item.senderNickname.isEmpty() && !item.senderName.isEmpty()
+                && item.senderNickname != item.senderName) {
+                int msgY = kPad - m_scrollPos;
+                for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
+                QFont nf;
+                nf.setPointSize(11);
+                QFontMetrics nfm(nf);
+                int headerH = nfm.lineSpacing();
+                QRect nameRect(kPad, msgY + kPad, width() - 2*kPad, headerH);
+                if (nameRect.contains(event->pos())) {
+                    showTempTooltip(this, nameRect, item.senderName);
+                }
+            }
+        }
+
         // ... compute charPos for link detection
         int curY = kPad - m_scrollPos;
         for (int i = 0; i < msgIndex; i++) { curY += m_items[i].height; }

@@ -174,7 +174,9 @@ void ChatWidget::updateHeaderCount() {
 }
 
 void ChatWidget::appendMessage(const QString& message, const QString& type, 
-                              const QString& senderName, int peerNumber,
+                              const QString& senderName,
+                              const QString& senderNickname,
+                              int peerNumber,
                               const QString& time, const QString& avatarText,
                               const QString& avatarUrl,
                               const QString& ipAddress) {
@@ -182,6 +184,7 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
     msg.messageText = message;
     msg.category = type;
     msg.senderName = senderName;
+    msg.senderNickname = senderNickname;
     msg.peerNumber = peerNumber;
     msg.time = time;
     msg.avatarText = avatarText;
