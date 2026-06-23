@@ -773,8 +773,11 @@ void MainWindow::handleEvents(const EventList& events) {
                         std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
                         auto it = peerInfoMap.find(key);
                         QString senderName;
-                        if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                            senderName = qFromUtf8(it->second.name);
+                        if (it != peerInfoMap.end()) {
+                            if (!it->second.nickname.empty())
+                                senderName = qFromUtf8(it->second.nickname);
+                            else if (!it->second.name.empty())
+                                senderName = qFromUtf8(it->second.name);
                         }
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, peerNumber, getCurrentTime());
@@ -833,7 +836,9 @@ void MainWindow::handleEvents(const EventList& events) {
                         QString senderName;
                         QString ipAddress;
                         if (it != peerInfoMap.end()) {
-                            if (!it->second.name.empty())
+                            if (!it->second.nickname.empty())
+                                senderName = qFromUtf8(it->second.nickname);
+                            else if (!it->second.name.empty())
                                 senderName = qFromUtf8(it->second.name);
                             ipAddress = qFromUtf8(it->second.peerIp);
                         }
@@ -1006,15 +1011,20 @@ void MainWindow::handleEvents(const EventList& events) {
                     if (!hm.sender_pubkey.empty()) {
                         for (const auto& p : pr.peers) {
                             if (p.publicKey == hm.sender_pubkey) {
-                                senderLabel = qFromUtf8(p.name);
+                                senderLabel = !p.nickname.empty()
+                                    ? qFromUtf8(p.nickname)
+                                    : qFromUtf8(p.name);
                                 break;
                             }
                         }
                         if (senderLabel.isEmpty()) {
                             std::string key = "unknown_" + hm.sender_pubkey;
                             auto it = peerInfoMap.find(key);
-                            if (it != peerInfoMap.end())
-                                senderLabel = qFromUtf8(it->second.name);
+                            if (it != peerInfoMap.end()) {
+                                senderLabel = !it->second.nickname.empty()
+                                    ? qFromUtf8(it->second.nickname)
+                                    : qFromUtf8(it->second.name);
+                            }
                         }
                     }
                     msg.senderName = senderLabel;
@@ -1637,9 +1647,13 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
             if (currentChatType == "friend") {
                 std::string key = "friend_" + std::to_string(currentChatId);
                 auto it = peerInfoMap.find(key);
-                if (it != peerInfoMap.end() && !it->second.name.empty()) {
-                    senderLabel = qFromUtf8(it->second.name);
-                    avatarText = qToUpper(senderLabel.left(1));
+                if (it != peerInfoMap.end()) {
+                    if (!it->second.nickname.empty())
+                        senderLabel = qFromUtf8(it->second.nickname);
+                    else if (!it->second.name.empty())
+                        senderLabel = qFromUtf8(it->second.name);
+                    if (!senderLabel.isEmpty())
+                        avatarText = qToUpper(senderLabel.left(1));
                 } else {
                     senderLabel = QString();
                     avatarText = "F";
@@ -1650,10 +1664,12 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
                     + "_" + std::to_string(msg.sender_number);
                 auto it = peerInfoMap.find(key);
                 if (it != peerInfoMap.end()) {
-                    if (!it->second.name.empty()) {
+                    if (!it->second.nickname.empty())
+                        senderLabel = qFromUtf8(it->second.nickname);
+                    else if (!it->second.name.empty())
                         senderLabel = qFromUtf8(it->second.name);
+                    if (!senderLabel.isEmpty())
                         avatarText = qToUpper(senderLabel.left(1));
-                    }
                     ipAddress = qFromUtf8(it->second.peerIp);
                 } else {
                     senderLabel = QString();

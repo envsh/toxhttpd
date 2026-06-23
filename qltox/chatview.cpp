@@ -302,7 +302,9 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setFont(f);
             p.setPen(pal.textMuted);
             QString displayName;
-            if (!senderName.isEmpty())
+            if (!senderNickname.isEmpty())
+                displayName = senderNickname;
+            else if (!senderName.isEmpty())
                 displayName = senderName;
             else if (peerNumber >= 0)
                 displayName = QString("Peer %1").arg(peerNumber);
@@ -383,7 +385,9 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setFont(f);
             p.setPen(pal.textMuted);
             QString displayName;
-            if (!senderName.isEmpty())
+            if (!senderNickname.isEmpty())
+                displayName = senderNickname;
+            else if (!senderName.isEmpty())
                 displayName = senderName;
             else if (peerNumber >= 0)
                 displayName = QString("Peer %1").arg(peerNumber);
@@ -593,7 +597,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             f.setPointSize(11);
             p.setFont(f);
             p.setPen(pal.textMuted);
-            QString dname = !senderName.isEmpty() ? senderName
+            QString dname = !senderNickname.isEmpty() ? senderNickname
+                          : !senderName.isEmpty() ? senderName
                           : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
             int nameW = fm.width(dname);
             p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
@@ -728,7 +733,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             // sender name
             f.setPointSize(11); p.setFont(f);
             p.setPen(pal.textMuted);
-            QString dname = !senderName.isEmpty() ? senderName
+            QString dname = !senderNickname.isEmpty() ? senderNickname
+                          : !senderName.isEmpty() ? senderName
                           : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
             int maxNameW = hdrTextRight - contentX;
             if (maxNameW < 20) { maxNameW = 20; }

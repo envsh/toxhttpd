@@ -25,6 +25,7 @@ struct ChatElement {
 
     // Common
     QString senderName;
+    QString senderNickname;
     int     peerNumber;
     QString avatarText;
     QString avatarUrl;
