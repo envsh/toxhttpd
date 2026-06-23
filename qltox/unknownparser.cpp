@@ -41,36 +41,41 @@ static int64_t jsonGetInt64(cJSON* root, const char* path) {
 // ── Matrix/gomuks sync_complete 解析 ──
 
 static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseResult& ret) {
+    // 从 events 数组中提取 m.room.member displayname → nickname
+    auto scanMembers = [](cJSON* arr, std::vector<PeerInfo>& peers) {
+        if (!arr) return;
+        int n = cJSON_GetArraySize(arr);
+        for (int i = 0; i < n; i++) {
+            cJSON* ev = cJSON_GetArrayItem(arr, i);
+            if (jsonGetString(ev, "type") != "m.room.member") continue;
+            std::string sender = jsonGetString(ev, "sender");
+            if (sender.empty()) continue;
+            std::string dn = jsonGetString(ev, "content.displayname");
+            if (dn.empty()) continue;
+
+            PeerInfo* pi = nullptr;
+            for (auto& p : peers)
+                if (p.publicKey == sender) { pi = &p; break; }
+            if (!pi) {
+                peers.push_back({});
+                pi = &peers.back();
+                pi->publicKey  = sender;
+                pi->name       = sender;
+                pi->peerNumber = (int)peers.size() - 1;
+            }
+            pi->nickname = dn;
+        }
+    };
+
     cJSON* events = jsonPath(roomObj, "events");
     if (!events) return;
     int n = cJSON_GetArraySize(events);
 
-    // 第一遍：从 m.room.member 事件提取 displayname 作为 nickname
-    for (int i = 0; i < n; i++) {
-        cJSON* ev = cJSON_GetArrayItem(events, i);
-        if (jsonGetString(ev, "type") != "m.room.member")
-            continue;
-        std::string sender = jsonGetString(ev, "sender");
-        if (sender.empty()) continue;
+    // 从 state.events（room state）+ events（timeline）两个来源提取 nickname
+    scanMembers(jsonPath(roomObj, "state.events"), ret.peers);
+    scanMembers(events, ret.peers);
 
-        std::string dn = jsonGetString(ev, "content.displayname");
-        if (dn.empty()) continue;
-
-        PeerInfo* pi = nullptr;
-        for (auto& p : ret.peers) {
-            if (p.publicKey == sender) { pi = &p; break; }
-        }
-        if (!pi) {
-            ret.peers.push_back({});
-            pi = &ret.peers.back();
-            pi->publicKey  = sender;
-            pi->name       = sender;
-            pi->peerNumber = (int)ret.peers.size() - 1;
-        }
-        pi->nickname = dn;
-    }
-
-    // 第二遍：消息
+    // 消息（仅来自 events）
     for (int i = 0; i < n; i++) {
         cJSON* ev = cJSON_GetArrayItem(events, i);
         if (jsonGetString(ev, "type") != "m.room.message")
