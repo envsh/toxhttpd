@@ -44,6 +44,33 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
     cJSON* events = jsonPath(roomObj, "events");
     if (!events) return;
     int n = cJSON_GetArraySize(events);
+
+    // 第一遍：从 m.room.member 事件提取 displayname 作为 nickname
+    for (int i = 0; i < n; i++) {
+        cJSON* ev = cJSON_GetArrayItem(events, i);
+        if (jsonGetString(ev, "type") != "m.room.member")
+            continue;
+        std::string sender = jsonGetString(ev, "sender");
+        if (sender.empty()) continue;
+
+        std::string dn = jsonGetString(ev, "content.displayname");
+        if (dn.empty()) continue;
+
+        PeerInfo* pi = nullptr;
+        for (auto& p : ret.peers) {
+            if (p.publicKey == sender) { pi = &p; break; }
+        }
+        if (!pi) {
+            ret.peers.push_back({});
+            pi = &ret.peers.back();
+            pi->publicKey  = sender;
+            pi->name       = sender;
+            pi->peerNumber = (int)ret.peers.size() - 1;
+        }
+        pi->nickname = dn;
+    }
+
+    // 第二遍：消息
     for (int i = 0; i < n; i++) {
         cJSON* ev = cJSON_GetArrayItem(events, i);
         if (jsonGetString(ev, "type") != "m.room.message")
@@ -167,9 +194,17 @@ static bool tryParseToxMessage(const std::string& rawStr, ParseResult& ret) {
             hm.created_at    = timestamp;
             hm.roomId        = cd.chatId;
 
-            std::string peerName = jsonGetString(inner, "peer_name");
-            if (!peerName.empty())
-                hm.message = peerName + ": " + hm.message;
+            // 创建 peer 信息，供后续显示使用 nickname
+            if (!hm.sender_pubkey.empty()) {
+                PeerInfo pi;
+                pi.publicKey  = hm.sender_pubkey;
+                pi.name       = hm.sender_pubkey;
+                pi.peerNumber = (int)hm.sender_number;
+                std::string peerName = jsonGetString(inner, "peer_name");
+                if (!peerName.empty())
+                    pi.nickname = peerName;
+                ret.peers.push_back(pi);
+            }
 
             if (!hm.message.empty())
                 ret.messages.push_back(hm);
