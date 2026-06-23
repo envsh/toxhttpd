@@ -13,6 +13,7 @@
 #include <qdatetime.h>
 #include <qimage.h>
 #include <qapplication.h>
+#include <qpainter.h>
 #else
 #include <QMimeData>
 #include <QClipboard>
@@ -23,12 +24,13 @@
 #include <QDragEnterEvent>
 #include <QKeyEvent>
 #include <QFocusEvent>
+#include <QPainter>
 #endif
 
 int MessageInput::s_pasteCounter = 0;
 
 MessageInput::MessageInput(QWidget* parent)
-    : QTextEdit(parent), m_isPlaceholderActive(false), m_historyIndex(-1) {
+    : QTextEdit(parent), m_historyIndex(-1) {
 #ifdef QT3_BUILD
     setTextFormat(Qt::PlainText);
     setUndoDepth(32);
@@ -39,19 +41,7 @@ MessageInput::MessageInput(QWidget* parent)
 
 void MessageInput::setPlaceholderText(const QString& t) {
     m_placeholder = t;
-#ifdef QT3_BUILD
-    bool empty = text().isEmpty();
-#else
-    bool empty = toPlainText().isEmpty();
-#endif
-    if (m_isPlaceholderActive || empty) {
-        m_isPlaceholderActive = true;
-#ifdef QT3_BUILD
-        QTextEdit::setText(m_placeholder);
-#else
-        QTextEdit::setPlainText(m_placeholder);
-#endif
-    }
+    update();
 }
 
 QString MessageInput::placeholderText() const {
@@ -59,43 +49,37 @@ QString MessageInput::placeholderText() const {
 }
 
 void MessageInput::clearPlaceholder() {
-    if (m_isPlaceholderActive) {
-        m_isPlaceholderActive = false;
-#ifdef QT3_BUILD
-        QTextEdit::setText(QString());
-#else
-        QTextEdit::setPlainText(QString());
-#endif
-    }
 }
 
 void MessageInput::focusInEvent(QFocusEvent* e) {
-    if (m_isPlaceholderActive) {
-        m_isPlaceholderActive = false;
-#ifdef QT3_BUILD
-        QTextEdit::setText(QString());
-#else
-        QTextEdit::setPlainText(QString());
-#endif
-    }
     QTextEdit::focusInEvent(e);
 }
 
 void MessageInput::focusOutEvent(QFocusEvent* e) {
-#ifdef QT3_BUILD
-    QString t = text();
-#else
-    QString t = toPlainText();
-#endif
-    if (t.isEmpty() && !m_placeholder.isEmpty()) {
-        m_isPlaceholderActive = true;
-#ifdef QT3_BUILD
-        QTextEdit::setText(m_placeholder);
-#else
-        QTextEdit::setPlainText(m_placeholder);
-#endif
-    }
     QTextEdit::focusOutEvent(e);
+}
+
+void MessageInput::paintEvent(QPaintEvent* e) {
+    QTextEdit::paintEvent(e);
+#ifdef QT3_BUILD
+    if (!m_placeholder.isEmpty() && text().isEmpty()) {
+        QPainter p(viewport());
+        p.setPen(QColor(160, 160, 160));
+        QRect r = viewport()->rect();
+        r.setLeft(r.left() + 4);
+        r.setTop(r.top() + 4);
+        r.setRight(r.right() - 4);
+        r.setBottom(r.bottom() - 4);
+        p.drawText(r, Qt::AlignLeft | Qt::WordBreak, m_placeholder);
+    }
+#else
+    if (!m_placeholder.isEmpty() && toPlainText().isEmpty()) {
+        QPainter p(viewport());
+        p.setPen(QColor(160, 160, 160));
+        QRect r = viewport()->rect().adjusted(4, 4, -4, -4);
+        p.drawText(r, Qt::AlignLeft | Qt::TextWordWrap, m_placeholder);
+    }
+#endif
 }
 
 void MessageInput::keyPressEvent(QKeyEvent* e) {

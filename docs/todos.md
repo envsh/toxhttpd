@@ -4,7 +4,7 @@
 - [ ] contact list lift latest message contact to top
 - [ ] contact list add aichat(s) fixed_room
 - [ ] impr matrix image msg parser and draw image chat element
-- [ ] impr matrix msg parser with username and nickname
+- [x] impr matrix msg parser with username and nickname
 - [ ] impr imapmail msg parser with proper content html, then to markdown
 - [ ] impr imapmail msg proper text codec
 - [ ] impr fedmsg proper timestamp
@@ -14,7 +14,7 @@
 - [ ] restore translate button usable
 - [ ] chat message timestamp format, multiple style, proper short/long
 - [ ] chat message context menu, add
-	- [ ] @ TA,
+	- [x] @ TA,
 	- [ ] reply,
 	- [ ] publish website,
 	- [ ] forward fedsite

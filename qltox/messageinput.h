@@ -19,6 +19,7 @@ signals:
 
 protected:
     void keyPressEvent(QKeyEvent* e);
+    void paintEvent(QPaintEvent* e);
     void focusInEvent(QFocusEvent* e);
     void focusOutEvent(QFocusEvent* e);
     void dragEnterEvent(QDragEnterEvent* e);
@@ -34,7 +35,6 @@ protected:
 private:
     static int s_pasteCounter;
     QString m_placeholder;
-    bool m_isPlaceholderActive;
     QStringList m_sentHistory;
     int m_historyIndex;
     QString m_savedDraft;
