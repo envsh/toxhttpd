@@ -7,6 +7,7 @@
 #include <map>
 #include <cstdint>
 #include <curl/curl.h>
+#include <qpixmap.h>
 #include <qthread.h>
 #include <qmutex.h>
 
@@ -25,6 +26,7 @@ extern const char* const kUnknownType;
 // ── 事件类型常量 ──
 const EventType34 EventListReadyType = toEventType34(QEvent::User + 100);
 const EventType34 ApiResultReadyType = toEventType34(QEvent::User + 102);
+const EventType34 MediaDownloadReadyType = toEventType34(QEvent::User + 103);
 
 // ── API 请求类型 ──
 enum ApiRequestType {
@@ -59,6 +61,7 @@ enum ApiRequestType {
     ApiLoadAllData,
     ApiLoadFriendDetail,
     ApiLoadPartialData,
+    ApiMediaDownload,
 };
 
 // ── 数据类型（事件契约）──
@@ -139,6 +142,18 @@ public:
     ApiResultEvent(ApiRequestType t) : CustomEventBase(ApiResultReadyType), type(t), elapsedMs(0) {}
     ApiRequestType type;
     int64_t elapsedMs = 0;   // HTTP 请求耗时，单位毫秒
+};
+
+class MediaDownloadEvent : public CustomEventBase {
+public:
+    MediaDownloadEvent() : CustomEventBase(MediaDownloadReadyType) {}
+    int chatId = 0;
+    std::string chatType;
+    int msgIndex = 0;
+    std::string mxcUrl;
+    QPixmap pixmap;
+    bool success = false;
+    std::string errorInfo;
 };
 
 class SelfInfoResultEvent : public ApiResultEvent {

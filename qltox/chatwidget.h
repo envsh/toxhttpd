@@ -30,8 +30,10 @@ public:
     void clearMessages();
     int messageCount() const;
     ChatElement messageAt(int index) const;
+    ChatElement& mutableMessageAt(int index);
     void appendMessage(const ChatElement& msg);
     void restoreMessages(const std::vector<ChatElement>& msgs);
+    void triggerRelayout(int msgIndex = -1);
     void retranslateUi();
     void showUnreadBanner(int count);
     
@@ -41,6 +43,7 @@ signals:
     void fileSendRequested(const QString& filePath);
     void translateRequested(int msgIndex, const QString& text, const QString& targetLang);
     void sourceClicked(int msgIndex);
+    void retryClicked(int msgIndex, const QString& mediaUrl);
 
 private slots:
     void onSendClicked();

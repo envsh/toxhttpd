@@ -286,6 +286,11 @@ void ToxAPI::getMessagesHistory(int contactId, const std::string& contactType) {
             + "&contact_type=" + contactType, "GET", ""}, ctx);
 }
 
+void ToxAPI::downloadMedia(int chatId, const std::string& chatType, int msgIndex, const std::string& mxcUrl) {
+    auto* ctx = new ApiCtx(ApiMediaDownload, chatId, chatType, mxcUrl, msgIndex);
+    request({"/api/media_download?url=" + urlEncode(mxcUrl), "GET"}, ctx);
+}
+
 void ToxAPI::joinConference(int friendNumber, const std::string& cookie) {
     request(ApiJoinConference, {"/api/conferences/join", "POST",
             "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie});
@@ -1041,6 +1046,28 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             ev->errorMessage = (code.empty() ? "UNKNOWN" : code) + ": " + (err.empty() ? "translate failed" : err);
         }
         cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiMediaDownload: {
+        auto* ev = new MediaDownloadEvent();
+        ev->chatId = ctx->id;
+        ev->chatType = ctx->str1;
+        ev->mxcUrl = ctx->str2;
+        ev->msgIndex = ctx->n1;
+        if (resp.httpCode != 200 || resp.body.empty()) {
+            ev->success = false;
+            ev->errorInfo = "HTTP " + std::to_string(resp.httpCode);
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        if (!ev->pixmap.loadFromData((const uchar*)resp.body.data(), resp.body.size())) {
+            ev->success = false;
+            ev->errorInfo = "pixmap load failed";
+        } else {
+            ev->success = true;
+        }
         QApplication::postEvent(s_target, ev);
         break;
     }

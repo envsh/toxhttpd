@@ -47,6 +47,9 @@ struct ChatElement {
     // Shared media fields (Image / Gif / Video)
     QPixmap thumbnail;
     QString caption;
+    QString mediaUrl;
+    bool downloadFailed;
+    QRect thumbnailRect;
     int mediaWidth;
     int mediaHeight;
 
@@ -69,7 +72,8 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , translationInProgress(false), mediaWidth(0), mediaHeight(0)
+        , translationInProgress(false), downloadFailed(false)
+        , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , cachedWidth(-1), height(0) {}
 
@@ -119,6 +123,7 @@ signals:
     void translateClicked(int msgIndex);
     void sourceClicked(int msgIndex);
     void mentionClicked(const QString& username);
+    void retryClicked(int msgIndex, const QString& mediaUrl);
 
 private slots:
     void onScrollChanged(int value);

@@ -89,6 +89,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     mainLayout->addWidget(messageArea, 1);
     connect(messageArea, SIGNAL(translateClicked(int)), this, SLOT(onTranslateClicked(int)));
     connect(messageArea, SIGNAL(sourceClicked(int)), this, SIGNAL(sourceClicked(int)));
+    connect(messageArea, SIGNAL(retryClicked(int, const QString&)), this, SIGNAL(retryClicked(int, const QString&)));
     connect(messageArea, SIGNAL(mentionClicked(const QString&)), this, SLOT(onMentionClicked(const QString&)));
     
     // 输入区域 (2行 x 3列)
@@ -212,6 +213,14 @@ int ChatWidget::messageCount() const {
 
 ChatElement ChatWidget::messageAt(int index) const {
     return messageArea->messageAt(index);
+}
+
+ChatElement& ChatWidget::mutableMessageAt(int index) {
+    return messageArea->messageAt(index);
+}
+
+void ChatWidget::triggerRelayout(int msgIndex) {
+    messageArea->triggerRelayout(msgIndex);
 }
 
 void ChatWidget::appendMessage(const ChatElement& msg) {

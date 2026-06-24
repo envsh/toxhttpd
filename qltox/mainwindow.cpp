@@ -219,6 +219,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(translateRequested(int, const QString&, const QString&)),
             this, SLOT(onTranslateRequested(int, const QString&, const QString&)));
     connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
+    connect(chatWidget, SIGNAL(retryClicked(int, const QString&)), this, SLOT(onRetryClicked(int, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 启动事件轮询引擎
@@ -294,6 +295,33 @@ void MainWindow::customEvent(CustomEventBase* event) {
     if (event->type() == EventListReadyType) {
         EventListEvent* e = static_cast<EventListEvent*>(event);
         handleEvents(e->events);
+        return;
+    }
+
+    // 媒体下载完成
+    if (event->type() == MediaDownloadReadyType) {
+        MediaDownloadEvent* e = static_cast<MediaDownloadEvent*>(event);
+        int cid = currentChatId;
+        QString ctype = currentChatType;
+        if (cid == e->chatId && ctype == qFromUtf8(e->chatType)) {
+            if (e->success) {
+                if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
+                    ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
+                    el.thumbnail = e->pixmap;
+                    el.downloadFailed = false;
+                    chatWidget->triggerRelayout(e->msgIndex);
+                }
+            } else {
+                qWarning("Media download failed: chat=%d/%s idx=%d err=%s",
+                         e->chatId, e->chatType.c_str(), e->msgIndex, e->errorInfo.c_str());
+                if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
+                    ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
+                    el.downloadFailed = true;
+                    el.mediaUrl = qFromUtf8(e->mxcUrl);
+                    chatWidget->triggerRelayout(e->msgIndex);
+                }
+            }
+        }
         return;
     }
     
@@ -1072,6 +1100,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         msg.messageText = qFromUtf8(hm.message);
                         msg.mediaWidth  = hm.mediaWidth;
                         msg.mediaHeight = hm.mediaHeight;
+                        msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
                     } else if (hm.msgtype == "video") {
                         msg.etype       = ChatElement::Video;
                         msg.caption     = qFromUtf8(hm.message);
@@ -1079,16 +1108,18 @@ void MainWindow::handleEvents(const EventList& events) {
                         msg.mediaWidth  = hm.mediaWidth;
                         msg.mediaHeight = hm.mediaHeight;
                         msg.durationSec = hm.duration / 1000;
+                        msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
                     } else if (hm.msgtype == "audio") {
                         msg.etype       = ChatElement::Audio;
                         msg.caption     = qFromUtf8(hm.message);
                         msg.messageText = qFromUtf8(hm.message);
                         msg.durationSec = hm.duration / 1000;
+                        msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
                     } else if (hm.msgtype == "file") {
                         msg.etype       = ChatElement::File;
                         msg.fileName    = qFromUtf8(hm.message);
-                        msg.messageText = qFromUtf8(hm.message);
                         msg.caption     = qFromUtf8(hm.message);
+                        msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
                     }
 
                     qWarning("Cache PUSH to %s %d: sender=%s",
@@ -1096,6 +1127,10 @@ void MainWindow::handleEvents(const EventList& events) {
                     m_messageCache[{chatId, chatType}].push_back(msg);
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
                         chatWidget->appendMessage(msg);
+                        int newIdx = chatWidget->messageCount() - 1;
+                        if (!hm.mediaUrl.empty() && hm.msgtype != "file") {
+                            ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
+                        }
                     } else {
                         contactListWidget->incrementUnread(chatId, qFromUtf8(chatType));
                     }
@@ -1739,6 +1774,13 @@ void MainWindow::loadMessageHistory() {
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
     ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)), msgIndex);
+}
+
+void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    if (currentChatId < 0) { return; }
+    ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
+                          msgIndex, std::string(qToUtf8(mediaUrl).data()));
 }
 
 void MainWindow::onSourceClicked(int msgIndex) {
