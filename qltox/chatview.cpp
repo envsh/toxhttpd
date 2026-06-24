@@ -98,12 +98,43 @@ static void drawEmojiIcon(QPainter& p, const QRect& rect, uint32_t cp, const cha
     }
 }
 
+// ───── Download button helper ─────
+struct DownloadBtnInfo {
+    QRect rect;
+    int height;
+};
+
+static DownloadBtnInfo paintDownloadBtn(QPainter& p, int cx, int cy, int parentW,
+    const QFont& baseFont, const StyleParams::Palette& pal)
+{
+    int btnW = 110, btnH = 26;
+    int bx = cx + (parentW - btnW) / 2;
+    int by = cy;
+    QRect btnR(bx, by, btnW, btnH);
+    p.setBrush(pal.accent);
+    p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+    p.drawRoundRect(btnR, 6, 6);
+#else
+    p.drawRoundedRect(btnR, 6, 6);
+#endif
+    p.setPen(Qt::white);
+    QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true); p.setFont(bf);
+    p.drawText(btnR, Qt::AlignCenter, qFromUtf8("⬇ ") + qFromUtf8("下载"));
+    p.setFont(baseFont);
+    DownloadBtnInfo info;
+    info.rect = btnR;
+    info.height = btnH + 4;
+    return info;
+}
+
 // ───── Media rendering helpers ─────
 
 static void paintThumbnail(QPainter& p, const QRect& imgRect,
     const QPixmap& thumb, int mediaW, int mediaH,
     const QFont& baseFont, const QFontMetrics& fm,
-    const StyleParams::Palette& pal, bool downloadFailed)
+    const StyleParams::Palette& pal, bool downloadFailed,
+    QRect* downloadBtnOut = nullptr)
 {
     int maxW = imgRect.width(), maxH = imgRect.height();
     int dw = maxW, dh = maxH;
@@ -170,6 +201,25 @@ static void paintThumbnail(QPainter& p, const QRect& imgRect,
             p.setFont(baseFont);
         }
     }
+    // ── download button (always visible) ──
+    {
+        int btnW = 110, btnH = 26;
+        int bx = imgRect.x() + (imgRect.width() - btnW) / 2;
+        int by = imgRect.bottom() - btnH - 4;
+        QRect btnR(bx, by, btnW, btnH);
+        p.setBrush(QColor(50, 50, 50));
+        p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+        p.drawRoundRect(btnR, 6, 6);
+#else
+        p.drawRoundedRect(btnR, 6, 6);
+#endif
+        p.setPen(Qt::white);
+        QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true); p.setFont(bf);
+        p.drawText(btnR, Qt::AlignCenter, qFromUtf8("⬇ ") + qFromUtf8("下载"));
+        p.setFont(baseFont);
+        if (downloadBtnOut) { *downloadBtnOut = btnR; }
+    }
 }
 
 static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
@@ -179,7 +229,8 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
     QMovie* movie,
     const QFont& baseFont, const QFontMetrics& fm,
     int emojiW, const StyleParams::Palette& pal,
-    bool downloadFailed)
+    bool downloadFailed,
+    QRect* downloadBtnOut = nullptr)
 {
     const int kBubbleHPad = 12, kBubbleVPad = 8, kPad = 8;
     QRect imgRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
@@ -194,7 +245,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 #endif
     }
     const QPixmap& src = !frame.isNull() ? frame : thumbnail;
-    paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed);
+    paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed, downloadBtnOut);
 
     // GIF badge
     if (etype == ChatElement::Gif) {
@@ -473,7 +524,8 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
             imgDispH = 200;
         }
         int captionH = caption.isEmpty() ? 0 : fm.lineSpacing() + kPad/2;
-        int bubbleH = 2 * kBubbleVPad + imgDispH + captionH;
+        int kDLBtnH = 30;
+        int bubbleH = 2 * kBubbleVPad + imgDispH + captionH + kDLBtnH;
         int headerHeight = fm.lineSpacing() + kPad;
         int contentHeight = kPad + headerHeight + bubbleH;
         int avatarTotal = kPad + kAvatarSize;
@@ -508,8 +560,9 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         }
         if (nameLines < 1) { nameLines = 1; }
         int textH = nameLines * fm.lineSpacing() + fm.lineSpacing() + kPad/2;
-        int bubbleH = 2 * kBubbleVPad + std::max(textH + kPad, iconSize);
-        if (bubbleH < 2 * kBubbleVPad + iconSize) { bubbleH = 2 * kBubbleVPad + iconSize; }
+        int kDLBtnH = 30;
+        int bubbleH = 2 * kBubbleVPad + std::max(textH + kPad, iconSize) + kDLBtnH;
+        if (bubbleH < 2 * kBubbleVPad + iconSize + kDLBtnH) { bubbleH = 2 * kBubbleVPad + iconSize + kDLBtnH; }
         int headerHeight = fm.lineSpacing() + kPad;
         int contentHeight = kPad + headerHeight + bubbleH;
         int avatarTotal = kPad + kAvatarSize;
@@ -564,10 +617,11 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         int textHeight = nameLines * fm.lineSpacing()
                        + (subLines > 0 ? kPad/2 + subLines * fm.lineSpacing() : 0);
 
+        int kDLBtnH = 30;
         int bubbleHeight = 2 * kBubbleVPad
-                         + std::max(textHeight + kPad, iconSize);
-        if (bubbleHeight < 2 * kBubbleVPad + iconSize) {
-            bubbleHeight = 2 * kBubbleVPad + iconSize;
+                         + std::max(textHeight + kPad, iconSize) + kDLBtnH;
+        if (bubbleHeight < 2 * kBubbleVPad + iconSize + kDLBtnH) {
+            bubbleHeight = 2 * kBubbleVPad + iconSize + kDLBtnH;
         }
 
         int headerHeight = fm.lineSpacing() + kPad;
@@ -1084,7 +1138,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         }
         paintMediaContent(p, bubbleRect, etype, displayPixmap, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
-                          baseFont, fm, emojiW, pal, downloadFailed);
+                          baseFont, fm, emojiW, pal, downloadFailed,
+                          &downloadBtnRect);
         break;
     }
     case Audio: {
@@ -1256,6 +1311,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         }
 
         paintAudioContent(p, bubbleRect, caption, durationSec, baseFont, fm, pal);
+        {
+            int btnY = bubbleRect.bottom() - 4 - 26;
+            DownloadBtnInfo bi = paintDownloadBtn(p, bubbleRect.x(), btnY,
+                bubbleRect.width(), baseFont, pal);
+            downloadBtnRect = bi.rect;
+        }
         break;
     }
     case File: {
@@ -1577,6 +1638,13 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
                 p.drawRect(r);
             }
+        }
+        // 下载按钮
+        {
+            int btnY = bubbleRect.bottom() - 4 - 26;
+            DownloadBtnInfo bi = paintDownloadBtn(p, bubbleRect.x(), btnY,
+                bubbleRect.width(), baseFont, pal);
+            downloadBtnRect = bi.rect;
         }
         break;
     }
@@ -2293,6 +2361,20 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 
 void ChatView::mouseReleaseEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
+        // Download button click (all media types, always visible)
+        int msgIndex = findMessageAtY(event->y());
+        if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+            ChatElement& el = m_items[msgIndex];
+            if ((el.etype == ChatElement::Image ||
+                 el.etype == ChatElement::Video ||
+                 el.etype == ChatElement::Gif ||
+                 el.etype == ChatElement::File ||
+                 el.etype == ChatElement::Audio) &&
+                el.downloadBtnRect.contains(event->pos())) {
+                emit retryClicked(msgIndex, el.mediaUrl);
+                return;
+            }
+        }
         if (m_selecting) {
             m_selecting = false;
             // If start and end are same, clear selection
@@ -2302,7 +2384,6 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
             }
         }
         // Retry click for failed media downloads
-        int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
             if ((m_items[msgIndex].etype == ChatElement::Image ||
                  m_items[msgIndex].etype == ChatElement::Video ||

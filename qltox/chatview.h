@@ -53,6 +53,7 @@ struct ChatElement {
     bool downloadFailed;
     QRect thumbnailRect;
     int mediaWidth;
+    QRect downloadBtnRect;
     int mediaHeight;
 
     // File only
