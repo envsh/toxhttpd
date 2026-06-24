@@ -221,6 +221,10 @@ void ChatWidget::triggerRelayout(int msgIndex) {
     messageArea->triggerRelayout(msgIndex);
 }
 
+void ChatWidget::triggerVisibleDownloads() {
+    messageArea->triggerVisibleDownloads();
+}
+
 void ChatWidget::appendMessage(const ChatElement& msg) {
     messageArea->appendMessage(msg);
     updateHeaderCount();

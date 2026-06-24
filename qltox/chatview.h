@@ -51,6 +51,7 @@ struct ChatElement {
     QString caption;
     QString mediaUrl;
     bool downloadFailed;
+    bool downloadRequested;
     QRect thumbnailRect;
     int mediaWidth;
     QRect downloadBtnRect;
@@ -75,7 +76,7 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , translationInProgress(false), downloadFailed(false)
+        , translationInProgress(false), downloadFailed(false), downloadRequested(false)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , scaledForDispW(-1), scaledForDispH(-1), cachedWidth(-1), height(0) {}
@@ -110,6 +111,7 @@ public:
     ChatElement& messageAt(int index);
     int messageCount() const;
     void triggerRelayout(int msgIndex = -1);
+    void triggerVisibleDownloads();
 
 protected:
     void paintEvent(QPaintEvent* event);
@@ -127,6 +129,7 @@ signals:
     void sourceClicked(int msgIndex);
     void mentionClicked(const QString& username);
     void retryClicked(int msgIndex, const QString& mediaUrl);
+    void downloadNeeded(int msgIndex, const QString& mediaUrl);
 
 private slots:
     void onScrollChanged(int value);
@@ -136,6 +139,7 @@ private:
     int contentWidth() const;
     int charWidth(uint32_t cp);
     void manageAnimations();
+    std::pair<int,int> visibleMessageRange() const;
 
     // Selection and link helpers
     int findMessageAtY(int y) const;

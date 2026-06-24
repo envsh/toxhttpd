@@ -33,6 +33,7 @@ public:
     void appendMessage(const ChatElement& msg);
     void restoreMessages(const std::vector<ChatElement>& msgs);
     void triggerRelayout(int msgIndex = -1);
+    void triggerVisibleDownloads();
     void retranslateUi();
     void showUnreadBanner(int count);
     

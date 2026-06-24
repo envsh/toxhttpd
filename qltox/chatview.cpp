@@ -2524,6 +2524,38 @@ void ChatView::manageAnimations() {
     }
 }
 
+std::pair<int,int> ChatView::visibleMessageRange() const {
+    int top = m_scrollPos;
+    int bottom = top + height();
+    int y = 0;
+    int first = -1, last = -1;
+    for (int i = 0; i < (int)m_items.size(); i++) {
+        int h = m_items[i].height;
+        if (y + h > top && y < bottom) {
+            if (first < 0) { first = i; }
+            last = i;
+        }
+        y += h;
+    }
+    return {first, last};
+}
+
+void ChatView::triggerVisibleDownloads() {
+    auto range = visibleMessageRange();
+    int first = range.first, last = range.second;
+    if (first < 0) { return; }
+    qWarning("[VisibleTrigger] visible range: %d ~ %d", first, last);
+    for (int i = first; i <= last; i++) {
+        ChatElement& el = m_items[i];
+        if (!el.downloadRequested && !el.downloadFailed && el.thumbnail.isNull()
+            && !el.mediaUrl.isEmpty()) {
+            el.downloadRequested = true;
+            qWarning("[VisibleTrigger] would download idx=%d type=%d url=%s",
+                     i, (int)el.etype, qToUtf8(el.mediaUrl).data());
+        }
+    }
+}
+
 void ChatView::paintEvent(QPaintEvent* event) {
     manageAnimations();
     QPainter p(this);
@@ -2555,6 +2587,7 @@ void ChatView::resizeEvent(QResizeEvent* event) {
     int sbw = m_vScrollBar->sizeHint().width();
     m_vScrollBar->setGeometry(width() - sbw, 0, sbw, height());
     relayout();
+    triggerVisibleDownloads();
 }
 
 void ChatView::onScrollChanged(int value) {
@@ -2569,4 +2602,5 @@ void ChatView::onScrollChanged(int value) {
     }
     m_vScrollBar->showTemporarily();
     update();
+    triggerVisibleDownloads();
 }
