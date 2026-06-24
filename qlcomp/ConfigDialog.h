@@ -152,7 +152,8 @@ private:
     
 #ifdef QT3_BUILD
     QListBox*      m_categoryList;
-    QWidgetStack* m_pageStack;
+    QWidgetStack*  m_pageStack;
+    QValueList<int> m_pageIds;
 #else
     QListWidget*     m_categoryList;
     QStackedWidget* m_pageStack;

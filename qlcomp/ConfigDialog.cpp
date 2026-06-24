@@ -216,6 +216,7 @@ void ConfigDialog::setupUi() {
     mainLayout->addWidget(buttonBox);
     
     connect(m_categoryList, SIGNAL(currentRowChanged(int)), this, SLOT(onCategoryChanged(int)));
+    m_pageStack->setCurrentIndex(0);
 #endif
 }
 
@@ -255,10 +256,20 @@ QWidget* ConfigDialog::createButtonBox() {
 void ConfigDialog::addCategory(const QString& name, QWidget* page) {
 #ifdef QT3_BUILD
     m_categoryList->insertItem(name);
+    int wid = m_pageStack->addWidget(page);
+    m_pageIds.append(wid);
 #else
     m_categoryList->addItem(name);
-#endif
     m_pageStack->addWidget(page);
+#endif
+    if (categoryCount() == 1) {
+#ifdef QT3_BUILD
+        m_pageStack->raiseWidget(m_pageIds[0]);
+#else
+        m_categoryList->setCurrentRow(0);
+        m_pageStack->setCurrentIndex(0);
+#endif
+    }
 }
 
 int ConfigDialog::categoryCount() const {
@@ -362,12 +373,17 @@ void ConfigDialog::resizeEvent(QResizeEvent* event) {
 }
 
 void ConfigDialog::onCategoryChanged(int index) {
+    qWarning("onCategoryChanged: index=%d", index);
 #ifdef QT3_BUILD
-    m_pageStack->raiseWidget(index);
+    if (index >= 0 && index < (int)m_pageIds.count()) {
+        m_pageStack->raiseWidget(m_pageIds[index]);
+    }
 #else
     m_pageStack->setCurrentIndex(index);
 #endif
 }
+
+
 
 void ConfigDialog::onAccepted() {
     saveSettings();
