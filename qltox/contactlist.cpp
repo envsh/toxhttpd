@@ -11,10 +11,12 @@
 #ifdef QT3_BUILD
 #include <qlistbox.h>
 #include <qregion.h>
+#include <qbitmap.h>
 #else
 #include <qlistwidget.h>
 #include <QStyledItemDelegate>
 #include <QPainterPath>
+#include <QBitmap>
 #endif
 
 // Emoji 和状态点常量（所有构建统一使用 UTF-8 emoji）
@@ -81,7 +83,20 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     uint32_t cp = typeToEmojiCp(type);
     QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kAvatarSz() - 4);
 
-    // 圆形背景（Qt3 不支持非矩形 clip region，用 emoji 自带 alpha 替代）
+#ifdef QT3_BUILD
+    // Qt3: 用 QPixmap::setMask 做圆形 clip（X11 不支持非矩形 clip region）
+    if (!pm.isNull()) {
+        QBitmap mask(pm.width(), pm.height(), true);
+        QPainter mp(&mask);
+        mp.setBrush(Qt::color1);
+        mp.setPen(Qt::NoPen);
+        mp.drawEllipse(0, 0, pm.width(), pm.height());
+        mp.end();
+        pm.setMask(mask);
+    }
+#endif
+
+    // 圆形背景（Qt4 用 QPainterPath clip，Qt3 用 QPixmap::setMask）
     p.save();
     p.setBrush(QColor(224, 224, 224));
     p.setPen(Qt::NoPen);
@@ -138,14 +153,15 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     // 5. Line 2: Last message（略透明）+ unread（right）
     int msgY = y + 6 + lh + 1;
     QString msg = lastMessage.isEmpty() ? displayName : lastMessage;
+    msg.replace('\n', ' ');
 
     if (!msg.isEmpty()) {
         int msgW = w - (cx - x) - rp - rightAreaW;
 
-        qWarning("paintContactRow: id=%s name=[%s] lastMsg=[%s] msg=[%s] w=%d h=%d msgY=%d msgW=%d lh=%d cx=%d",
-                 qToUtf8(type).data(), qToUtf8(displayName).data(),
-                 qToUtf8(lastMessage).data(), qToUtf8(msg).data(),
-                 w, h, msgY, msgW, lh, cx);
+        // qWarning("paintContactRow: id=%s name=[%s] lastMsg=[%s] msg=[%s] w=%d h=%d msgY=%d msgW=%d lh=%d cx=%d",
+        //          qToUtf8(type).data(), qToUtf8(displayName).data(),
+        //          qToUtf8(lastMessage).data(), qToUtf8(msg).data(),
+        //          w, h, msgY, msgW, lh, cx);
         if (msgW < 20) { msgW = 20; }
         if (p.fontMetrics().width(msg) > msgW) {
             while (!msg.isEmpty() && p.fontMetrics().width(msg + "...") > msgW)
@@ -471,8 +487,8 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
 
 void ContactListWidget::updateContactLastMessage(int id, const QString& type, const QString& msg,
                                                   const QString& timeStr) {
-    qWarning("updateContactLastMessage: id=%d type=%s msg=[%s]",
-             id, qToUtf8(type).data(), qToUtf8(msg).data());
+    // qWarning("updateContactLastMessage: id=%d type=%s msg=[%s]",
+    //          id, qToUtf8(type).data(), qToUtf8(msg).data());
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
     m_lastMessages[key] = msg;
     m_lastMessageTimes[key] = timeStr;
@@ -664,8 +680,8 @@ void ContactListWidget::updateView_v3() {
 
         QString lastMsg = c->lastMessage;
         if (lastMsg.isEmpty()) {
-            qWarning("updateView_v3: id=%d type=%s name=[%s] c->lastMessage EMPTY, trying m_lastMessages",
-                     c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data());
+            // qWarning("updateView_v3: id=%d type=%s name=[%s] c->lastMessage EMPTY, trying m_lastMessages",
+            //          c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data());
             auto lit = m_lastMessages.find(key);
             if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
         }
@@ -676,9 +692,9 @@ void ContactListWidget::updateView_v3() {
             if (tit != m_lastMessageTimes.end()) { lastTime = tit->second; }
         }
 
-        qWarning("updateView_v3: id=%d type=%s name=[%s] lastMsg=[%s]",
-                 c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data(),
-                 qToUtf8(lastMsg).data());
+        // qWarning("updateView_v3: id=%d type=%s name=[%s] lastMsg=[%s]",
+        //          c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data(),
+        //          qToUtf8(lastMsg).data());
 
         ContactListItem* item = new ContactListItem(lb, c->id, c->type,
             c->name, c->status, c->is_connected, unread,

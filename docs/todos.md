@@ -1,6 +1,6 @@
 ### TODOs
 
-- [ ] contact list two line with last msg
+- [x] contact list two line with last msg
 - [ ] contact list lift latest message contact to top
 - [ ] contact list add aichat(s) fixed_room
 - [x] impr matrix image msg parser and draw image chat element
@@ -21,8 +21,8 @@
 	- [ ] edit/resend
 	- [ ] delete/remove/redact
 	- [ ] favorit
-- [ ] chat message identicon
-- [ ] contact identicon fixed mode
+- [ ] fix chat message identicon
+- [x] contact identicon fixed mode
 - [ ] contact identicon multiple combined mode
 - [ ] add settings window, log/aichat-account/proxy/fedclipauto
 - [ ] message sending/error/success flag
