@@ -15,7 +15,8 @@ QTCOMP_CPP = $$PWD/limelog.cpp $$PWD/appsetup.cpp $$PWD/compat34.cpp $$PWD/trans
 			$$PWD/qthooks.cpp \
 			$$PWD/jsonview.cpp \
 			$$PWD/floatingpill.cpp \
-			$$PWD/generic_slot.cpp
+			$$PWD/generic_slot.cpp \
+			$$PWD/md5.c $$PWD/identicon.cpp
 
 QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translator.h $$PWD/compat34.h \
 			$$PWD/emojiutil.h $$PWD/emojiwidgets.h $$PWD/emojiitems.h \
@@ -25,7 +26,8 @@ QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translato
 			$$PWD/lambdaslot.h \
 			$$PWD/sharedstatusbar.h \
 			$$PWD/jsonview.h \
-			$$PWD/floatingpill.h
+			$$PWD/floatingpill.h \
+			$$PWD/md5.h $$PWD/identicon.h
 
 HEADERS += $$LIME_STYLE_H $$QTCOMP_HDR
 SOURCES += $$LIME_STYLE_CPP $$QTCOMP_CPP
