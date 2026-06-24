@@ -95,6 +95,12 @@ struct HistoryMessage {
     std::string direction;
     std::string created_at;
     std::string roomId;
+    // Media (e.g. Matrix image)
+    std::string msgtype;       // "image" / ""(text)
+    std::string mediaUrl;      // "mxc://..."
+    std::string mediaMime;     // "image/png"
+    int mediaWidth  = 0;
+    int mediaHeight = 0;
 };
 
 struct TranslateApiResult {

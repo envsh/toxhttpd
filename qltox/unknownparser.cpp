@@ -84,6 +84,20 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
         HistoryMessage hm;
         hm.message       = jsonGetString(ev, "content.body");
         {
+            // ── 图片消息检测 ──
+            std::string msgtype = jsonGetString(ev, "content.msgtype");
+            if (msgtype.find("m.image") == 0) {
+                hm.msgtype  = "image";
+                hm.mediaUrl = jsonGetString(ev, "content.url");
+                cJSON* info = jsonPath(ev, "content.info");
+                if (info) {
+                    hm.mediaWidth  = (int)jsonGetInt64(ev, "content.info.w");
+                    hm.mediaHeight = (int)jsonGetInt64(ev, "content.info.h");
+                    hm.mediaMime   = jsonGetString(ev, "content.info.mimetype");
+                }
+            }
+        }
+        {
             cJSON* content = cJSON_GetObjectItem(ev, "content");
             if (content) {
                 cJSON* rt = cJSON_GetObjectItem(content, "m.relates_to");

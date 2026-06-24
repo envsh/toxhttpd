@@ -1066,6 +1066,12 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                         msg.caption = (slashPos >= 0)
                             ? msg.fileName.mid(slashPos + 1) : msg.fileName;
+                    } else if (hm.msgtype == "image") {
+                        msg.etype       = ChatElement::Image;
+                        msg.caption     = qFromUtf8(hm.message);
+                        msg.messageText = qFromUtf8(hm.message);
+                        msg.mediaWidth  = hm.mediaWidth;
+                        msg.mediaHeight = hm.mediaHeight;
                     }
 
                     qWarning("Cache PUSH to %s %d: sender=%s",
