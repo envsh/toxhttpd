@@ -326,31 +326,35 @@ void ConfigDialog::loadSettings() {
 void ConfigDialog::saveSettings() {
     if (m_settingsFile.isEmpty() || !m_settings) { return; }
     
+    SettingsChangedMap all;
     for (int i = 0; i < m_configItems.count(); ++i) {
-        m_configItems[i]->save();
+        ConfigItemBase* item = m_configItems[i];
+        all[item->itemKey()] = item->widgetValue();
+    }
+    
+    // batch 写文件
+    for (auto it = all.begin(); it != all.end(); ++it) {
+#ifdef QT3_BUILD
+        switch (it.data().type()) {
+            case QVariant::Bool:   m_settings->writeEntry(it.key(), it.data().toBool()); break;
+            case QVariant::Int:    m_settings->writeEntry(it.key(), it.data().toInt());  break;
+            default:               m_settings->writeEntry(it.key(), it.data().toString()); break;
+        }
+#else
+        m_settings->setValue(it.key(), it.data());
+#endif
     }
     m_settings->sync();
     
-#ifdef QT3_BUILD
-    QFile file(m_settingsFile);
-    if (file.open(IO_WriteOnly)) {
-        QTextStream ts(&file);
-        ts << "# Config file saved by QtxComp\n";
-        for (int i = 0; i < m_configItems.count(); ++i) {
-            BoolConfigItem* bi = dynamic_cast<BoolConfigItem*>(m_configItems[i]);
-            IntConfigItem* ii = dynamic_cast<IntConfigItem*>(m_configItems[i]);
-            StringConfigItem* si = dynamic_cast<StringConfigItem*>(m_configItems[i]);
-            SelectConfigItem* seli = dynamic_cast<SelectConfigItem*>(m_configItems[i]);
-            QString k, v;
-            if (bi) { k = bi->key(); v = bi->value() ? "true" : "false"; }
-            else if (ii) { k = ii->key(); v = QString::number(ii->value()); }
-            else if (si) { k = si->key(); v = si->value(); }
-            else if (seli) { k = seli->key(); v = seli->value(); }
-            if (!k.isEmpty()) ts << k << "=" << v << "\n";
-        }
-        file.close();
+    // 计算 diff
+    SettingsChangedMap changed;
+    for (int i = 0; i < m_configItems.count(); ++i) {
+        ConfigItemBase* item = m_configItems[i];
+        if (item->isModified())
+            changed[item->itemKey()] = all[item->itemKey()];
     }
-#endif
+    
+    emit settingsSaved(changed);
 }
 
 void ConfigDialog::setSettingsFile(const QString& filePath) {

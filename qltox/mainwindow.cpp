@@ -1811,19 +1811,19 @@ void MainWindow::onSourceClicked(int msgIndex) {
 }
 
 void MainWindow::openSettings() {
-    ConfigDialog dlg(qFromUtf8("设置"), this);
-    dlg.setSettingsFile(ConfigDialog::defaultSettingsFile());
+    ConfigDialog* dlg = new ConfigDialog(qFromUtf8("设置"), this);
+    dlg->setSettingsFile(ConfigDialog::defaultSettingsFile());
 
-    CategoryPage* general = new CategoryPage(qFromUtf8("常规"), &dlg);
+    CategoryPage* general = new CategoryPage(qFromUtf8("常规"), dlg);
     StringConfigItem* serverUrl = new StringConfigItem(
         "server/baseUrl", "http://localhost:8181",
         qFromUtf8("服务器地址"), general);
     general->addLabeledControl(serverUrl->label(), serverUrl->lineEdit());
     general->addStretch();
-    dlg.addCategory(qFromUtf8("常规"), general);
-    dlg.registerConfigItem(serverUrl);
+    dlg->addCategory(qFromUtf8("常规"), general);
+    dlg->registerConfigItem(serverUrl);
 
-    CategoryPage* appearance = new CategoryPage(qFromUtf8("界面"), &dlg);
+    CategoryPage* appearance = new CategoryPage(qFromUtf8("界面"), dlg);
     QStringList langs;
     langs << qFromUtf8("zh-CN") << qFromUtf8("zh-TW") << qFromUtf8("en-US");
     SelectConfigItem* langItem = new SelectConfigItem(
@@ -1831,10 +1831,10 @@ void MainWindow::openSettings() {
         qFromUtf8("语言"), langs, appearance);
     appearance->addLabeledControl(langItem->label(), langItem->comboBox());
     appearance->addStretch();
-    dlg.addCategory(qFromUtf8("界面"), appearance);
-    dlg.registerConfigItem(langItem);
+    dlg->addCategory(qFromUtf8("界面"), appearance);
+    dlg->registerConfigItem(langItem);
 
-    CategoryPage* notify = new CategoryPage(qFromUtf8("通知"), &dlg);
+    CategoryPage* notify = new CategoryPage(qFromUtf8("通知"), dlg);
     BoolConfigItem* msgNotif = new BoolConfigItem(
         "notify/enabled", true,
         qFromUtf8("消息通知"), notify);
@@ -1844,21 +1844,21 @@ void MainWindow::openSettings() {
         qFromUtf8("声音"), notify);
     notify->addWidget(soundNotif->checkBox());
     notify->addStretch();
-    dlg.addCategory(qFromUtf8("通知"), notify);
-    dlg.registerConfigItem(msgNotif);
-    dlg.registerConfigItem(soundNotif);
+    dlg->addCategory(qFromUtf8("通知"), notify);
+    dlg->registerConfigItem(msgNotif);
+    dlg->registerConfigItem(soundNotif);
 
-    CategoryPage* chat = new CategoryPage(qFromUtf8("聊天"), &dlg);
+    CategoryPage* chat = new CategoryPage(qFromUtf8("聊天"), dlg);
     IntConfigItem* pageSize = new IntConfigItem(
         "chat/pageSize", 200,
         qFromUtf8("每页消息数"), 50, 500, chat);
     chat->addLabeledControl(pageSize->label(), pageSize->spinBox());
     chat->addStretch();
-    dlg.addCategory(qFromUtf8("聊天"), chat);
-    dlg.registerConfigItem(pageSize);
+    dlg->addCategory(qFromUtf8("聊天"), chat);
+    dlg->registerConfigItem(pageSize);
 
     // --- 网络 ---
-    CategoryPage* network = new CategoryPage(qFromUtf8("网络"), &dlg);
+    CategoryPage* network = new CategoryPage(qFromUtf8("网络"), dlg);
     IntConfigItem* timeout = new IntConfigItem(
         "server/timeout", 30,
         qFromUtf8("服务器超时(秒)"), 5, 120, network);
@@ -1868,12 +1868,12 @@ void MainWindow::openSettings() {
         qFromUtf8("连接重试间隔(秒)"), 1, 60, network);
     network->addLabeledControl(retryInterval->label(), retryInterval->spinBox());
     network->addStretch();
-    dlg.addCategory(qFromUtf8("网络"), network);
-    dlg.registerConfigItem(timeout);
-    dlg.registerConfigItem(retryInterval);
+    dlg->addCategory(qFromUtf8("网络"), network);
+    dlg->registerConfigItem(timeout);
+    dlg->registerConfigItem(retryInterval);
 
     // --- 其他 ---
-    CategoryPage* other = new CategoryPage(qFromUtf8("其他"), &dlg);
+    CategoryPage* other = new CategoryPage(qFromUtf8("其他"), dlg);
     QStringList logLevels;
     logLevels << qFromUtf8("debug") << qFromUtf8("info")
               << qFromUtf8("warning") << qFromUtf8("error");
@@ -1890,14 +1890,27 @@ void MainWindow::openSettings() {
         qFromUtf8("消息字体大小"), 8, 32, other);
     other->addLabeledControl(fontSize->label(), fontSize->spinBox());
     other->addStretch();
-    dlg.addCategory(qFromUtf8("其他"), other);
-    dlg.registerConfigItem(logLevel);
-    dlg.registerConfigItem(autoConnect);
-    dlg.registerConfigItem(fontSize);
+    dlg->addCategory(qFromUtf8("其他"), other);
+    dlg->registerConfigItem(logLevel);
+    dlg->registerConfigItem(autoConnect);
+    dlg->registerConfigItem(fontSize);
 
-    dlg.loadSettings();
-    if (dlg.exec() == QDialog::Accepted) {
-        dlg.saveSettings();
+    connect(dlg, SIGNAL(settingsSaved(SettingsChangedMap)), this, SLOT(onSettingsSaved(SettingsChangedMap)));
+    dlg->loadSettings();
+    dlg->show();
+}
+
+void MainWindow::onSettingsSaved(const SettingsChangedMap& changed) {
+    if (changed.isEmpty()) { return; }
+    qWarning("Settings changed (%d keys):", changed.size());
+    for (auto it = changed.begin(); it != changed.end(); ++it) {
+#ifdef QT3_BUILD
+        qWarning("  %s => %s", (const char*)it.key().utf8(),
+                 (const char*)it.data().toString().utf8());
+#else
+        qWarning("  %s => %s", qPrintable(it.key()),
+                 qPrintable(it.value().toString()));
+#endif
     }
 }
 

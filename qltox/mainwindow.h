@@ -16,6 +16,7 @@
 #include "FramelessHelper.h"
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"
+#include "ConfigDialog.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -50,6 +51,7 @@ public:
     void onMenu1Stub();
     void onMenu2Stub();
     void openHomePage();
+    void onSettingsSaved(const SettingsChangedMap& changed);
     
 private:
     FramelessHelper* framelessHelper;

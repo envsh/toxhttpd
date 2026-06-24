@@ -158,4 +158,6 @@ inline std::string timeSince(const TimePoint& start) {
     return std::to_string(sec / 60) + "m" + std::to_string(sec % 60) + "s";
 }
 
+void qActivateWindow(QWidget* w);
+
 #endif  // COMPAT34_H

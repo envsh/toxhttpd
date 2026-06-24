@@ -12,6 +12,7 @@
 #include <qsettings.h>
 #include <qdialog.h>
 #include <qvariant.h>
+#include <qmap.h>
 #else
 #include <QGroupBox>
 #include <QSpinBox>
@@ -22,6 +23,7 @@
 #include <QSettings>
 #include <QDialog>
 #include <QVariant>
+#include <QMap>
 #endif
 
 class ConfigItemBase {
@@ -32,6 +34,9 @@ public:
     void setSettings(QSettings* s) { m_settings = s; }
     virtual void load() {}
     virtual void save() {}
+    virtual QString itemKey() const = 0;
+    virtual QVariant widgetValue() const = 0;
+    virtual bool isModified() const = 0;
 };
 
 class BoolConfigItem : public ConfigItemBase {
@@ -40,10 +45,13 @@ public:
     ~BoolConfigItem();
     void load();
     void save();
+    QString itemKey() const { return m_key; }
+    QVariant widgetValue() const { return QVariant(checkBox()->isChecked()); }
+    bool isModified() const { return checkBox()->isChecked() != m_value; }
     QString key() const { return m_key; }
     QString label() const { return m_label; }
     bool value() const { return m_value; }
-    QCheckBox* checkBox() { return m_checkbox; }
+    QCheckBox* checkBox() const { return m_checkbox; }
     
 private:
     QCheckBox* m_checkbox;
@@ -60,10 +68,13 @@ public:
     ~StringConfigItem();
     void load();
     void save();
+    QString itemKey() const { return m_key; }
+    QVariant widgetValue() const { return QVariant(lineEdit()->text()); }
+    bool isModified() const { return lineEdit()->text() != m_value; }
     QString key() const { return m_key; }
     QString label() const { return m_label; }
     QString value() const { return m_value; }
-    QLineEdit* lineEdit() { return m_lineEdit; }
+    QLineEdit* lineEdit() const { return m_lineEdit; }
     
 private:
     QLineEdit* m_lineEdit;
@@ -81,10 +92,13 @@ public:
     ~IntConfigItem();
     void load();
     void save();
+    QString itemKey() const { return m_key; }
+    QVariant widgetValue() const { return QVariant(spinBox()->value()); }
+    bool isModified() const { return spinBox()->value() != m_value; }
     QString key() const { return m_key; }
     QString label() const { return m_label; }
     int value() const { return m_value; }
-    QSpinBox* spinBox() { return m_spinBox; }
+    QSpinBox* spinBox() const { return m_spinBox; }
     
 private:
     QSpinBox* m_spinBox;
@@ -104,10 +118,13 @@ public:
     ~SelectConfigItem();
     void load();
     void save();
+    QString itemKey() const { return m_key; }
+    QVariant widgetValue() const { return QVariant(comboBox()->currentText()); }
+    bool isModified() const { return comboBox()->currentText() != m_value; }
     QString key() const { return m_key; }
     QString label() const { return m_label; }
     QString value();
-    QComboBox* comboBox() { return m_comboBox; }
+    QComboBox* comboBox() const { return m_comboBox; }
     
 private:
     QComboBox*  m_comboBox;
@@ -118,6 +135,8 @@ private:
     QStringList m_options;
     QWidget*   m_parent;
 };
+
+typedef QMap<QString, QVariant> SettingsChangedMap;
 
 class ConfigDialog : public QDialog {
     Q_OBJECT
@@ -145,6 +164,9 @@ private slots:
     void onCategoryChanged(int index);
     void onAccepted();
     void onApply();
+    
+signals:
+    void settingsSaved(const SettingsChangedMap& changed);
     
 private:
     void setupUi();

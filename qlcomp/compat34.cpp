@@ -712,3 +712,14 @@ QByteArray base64Decode(const std::string& b64) {
     return QByteArray::fromBase64(QByteArray(b64.data(), (int)b64.size()));
 #endif
 }
+
+void qActivateWindow(QWidget* w) {
+    w->show();
+    w->raise();
+    w->setFocus();
+#ifdef QT3_BUILD
+    w->setActiveWindow();
+#else
+    w->activateWindow();
+#endif
+}
