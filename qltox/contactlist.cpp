@@ -32,10 +32,11 @@ const char* STATUS_OFFLINE = "○";
 
 // ---- 公共辅助函数 ----
 
-static int kRowH() { return 54; }
-static int kPad() { return 8; }
-static int kDotR() { return 5; }
-static int kAvatarSz() { return 36; }
+static const int kRowH = 54;
+static const int kPad = 8;
+static const int kRightPad = 12;
+static const int kDotR = 5;
+static const int kAvatarSz = 36;
 
 static uint32_t typeToEmojiCp(const QString& type) {
     if (type == "friend" || type == kUnktoxFriendType)       return 0x1F464;
@@ -62,11 +63,11 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
         p.fillRect(x, y, w, h, selBg);
     }
 
-    int rh = kRowH();
-    int rp = kPad();
+    int rh = kRowH;
+    int rp = kPad;
 
     int cx = x + rp;
-    int cy = y + (h - kDotR() * 2) / 2;
+    int cy = y + (h - kDotR * 2) / 2;
 
     // 2. Status dot（不变）
     bool online = (status == "online" || status == "tcp" || status == "udp");
@@ -74,14 +75,14 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     p.save();
     p.setBrush(online ? QColor(76, 175, 80) : QColor(158, 158, 158));
     p.setPen(Qt::NoPen);
-    p.drawEllipse(cx, cy, kDotR() * 2, kDotR() * 2);
+    p.drawEllipse(cx, cy, kDotR * 2, kDotR * 2);
     p.restore();
-    cx += kDotR() * 2 + rp;
+    cx += kDotR * 2 + rp;
 
     // 3. 圆形头像（仿 chatview 风格）
     int avatarY = y + 6;
     uint32_t cp = typeToEmojiCp(type);
-    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kAvatarSz() - 4);
+    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kAvatarSz - 4);
 
 #ifdef QT3_BUILD
     // Qt3: 用 QPixmap::setMask 做圆形 clip（X11 不支持非矩形 clip region）
@@ -103,21 +104,21 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
 #ifndef QT3_BUILD
     {
         QPainterPath clipPath;
-        clipPath.addEllipse(cx, avatarY, kAvatarSz(), kAvatarSz());
+        clipPath.addEllipse(cx, avatarY, kAvatarSz, kAvatarSz);
         p.setClipPath(clipPath);
 #endif
-        p.drawEllipse(cx, avatarY, kAvatarSz(), kAvatarSz());
+        p.drawEllipse(cx, avatarY, kAvatarSz, kAvatarSz);
 
         if (!pm.isNull()) {
-            int pmx = cx + (kAvatarSz() - pm.width()) / 2;
-            int pmy = avatarY + (kAvatarSz() - pm.height()) / 2;
+            int pmx = cx + (kAvatarSz - pm.width()) / 2;
+            int pmy = avatarY + (kAvatarSz - pm.height()) / 2;
             p.drawPixmap(pmx, pmy, pm);
         }
 #ifndef QT3_BUILD
     }
 #endif
     p.restore();
-    cx += kAvatarSz() + rp;
+    cx += kAvatarSz + rp;
 
     // 4. Line 1: Name（bold）+ time（right）
     QFont normalFont = p.font();
@@ -127,7 +128,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     if (normalFont.pointSize() > 4) smallFont.setPointSize(normalFont.pointSize() - 2);
     int lh = p.fontMetrics().lineSpacing();
     int rightAreaW = 55; // time + unread + right margin conservative area
-    int nameW = w - (cx - x) - rp - rightAreaW;
+    int nameW = w - (cx - x) - kRightPad - rightAreaW;
     if (nameW < 20) { nameW = 20; }
 
     QString displayName = name.isEmpty() ? _("no_name") : name;
@@ -150,7 +151,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
 #endif
         ));
         int tw = p.fontMetrics().width(timeStr);
-        p.drawText(x + w - rp - tw, y + 6, tw, lh, Qt::AlignLeft | Qt::AlignVCenter, timeStr);
+        p.drawText(x + w - kRightPad - tw, y + 6, tw, lh, Qt::AlignLeft | Qt::AlignVCenter, timeStr);
     }
 
     // 5. Line 2: Last message（略透明）+ unread（right）
@@ -159,7 +160,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     msg.replace('\n', ' ');
 
     if (!msg.isEmpty()) {
-        int msgW = w - (cx - x) - rp - rightAreaW;
+        int msgW = w - (cx - x) - kRightPad - rightAreaW;
 
         // qWarning("paintContactRow: id=%s name=[%s] lastMsg=[%s] msg=[%s] w=%d h=%d msgY=%d msgW=%d lh=%d cx=%d",
         //          qToUtf8(type).data(), qToUtf8(displayName).data(),
@@ -187,7 +188,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
         QString badge = QString("(%1)").arg(unread);
         p.setPen(QColor(100, 100, 100));
         int bw = p.fontMetrics().width(badge);
-        p.drawText(x + w - rp - bw, msgY, bw, lh,
+        p.drawText(x + w - kRightPad - bw, msgY, bw, lh,
                    Qt::AlignLeft | Qt::AlignVCenter, badge);
     }
 }
@@ -224,7 +225,7 @@ ContactListItem::ContactListItem(QListBox* lb, int id, const QString& type,
 
 void ContactListItem::paint(QPainter* p) {
     bool sel = m_lb->isSelected(this);
-    paintContactRow(*p, 0, 0, m_lb->width(), kRowH(),
+    paintContactRow(*p, 0, 0, m_lb->width(), kRowH,
                     sel, m_type, m_name, m_status, m_isConnected, m_unread,
                     m_lastMessage, m_timeStr);
 }
@@ -727,7 +728,7 @@ void ContactListWidget::updateView_v3() {
         if (selItem) {
             int selIdx = lb->index(selItem);
             int topIdx = lb->topItem();
-            int visRows = lb->height() / kRowH();
+            int visRows = lb->height() / kRowH;
             if (visRows < 2) visRows = 2;
             if (selIdx < topIdx)
                 lb->setTopItem(selIdx);
@@ -765,7 +766,7 @@ void ContactListWidget::updateView_v4() {
     // 保存滚动位置（顶部可见项的联系人 ID，而非像素偏移）
     int scrollId = -1;
     QString scrollType;
-    int scrollTopIdx = lw->verticalScrollBar()->value() / kRowH();
+    int scrollTopIdx = lw->verticalScrollBar()->value() / kRowH;
     if (scrollTopIdx >= 0 && (uint)scrollTopIdx < lw->count()) {
         QListWidgetItem* topItem = lw->item(scrollTopIdx);
         if (topItem) {
@@ -820,7 +821,7 @@ void ContactListWidget::updateView_v4() {
             QListWidgetItem* item = lw->item(i);
             if (item && item->data(Qt::UserRole).toInt() == scrollId
                     && item->data(Qt::UserRole+1).toString() == scrollType) {
-                lw->verticalScrollBar()->setValue(i * kRowH());
+                lw->verticalScrollBar()->setValue(i * kRowH);
                 break;
             }
         }
