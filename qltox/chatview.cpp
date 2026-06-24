@@ -114,6 +114,11 @@ static void paintThumbnail(QPainter& p, const QRect& imgRect,
         if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
     }
     if (!thumb.isNull()) {
+        if (thumb.width() == dw && thumb.height() == dh) {
+            int ox = imgRect.x() + (maxW - dw) / 2;
+            int oy = imgRect.y() + (maxH - dh) / 2;
+            p.drawPixmap(ox, oy, thumb);
+        } else {
 #ifdef QT3_BUILD
         QImage img = thumb.convertToImage();
         QImage scaledImg = img.scale(dw, dh, QImage::ScaleMax);
@@ -125,6 +130,7 @@ static void paintThumbnail(QPainter& p, const QRect& imgRect,
         int ox = imgRect.x() + (maxW - scaled.width()) / 2;
         int oy = imgRect.y() + (maxH - scaled.height()) / 2;
         p.drawPixmap(ox, oy, scaled);
+        }
     } else {
         p.setBrush(pal.hoverBg);
         p.setPen(Qt::NoPen);
@@ -457,7 +463,7 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
             double ratio = (double)mediaHeight / mediaWidth;
             imgDispW = imgMaxW;
             imgDispH = (int)(imgMaxW * ratio);
-            const int kMaxMediaH = 300;
+            const int kMaxMediaH = 280;
             if (imgDispH > kMaxMediaH) {
                 imgDispH = kMaxMediaH;
                 imgDispW = (int)(kMaxMediaH / ratio);
@@ -1054,7 +1060,29 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             thumbnailRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                                   bubbleRect.width() - 2*kBubbleHPad, bubbleRect.height() - 2*kBubbleVPad);
         }
-        paintMediaContent(p, bubbleRect, etype, thumbnail, caption,
+        // 预缩放缓存：避免每帧重新缩放全分辨率图片
+        QPixmap displayPixmap = thumbnail;
+        if (!thumbnail.isNull() && mediaWidth > 0 && mediaHeight > 0) {
+            int maxW = thumbnailRect.width(), maxH = thumbnailRect.height();
+            double ratio = (double)mediaHeight / mediaWidth;
+            int dw = maxW, dh = (int)(maxW * ratio);
+            if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
+            if (dw != scaledForDispW || dh != scaledForDispH) {
+#ifdef QT3_BUILD
+                {
+                    QImage img = thumbnail.convertToImage();
+                    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMax);
+                    scaledDisplay.convertFromImage(scaledImg);
+                }
+#else
+                scaledDisplay = thumbnail.scaled(dw, dh, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+#endif
+                scaledForDispW = dw;
+                scaledForDispH = dh;
+            }
+            displayPixmap = scaledDisplay;
+        }
+        paintMediaContent(p, bubbleRect, etype, displayPixmap, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
                           baseFont, fm, emojiW, pal, downloadFailed);
         break;
@@ -1711,6 +1739,7 @@ void ChatView::relayout() {
         if (m_items[i].cachedWidth != w) {
             m_items[i].height = m_items[i].calcHeight(w, m_fm, m_emojiW, font());
             m_items[i].cachedWidth = (short)w;
+            m_items[i].scaledForDispW = -1;
         }
         m_totalHeight += m_items[i].height;
     }

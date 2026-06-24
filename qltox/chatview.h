@@ -45,6 +45,9 @@ struct ChatElement {
 
     // Shared media fields (Image / Gif / Video)
     QPixmap thumbnail;
+    QPixmap scaledDisplay;   // 预缩放到显示尺寸的缓存
+    int     scaledForDispW;  // 缓存对应的绘制宽度
+    int     scaledForDispH;  // 缓存对应的绘制高度
     QString caption;
     QString mediaUrl;
     bool downloadFailed;
@@ -74,7 +77,7 @@ struct ChatElement {
         , translationInProgress(false), downloadFailed(false)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
-        , cachedWidth(-1), height(0) {}
+        , scaledForDispW(-1), scaledForDispH(-1), cachedWidth(-1), height(0) {}
 
     int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont);
     void paint(QPainter& p, int y, int viewWidth, bool isSelected,
