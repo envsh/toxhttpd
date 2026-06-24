@@ -22,7 +22,7 @@
 	- [ ] edit/resend
 	- [ ] delete/remove/redact
 	- [ ] favorit
-- [ ] fix chat message identicon
+- [x] fix chat message identicon
 - [x] contact identicon fixed mode
 - [ ] contact identicon multiple combined mode
 - [ ] add settings window, log/aichat-account/proxy/fedclipauto
