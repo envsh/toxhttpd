@@ -715,6 +715,20 @@ void ContactListWidget::updateView_v3() {
             }
         }
     }
+    // 确保选中项可见
+    {
+        ContactListItem* selItem = (ContactListItem*)lb->selectedItem();
+        if (selItem) {
+            int selIdx = lb->index(selItem);
+            int topIdx = lb->topItem();
+            int visRows = lb->height() / kRowH();
+            if (visRows < 2) visRows = 2;
+            if (selIdx < topIdx)
+                lb->setTopItem(selIdx);
+            else if (selIdx >= topIdx + visRows)
+                lb->setTopItem(selIdx - visRows + 1);
+        }
+    }
 #endif
 }
 
@@ -803,6 +817,13 @@ void ContactListWidget::updateView_v4() {
                 lw->verticalScrollBar()->setValue(i * kRowH());
                 break;
             }
+        }
+    }
+    // 确保选中项可见
+    {
+        QList<QListWidgetItem*> selItems = lw->selectedItems();
+        if (!selItems.isEmpty()) {
+            lw->scrollToItem(selItems.first(), QAbstractItemView::EnsureVisible);
         }
     }
 #endif

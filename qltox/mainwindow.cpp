@@ -884,7 +884,7 @@ void MainWindow::handleEvents(const EventList& events) {
                                 senderNickname = qFromUtf8(it->second.nickname);
                             ipAddress = qFromUtf8(it->second.peerIp);
                         }
-                        chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime(), "", "", ipAddress);
+                        chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime(), "", ipAddress);
                     } else {
                         contactListWidget->incrementUnread(groupNumber, "group");
                     }
@@ -1719,12 +1719,10 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
         bool isSelf = (msg.sender_pubkey == selfPubkey);
         QString senderLabel;
         QString senderNickname;
-        QString avatarText;
         QString ipAddress;
         
         if (isSelf) {
             senderLabel = "Me";
-            avatarText = "M";
         } else {
             if (currentChatType == "friend") {
                 std::string key = "friend_" + std::to_string(currentChatId);
@@ -1734,14 +1732,7 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
                     if (!it->second.nickname.empty()) {
                         QString n = qFromUtf8(it->second.nickname);
                         senderNickname = n;
-                        avatarText = qToUpper(n.left(1));
-                    } else if (!senderLabel.isEmpty()) {
-                        avatarText = qToUpper(senderLabel.left(1));
                     }
-                } else {
-                    senderLabel = QString();
-                    senderNickname = QString();
-                    avatarText = "F";
                 }
             } else {
                 std::string key = std::string(qToUtf8(currentChatType).data())
@@ -1753,15 +1744,8 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
                     if (!it->second.nickname.empty()) {
                         QString n = qFromUtf8(it->second.nickname);
                         senderNickname = n;
-                        avatarText = qToUpper(n.left(1));
-                    } else if (!senderLabel.isEmpty()) {
-                        avatarText = qToUpper(senderLabel.left(1));
                     }
                     ipAddress = qFromUtf8(it->second.peerIp);
-                } else {
-                    senderLabel = QString();
-                    senderNickname = QString();
-                    avatarText = "P";
                 }
             }
         }
@@ -1775,7 +1759,6 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
             senderNickname,
             isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
             timeStr,
-            avatarText,
             "",
             ipAddress
         );

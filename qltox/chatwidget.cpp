@@ -185,8 +185,7 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
                               const QString& senderName,
                               const QString& senderNickname,
                               int peerNumber,
-                              const QString& time, const QString& avatarText,
-                              const QString& avatarUrl,
+                              const QString& time, const QString& avatarUrl,
                               const QString& ipAddress) {
     ChatElement msg;
     msg.messageText = message;
@@ -195,7 +194,6 @@ void ChatWidget::appendMessage(const QString& message, const QString& type,
     msg.senderNickname = senderNickname;
     msg.peerNumber = peerNumber;
     msg.time = time;
-    msg.avatarText = avatarText;
     msg.avatarUrl = avatarUrl;
     msg.ipAddress = ipAddress;
     messageArea->appendMessage(msg);

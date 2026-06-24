@@ -580,12 +580,13 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
 
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18);
                 f.setBold(true);
                 p.setFont(f);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
 
@@ -663,12 +664,13 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
 
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18);
                 f.setBold(true);
                 p.setFont(f);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
 
@@ -868,11 +870,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setBrush(pal.surfaceBg);
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                           Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
@@ -934,11 +937,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setBrush(pal.surfaceBg);
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                           Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
             int contentX = 2 * kPad + kAvatarSize;
@@ -1045,11 +1049,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setBrush(pal.surfaceBg);
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                           Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
@@ -1111,11 +1116,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setBrush(pal.surfaceBg);
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                           Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
             int contentX = 2 * kPad + kAvatarSize;
@@ -1221,13 +1227,14 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setBrush(pal.surfaceBg);
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18);
                 f.setBold(true);
                 p.setFont(f);
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                           Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
 
@@ -1362,11 +1369,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.setBrush(pal.surfaceBg);
             p.setPen(Qt::NoPen);
             p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            if (!avatarText.isEmpty()) {
+            {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
+                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, qToUpper(avatarText.left(1)));
+                           Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
 

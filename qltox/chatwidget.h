@@ -23,8 +23,7 @@ public:
     void appendMessage(const QString& message, const QString& type, 
                     const QString& senderName = QString(),
                     const QString& senderNickname = QString(),
-                    int peerNumber = -1,
-                    const QString& time = "", const QString& avatarText = "",
+                    int peerNumber = -1, const QString& time = "",
                     const QString& avatarUrl = "",
                     const QString& ipAddress = "");
     void clearMessages();
