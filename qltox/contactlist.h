@@ -6,6 +6,11 @@
 #include "LimeScrollBar.h"
 #include <qwidget.h>
 #include <qpoint.h>
+#ifdef QT3_BUILD
+#include <qdatetime.h>
+#else
+#include <QDateTime>
+#endif
 #include <map>
 #include <vector>
 
@@ -27,6 +32,7 @@ struct Contact {
     bool is_connected; // 群组/会议连接状态
     QString lastMessage;
     QString lastMessageTime;
+    QDateTime lastActive;
 };
 
 typedef QPtrList<Contact> ContactList;

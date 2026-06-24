@@ -496,6 +496,7 @@ void ContactListWidget::updateContactLastMessage(int id, const QString& type, co
         Contact* c = allContacts.at(i);
         if (c->id == id && c->type == type) {
             c->lastMessage = msg;
+            c->lastActive = QDateTime::currentDateTime();
             c->lastMessageTime = timeStr;
             break;
         }
@@ -594,19 +595,9 @@ void ContactListWidget::onSortMenuClicked() {
 void ContactListWidget::onSelectionChanged() {
 #ifdef QT3_BUILD
     QListBox* lb = (QListBox*)listWidget;
-    QListBoxItem* item = lb->selectedItem();
-    if (!item) { return; }
-    int index = lb->index(item);
-    int count = 0;
-    for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact* c = allContacts.at(i);
-        if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
-        if (count == index) {
-            emit contactSelected(c->id, c->type, c->name);
-            return;
-        }
-        ++count;
-    }
+    ContactListItem* citem = (ContactListItem*)lb->selectedItem();
+    if (!citem) { return; }
+    emit contactSelected(citem->itemId(), citem->itemType(), citem->itemName());
 #endif
 }
 
@@ -654,18 +645,21 @@ void ContactListWidget::updateView_v3() {
     QString selectedType;
     QListBoxItem* selItem = lb->selectedItem();
     if (selItem) {
-        int index = lb->index(selItem);
-        if (index >= 0 && (uint)index < visible.size()) {
-            selectedId = visible[index]->id;
-            selectedType = visible[index]->type;
-        }
+        ContactListItem* citem = (ContactListItem*)selItem;
+        selectedId = citem->itemId();
+        selectedType = citem->itemType();
     }
     
-    // 保存滚动位置（顶部可见项索引）
-    int scrollIndex = -1;
+    // 保存滚动位置（顶部可见项的联系人 ID，而非索引）
+    int scrollId = -1;
+    QString scrollType;
     int scrollTopIdx = lb->topItem();
-    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < visible.size()) {
-        scrollIndex = scrollTopIdx;
+    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < lb->count()) {
+        ContactListItem* topCItem = (ContactListItem*)lb->item(scrollTopIdx);
+        if (topCItem) {
+            scrollId = topCItem->itemId();
+            scrollType = topCItem->itemType();
+        }
     }
     
     lb->clear();
@@ -712,8 +706,14 @@ void ContactListWidget::updateView_v3() {
     }
     
     // 恢复滚动位置
-    if (scrollIndex >= 0 && scrollIndex < (int)lb->count()) {
-        lb->setTopItem(scrollIndex);
+    if (scrollId >= 0) {
+        for (uint i = 0; i < lb->count(); ++i) {
+            ContactListItem* item = (ContactListItem*)lb->item(i);
+            if (item && item->itemId() == scrollId && item->itemType() == scrollType) {
+                lb->setTopItem(i);
+                break;
+            }
+        }
     }
 #endif
 }
@@ -742,7 +742,17 @@ void ContactListWidget::updateView_v4() {
         selectedType = selItem->data(Qt::UserRole + 1).toString();
     }
     
-    int scrollPos = lw->verticalScrollBar()->value();
+    // 保存滚动位置（顶部可见项的联系人 ID，而非像素偏移）
+    int scrollId = -1;
+    QString scrollType;
+    int scrollTopIdx = lw->verticalScrollBar()->value() / kRowH();
+    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < lw->count()) {
+        QListWidgetItem* topItem = lw->item(scrollTopIdx);
+        if (topItem) {
+            scrollId = topItem->data(Qt::UserRole).toInt();
+            scrollType = topItem->data(Qt::UserRole + 1).toString();
+        }
+    }
     
     lw->clear();
     for (uint i = 0; i < visible.size(); ++i) {
@@ -784,11 +794,25 @@ void ContactListWidget::updateView_v4() {
         lw->addItem(new QListWidgetItem(_("no_contacts")));
     }
     
-    lw->verticalScrollBar()->setValue(scrollPos);
+    // 恢复滚动位置（按联系人 ID 找新位置）
+    if (scrollId >= 0) {
+        for (uint i = 0; i < lw->count(); ++i) {
+            QListWidgetItem* item = lw->item(i);
+            if (item && item->data(Qt::UserRole).toInt() == scrollId
+                    && item->data(Qt::UserRole+1).toString() == scrollType) {
+                lw->verticalScrollBar()->setValue(i * kRowH());
+                break;
+            }
+        }
+    }
 #endif
 }
 
 void ContactListWidget::sortVisible(std::vector<Contact*>& visible) {
+    // 最高优先级：按 lastActive 降序，最近消息的联系人置顶
+    std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
+        return a->lastActive > b->lastActive;
+    });
     // 反向迭代：低优先级先排，高优先级后排
     for (int i = (int)m_sortCriteria.size() - 1; i >= 0; --i) {
         const QString& criterion = m_sortCriteria[i];

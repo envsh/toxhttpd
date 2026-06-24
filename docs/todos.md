@@ -1,8 +1,9 @@
 ### TODOs
 
 - [x] contact list two line with last msg
-- [ ] contact list lift latest message contact to top
+- [x] contact list lift latest message contact to top
 - [ ] contact list add aichat(s) fixed_room
+- [ ] contact list 现在更新排序都是全量set需要改进，应该能做到在不使用clear的情况下准确的在某个位置删除一条或者添加一条
 - [x] impr matrix image msg parser and draw image chat element
 - [x] impr matrix msg parser with username and nickname
 - [ ] impr imapmail msg parser with proper content html, then to markdown
