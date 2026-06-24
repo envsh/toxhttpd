@@ -1857,6 +1857,44 @@ void MainWindow::openSettings() {
     dlg.addCategory(qFromUtf8("聊天"), chat);
     dlg.registerConfigItem(pageSize);
 
+    // --- 网络 ---
+    CategoryPage* network = new CategoryPage(qFromUtf8("网络"), &dlg);
+    IntConfigItem* timeout = new IntConfigItem(
+        "server/timeout", 30,
+        qFromUtf8("服务器超时(秒)"), 5, 120, network);
+    network->addLabeledControl(timeout->label(), timeout->spinBox());
+    IntConfigItem* retryInterval = new IntConfigItem(
+        "server/retryInterval", 5,
+        qFromUtf8("连接重试间隔(秒)"), 1, 60, network);
+    network->addLabeledControl(retryInterval->label(), retryInterval->spinBox());
+    network->addStretch();
+    dlg.addCategory(qFromUtf8("网络"), network);
+    dlg.registerConfigItem(timeout);
+    dlg.registerConfigItem(retryInterval);
+
+    // --- 其他 ---
+    CategoryPage* other = new CategoryPage(qFromUtf8("其他"), &dlg);
+    QStringList logLevels;
+    logLevels << qFromUtf8("debug") << qFromUtf8("info")
+              << qFromUtf8("warning") << qFromUtf8("error");
+    SelectConfigItem* logLevel = new SelectConfigItem(
+        "log/level", "info",
+        qFromUtf8("日志级别"), logLevels, other);
+    other->addLabeledControl(logLevel->label(), logLevel->comboBox());
+    BoolConfigItem* autoConnect = new BoolConfigItem(
+        "startup/autoConnect", true,
+        qFromUtf8("启动时自动连接"), other);
+    other->addWidget(autoConnect->checkBox());
+    IntConfigItem* fontSize = new IntConfigItem(
+        "chat/fontSize", 14,
+        qFromUtf8("消息字体大小"), 8, 32, other);
+    other->addLabeledControl(fontSize->label(), fontSize->spinBox());
+    other->addStretch();
+    dlg.addCategory(qFromUtf8("其他"), other);
+    dlg.registerConfigItem(logLevel);
+    dlg.registerConfigItem(autoConnect);
+    dlg.registerConfigItem(fontSize);
+
     dlg.loadSettings();
     if (dlg.exec() == QDialog::Accepted) {
         dlg.saveSettings();
