@@ -150,8 +150,10 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
             , 180
 #endif
         ));
-        int tw = p.fontMetrics().width(timeStr);
+        p.setFont(smallFont);
+        int tw = QFontMetrics(smallFont).width(timeStr);
         p.drawText(x + w - kRightPad - tw, y + 6, tw, lh, Qt::AlignLeft | Qt::AlignVCenter, timeStr);
+        p.setFont(normalFont);
     }
 
     // 5. Line 2: Last message（略透明）+ unread（right）
