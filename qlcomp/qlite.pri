@@ -21,6 +21,7 @@ QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translato
 			$$PWD/emojiutil.h $$PWD/emojiwidgets.h $$PWD/emojiitems.h \
 			$$PWD/emoji_picker.h $$PWD/ThemeManager.h $$PWD/placeholderlineedit.h $$PWD/toastwidget.h \
 			$$PWD/FramelessHelper.h $$PWD/CustomTitleBar.h $$PWD/EmbeddedMenuBar.h $$PWD/ConfigDialog.h \
+			$$PWD/generic_slot_base.h \
 			$$PWD/lambdaslot.h \
 			$$PWD/sharedstatusbar.h \
 			$$PWD/jsonview.h \
