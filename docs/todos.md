@@ -19,6 +19,7 @@
 	- [ ] reply,
 	- [ ] publish website,
 	- [ ] forward fedsite
+	- [ ] 转发到其他群
 	- [ ] edit/resend
 	- [ ] delete/remove/redact
 	- [ ] favorit

@@ -657,16 +657,14 @@ void ContactListWidget::updateView_v3() {
         selectedType = citem->itemType();
     }
     
-    // 保存滚动位置（顶部可见项的联系人 ID，而非索引）
+    // 保存滚动位置（从 visible 向量读 id/type，不碰 QListBoxItem 的 QString）
     int scrollId = -1;
     QString scrollType;
     int scrollTopIdx = lb->topItem();
-    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < lb->count()) {
-        ContactListItem* topCItem = (ContactListItem*)lb->item(scrollTopIdx);
-        if (topCItem) {
-            scrollId = topCItem->itemId();
-            scrollType = topCItem->itemType();
-        }
+    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < visible.size()) {
+        Contact* c = visible[scrollTopIdx];
+        scrollId = c->id;
+        scrollType = c->type;
     }
     
     lb->clear();
@@ -713,7 +711,7 @@ void ContactListWidget::updateView_v3() {
     }
     
     // 恢复滚动位置
-    if (scrollId >= 0) {
+    if (scrollId >= 0 && !scrollType.isEmpty()) {
         for (uint i = 0; i < lb->count(); ++i) {
             ContactListItem* item = (ContactListItem*)lb->item(i);
             if (item && item->itemId() == scrollId && item->itemType() == scrollType) {
