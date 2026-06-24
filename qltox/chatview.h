@@ -76,7 +76,7 @@ struct ChatElement {
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , cachedWidth(-1), height(0) {}
 
-    int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW);
+    int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont);
     void paint(QPainter& p, int y, int viewWidth, bool isSelected,
                const std::vector<QRect>& selRects,
                const QFontMetrics& fm, int emojiW,

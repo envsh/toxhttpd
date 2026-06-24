@@ -334,7 +334,7 @@ static void paintAudioContent(QPainter& p, const QRect& bubbleRect,
 
 // ───── ChatElement methods ─────
 
-int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
+int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont) {
     switch (etype) {
     case Text: {
         if (viewWidth <= 0) { viewWidth = 400; }
@@ -408,6 +408,11 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
         if (bubbleHeight < minBubbleH) { bubbleHeight = minBubbleH; }
 
         if (showTranslation && !translatedText.isEmpty()) {
+            QFont sfmFont = baseFont;
+            int pt = std::max(sfmFont.pointSize() - 2, 8);
+            sfmFont.setPointSize(pt);
+            QFontMetrics sfm(sfmFont);
+
             int transLineCount = 0;
             int tLen2 = translatedText.length();
             int tPos = 0;
@@ -417,7 +422,7 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
                 int lastSpace = -1;
                 int end = tPos;
                 while (end < tLen2 && translatedText[end] != '\n') {
-                    lineWidth += fm.width(translatedText[end]);
+                    lineWidth += sfm.width(translatedText[end]);
                     if (translatedText[end].isSpace()) lastSpace = end;
                     if (lineWidth >= bubbleTextWidth) {
                         if (lastSpace > tPos && end - tPos > 10) {
@@ -431,7 +436,7 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
                 tPos = end;
             }
             if (transLineCount < 1) { transLineCount = 1; }
-            bubbleHeight += kBubbleVPad / 2 + transLineCount * fm.lineSpacing() + kBubbleVPad;
+            bubbleHeight += kBubbleVPad / 2 + transLineCount * sfm.lineSpacing() + kBubbleVPad + 7;
         }
 
         int headerHeight = fm.lineSpacing() + kPad;
@@ -854,15 +859,18 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                             textRect.width(), bubbleRect.bottom() - kBubbleVPad - transY);
             if (transRect.height() > 0) {
                 p.setPen(pal.textMuted);
-                f.setItalic(true);
-                p.setFont(f);
+                QFont smallFont = baseFont;
+                int pt2 = std::max(smallFont.pointSize() - 2, 8);
+                smallFont.setPointSize(pt2);
+                p.setFont(smallFont);
+                QString displayText = QString::fromUtf8("🌐 ") + translatedText;
 #ifdef EMOJI_RENDER_QT34
-                EmojiRenderer::instance().drawText(p, transRect, translatedText);
+                EmojiRenderer::instance().drawText(p, transRect, displayText);
 #else
 #  ifdef QT3_BUILD
-                p.drawText(transRect, Qt::WordBreak | Qt::AlignLeft | Qt::AlignTop, translatedText);
+                p.drawText(transRect, Qt::WordBreak | Qt::AlignLeft | Qt::AlignTop, displayText);
 #  else
-                p.drawText(transRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, translatedText);
+                p.drawText(transRect, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, displayText);
 #  endif
 #endif
                 p.setFont(baseFont);
@@ -1628,7 +1636,7 @@ void ChatView::appendMessage(const ChatElement& msg) {
     if (w <= 0) { w = 400; }
     m_items.push_back(msg);
     ChatElement& el = m_items.back();
-    el.height = el.calcHeight(w, m_fm, m_emojiW);
+    el.height = el.calcHeight(w, m_fm, m_emojiW, font());
     el.cachedWidth = (short)w;
     m_totalHeight += el.height;
 
@@ -1701,7 +1709,7 @@ void ChatView::relayout() {
     m_totalHeight = kPad;
     for (size_t i = 0; i < m_items.size(); ++i) {
         if (m_items[i].cachedWidth != w) {
-            m_items[i].height = m_items[i].calcHeight(w, m_fm, m_emojiW);
+            m_items[i].height = m_items[i].calcHeight(w, m_fm, m_emojiW, font());
             m_items[i].cachedWidth = (short)w;
         }
         m_totalHeight += m_items[i].height;
