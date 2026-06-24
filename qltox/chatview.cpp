@@ -1,3 +1,4 @@
+#include "identicon.h"
 #include "chatview.h"
 #include "photoviewer.h"
 #include "LimeScrollBar.h"
@@ -9,21 +10,10 @@
 #include <cstdlib>
 #include "translator.h"
 
-static bool isSkipChar(ushort u) {
-    return u == '@' || u == '#' || u == '(' || u == ')' || u == '[' || u == ']';
-}
-
-static QString firstAvatarChar(const QString& senderName, const QString& senderNickname) {
-    QString s = senderNickname.isEmpty() ? senderName : senderNickname;
-    if (s.isEmpty()) return "?";
-    for (int i = 0; i < s.length(); ++i) {
-        ushort u = s[i].unicode();
-        if (u >= 0xD800 && u <= 0xDBFF && i + 1 < s.length())
-            return s.mid(i, 2);
-        if (!isSkipChar(u))
-            return qToUpper(s.mid(i, 1));
-    }
-    return "?";
+static QString avatarSeed(const QString& name, int peer) {
+    if (name.isEmpty())
+        return QString::number(peer);
+    return QString::number(peer) + "|" + name;
 }
 #ifdef QT3_BUILD
 #include <qpainter.h>
@@ -658,19 +648,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18);
-                f.setBold(true);
-                p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
 
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
@@ -742,19 +721,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
         } else {
             int ax = kPad;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18);
-                f.setBold(true);
-                p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
 
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
@@ -952,17 +920,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
             int bubbleMaxW = contentRight - contentLeft;
@@ -1019,17 +978,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
         } else {
             int ax = kPad;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
             int bubbleW = (contentW * 80) / 100;
@@ -1154,17 +1104,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
             int bubbleMaxW = contentRight - contentLeft;
@@ -1221,17 +1162,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
         } else {
             int ax = kPad;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
             int bubbleW = (contentW * 80) / 100;
@@ -1336,21 +1268,9 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int hdrBtnAreaW = 2 * hdrBtnSize + hdrBtnGap;
 
         if (category == "self") {
-            // ── self ──
             int ax = viewWidth - kPad - kAvatarSize;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18);
-                f.setBold(true);
-                p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
 
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
@@ -1478,19 +1398,9 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 p.setFont(baseFont);
             }
         } else {
-            // ── other ──
             int ax = kPad;
-            p.setBrush(pal.surfaceBg);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(ax, y + kPad, kAvatarSize, kAvatarSize);
-            {
-                p.setPen(pal.textMuted);
-                f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = firstAvatarChar(senderName, senderNickname);
-                p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
-                           Qt::AlignCenter, ch);
-                p.setFont(baseFont);
-            }
+            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            p.drawPixmap(ax, y + kPad, av);
 
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;

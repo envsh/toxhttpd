@@ -35,7 +35,7 @@ static void hslToRgb(double h, double s, double l,
 static void colorFromDigest(const uint8_t digest[16],
                             int& r, int& g, int& b) {
     uint32_t hueSeed = (digest[12] << 8) | digest[13];
-    double h = hueSeed % 360 + hueSeed / 360.0;
+    double h = 180.0 + (hueSeed % 80);
     double s = 0.4 + (digest[14] >> 4) / 15.0 * 0.6;
     double l = 0.4 + (digest[14] & 0x0F) / 15.0 * 0.5;
     hslToRgb(h, s, l, r, g, b);
@@ -63,12 +63,18 @@ static void mirrorPat(int src[5][3], int dst[5][5]) {
     }
 }
 
-static QMap<QString, QPixmap> s_idCache;
+static QMap<QString, QPixmap>* s_idCachePtr() {
+    static QMap<QString, QPixmap>* cache = 0;
+    if (!cache)
+        cache = new QMap<QString, QPixmap>();
+    return cache;
+}
 
 QPixmap generateIdenticon(const QString& seed, int size) {
     QString key = seed + ":" + QString::number(size);
-    QMap<QString, QPixmap>::const_iterator it = s_idCache.find(key);
-    if (it != s_idCache.end()) {
+    QMap<QString, QPixmap>* cache = s_idCachePtr();
+    QMap<QString, QPixmap>::const_iterator it = cache->find(key);
+    if (it != cache->end()) {
         return *it;
     }
 
@@ -122,6 +128,6 @@ QPixmap generateIdenticon(const QString& seed, int size) {
     mp.end();
     pm.setMask(mask);
 
-    s_idCache.insert(key, pm);
+    cache->insert(key, pm);
     return pm;
 }

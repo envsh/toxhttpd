@@ -174,7 +174,7 @@ private:
     uint8_t m_ascW[128];
     uint8_t* m_bmpW;
 
-    static const int kAvatarSize = 48;
+    static const int kAvatarSize = 38;
     static const int kPad = 8;
     static const int kMsgSpacing = 8;
     static const int kBubbleHPad = 12;
