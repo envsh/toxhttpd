@@ -123,6 +123,8 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     QFont normalFont = p.font();
     QFont boldFont = normalFont;
     boldFont.setBold(true);
+    QFont smallFont = normalFont;
+    if (normalFont.pointSize() > 4) smallFont.setPointSize(normalFont.pointSize() - 2);
     int lh = p.fontMetrics().lineSpacing();
     int rightAreaW = 55; // time + unread + right margin conservative area
     int nameW = w - (cx - x) - rp - rightAreaW;
@@ -164,6 +166,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
         //          qToUtf8(lastMessage).data(), qToUtf8(msg).data(),
         //          w, h, msgY, msgW, lh, cx);
         if (msgW < 20) { msgW = 20; }
+        p.setFont(smallFont);
         if (p.fontMetrics().width(msg) > msgW) {
             while (!msg.isEmpty() && p.fontMetrics().width(msg + "...") > msgW)
                 msg.truncate(msg.length() - 1);
@@ -174,7 +177,9 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
             , 180
 #endif
         ));
+        p.setFont(smallFont);
         p.drawText(cx, msgY, msgW, lh, Qt::AlignLeft | Qt::AlignVCenter, msg);
+        p.setFont(normalFont);
     }
 
     // Unread badge: right-aligned on line 2
