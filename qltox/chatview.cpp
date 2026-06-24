@@ -2118,17 +2118,6 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 return;
             }
 
-            // Click on loaded media thumbnail -> open PhotoViewer
-            if ((m_items[msgIndex].etype == ChatElement::Image ||
-                 m_items[msgIndex].etype == ChatElement::Video ||
-                 m_items[msgIndex].etype == ChatElement::Gif) &&
-                !m_items[msgIndex].thumbnail.isNull() &&
-                m_items[msgIndex].thumbnailRect.contains(event->pos())) {
-                PhotoViewer* pv = new PhotoViewer(this, m_items[msgIndex].thumbnail);
-                pv->show();
-                return;
-            }
-
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
             for (int i = 0; i < msgIndex; i++) { curY += m_items[i].height; }
@@ -2302,6 +2291,18 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
 void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
+        if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+            // 双击媒体缩略图 → 打开 PhotoViewer
+            if ((m_items[msgIndex].etype == ChatElement::Image ||
+                 m_items[msgIndex].etype == ChatElement::Video ||
+                 m_items[msgIndex].etype == ChatElement::Gif) &&
+                !m_items[msgIndex].thumbnail.isNull() &&
+                m_items[msgIndex].thumbnailRect.contains(event->pos())) {
+                PhotoViewer* pv = new PhotoViewer(this, m_items[msgIndex].thumbnail);
+                pv->show();
+                return;
+            }
+        }
         if (msgIndex >= 0) {
             int msgY = kPad - m_scrollPos;
             for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
