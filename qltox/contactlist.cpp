@@ -4,14 +4,17 @@
 #include "restapi.h"
 #include "placeholderlineedit.h"
 #include "emojiutil.h"
+#include "LimeStyle.h"
 #include <qmessagebox.h>
 #include <algorithm>
 #include <qpainter.h>
 #ifdef QT3_BUILD
 #include <qlistbox.h>
+#include <qregion.h>
 #else
 #include <qlistwidget.h>
 #include <QStyledItemDelegate>
+#include <QPainterPath>
 #endif
 
 // Emoji 和状态点常量（所有构建统一使用 UTF-8 emoji）
@@ -27,10 +30,10 @@ const char* STATUS_OFFLINE = "○";
 
 // ---- 公共辅助函数 ----
 
-static int kRowH() { return 36; }
+static int kRowH() { return 54; }
 static int kPad() { return 8; }
 static int kDotR() { return 5; }
-static int kIconSz() { return 20; }
+static int kAvatarSz() { return 36; }
 
 static uint32_t typeToEmojiCp(const QString& type) {
     if (type == "friend" || type == kUnktoxFriendType)       return 0x1F464;
@@ -49,15 +52,21 @@ static uint32_t typeToEmojiCp(const QString& type) {
 // 公共绘制函数（Qt3/Qt4 共用）
 static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     bool selected, const QString& type, const QString& name,
-    const QString& status, bool isConnected, int unread)
+    const QString& status, bool isConnected, int unread,
+    const QString& lastMessage, const QString& timeStr)
 {
+    if (selected) {
+        QColor selBg = lerpColor(currentPalette().baseBg, currentPalette().accent, 0.25f);
+        p.fillRect(x, y, w, h, selBg);
+    }
+
     int rh = kRowH();
     int rp = kPad();
 
     int cx = x + rp;
     int cy = y + (h - kDotR() * 2) / 2;
 
-    // 2. Status dot
+    // 2. Status dot（不变）
     bool online = (status == "online" || status == "tcp" || status == "udp");
     if (type == "group") { online = isConnected; }
     p.save();
@@ -67,34 +76,91 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     p.restore();
     cx += kDotR() * 2 + rp;
 
-    // 3. Type emoji icon
+    // 3. 圆形头像（仿 chatview 风格）
+    int avatarY = y + (h - kAvatarSz()) / 2;
     uint32_t cp = typeToEmojiCp(type);
-    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kIconSz());
-    if (!pm.isNull()) {
-        int iy = y + (h - pm.height()) / 2;
-        p.drawPixmap(cx, iy, pm);
-        cx += pm.width() + rp;
-    } else {
-        cx += kIconSz() + rp;
+    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kAvatarSz() - 4);
+
+    // 圆形背景 + 掩码 mask（Qt4 用 clip path，Qt3 无 clip path）
+    p.save();
+    p.setBrush(QColor(224, 224, 224));
+    p.setPen(Qt::NoPen);
+#ifndef QT3_BUILD
+    {
+        QPainterPath clipPath;
+        clipPath.addEllipse(cx, avatarY, kAvatarSz(), kAvatarSz());
+        p.setClipPath(clipPath);
+#endif
+        p.drawEllipse(cx, avatarY, kAvatarSz(), kAvatarSz());
+
+        if (!pm.isNull()) {
+            int pmx = cx + (kAvatarSz() - pm.width()) / 2;
+            int pmy = avatarY + (kAvatarSz() - pm.height()) / 2;
+            p.drawPixmap(pmx, pmy, pm);
+        }
+#ifndef QT3_BUILD
+    }
+#endif
+    p.restore();
+    cx += kAvatarSz() + rp;
+
+    // 4. Line 1: Name（bold）+ time（right）
+    QFont normalFont = p.font();
+    QFont boldFont = normalFont;
+    boldFont.setBold(true);
+    int lh = p.fontMetrics().lineSpacing();
+    int rightAreaW = 55; // time + unread + right margin conservative area
+    int nameW = w - (cx - x) - rp - rightAreaW;
+    if (nameW < 20) { nameW = 20; }
+
+    QString displayName = name.isEmpty() ? _("no_name") : name;
+    if (p.fontMetrics().width(displayName) > nameW) {
+        while (!displayName.isEmpty() && p.fontMetrics().width(displayName + "...") > nameW)
+            displayName.truncate(displayName.length() - 1);
+        displayName += "...";
     }
 
-    // 4. Name text（支持 emoji 渲染）
-    int remainingW = w - (cx - x) - rp - 50;
-    if (remainingW < 20) { remainingW = 20; }
-    QRect nameRect(cx, y + (h - p.fontMetrics().lineSpacing()) / 2,
-                   remainingW, p.fontMetrics().lineSpacing());
-    QString displayName = name.isEmpty() ? _("no_name") : name;
-    if (displayName.length() > 20) { displayName = displayName.left(20) + "..."; }
-    EmojiRenderer::instance().drawText(p, nameRect, displayName);
+    p.setFont(boldFont);
+    p.drawText(cx, y + 6, nameW, lh, Qt::AlignLeft | Qt::AlignVCenter, displayName);
+    p.setFont(normalFont);
 
-    // 5. Unread badge
+    // Time: right-aligned on line 1
+    if (!timeStr.isEmpty()) {
+        p.setPen(QColor(160, 160, 160
+#ifndef QT3_BUILD
+            , 180
+#endif
+        ));
+        int tw = p.fontMetrics().width(timeStr);
+        p.drawText(x + w - rp - tw, y + 6, tw, lh, Qt::AlignLeft | Qt::AlignVCenter, timeStr);
+    }
+
+    // 5. Line 2: Last message（略透明）+ unread（right）
+    int msgY = y + 6 + lh + 1;
+    QString msg = lastMessage.isEmpty() ? "" : lastMessage;
+    if (!msg.isEmpty()) {
+        int msgW = w - (cx - x) - rp - rightAreaW;
+        if (msgW < 20) { msgW = 20; }
+        if (p.fontMetrics().width(msg) > msgW) {
+            while (!msg.isEmpty() && p.fontMetrics().width(msg + "...") > msgW)
+                msg.truncate(msg.length() - 1);
+            msg += "...";
+        }
+        p.setPen(QColor(150, 150, 150
+#ifndef QT3_BUILD
+            , 180
+#endif
+        ));
+        p.drawText(cx, msgY, msgW, lh, Qt::AlignLeft | Qt::AlignVCenter, msg);
+    }
+
+    // Unread badge: right-aligned on line 2
     if (unread > 0) {
         QString badge = QString("(%1)").arg(unread);
-        int bw = p.fontMetrics().width(badge);
-        int bx = x + w - rp - bw;
         p.setPen(QColor(100, 100, 100));
-        p.drawText(bx, y + (h - p.fontMetrics().lineSpacing()) / 2,
-                   bw, p.fontMetrics().lineSpacing(), Qt::AlignLeft, badge);
+        int bw = p.fontMetrics().width(badge);
+        p.drawText(x + w - rp - bw, msgY, bw, lh,
+                   Qt::AlignLeft | Qt::AlignVCenter, badge);
     }
 }
 
@@ -105,30 +171,34 @@ class ContactListItem : public QListBoxItem {
 public:
     ContactListItem(QListBox* lb, int id, const QString& type,
                     const QString& name, const QString& status,
-                    bool isConnected, int unread);
+                    bool isConnected, int unread,
+                    const QString& lastMessage, const QString& timeStr);
     void paint(QPainter* p);
-    int height(const QListBox*) const { return 36; }
+    int height(const QListBox*) const { return 54; }
     int itemId() const { return m_id; }
     const QString& itemType() const { return m_type; }
     const QString& itemName() const { return m_name; }
 private:
     int m_id, m_unread;
-    QString m_type, m_name, m_status;
+    QString m_type, m_name, m_status, m_lastMessage, m_timeStr;
     bool m_isConnected;
     QListBox* m_lb;
 };
 
 ContactListItem::ContactListItem(QListBox* lb, int id, const QString& type,
     const QString& name, const QString& status,
-    bool isConnected, int unread)
+    bool isConnected, int unread,
+    const QString& lastMessage, const QString& timeStr)
     : QListBoxItem(lb), m_id(id), m_unread(unread),
       m_type(type), m_name(name), m_status(status),
-      m_isConnected(isConnected), m_lb(lb) {}
+      m_isConnected(isConnected), m_lb(lb),
+      m_lastMessage(lastMessage), m_timeStr(timeStr) {}
 
 void ContactListItem::paint(QPainter* p) {
     bool sel = m_lb->isSelected(this);
     paintContactRow(*p, 0, 0, m_lb->width(), kRowH(),
-                    sel, m_type, m_name, m_status, m_isConnected, m_unread);
+                    sel, m_type, m_name, m_status, m_isConnected, m_unread,
+                    m_lastMessage, m_timeStr);
 }
 
 // ---- Qt3: ContactListBox（右键菜单由 contentsMousePressEvent 直接处理）----
@@ -165,7 +235,7 @@ public:
     ContactListDelegate(QObject* parent = 0) : QStyledItemDelegate(parent) {}
     void paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const;
     QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const {
-        return QSize(100, 36);
+        return QSize(100, 54);
     }
 };
 
@@ -176,13 +246,11 @@ void ContactListDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt,
     int unread = idx.data(Qt::UserRole + 3).toInt();
     bool conn  = idx.data(Qt::UserRole + 4).toBool();
     QString status = idx.data(Qt::UserRole + 5).toString();
+    QString lastMessage = idx.data(Qt::UserRole + 6).toString();
+    QString timeStr = idx.data(Qt::UserRole + 7).toString();
     bool sel = (opt.state & QStyle::State_Selected);
-    // Qt4 delegate 需自己绘制选中背景
-    if (sel) {
-        p->fillRect(opt.rect, opt.palette.brush(QPalette::Highlight));
-    }
     paintContactRow(*p, opt.rect.x(), opt.rect.y(), opt.rect.width(), opt.rect.height(),
-                    sel, type, name, status, conn, unread);
+                    sel, type, name, status, conn, unread, lastMessage, timeStr);
 }
 #endif
 
@@ -395,6 +463,22 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
 #endif
 }
 
+void ContactListWidget::updateContactLastMessage(int id, const QString& type, const QString& msg) {
+    auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+    m_lastMessages[key] = msg;
+    for (uint i = 0; i < allContacts.count(); ++i) {
+        Contact* c = allContacts.at(i);
+        if (c->id == id && c->type == type) {
+            c->lastMessage = msg;
+            break;
+        }
+    }
+    updateView_v3();
+#ifndef QT3_BUILD
+    updateView_v4();
+#endif
+}
+
 void ContactListWidget::onSearchTextChanged(const QString& text) {
     m_searchText = text;
     updateView_v3();
@@ -566,9 +650,16 @@ void ContactListWidget::updateView_v3() {
         auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
         auto uit = m_unreadCounts.find(key);
         int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
-        
+
+        QString lastMsg = c->lastMessage;
+        if (lastMsg.isEmpty()) {
+            auto lit = m_lastMessages.find(key);
+            if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
+        }
+
         ContactListItem* item = new ContactListItem(lb, c->id, c->type,
-            c->name, c->status, c->is_connected, unread);
+            c->name, c->status, c->is_connected, unread,
+            lastMsg, QString());
         
         if (c->id == selectedId && c->type == selectedType) {
             targetItem = item;
@@ -621,7 +712,13 @@ void ContactListWidget::updateView_v4() {
         auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
         auto uit = m_unreadCounts.find(key);
         int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
-        
+
+        QString lastMsg = c->lastMessage;
+        if (lastMsg.isEmpty()) {
+            auto lit = m_lastMessages.find(key);
+            if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
+        }
+
         QListWidgetItem* item = new QListWidgetItem();
         item->setData(Qt::UserRole,     c->id);
         item->setData(Qt::UserRole + 1, c->type);
@@ -629,6 +726,8 @@ void ContactListWidget::updateView_v4() {
         item->setData(Qt::UserRole + 3, unread);
         item->setData(Qt::UserRole + 4, c->is_connected);
         item->setData(Qt::UserRole + 5, c->status);
+        item->setData(Qt::UserRole + 6, lastMsg);
+        item->setData(Qt::UserRole + 7, QString());
         lw->addItem(item);
         
         if (c->id == selectedId && c->type == selectedType) {

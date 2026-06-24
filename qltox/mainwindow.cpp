@@ -725,6 +725,7 @@ void MainWindow::onMessageSending(const QString& message) {
 
     // 乐观更新：先显示在界面
     chatWidget->appendMessage(message, "self", "Me", QString(), -1, getCurrentTime());
+    contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message);
 }
 
 void MainWindow::handleEvents(const EventList& events) {
@@ -746,6 +747,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         contactListWidget->incrementUnread(friendId, "friend");
                     }
+                    contactListWidget->updateContactLastMessage(friendId, "friend", message);
                     if (!qIsAppActive())
                         playNotificationSound();
                 }
@@ -815,6 +817,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         contactListWidget->incrementUnread(confNumber, "conference");
                     }
+                    contactListWidget->updateContactLastMessage(confNumber, "conference", message);
                     if (!qIsAppActive())
                         playNotificationSound();
                 } else {
@@ -877,6 +880,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         contactListWidget->incrementUnread(groupNumber, "group");
                     }
+                    contactListWidget->updateContactLastMessage(groupNumber, "group", message);
                     if (!qIsAppActive())
                         playNotificationSound();
                 }
