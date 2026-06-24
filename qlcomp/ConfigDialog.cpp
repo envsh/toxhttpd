@@ -341,7 +341,7 @@ void ConfigDialog::saveSettings() {
             default:               m_settings->writeEntry(it.key(), it.data().toString()); break;
         }
 #else
-        m_settings->setValue(it.key(), it.data());
+        m_settings->setValue(it.key(), it.value());
 #endif
     }
     m_settings->sync();

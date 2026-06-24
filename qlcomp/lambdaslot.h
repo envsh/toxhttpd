@@ -5,7 +5,7 @@
 #include <functional>
 
 /*
- * 0 参数 Lambda 槽代理
+ * LambdaSlot — 零参数 lambda 槽代理
  *
  * 基于 Evan Teran (blog.codef00.com, 2011) 和
  * caetanus/lambda-connect-qt4 (github.com/caetanus/lambda-connect-qt4, 2013)
