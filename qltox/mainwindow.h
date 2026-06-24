@@ -46,6 +46,7 @@ public:
     void onSourceClicked(int msgIndex);
     void onRetryClicked(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
+    void openSettings();
     void onMenu1Stub();
     void onMenu2Stub();
     void openHomePage();

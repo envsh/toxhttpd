@@ -23,6 +23,7 @@
 #include "toastwidget.h"
 #include "sharedstatusbar.h"
 #include <qlabel.h>
+#include "ConfigDialog.h"
 #include <qpushbutton.h>
 #include <qlineedit.h>
 
@@ -275,7 +276,7 @@ MainWindow::MainWindow(QWidget* parent)
     MenuWidget34* tool = mb->addMenu(qFromUtf8("工具(&T)"));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("统计(&T)..."), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("日志(&L)..."), this, SLOT(onMenu1Stub()));
-    EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(onMenu1Stub()));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(openSettings()));
 
     MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));
     EmbeddedMenuBar::addItem(help, _("menu.homepage"), this, SLOT(openHomePage()));
@@ -1807,6 +1808,59 @@ void MainWindow::onSourceClicked(int msgIndex) {
     QObject::connect(dlg, SIGNAL(finished(int)), dlg, SLOT(deleteLater()));
 #endif
     dlg->show();
+}
+
+void MainWindow::openSettings() {
+    ConfigDialog dlg(qFromUtf8("设置"), this);
+    dlg.setSettingsFile(ConfigDialog::defaultSettingsFile());
+
+    CategoryPage* general = new CategoryPage(qFromUtf8("常规"), &dlg);
+    StringConfigItem* serverUrl = new StringConfigItem(
+        "server/baseUrl", "http://localhost:8181",
+        qFromUtf8("服务器地址"), general);
+    general->addLabeledControl(serverUrl->label(), serverUrl->lineEdit());
+    general->addStretch();
+    dlg.addCategory(qFromUtf8("常规"), general);
+    dlg.registerConfigItem(serverUrl);
+
+    CategoryPage* appearance = new CategoryPage(qFromUtf8("界面"), &dlg);
+    QStringList langs;
+    langs << qFromUtf8("zh-CN") << qFromUtf8("zh-TW") << qFromUtf8("en-US");
+    SelectConfigItem* langItem = new SelectConfigItem(
+        "lang/code", "zh-CN",
+        qFromUtf8("语言"), langs, appearance);
+    appearance->addLabeledControl(langItem->label(), langItem->comboBox());
+    appearance->addStretch();
+    dlg.addCategory(qFromUtf8("界面"), appearance);
+    dlg.registerConfigItem(langItem);
+
+    CategoryPage* notify = new CategoryPage(qFromUtf8("通知"), &dlg);
+    BoolConfigItem* msgNotif = new BoolConfigItem(
+        "notify/enabled", true,
+        qFromUtf8("消息通知"), notify);
+    notify->addWidget(msgNotif->checkBox());
+    BoolConfigItem* soundNotif = new BoolConfigItem(
+        "notify/sound", true,
+        qFromUtf8("声音"), notify);
+    notify->addWidget(soundNotif->checkBox());
+    notify->addStretch();
+    dlg.addCategory(qFromUtf8("通知"), notify);
+    dlg.registerConfigItem(msgNotif);
+    dlg.registerConfigItem(soundNotif);
+
+    CategoryPage* chat = new CategoryPage(qFromUtf8("聊天"), &dlg);
+    IntConfigItem* pageSize = new IntConfigItem(
+        "chat/pageSize", 200,
+        qFromUtf8("每页消息数"), 50, 500, chat);
+    chat->addLabeledControl(pageSize->label(), pageSize->spinBox());
+    chat->addStretch();
+    dlg.addCategory(qFromUtf8("聊天"), chat);
+    dlg.registerConfigItem(pageSize);
+
+    dlg.loadSettings();
+    if (dlg.exec() == QDialog::Accepted) {
+        dlg.saveSettings();
+    }
 }
 
 void MainWindow::onMenu1Stub() {

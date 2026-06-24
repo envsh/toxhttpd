@@ -3,10 +3,10 @@
 - [ ] contact list two line with last msg
 - [ ] contact list lift latest message contact to top
 - [ ] contact list add aichat(s) fixed_room
-- [ ] impr matrix image msg parser and draw image chat element
+- [x] impr matrix image msg parser and draw image chat element
 - [x] impr matrix msg parser with username and nickname
 - [ ] impr imapmail msg parser with proper content html, then to markdown
-- [ ] impr imapmail msg proper text codec
+- [x] impr imapmail msg proper text codec
 - [ ] impr fedmsg proper timestamp
 - [ ] impr fedmsg proper msgid/eventid
 - [ ] fedgif libgif/qmovie compare
@@ -26,7 +26,7 @@
 - [ ] contact identicon multiple combined mode
 - [ ] add settings window, log/aichat-account/proxy/fedclipauto
 - [ ] message sending/error/success flag
-- [ ] peer info dialog
-- [ ] persist chat message history with bdb
+- [ ] peer info/profile dialog
+- [ ] persist chat message history locally with bdb
 - [ ] maybe split msg parses to plugin is better
 - [ ] qltox memory keep increase
