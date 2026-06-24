@@ -96,9 +96,11 @@ struct HistoryMessage {
     std::string created_at;
     std::string roomId;
     // Media (e.g. Matrix image)
-    std::string msgtype;       // "image" / ""(text)
+    std::string msgtype;       // "image"/"video"/"audio"/"file"/""(text)
     std::string mediaUrl;      // "mxc://..."
     std::string mediaMime;     // "image/png"
+    std::string thumbnailUrl;  // preview thumb mxc:// (video)
+    int duration       = 0;    // milliseconds (video/audio)
     int mediaWidth  = 0;
     int mediaHeight = 0;
 };

@@ -84,16 +84,39 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
         HistoryMessage hm;
         hm.message       = jsonGetString(ev, "content.body");
         {
-            // ── 图片消息检测 ──
+            // ── 媒体消息检测 ──
             std::string msgtype = jsonGetString(ev, "content.msgtype");
+            cJSON* info = jsonPath(ev, "content.info");
             if (msgtype.find("m.image") == 0) {
                 hm.msgtype  = "image";
                 hm.mediaUrl = jsonGetString(ev, "content.url");
-                cJSON* info = jsonPath(ev, "content.info");
                 if (info) {
                     hm.mediaWidth  = (int)jsonGetInt64(ev, "content.info.w");
                     hm.mediaHeight = (int)jsonGetInt64(ev, "content.info.h");
                     hm.mediaMime   = jsonGetString(ev, "content.info.mimetype");
+                }
+            } else if (msgtype.find("m.video") == 0) {
+                hm.msgtype      = "video";
+                hm.mediaUrl     = jsonGetString(ev, "content.url");
+                if (info) {
+                    hm.mediaWidth   = (int)jsonGetInt64(ev, "content.info.w");
+                    hm.mediaHeight  = (int)jsonGetInt64(ev, "content.info.h");
+                    hm.mediaMime    = jsonGetString(ev, "content.info.mimetype");
+                    hm.duration     = (int)jsonGetInt64(ev, "content.info.duration");
+                    hm.thumbnailUrl = jsonGetString(ev, "content.info.thumbnail_url");
+                }
+            } else if (msgtype.find("m.audio") == 0) {
+                hm.msgtype  = "audio";
+                hm.mediaUrl = jsonGetString(ev, "content.url");
+                if (info) {
+                    hm.mediaMime = jsonGetString(ev, "content.info.mimetype");
+                    hm.duration  = (int)jsonGetInt64(ev, "content.info.duration");
+                }
+            } else if (msgtype.find("m.file") == 0) {
+                hm.msgtype  = "file";
+                hm.mediaUrl = jsonGetString(ev, "content.url");
+                if (info) {
+                    hm.mediaMime = jsonGetString(ev, "content.info.mimetype");
                 }
             }
         }

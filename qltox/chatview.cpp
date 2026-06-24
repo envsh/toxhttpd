@@ -190,6 +190,7 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW) {
     case Image:
     case Gif:
     case Video:
+    case Audio:
         return 0;
     case File: {
         int kAvatarSize = 48;
@@ -556,6 +557,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
     case Image:
     case Gif:
     case Video:
+    case Audio:
         break;
     case File: {
         QFont f = baseFont;

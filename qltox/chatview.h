@@ -19,7 +19,7 @@
 #endif
 
 struct ChatElement {
-    enum ElementType { Text, Image, File, Video, Gif };
+    enum ElementType { Text, Image, File, Video, Gif, Audio };
 
     ElementType etype;
 
