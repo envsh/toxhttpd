@@ -77,11 +77,11 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     cx += kDotR() * 2 + rp;
 
     // 3. 圆形头像（仿 chatview 风格）
-    int avatarY = y + (h - kAvatarSz()) / 2;
+    int avatarY = y + 6;
     uint32_t cp = typeToEmojiCp(type);
     QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kAvatarSz() - 4);
 
-    // 圆形背景 + 掩码 mask（Qt4 用 clip path，Qt3 无 clip path）
+    // 圆形背景（Qt3 不支持非矩形 clip region，用 emoji 自带 alpha 替代）
     p.save();
     p.setBrush(QColor(224, 224, 224));
     p.setPen(Qt::NoPen);
@@ -137,9 +137,15 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
 
     // 5. Line 2: Last message（略透明）+ unread（right）
     int msgY = y + 6 + lh + 1;
-    QString msg = lastMessage.isEmpty() ? "" : lastMessage;
+    QString msg = lastMessage.isEmpty() ? displayName : lastMessage;
+
     if (!msg.isEmpty()) {
         int msgW = w - (cx - x) - rp - rightAreaW;
+
+        qWarning("paintContactRow: id=%s name=[%s] lastMsg=[%s] msg=[%s] w=%d h=%d msgY=%d msgW=%d lh=%d cx=%d",
+                 qToUtf8(type).data(), qToUtf8(displayName).data(),
+                 qToUtf8(lastMessage).data(), qToUtf8(msg).data(),
+                 w, h, msgY, msgW, lh, cx);
         if (msgW < 20) { msgW = 20; }
         if (p.fontMetrics().width(msg) > msgW) {
             while (!msg.isEmpty() && p.fontMetrics().width(msg + "...") > msgW)
@@ -463,13 +469,18 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
 #endif
 }
 
-void ContactListWidget::updateContactLastMessage(int id, const QString& type, const QString& msg) {
+void ContactListWidget::updateContactLastMessage(int id, const QString& type, const QString& msg,
+                                                  const QString& timeStr) {
+    qWarning("updateContactLastMessage: id=%d type=%s msg=[%s]",
+             id, qToUtf8(type).data(), qToUtf8(msg).data());
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
     m_lastMessages[key] = msg;
+    m_lastMessageTimes[key] = timeStr;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         if (c->id == id && c->type == type) {
             c->lastMessage = msg;
+            c->lastMessageTime = timeStr;
             break;
         }
     }
@@ -653,13 +664,25 @@ void ContactListWidget::updateView_v3() {
 
         QString lastMsg = c->lastMessage;
         if (lastMsg.isEmpty()) {
+            qWarning("updateView_v3: id=%d type=%s name=[%s] c->lastMessage EMPTY, trying m_lastMessages",
+                     c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data());
             auto lit = m_lastMessages.find(key);
             if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
         }
 
+        QString lastTime = c->lastMessageTime;
+        if (lastTime.isEmpty()) {
+            auto tit = m_lastMessageTimes.find(key);
+            if (tit != m_lastMessageTimes.end()) { lastTime = tit->second; }
+        }
+
+        qWarning("updateView_v3: id=%d type=%s name=[%s] lastMsg=[%s]",
+                 c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data(),
+                 qToUtf8(lastMsg).data());
+
         ContactListItem* item = new ContactListItem(lb, c->id, c->type,
             c->name, c->status, c->is_connected, unread,
-            lastMsg, QString());
+            lastMsg, lastTime);
         
         if (c->id == selectedId && c->type == selectedType) {
             targetItem = item;
@@ -719,6 +742,12 @@ void ContactListWidget::updateView_v4() {
             if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
         }
 
+        QString lastTime = c->lastMessageTime;
+        if (lastTime.isEmpty()) {
+            auto tit = m_lastMessageTimes.find(key);
+            if (tit != m_lastMessageTimes.end()) { lastTime = tit->second; }
+        }
+
         QListWidgetItem* item = new QListWidgetItem();
         item->setData(Qt::UserRole,     c->id);
         item->setData(Qt::UserRole + 1, c->type);
@@ -727,7 +756,7 @@ void ContactListWidget::updateView_v4() {
         item->setData(Qt::UserRole + 4, c->is_connected);
         item->setData(Qt::UserRole + 5, c->status);
         item->setData(Qt::UserRole + 6, lastMsg);
-        item->setData(Qt::UserRole + 7, QString());
+        item->setData(Qt::UserRole + 7, lastTime);
         lw->addItem(item);
         
         if (c->id == selectedId && c->type == selectedType) {

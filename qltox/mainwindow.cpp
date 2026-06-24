@@ -32,6 +32,14 @@ static const int VIRTUAL_UNKNOWN_ID = -100;
 static const int VIRTUAL_SYSEVENT_ID = -101;
 static const int VIRTUAL_REDDIT_ID = -102;
 
+static QString timenowhm() {
+#ifdef QT3_BUILD
+    return QTime::currentTime().toString("hh:mm");
+#else
+    return QTime::currentTime().toString("HH:mm");
+#endif
+}
+
 // 读取保存的语言设置
 static QString loadSavedLanguage() {
     QString home = qGetHomePath();
@@ -725,7 +733,7 @@ void MainWindow::onMessageSending(const QString& message) {
 
     // 乐观更新：先显示在界面
     chatWidget->appendMessage(message, "self", "Me", QString(), -1, getCurrentTime());
-    contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message);
+    contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message, timenowhm());
 }
 
 void MainWindow::handleEvents(const EventList& events) {
@@ -747,7 +755,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         contactListWidget->incrementUnread(friendId, "friend");
                     }
-                    contactListWidget->updateContactLastMessage(friendId, "friend", message);
+                    contactListWidget->updateContactLastMessage(friendId, "friend", message, timenowhm());
                     if (!qIsAppActive())
                         playNotificationSound();
                 }
@@ -817,7 +825,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         contactListWidget->incrementUnread(confNumber, "conference");
                     }
-                    contactListWidget->updateContactLastMessage(confNumber, "conference", message);
+                    contactListWidget->updateContactLastMessage(confNumber, "conference", message, timenowhm());
                     if (!qIsAppActive())
                         playNotificationSound();
                 } else {
@@ -880,7 +888,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         contactListWidget->incrementUnread(groupNumber, "group");
                     }
-                    contactListWidget->updateContactLastMessage(groupNumber, "group", message);
+                    contactListWidget->updateContactLastMessage(groupNumber, "group", message, timenowhm());
                     if (!qIsAppActive())
                         playNotificationSound();
                 }
@@ -1130,6 +1138,8 @@ void MainWindow::handleEvents(const EventList& events) {
                     qWarning("Cache PUSH to %s %d: sender=%s",
                              chatType.c_str(), chatId, qToUtf8(msg.senderName).data());
                     m_messageCache[{chatId, chatType}].push_back(msg);
+                    contactListWidget->updateContactLastMessage(
+                        chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
                         chatWidget->appendMessage(msg);
                         int newIdx = chatWidget->messageCount() - 1;
@@ -1160,6 +1170,8 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("Cache PUSH to reddit %d: sender=%s",
                          VIRTUAL_REDDIT_ID, qToUtf8(msg.senderName).data());
                 m_messageCache[{VIRTUAL_REDDIT_ID, kTopicType}].push_back(msg);
+                contactListWidget->updateContactLastMessage(
+                    VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
                 if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType) {
                     chatWidget->appendMessage(msg);
                 } else {
@@ -1180,6 +1192,8 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("Cache PUSH to unknown %d: type=%s, handled=%d, sender=%s",
                          VIRTUAL_UNKNOWN_ID, e.type.c_str(), pr.handled, qToUtf8(msg.senderName).data());
                 m_messageCache[{VIRTUAL_UNKNOWN_ID, kUnknownType}].push_back(msg);
+                contactListWidget->updateContactLastMessage(
+                    VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
                 if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType) {
                     chatWidget->appendMessage(msg);
                 } else {

@@ -26,6 +26,7 @@ struct Contact {
     QString chat_id; // public key
     bool is_connected; // 群组/会议连接状态
     QString lastMessage;
+    QString lastMessageTime;
 };
 
 typedef QPtrList<Contact> ContactList;
@@ -43,7 +44,8 @@ public:
                        const QString& chatId, const QString& status);
     void addContact(Contact* c);
     void removeContact(int id, const QString& type);
-    void updateContactLastMessage(int id, const QString& type, const QString& msg);
+    void updateContactLastMessage(int id, const QString& type, const QString& msg,
+                                  const QString& timeStr = QString());
     bool isFriendLoaded(int friendId);
     void retranslateUi();
     
@@ -100,6 +102,7 @@ private:
     // 未读消息数 map: key=(id, type)
     std::map<std::pair<int, std::string>, int> m_unreadCounts;
     std::map<std::pair<int, std::string>, QString> m_lastMessages;
+    std::map<std::pair<int, std::string>, QString> m_lastMessageTimes;
     
     // 搜索与排序
     PlaceholderLineEdit* searchInput;
