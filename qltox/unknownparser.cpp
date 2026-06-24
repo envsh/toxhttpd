@@ -282,12 +282,25 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     std::string fullText = subject;
     QByteArray decoded = base64Decode(cleanB64);
     if (!decoded.isEmpty()) {
-        QTextCodec* gbk = QTextCodec::codecForName("GBK");
+        // 轮询常见编码，回环检测确定正确编码
         QString text;
-        if (gbk)
-            text = gbk->toUnicode(decoded);
+        static const char* kCodecs[] = {
+            "UTF-8", "GBK", "Shift-JIS", "Big5", "EUC-KR", "ISO-8859-1"
+        };
+        for (const char* name : kCodecs) {
+            QTextCodec* codec = QTextCodec::codecForName(name);
+            if (!codec) continue;
+            QString t = codec->toUnicode(decoded);
+            QByteArray re = codec->fromUnicode(t);
+            if (re == decoded) {
+                text = t;
+                break;
+            }
+        }
+        // 回环检测均失败时兜底 UTF-8
         if (text.isEmpty())
             text = qFromUtf8(decoded.data(), decoded.size());
+        // TODO: 若仍乱码，可引入 uchardet 库做更准确的编码检测
         std::string body(qToUtf8(text).data());
         fullText += "\n" + std::to_string(body.size()) + ": " + body;
     } else if (!cleanB64.empty()) {
