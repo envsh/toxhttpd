@@ -8,6 +8,23 @@
 #include <algorithm>
 #include <cstdlib>
 #include "translator.h"
+
+static bool isSkipChar(ushort u) {
+    return u == '@' || u == '#' || u == '(' || u == ')' || u == '[' || u == ']';
+}
+
+static QString firstAvatarChar(const QString& senderName, const QString& senderNickname) {
+    QString s = senderNickname.isEmpty() ? senderName : senderNickname;
+    if (s.isEmpty()) return "?";
+    for (int i = 0; i < s.length(); ++i) {
+        ushort u = s[i].unicode();
+        if (u >= 0xD800 && u <= 0xDBFF && i + 1 < s.length())
+            return s.mid(i, 2);
+        if (!isSkipChar(u))
+            return qToUpper(s.mid(i, 1));
+    }
+    return "?";
+}
 #ifdef QT3_BUILD
 #include <qpainter.h>
 #include <qimage.h>
@@ -585,7 +602,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 f.setPointSize(18);
                 f.setBold(true);
                 p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
@@ -669,7 +686,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 f.setPointSize(18);
                 f.setBold(true);
                 p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize, Qt::AlignCenter, ch);
                 p.setFont(baseFont);
             }
@@ -873,7 +890,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
                            Qt::AlignCenter, ch);
                 p.setFont(baseFont);
@@ -940,7 +957,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
                            Qt::AlignCenter, ch);
                 p.setFont(baseFont);
@@ -1052,7 +1069,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
                            Qt::AlignCenter, ch);
                 p.setFont(baseFont);
@@ -1119,7 +1136,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
                            Qt::AlignCenter, ch);
                 p.setFont(baseFont);
@@ -1232,7 +1249,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 f.setPointSize(18);
                 f.setBold(true);
                 p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
                            Qt::AlignCenter, ch);
                 p.setFont(baseFont);
@@ -1372,7 +1389,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             {
                 p.setPen(pal.textMuted);
                 f.setPointSize(18); f.setBold(true); p.setFont(f);
-                QString ch = senderNickname.isEmpty() ? (senderName.isEmpty() ? "?" : qToUpper(senderName.left(1))) : qToUpper(senderNickname.left(1));
+                QString ch = firstAvatarChar(senderName, senderNickname);
                 p.drawText(ax, y + kPad, kAvatarSize, kAvatarSize,
                            Qt::AlignCenter, ch);
                 p.setFont(baseFont);

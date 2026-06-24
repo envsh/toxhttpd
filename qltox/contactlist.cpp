@@ -135,6 +135,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
         displayName += "...";
     }
 
+    p.setPen(currentPalette().textPrimary);
     p.setFont(boldFont);
     p.drawText(cx, y + 6, nameW, lh, Qt::AlignLeft | Qt::AlignVCenter, displayName);
     p.setFont(normalFont);
