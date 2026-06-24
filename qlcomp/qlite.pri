@@ -14,7 +14,8 @@ QTCOMP_CPP = $$PWD/limelog.cpp $$PWD/appsetup.cpp $$PWD/compat34.cpp $$PWD/trans
 			$$PWD/sharedstatusbar.cpp \
 			$$PWD/qthooks.cpp \
 			$$PWD/jsonview.cpp \
-			$$PWD/floatingpill.cpp
+			$$PWD/floatingpill.cpp \
+			$$PWD/generic_slot.cpp
 
 QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translator.h $$PWD/compat34.h \
 			$$PWD/emojiutil.h $$PWD/emojiwidgets.h $$PWD/emojiitems.h \
