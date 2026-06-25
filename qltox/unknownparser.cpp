@@ -363,34 +363,33 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     std::string fullText = subject;
     QByteArray decoded = base64Decode(cleanB64);
     if (!decoded.isEmpty()) {
-        QString text;
-        // 1) uchardet 前置检测
+        fullText += "\n";
+        // uchardet 检测结果（如果有）
         std::string enc = detectEncoding(decoded);
         if (!enc.empty()) {
             QTextCodec* codec = QTextCodec::codecForName(enc.c_str());
-            if (codec) text = codec->toUnicode(decoded);
-        }
-        // 2) 轮询常见编码，回环检测确定正确编码
-        if (text.isEmpty()) {
-            static const char* kCodecs[] = {
-                "UTF-8", "GBK", "Shift-JIS", "Big5", "EUC-KR", "ISO-8859-1"
-            };
-            for (const char* name : kCodecs) {
-                QTextCodec* codec = QTextCodec::codecForName(name);
-                if (!codec) continue;
+            if (codec) {
                 QString t = codec->toUnicode(decoded);
-                QByteArray re = codec->fromUnicode(t);
-                if (re == decoded) {
-                    text = t;
-                    break;
+                if (!t.isEmpty()) {
+                    std::string s(qToUtf8(t).data());
+                    fullText += std::string("[uchardet] ") + enc + "(" + std::to_string(s.size()) + "): " + s + "\n";
                 }
             }
         }
-        // 3) 回环检测均失败时兜底 UTF-8
-        if (text.isEmpty())
-            text = qFromUtf8(decoded.data(), decoded.size());
-        std::string body(qToUtf8(text).data());
-        fullText += "\n" + std::to_string(body.size()) + ": " + body;
+        // 所有候选编码依次解码
+        static const char* kCodecs[] = {
+            "UTF-8", "GBK", "Shift-JIS", "Big5", "EUC-KR", "ISO-8859-1"
+        };
+        for (const char* name : kCodecs) {
+            QTextCodec* codec = QTextCodec::codecForName(name);
+            if (!codec) continue;
+            QString t = codec->toUnicode(decoded);
+            if (t.isEmpty()) continue;
+            std::string s(qToUtf8(t).data());
+            fullText += std::string(name) + "(" + std::to_string(s.size()) + "): " + s + "\n";
+        }
+        if (fullText.size() > 1 && fullText.back() == '\n')
+            fullText.pop_back();
     } else if (!cleanB64.empty()) {
         // base64 数据存在但解码后为空 → 解码失败，附上原始 base64 文本
         fullText += "\n(dcode failed, raw: " + cleanB64 + ")";
