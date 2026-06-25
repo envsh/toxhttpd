@@ -1924,11 +1924,56 @@ void MainWindow::openSettings() {
         "chat/fontSize", 14,
         qFromUtf8("消息字体大小"), 8, 32, other);
     other->addLabeledControl(fontSize->label(), fontSize->spinBox());
+
+    // ── 富媒体显示 ──
+    BoolConfigItem* dispImg = new BoolConfigItem(
+        "media/displayImage", true,
+        qFromUtf8("显示图片"), other);
+    other->addWidget(dispImg->checkBox());
+    BoolConfigItem* dispFile = new BoolConfigItem(
+        "media/displayFile", false,
+        qFromUtf8("显示文件"), other);
+    other->addWidget(dispFile->checkBox());
+    BoolConfigItem* dispGif = new BoolConfigItem(
+        "media/displayGif", true,
+        qFromUtf8("显示GIF"), other);
+    other->addWidget(dispGif->checkBox());
+    BoolConfigItem* dispVid = new BoolConfigItem(
+        "media/displayVideo", false,
+        qFromUtf8("显示视频"), other);
+    other->addWidget(dispVid->checkBox());
+
+    // ── 富媒体自动下载 ──
+    BoolConfigItem* dlImg = new BoolConfigItem(
+        "media/downloadImage", true,
+        qFromUtf8("自动下载图片"), other);
+    other->addWidget(dlImg->checkBox());
+    BoolConfigItem* dlFile = new BoolConfigItem(
+        "media/downloadFile", false,
+        qFromUtf8("自动下载文件"), other);
+    other->addWidget(dlFile->checkBox());
+    BoolConfigItem* dlGif = new BoolConfigItem(
+        "media/downloadGif", true,
+        qFromUtf8("自动下载GIF"), other);
+    other->addWidget(dlGif->checkBox());
+    BoolConfigItem* dlVid = new BoolConfigItem(
+        "media/downloadVideo", false,
+        qFromUtf8("自动下载视频"), other);
+    other->addWidget(dlVid->checkBox());
+
     other->addStretch();
     dlg->addCategory(qFromUtf8("其他"), other);
     dlg->registerConfigItem(logLevel);
     dlg->registerConfigItem(autoConnect);
     dlg->registerConfigItem(fontSize);
+    dlg->registerConfigItem(dispImg);
+    dlg->registerConfigItem(dispFile);
+    dlg->registerConfigItem(dispGif);
+    dlg->registerConfigItem(dispVid);
+    dlg->registerConfigItem(dlImg);
+    dlg->registerConfigItem(dlFile);
+    dlg->registerConfigItem(dlGif);
+    dlg->registerConfigItem(dlVid);
 
     connect(dlg, SIGNAL(settingsSaved(SettingsChangedMap)), this, SLOT(onSettingsSaved(SettingsChangedMap)));
     dlg->loadSettings();
