@@ -339,9 +339,17 @@ void MainWindow::customEvent(CustomEventBase* event) {
     if (event->type() == AvatarDownloadReadyType) {
         AvatarDownloadEvent* e = static_cast<AvatarDownloadEvent*>(event);
         QString key = qFromUtf8(e->mxcUrl);
-        AvatarManager::inst().store(key, e->pixmap, ChatView::kAvatarSize);
         if (e->success) {
-            chatWidget->repaintMessages();
+            if (!e->pixmap.isNull()) {
+                AvatarManager::inst().store(key, e->pixmap, ChatView::kAvatarSize);
+                chatWidget->repaintMessages();
+            } else {
+                qWarning("AvatarManager: success but null pixmap for [%s]",
+                         e->mxcUrl.c_str());
+            }
+        } else {
+            qWarning("AvatarManager: download failed for [%s] reason: [%s]",
+                     e->mxcUrl.c_str(), e->errorInfo.c_str());
         }
         return;
     }

@@ -38,7 +38,6 @@ bool AvatarManager::requestDownload(const QString& mxcUrl) {
 void AvatarManager::store(const QString& mxcUrl, const QPixmap& source, int size) {
     m_pending.erase(mxcUrl);
     if (source.isNull()) {
-        qWarning("AvatarManager: download failed for [%s]", qToUtf8(mxcUrl).data());
         return;
     }
 
