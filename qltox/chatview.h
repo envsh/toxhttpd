@@ -113,6 +113,13 @@ public:
     void triggerRelayout(int msgIndex = -1);
     void triggerVisibleDownloads();
 
+    static const int kAvatarSize   = 42;
+    static const int kPad          = 8;
+    static const int kMsgSpacing   = 8;
+    static const int kBubbleHPad   = 12;
+    static const int kBubbleVPad   = 8;
+    static const int kBubbleRadius = 8;
+
 protected:
     void paintEvent(QPaintEvent* event);
     void resizeEvent(QResizeEvent* event);
@@ -174,12 +181,6 @@ private:
     uint8_t m_ascW[128];
     uint8_t* m_bmpW;
 
-    static const int kAvatarSize = 38;
-    static const int kPad = 8;
-    static const int kMsgSpacing = 8;
-    static const int kBubbleHPad = 12;
-    static const int kBubbleVPad = 8;
-    static const int kBubbleRadius = 8;
 };
 
 #endif

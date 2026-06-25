@@ -386,11 +386,11 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
     case Text: {
         if (viewWidth <= 0) { viewWidth = 400; }
 
-        int kAvatarSize = 48;
-        int kPad = 8;
-        int kBubbleHPad = 12;
-        int kBubbleVPad = 8;
-        int kMsgSpacing = 8;
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+        int kMsgSpacing = ChatView::kMsgSpacing;
 
         int contentW = viewWidth - 3 * kPad - kAvatarSize;
         int bubbleW = (contentW * 80) / 100;
@@ -494,7 +494,11 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
     case Image:
     case Gif:
     case Video: {
-        int kAvatarSize = 48, kPad = 8, kBubbleHPad = 12, kBubbleVPad = 8;
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+
         int contentW = viewWidth - 3 * kPad - kAvatarSize;
         int bubbleW = (contentW * 80) / 100;
         if (bubbleW < 100) { bubbleW = contentW; }
@@ -522,7 +526,11 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         return std::max(contentHeight, avatarTotal) + 8;
     }
     case Audio: {
-        int kAvatarSize = 48, kPad = 8, kBubbleHPad = 12, kBubbleVPad = 8;
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+
         int contentW = viewWidth - 3 * kPad - kAvatarSize;
         int bubbleW = (contentW * 80) / 100;
         if (bubbleW < 100) { bubbleW = contentW; }
@@ -559,11 +567,11 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         return std::max(contentHeight, avatarTotal) + 8;
     }
     case File: {
-        int kAvatarSize = 48;
-        int kPad = 8;
-        int kBubbleHPad = 12;
-        int kBubbleVPad = 8;
-        int kMsgSpacing = 8;
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+        int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (viewWidth <= 0) { viewWidth = 400; }
 
@@ -573,7 +581,7 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         int innerW = bubbleW - 2 * kBubbleHPad;
 
         int iconSize = 48;
-        int textW = innerW - iconSize - kPad;
+        int textW = innerW - iconSize - ChatView::kPad;
         if (textW < 20) { textW = 20; }
 
         int nameLines = 0;
@@ -639,12 +647,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int hdrBtnCnt = 2;
         int hdrBtnAreaW = hdrBtnCnt * hdrBtnSize + (hdrBtnCnt - 1) * hdrBtnGap;
 
-        int kAvatarSize = 48;
-        int kPad = 8;
-        int kBubbleHPad = 12;
-        int kBubbleVPad = 8;
-        int kBubbleRadius = 8;
-        int kMsgSpacing = 8;
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+        int kBubbleRadius = ChatView::kBubbleRadius;
+        int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
@@ -913,10 +921,15 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int headerH = fm.lineSpacing();
         QRect bubbleRect;
 
-        int kAvatarSize = 48, kPad = 8, kBubbleHPad = 12;
-        int kBubbleVPad = 8, kBubbleRadius = 8, kMsgSpacing = 8;
         const int hdrBtnSize = 18, hdrBtnGap = 4;
         int hdrBtnAreaW = 2 * hdrBtnSize + hdrBtnGap;
+
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+        int kBubbleRadius = ChatView::kBubbleRadius;
+        int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
@@ -1097,10 +1110,15 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int headerH = fm.lineSpacing();
         QRect bubbleRect;
 
-        int kAvatarSize = 48, kPad = 8, kBubbleHPad = 12;
-        int kBubbleVPad = 8, kBubbleRadius = 8, kMsgSpacing = 8;
         const int hdrBtnSize = 18, hdrBtnGap = 4;
         int hdrBtnAreaW = 2 * hdrBtnSize + hdrBtnGap;
+
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+        int kBubbleRadius = ChatView::kBubbleRadius;
+        int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
@@ -1256,16 +1274,16 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int headerH = fm.lineSpacing();
         QRect bubbleRect;
 
-        int kAvatarSize = 48;
-        int kPad = 8;
-        int kBubbleHPad = 12;
-        int kBubbleVPad = 8;
-        int kBubbleRadius = 8;
-        int kMsgSpacing = 8;
-
         const int hdrBtnSize = 18;
         const int hdrBtnGap = 4;
         int hdrBtnAreaW = 2 * hdrBtnSize + hdrBtnGap;
+
+        int kAvatarSize = ChatView::kAvatarSize;
+        int kPad = ChatView::kPad;
+        int kBubbleHPad = ChatView::kBubbleHPad;
+        int kBubbleVPad = ChatView::kBubbleVPad;
+        int kBubbleRadius = ChatView::kBubbleRadius;
+        int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
