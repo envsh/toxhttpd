@@ -1,6 +1,7 @@
 #include "unknownparser.h"
 #include "cJSON.h"
 #include "compat34.h"
+#include <dlfcn.h>
 
 // ── JSON 路径导航 ──
 
@@ -295,6 +296,37 @@ static bool tryParseToxMessage(const std::string& rawStr, ParseResult& ret) {
 
 // ── IMAP 邮件解析 ──
 
+// uchardet 动态库检测编码（无外部链接依赖）
+static std::string detectEncoding(const QByteArray& data) {
+    void* h = dlopen("libuchardet.so.0", RTLD_LAZY);
+    if (!h) h = dlopen("libuchardet.so", RTLD_LAZY);
+    if (!h) return "";
+
+    auto uchardet_new          = (void*(*)())dlsym(h, "uchardet_new");
+    auto uchardet_delete       = (void(*)(void*))dlsym(h, "uchardet_delete");
+    auto uchardet_handle_data  = (int(*)(void*,const char*,size_t))dlsym(h, "uchardet_handle_data");
+    auto uchardet_data_end     = (void(*)(void*))dlsym(h, "uchardet_data_end");
+    auto uchardet_get_charset  = (const char*(*)(void*))dlsym(h, "uchardet_get_charset");
+    if (!(uchardet_new && uchardet_delete && uchardet_handle_data &&
+          uchardet_data_end && uchardet_get_charset)) {
+        dlclose(h);
+        return "";
+    }
+
+    void* ud = uchardet_new();
+    if (!ud) { dlclose(h); return ""; }
+
+    std::string result;
+    if (uchardet_handle_data(ud, data.data(), data.size()) == 0) {
+        uchardet_data_end(ud);
+        const char* cs = uchardet_get_charset(ud);
+        if (cs && cs[0]) result = cs;
+    }
+    uchardet_delete(ud);
+    dlclose(h);
+    return result;
+}
+
 static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     cJSON* root = cJSON_Parse(rawStr.c_str());
     if (!root) return false;
@@ -321,25 +353,32 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     std::string fullText = subject;
     QByteArray decoded = base64Decode(cleanB64);
     if (!decoded.isEmpty()) {
-        // 轮询常见编码，回环检测确定正确编码
         QString text;
-        static const char* kCodecs[] = {
-            "UTF-8", "GBK", "Shift-JIS", "Big5", "EUC-KR", "ISO-8859-1"
-        };
-        for (const char* name : kCodecs) {
-            QTextCodec* codec = QTextCodec::codecForName(name);
-            if (!codec) continue;
-            QString t = codec->toUnicode(decoded);
-            QByteArray re = codec->fromUnicode(t);
-            if (re == decoded) {
-                text = t;
-                break;
+        // 1) uchardet 前置检测
+        std::string enc = detectEncoding(decoded);
+        if (!enc.empty()) {
+            QTextCodec* codec = QTextCodec::codecForName(enc.c_str());
+            if (codec) text = codec->toUnicode(decoded);
+        }
+        // 2) 轮询常见编码，回环检测确定正确编码
+        if (text.isEmpty()) {
+            static const char* kCodecs[] = {
+                "UTF-8", "GBK", "Shift-JIS", "Big5", "EUC-KR", "ISO-8859-1"
+            };
+            for (const char* name : kCodecs) {
+                QTextCodec* codec = QTextCodec::codecForName(name);
+                if (!codec) continue;
+                QString t = codec->toUnicode(decoded);
+                QByteArray re = codec->fromUnicode(t);
+                if (re == decoded) {
+                    text = t;
+                    break;
+                }
             }
         }
-        // 回环检测均失败时兜底 UTF-8
+        // 3) 回环检测均失败时兜底 UTF-8
         if (text.isEmpty())
             text = qFromUtf8(decoded.data(), decoded.size());
-        // TODO: 若仍乱码，可引入 uchardet 库做更准确的编码检测
         std::string body(qToUtf8(text).data());
         fullText += "\n" + std::to_string(body.size()) + ": " + body;
     } else if (!cleanB64.empty()) {
