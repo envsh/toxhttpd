@@ -126,13 +126,14 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
         {
             cJSON* content = cJSON_GetObjectItem(ev, "content");
             if (content) {
+                std::vector<std::string> replyTexts;
                 cJSON* rt = cJSON_GetObjectItem(content, "m.relates_to");
                 if (rt) {
                     cJSON* ir = cJSON_GetObjectItem(rt, "m.in_reply_to");
                     if (ir) {
                         cJSON* eid = cJSON_GetObjectItem(ir, "event_id");
                         if (eid && cJSON_IsString(eid))
-                            hm.message += " -- Re: " + std::string(cJSON_GetStringValue(eid));
+                            replyTexts.push_back(cJSON_GetStringValue(eid));
                     }
                 }
                 cJSON* mt = cJSON_GetObjectItem(content, "m.mentions");
@@ -149,8 +150,17 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
                             }
                         }
                         if (!ms.empty())
-                            hm.message += " -- Re: " + ms;
+                            replyTexts.push_back(ms);
                     }
+                }
+                // 若存在 @ 开头的回复文本，只保留这些
+                bool hasAt = false;
+                for (const auto& s : replyTexts) {
+                    if (!s.empty() && s[0] == '@') { hasAt = true; break; }
+                }
+                for (const auto& s : replyTexts) {
+                    if (hasAt && (s.empty() || s[0] != '@')) continue;
+                    hm.message += " -- Re: " + s;
                 }
             }
         }
