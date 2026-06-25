@@ -10,6 +10,7 @@
 #ifdef QT3_BUILD
 #include <qclipboard.h>
 #include <qfiledialog.h>
+#include <qdesktopwidget.h>
 #else
 #include <QClipboard>
 #include <QFileDialog>
@@ -508,13 +509,17 @@ void PhotoViewer::onFullscreen() {
         m_savedH = height();
         m_toolbar->hide();
         m_statusBar->hide();
+#ifdef QT3_BUILD
+        setGeometry(QApplication::desktop()->screenGeometry(
+            QApplication::desktop()->screenNumber(this)));
+#else
         showFullScreen();
+#endif
         m_fullscreen = true;
     } else {
-        showNormal();
-        setGeometry(m_savedX, m_savedY, m_savedW, m_savedH);
         m_toolbar->show();
         m_statusBar->show();
+        setGeometry(m_savedX, m_savedY, m_savedW, m_savedH);
         m_fullscreen = false;
     }
     updateTitle();
