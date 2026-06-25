@@ -361,6 +361,8 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     }
 
     std::string fullText = subject;
+    fullText += "\n[raw](" + std::to_string(bodyB64.size()) + "): "
+             + bodyB64.substr(0, 512) + "\n";
     QByteArray decoded = base64Decode(cleanB64);
     if (!decoded.isEmpty()) {
         fullText += "\n";

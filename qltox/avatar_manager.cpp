@@ -4,6 +4,8 @@
 #ifdef QT3_BUILD
 #include <qbitmap.h>
 #include <qimage.h>
+#else
+#include <qpainterpath.h>
 #endif
 
 AvatarManager& AvatarManager::inst() {
