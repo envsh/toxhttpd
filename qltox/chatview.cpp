@@ -1,4 +1,5 @@
 #include "identicon.h"
+#include "avatar_manager.h"
 #include "chatview.h"
 #include "photoviewer.h"
 #include "LimeScrollBar.h"
@@ -10,11 +11,7 @@
 #include <cstdlib>
 #include "translator.h"
 
-static QString avatarSeed(const QString& name, int peer) {
-    if (name.isEmpty())
-        return QString::number(peer);
-    return QString::number(peer) + "|" + name;
-}
+
 #ifdef QT3_BUILD
 #include <qpainter.h>
 #include <qimage.h>
@@ -656,7 +653,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
 
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
@@ -729,7 +726,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
         } else {
             int ax = kPad;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
 
             int contentX = 2 * kPad + kAvatarSize;
@@ -933,7 +930,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
@@ -991,7 +988,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
         } else {
             int ax = kPad;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
@@ -1122,7 +1119,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
@@ -1180,7 +1177,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
         } else {
             int ax = kPad;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
@@ -1287,7 +1284,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         if (category == "self") {
             int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
 
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
@@ -1417,7 +1414,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             }
         } else {
             int ax = kPad;
-            QPixmap av = generateIdenticon(avatarSeed(senderName, peerNumber), kAvatarSize);
+            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
             p.drawPixmap(ax, y + kPad, av);
 
             int contentX = 2 * kPad + kAvatarSize;

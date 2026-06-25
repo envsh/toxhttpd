@@ -3,6 +3,7 @@
 #include "restapi.h"
 #include "eventpoller.h"
 #include "unknownparser.h"
+#include "avatar_manager.h"
 #include "translator.h"
 #include "logindialog.h"
 #include "conferenceinvitedialog.h"
@@ -333,6 +334,17 @@ void MainWindow::customEvent(CustomEventBase* event) {
         }
         return;
     }
+
+    // 头像下载完成
+    if (event->type() == AvatarDownloadReadyType) {
+        AvatarDownloadEvent* e = static_cast<AvatarDownloadEvent*>(event);
+        QString key = qFromUtf8(e->mxcUrl);
+        AvatarManager::inst().store(key, e->pixmap, ChatView::kAvatarSize);
+        if (e->success) {
+            chatWidget->repaintMessages();
+        }
+        return;
+    }
     
     // 数据加载完成
     if (event->type() == ApiResultReadyType) {
@@ -375,6 +387,12 @@ void MainWindow::customEvent(CustomEventBase* event) {
                         peerInfoMap[key].peerNumber = cd.id;
                         peerInfoMap[key].publicKey = cd.chatId;
                         peerInfoMap[key].iconUrl = cd.iconUrl;
+                        {
+                            QString mxc = qFromUtf8(cd.iconUrl);
+                            if (AvatarManager::inst().requestDownload(mxc)) {
+                                ToxAPI::downloadAvatar(cd.iconUrl);
+                            }
+                        }
                         peerInfoMap[key].isSelf = false;
                         if (cd.status == "tcp") {
                             peerInfoMap[key].status = 1;
@@ -461,6 +479,12 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 peerInfoMap[key].peerNumber = evt->friendId;
                 peerInfoMap[key].publicKey = evt->publicKey;
                 peerInfoMap[key].iconUrl = evt->iconUrl;
+                {
+                    QString mxc = qFromUtf8(evt->iconUrl);
+                    if (AvatarManager::inst().requestDownload(mxc)) {
+                        ToxAPI::downloadAvatar(evt->iconUrl);
+                    }
+                }
                 peerInfoMap[key].statusText = evt->statusText;
                 int s = 0;
                 if (evt->statusStr == "tcp") { s = 1; }
@@ -1011,6 +1035,12 @@ void MainWindow::handleEvents(const EventList& events) {
                 for (const auto& p : pr.peers) {
                     std::string key = "unknown_" + p.publicKey;
                     peerInfoMap[key] = p;
+                }
+                for (const auto& p : pr.peers) {
+                    QString mxc = qFromUtf8(p.iconUrl);
+                    if (AvatarManager::inst().requestDownload(mxc)) {
+                        ToxAPI::downloadAvatar(p.iconUrl);
+                    }
                 }
             }
 

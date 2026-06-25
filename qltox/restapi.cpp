@@ -291,6 +291,12 @@ void ToxAPI::downloadMedia(int chatId, const std::string& chatType, int msgIndex
     request({"/api/media_download?url=" + urlEncode(mxcUrl), "GET"}, ctx);
 }
 
+void ToxAPI::downloadAvatar(const std::string& mxcUrl) {
+    auto* ctx = new ApiCtx(ApiAvatarDownload);
+    ctx->str2 = mxcUrl;
+    request({"/api/media_download?url=" + urlEncode(mxcUrl), "GET"}, ctx);
+}
+
 void ToxAPI::joinConference(int friendNumber, const std::string& cookie) {
     request(ApiJoinConference, {"/api/conferences/join", "POST",
             "friend_number=" + std::to_string(friendNumber) + "&cookie=" + cookie});
@@ -1063,6 +1069,23 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             break;
         }
         if (!ev->pixmap.loadFromData((const uchar*)resp.body.data(), resp.body.size())) {
+            ev->success = false;
+            ev->errorInfo = "pixmap load failed";
+        } else {
+            ev->success = true;
+        }
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiAvatarDownload: {
+        auto* ev = new AvatarDownloadEvent();
+        ev->mxcUrl = ctx->str2;
+        if (resp.httpCode != 200 || resp.body.empty()) {
+            ev->success = false;
+            ev->errorInfo = "HTTP " + std::to_string(resp.httpCode);
+        } else if (!ev->pixmap.loadFromData(
+                       (const uchar*)resp.body.data(), resp.body.size())) {
             ev->success = false;
             ev->errorInfo = "pixmap load failed";
         } else {

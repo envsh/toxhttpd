@@ -100,6 +100,7 @@ public:
     static void setGroupTopic(int groupId, const std::string& topic);
     static void setConferenceTitle(int conferenceId, const std::string& title);
     static void downloadMedia(int chatId, const std::string& chatType, int msgIndex, const std::string& mxcUrl);
+    static void downloadAvatar(const std::string& mxcUrl);
     static bool setSelfInfoSync(const std::string& name, const std::string& statusMessage);
     static bool joinGroupSync(int friendNumber, const std::string& chatId,
                               const std::string& name = "", const std::string& password = "");

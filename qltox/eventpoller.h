@@ -27,6 +27,7 @@ extern const char* const kUnknownType;
 const EventType34 EventListReadyType = toEventType34(QEvent::User + 100);
 const EventType34 ApiResultReadyType = toEventType34(QEvent::User + 102);
 const EventType34 MediaDownloadReadyType = toEventType34(QEvent::User + 103);
+const EventType34 AvatarDownloadReadyType = toEventType34(QEvent::User + 104);
 
 // ── API 请求类型 ──
 enum ApiRequestType {
@@ -62,6 +63,7 @@ enum ApiRequestType {
     ApiLoadFriendDetail,
     ApiLoadPartialData,
     ApiMediaDownload,
+    ApiAvatarDownload,
 };
 
 // ── 数据类型（事件契约）──
@@ -150,6 +152,15 @@ public:
     int chatId = 0;
     std::string chatType;
     int msgIndex = 0;
+    std::string mxcUrl;
+    QPixmap pixmap;
+    bool success = false;
+    std::string errorInfo;
+};
+
+class AvatarDownloadEvent : public CustomEventBase {
+public:
+    AvatarDownloadEvent() : CustomEventBase(AvatarDownloadReadyType) {}
     std::string mxcUrl;
     QPixmap pixmap;
     bool success = false;
