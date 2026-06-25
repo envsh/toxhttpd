@@ -51,7 +51,8 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
             std::string sender = jsonGetString(ev, "sender");
             if (sender.empty()) continue;
             std::string dn = jsonGetString(ev, "content.displayname");
-            if (dn.empty()) continue;
+            std::string av = jsonGetString(ev, "content.avatar_url");
+            if (dn.empty() && av.empty()) continue;
 
             PeerInfo* pi = nullptr;
             for (auto& p : peers)
@@ -63,7 +64,8 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
                 pi->name       = sender;
                 pi->peerNumber = (int)peers.size() - 1;
             }
-            pi->nickname = dn;
+            if (!dn.empty()) pi->nickname = dn;
+            if (!av.empty()) pi->iconUrl  = av;
         }
     };
 

@@ -1053,12 +1053,14 @@ void MainWindow::handleEvents(const EventList& events) {
 
                     QString senderLabel;
                     QString userName;
+                    QString avatarMxc;
                     if (!hm.sender_pubkey.empty()) {
                         for (const auto& p : pr.peers) {
                             if (p.publicKey == hm.sender_pubkey) {
                                 userName = qFromUtf8(p.name);
                                 senderLabel = !p.nickname.empty()
                                     ? qFromUtf8(p.nickname) : QString();
+                                avatarMxc = qFromUtf8(p.iconUrl);
                                 break;
                             }
                         }
@@ -1075,6 +1077,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     msg.senderName = userName;
                     msg.senderNickname = senderLabel;
                     msg.peerNumber = (int)hm.sender_number;
+                    msg.avatarUrl = avatarMxc;
 
                     int chatId = VIRTUAL_REDDIT_ID;
                     std::string chatType = kTopicType;
