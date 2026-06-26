@@ -141,6 +141,8 @@ setAttribute(Qt::WA_OpaquePaintEvent);
 - image preview 固定尺寸 260×260
 - **增量滚动（P0）**：`onScrollChanged` 用 `QWidget::scroll()` bit blit 替代 `updateFull()`，每帧只画新露出条带
 - **OpaquePaintEvent（P1）**：Qt3 `WNoAutoErase` / Qt4 `WA_OpaquePaintEvent`，消除系统擦除 + fillRect 双重重绘
+- **图片预览闪烁修复**：`scaledDisplay` 缓存匹配 `paintThumbnail` 最终显示尺寸，消除每帧 `QPixmap::scaled(SmoothTransformation)`
+- **mouseMoveEvent 3 处 O(n)→O(log n)**：所有 `for` 循环手工累加替换为 `msgAbsY()`
 
 ### 待完成
 

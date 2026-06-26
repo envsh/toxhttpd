@@ -1146,24 +1146,30 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         // 预缩放缓存：避免每帧重新缩放全分辨率图片
         QPixmap displayPixmap = thumbnail;
         if (!thumbnail.isNull() && mediaWidth > 0 && mediaHeight > 0) {
-            const int kMaxMediaDim = 260;
-            const int kMinMediaH = 50;
             int maxW = thumbnailRect.width(), maxH = thumbnailRect.height();
+            // dw/dh 计算必须与 paintThumbnail() 一致，否则每帧 rescale
+            int dw = maxW, dh = maxH;
             double ratio = (double)mediaHeight / mediaWidth;
-            int dw = std::min(maxW, kMaxMediaDim);
-            int dh = (int)(dw * ratio);
-            if (dh > kMaxMediaDim) { dh = kMaxMediaDim; dw = (int)(kMaxMediaDim / ratio); }
-            if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
-            if (dh < kMinMediaH) { dh = kMinMediaH; dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
+            if (mediaHeight > 0 && mediaWidth > 0) {
+                dh = (int)(maxW * ratio);
+                dw = maxW;
+                if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
+            }
+            // kMinMediaH 保底（防止超宽图缩成细线）
+            {
+                const int kMinMediaH = 50;
+                const int kMaxMediaDim = 260;
+                if (dh < kMinMediaH) { dh = kMinMediaH; dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
+            }
             if (dw != scaledForDispW || dh != scaledForDispH) {
 #ifdef QT3_BUILD
                 {
                     QImage img = thumbnail.convertToImage();
-                    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMax);
+                    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMin);
                     scaledDisplay.convertFromImage(scaledImg);
                 }
 #else
-                scaledDisplay = thumbnail.scaled(dw, dh, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                scaledDisplay = thumbnail.scaled(dw, dh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 #endif
                 scaledForDispW = dw;
                 scaledForDispH = dh;
@@ -2394,8 +2400,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     if (m_selecting && m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_items.size()) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex == m_selMsgIndex) {
-            int msgY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
+            int msgY = msgAbsY(msgIndex) - m_scrollPos;
             int localY = event->y() - msgY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
@@ -2429,8 +2434,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
             const auto& item = m_items[msgIndex];
             if (!item.senderNickname.isEmpty() && !item.senderName.isEmpty()
                 && item.senderNickname != item.senderName) {
-                int msgY = kPad - m_scrollPos;
-                for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
+                int msgY = msgAbsY(msgIndex) - m_scrollPos;
                 QFont nf;
                 nf.setPointSize(11);
                 QFontMetrics nfm(nf);
@@ -2443,8 +2447,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
         }
 
         // ... compute charPos for link detection
-        int curY = kPad - m_scrollPos;
-        for (int i = 0; i < msgIndex; i++) { curY += m_items[i].height; }
+        int curY = msgAbsY(msgIndex) - m_scrollPos;
         int localY = event->y() - curY;
         int localX = event->x();
         int charPos = charPosAt(msgIndex, localX, localY);
