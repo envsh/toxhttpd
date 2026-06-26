@@ -1157,6 +1157,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         msg.mediaWidth  = hm.mediaWidth;
                         msg.mediaHeight = hm.mediaHeight;
                         msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
+                        msg.fileSize    = hm.fileSize;
                     } else if (hm.msgtype == "video") {
                         msg.etype       = ChatElement::Video;
                         msg.caption     = qFromUtf8(hm.message);
@@ -1165,19 +1166,22 @@ void MainWindow::handleEvents(const EventList& events) {
                         msg.mediaHeight = hm.mediaHeight;
                         msg.durationSec = hm.duration / 1000;
                         msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
+                        msg.fileSize    = hm.fileSize;
                     } else if (hm.msgtype == "audio") {
                         msg.etype       = ChatElement::Audio;
                         msg.caption     = qFromUtf8(hm.message);
                         msg.messageText = qFromUtf8(hm.message);
                         msg.durationSec = hm.duration / 1000;
                         msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
+                        msg.fileSize    = hm.fileSize;
                     } else if (hm.msgtype == "file") {
                         msg.etype       = ChatElement::File;
                         msg.fileName    = qFromUtf8(hm.message);
                         msg.caption     = qFromUtf8(hm.message);
                         msg.mediaUrl    = qFromUtf8(hm.mediaUrl);
+                        msg.fileSize    = hm.fileSize;
                     }
-
+                
                     qWarning("Cache PUSH to %s %d: sender=%s",
                              chatType.c_str(), chatId, qToUtf8(msg.senderName).data());
                     m_messageCache[{chatId, chatType}].push_back(msg);

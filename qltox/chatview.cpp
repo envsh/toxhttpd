@@ -135,15 +135,34 @@ static void drawEmojiIcon(QPainter& p, const QRect& rect, uint32_t cp, const cha
 }
 
 // ───── Download button helper ─────
+static QString formatFileSize(int bytes) {
+    if (bytes <= 0) return QString();
+    if (bytes < 1024) return QString::number(bytes) + qFromUtf8(" B");
+    double kb = bytes / 1024.0;
+    if (kb < 1024.0) {
+        return QString::number(kb, 'f', 1) + qFromUtf8(" KB");
+    }
+    double mb = kb / 1024.0;
+    return QString::number(mb, 'f', 1) + qFromUtf8(" MB");
+}
+
 struct DownloadBtnInfo {
     QRect rect;
     int height;
 };
 
 static DownloadBtnInfo paintDownloadBtn(QPainter& p, int cx, int cy, int parentW,
-    const QFont& baseFont, const StyleParams::Palette& pal)
+    const QFont& baseFont, const StyleParams::Palette& pal, int fileSize = 0)
 {
-    int btnW = 110, btnH = 26;
+    int btnH = 26;
+    QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true);
+    QString btnText = qFromUtf8("⬇ ") + qFromUtf8("下载");
+    if (fileSize > 0) {
+        QString sz = formatFileSize(fileSize);
+        if (!sz.isEmpty()) { btnText += qFromUtf8(" ") + sz; }
+    }
+    QFontMetrics bfm(bf);
+    int btnW = std::max(110, bfm.width(btnText) + 24);
     int bx = cx + (parentW - btnW) / 2;
     int by = cy;
     QRect btnR(bx, by, btnW, btnH);
@@ -155,8 +174,8 @@ static DownloadBtnInfo paintDownloadBtn(QPainter& p, int cx, int cy, int parentW
     p.drawRoundedRect(btnR, 6, 6);
 #endif
     p.setPen(Qt::white);
-    QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true); p.setFont(bf);
-    p.drawText(btnR, Qt::AlignCenter, qFromUtf8("⬇ ") + qFromUtf8("下载"));
+    p.setFont(bf);
+    p.drawText(btnR, Qt::AlignCenter, btnText);
     p.setFont(baseFont);
     DownloadBtnInfo info;
     info.rect = btnR;
@@ -170,7 +189,7 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
     const QPixmap& thumb, int mediaW, int mediaH,
     const QFont& baseFont, const QFontMetrics& fm,
     const StyleParams::Palette& pal, bool downloadFailed,
-    QRect* downloadBtnOut = nullptr)
+    QRect* downloadBtnOut = nullptr, int fileSize = 0)
 {
     int maxW = imgRect.width(), maxH = imgRect.height();
     int dw, dh;
@@ -243,7 +262,15 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
     }
     // ── download button (always visible) ──
     {
-        int btnW = 110, btnH = 26;
+        QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true);
+        QString btnText = qFromUtf8("⬇ ") + qFromUtf8("下载");
+        if (fileSize > 0) {
+            QString sz = formatFileSize(fileSize);
+            if (!sz.isEmpty()) { btnText += qFromUtf8(" ") + sz; }
+        }
+        QFontMetrics bfm(bf);
+        int btnW = std::max(110, bfm.width(btnText) + 24);
+        int btnH = 26;
         int bx = imgRect.x() + (imgRect.width() - btnW) / 2;
         int by = imgRect.bottom() - btnH - 4;
         QRect btnR(bx, by, btnW, btnH);
@@ -255,8 +282,8 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
         p.drawRoundedRect(btnR, 6, 6);
 #endif
         p.setPen(Qt::white);
-        QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true); p.setFont(bf);
-        p.drawText(btnR, Qt::AlignCenter, qFromUtf8("⬇ ") + qFromUtf8("下载"));
+        p.setFont(bf);
+        p.drawText(btnR, Qt::AlignCenter, btnText);
         p.setFont(baseFont);
         if (downloadBtnOut) { *downloadBtnOut = btnR; }
     }
@@ -271,7 +298,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
     const QFont& baseFont, const QFontMetrics& fm,
     int emojiW, const StyleParams::Palette& pal,
     bool downloadFailed,
-    QRect* downloadBtnOut = nullptr)
+    QRect* downloadBtnOut = nullptr, int fileSize = 0)
 {
     const int kBubbleHPad = 12, kBubbleVPad = 8, kPad = 8;
     QRect imgRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
@@ -286,7 +313,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 #endif
     }
     const QPixmap& src = !frame.isNull() ? frame : thumbnail;
-    int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed, downloadBtnOut);
+    int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed, downloadBtnOut, fileSize);
 
     // GIF badge
     if (etype == ChatElement::Gif) {
@@ -1183,7 +1210,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         paintMediaContent(p, bubbleRect, etype, displayPixmap, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
                           baseFont, fm, emojiW, pal, downloadFailed,
-                          &downloadBtnRect);
+                          &downloadBtnRect, fileSize);
         break;
     }
     case Audio: {
@@ -1345,7 +1372,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         {
             int btnY = bubbleRect.bottom() - 4 - 26;
             DownloadBtnInfo bi = paintDownloadBtn(p, bubbleRect.x(), btnY,
-                bubbleRect.width(), baseFont, pal);
+                bubbleRect.width(), baseFont, pal, fileSize);
             downloadBtnRect = bi.rect;
         }
         break;
@@ -1652,7 +1679,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         {
             int btnY = bubbleRect.bottom() - 4 - 26;
             DownloadBtnInfo bi = paintDownloadBtn(p, bubbleRect.x(), btnY,
-                bubbleRect.width(), baseFont, pal);
+                bubbleRect.width(), baseFont, pal, fileSize);
             downloadBtnRect = bi.rect;
         }
         break;

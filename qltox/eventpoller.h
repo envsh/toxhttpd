@@ -108,6 +108,7 @@ struct HistoryMessage {
     int duration       = 0;    // milliseconds (video/audio)
     int mediaWidth  = 0;
     int mediaHeight = 0;
+    int fileSize    = 0;    // bytes
 };
 
 struct TranslateApiResult {

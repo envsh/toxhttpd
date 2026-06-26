@@ -97,6 +97,7 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
                     hm.mediaWidth  = (int)jsonGetInt64(ev, "content.info.w");
                     hm.mediaHeight = (int)jsonGetInt64(ev, "content.info.h");
                     hm.mediaMime   = jsonGetString(ev, "content.info.mimetype");
+                    hm.fileSize    = (int)jsonGetInt64(ev, "content.info.size");
                 }
             } else if (msgtype.find("m.video") == 0) {
                 hm.msgtype      = "video";
@@ -107,6 +108,7 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
                     hm.mediaMime    = jsonGetString(ev, "content.info.mimetype");
                     hm.duration     = (int)jsonGetInt64(ev, "content.info.duration");
                     hm.thumbnailUrl = jsonGetString(ev, "content.info.thumbnail_url");
+                    hm.fileSize     = (int)jsonGetInt64(ev, "content.info.size");
                 }
             } else if (msgtype.find("m.audio") == 0) {
                 hm.msgtype  = "audio";
@@ -114,12 +116,14 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
                 if (info) {
                     hm.mediaMime = jsonGetString(ev, "content.info.mimetype");
                     hm.duration  = (int)jsonGetInt64(ev, "content.info.duration");
+                    hm.fileSize  = (int)jsonGetInt64(ev, "content.info.size");
                 }
             } else if (msgtype.find("m.file") == 0) {
                 hm.msgtype  = "file";
                 hm.mediaUrl = jsonGetString(ev, "content.url");
                 if (info) {
                     hm.mediaMime = jsonGetString(ev, "content.info.mimetype");
+                    hm.fileSize  = (int)jsonGetInt64(ev, "content.info.size");
                 }
             }
         }
