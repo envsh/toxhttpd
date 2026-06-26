@@ -153,7 +153,7 @@ public:
     std::string chatType;
     int msgIndex = 0;
     std::string mxcUrl;
-    QPixmap pixmap;
+    std::string rawData;   // 原始字节，WebP 等 Qt 不支持时 fallback
     bool success = false;
     std::string errorInfo;
 };

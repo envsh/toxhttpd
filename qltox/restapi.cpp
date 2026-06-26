@@ -1068,12 +1068,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             QApplication::postEvent(s_target, ev);
             break;
         }
-        if (!ev->pixmap.loadFromData((const uchar*)resp.body.data(), resp.body.size())) {
-            ev->success = false;
-            ev->errorInfo = "pixmap load failed";
-        } else {
-            ev->success = true;
-        }
+        ev->success = true;
+        ev->rawData = resp.body;
         QApplication::postEvent(s_target, ev);
         break;
     }

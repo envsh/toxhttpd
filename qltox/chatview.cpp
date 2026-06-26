@@ -35,6 +35,52 @@
 #include <QToolTip>
 #endif
 
+// ───── WebP fallback decode (dlopen libwebp) ─────
+#include <dlfcn.h>
+#include <cstdint>
+
+static bool isWebP(const std::string& d) {
+    return d.size() >= 12 &&
+           d[0]=='R'&&d[1]=='I'&&d[2]=='F'&&d[3]=='F' &&
+           d[8]=='W'&&d[9]=='E'&&d[10]=='B'&&d[11]=='P';
+}
+
+static QPixmap decodeWebP(const std::string& data) {
+    if (!isWebP(data) || data.size() < 12) return QPixmap();
+    void* lib = dlopen("libwebp.so", RTLD_LAZY);
+    if (!lib) { qWarning("dlopen libwebp: %s", dlerror()); return QPixmap(); }
+    using GetInfo  = int (*)(const uint8_t*, size_t, int*, int*);
+    using DecodeRGB = uint8_t* (*)(const uint8_t*, size_t, int*, int*);
+    auto gi   = (GetInfo)dlsym(lib, "WebPGetInfo");
+    auto drgb = (DecodeRGB)dlsym(lib, "WebPDecodeRGB");
+    if (!gi || !drgb) { dlclose(lib); return QPixmap(); }
+    int w=0, imgH=0;
+    if (!gi((const uint8_t*)data.data(), data.size(), &w, &imgH) || w<=0 || imgH<=0)
+        { dlclose(lib); return QPixmap(); }
+    uint8_t* rgb = drgb((const uint8_t*)data.data(), data.size(), &w, &imgH);
+    if (!rgb) { dlclose(lib); return QPixmap(); }
+    // Qt3/Qt4 no Format_RGB888; expand 24-bit RGB → 32-bit XRGB
+#ifdef QT3_BUILD
+    QImage img(w, imgH, 32);
+#else
+    QImage img(w, imgH, QImage::Format_RGB32);
+#endif
+    for (int y = 0; y < imgH; y++) {
+        uint32_t* dst = (uint32_t*)img.scanLine(y);
+        const uint8_t* src = rgb + y * w * 3;
+        for (int x = 0; x < w; x++) {
+            dst[x] = 0xFF000000 | (src[0] << 16) | (src[1] << 8) | src[2];
+            src += 3;
+        }
+    }
+    free(rgb); dlclose(lib);
+#ifdef QT3_BUILD
+    return QPixmap(img);
+#else
+    return QPixmap::fromImage(img);
+#endif
+}
+
 #ifdef EMOJI_RENDER_QT34
 // ───── Emoji icon helpers ─────
 static uint32_t fileIconForName(const QString& name) {
@@ -1073,6 +1119,24 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             int kBubbleHPad = 12, kBubbleVPad = 8;
             thumbnailRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                                   bubbleRect.width() - 2*kBubbleHPad, bubbleRect.height() - 2*kBubbleVPad);
+        }
+        // WebP fallback: decode raw bytes to thumbnail
+        if (thumbnail.isNull() && !rawFileData.empty() && isWebP(rawFileData)) {
+            QPixmap wp = decodeWebP(rawFileData);
+            if (!wp.isNull()) {
+                mediaWidth = wp.width();
+                mediaHeight = wp.height();
+#ifdef QT3_BUILD
+                {
+                    QImage tmpImg = wp.convertToImage();
+                    QImage scaledImg = tmpImg.smoothScale(thumbnailRect.width(), thumbnailRect.height(), QImage::ScaleMax);
+                    thumbnail.convertFromImage(scaledImg);
+                }
+#else
+                thumbnail = wp.scaled(thumbnailRect.width(), thumbnailRect.height(),
+                                      Qt::KeepAspectRatio, Qt::SmoothTransformation);
+#endif
+            }
         }
         // 预缩放缓存：避免每帧重新缩放全分辨率图片
         QPixmap displayPixmap = thumbnail;
@@ -2331,9 +2395,13 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
             if ((m_items[msgIndex].etype == ChatElement::Image ||
                  m_items[msgIndex].etype == ChatElement::Video ||
                  m_items[msgIndex].etype == ChatElement::Gif) &&
-                !m_items[msgIndex].thumbnail.isNull() &&
+                (!m_items[msgIndex].thumbnail.isNull() || !m_items[msgIndex].rawFileData.empty()) &&
                 m_items[msgIndex].thumbnailRect.contains(event->pos())) {
-                PhotoViewer* pv = new PhotoViewer(this, m_items[msgIndex].thumbnail);
+                QPixmap fullPix = m_items[msgIndex].thumbnail;
+                if (fullPix.isNull() && isWebP(m_items[msgIndex].rawFileData))
+                    fullPix = decodeWebP(m_items[msgIndex].rawFileData);
+                if (fullPix.isNull()) return;
+                PhotoViewer* pv = new PhotoViewer(this, fullPix);
                 pv->show();
                 return;
             }

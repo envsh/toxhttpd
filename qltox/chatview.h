@@ -74,6 +74,9 @@ struct ChatElement {
     short cachedWidth;
     short height;
 
+    // Raw downloaded bytes (WebP fallback decode)
+    std::string rawFileData;
+
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
         , translationInProgress(false), downloadFailed(false), downloadRequested(false)
