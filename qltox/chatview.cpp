@@ -547,17 +547,22 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         if (bubbleW < 100) { bubbleW = contentW; }
         int imgMaxW = bubbleW - 2 * kBubbleHPad;
         int imgDispW, imgDispH;
+        const int kMaxMediaDim = 260;
+        const int kMinMediaH = 50;
         if (mediaWidth > 0 && mediaHeight > 0) {
             double ratio = (double)mediaHeight / mediaWidth;
-            imgDispW = imgMaxW;
-            imgDispH = (int)(imgMaxW * ratio);
-            const int kMaxMediaH = 280;
-            if (imgDispH > kMaxMediaH) {
-                imgDispH = kMaxMediaH;
-                imgDispW = (int)(kMaxMediaH / ratio);
+            imgDispW = std::min(imgMaxW, kMaxMediaDim);
+            imgDispH = (int)(imgDispW * ratio);
+            if (imgDispH > kMaxMediaDim) {
+                imgDispH = kMaxMediaDim;
+                imgDispW = (int)(kMaxMediaDim / ratio);
+            }
+            if (imgDispH < kMinMediaH) {
+                imgDispH = kMinMediaH;
+                imgDispW = std::min((int)(kMinMediaH / ratio), kMaxMediaDim);
             }
         } else {
-            imgDispW = imgMaxW;
+            imgDispW = std::min(imgMaxW, kMaxMediaDim);
             imgDispH = 200;
         }
         int captionH = caption.isEmpty() ? 0 : fm.lineSpacing() + kPad/2;
@@ -1141,10 +1146,15 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         // 预缩放缓存：避免每帧重新缩放全分辨率图片
         QPixmap displayPixmap = thumbnail;
         if (!thumbnail.isNull() && mediaWidth > 0 && mediaHeight > 0) {
+            const int kMaxMediaDim = 260;
+            const int kMinMediaH = 50;
             int maxW = thumbnailRect.width(), maxH = thumbnailRect.height();
             double ratio = (double)mediaHeight / mediaWidth;
-            int dw = maxW, dh = (int)(maxW * ratio);
+            int dw = std::min(maxW, kMaxMediaDim);
+            int dh = (int)(dw * ratio);
+            if (dh > kMaxMediaDim) { dh = kMaxMediaDim; dw = (int)(kMaxMediaDim / ratio); }
             if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
+            if (dh < kMinMediaH) { dh = kMinMediaH; dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
             if (dw != scaledForDispW || dh != scaledForDispH) {
 #ifdef QT3_BUILD
                 {
