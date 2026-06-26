@@ -18,6 +18,15 @@
 #include <QMovie>
 #endif
 
+// Block index for binary-search accelerated Y-position lookup.
+// Each block has at most kBlockSize messages; cumulativeHeight is
+// the absolute Y of the first message in the block (including kPad).
+static const int kBlockSize = 50;
+
+struct MsgBlock {
+    int cumulativeHeight;
+};
+
 struct ChatElement {
     enum ElementType { Text, Image, File, Video, Gif, Audio };
 
@@ -146,6 +155,10 @@ private slots:
 
 private:
     void relayout();
+    void rebuildBlocks();
+    int blockForIndex(int msgIndex) const;
+    int msgAbsY(int msgIndex) const;
+    int findByAbsY(int absY) const;
     /// 全量刷新：切换上下文、滚动、clearMessages、relayout、全选等结构变化场景
     void updateFull();
     /// 增量刷新：appendMessage、pill 悬浮/计数、selection 拖拽等局部脏矩形场景
@@ -182,6 +195,7 @@ private:
     std::vector<ChatElement> m_items;
     int m_totalHeight;
     int m_scrollPos;
+    std::vector<MsgBlock> m_blocks;
     LimeScrollBar* m_vScrollBar;
     FloatingPill m_scrollDownPill;
 

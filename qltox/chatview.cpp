@@ -1673,6 +1673,71 @@ void ChatElement::stopAnimation() {
 
 // ───── ChatView ─────
 
+// Block index helpers — binary-search accelerated Y-position lookup.
+void ChatView::rebuildBlocks() {
+    m_blocks.clear();
+    int absY = kPad;
+    for (size_t i = 0; i < m_items.size(); i += kBlockSize) {
+        m_blocks.push_back({absY});
+        size_t end = std::min(i + kBlockSize, m_items.size());
+        for (size_t j = i; j < end; ++j) {
+            absY += m_items[j].height;
+        }
+    }
+}
+
+int ChatView::blockForIndex(int msgIndex) const {
+    if (m_blocks.empty() || msgIndex < 0) { return -1; }
+    int lo = 0, hi = (int)m_blocks.size();
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        if (mid * kBlockSize <= msgIndex) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo - 1;
+}
+
+int ChatView::msgAbsY(int msgIndex) const {
+    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) { return -1; }
+    int blockIdx = blockForIndex(msgIndex);
+    if (blockIdx < 0) { return kPad; }
+    int absY = m_blocks[blockIdx].cumulativeHeight;
+    int blockStart = blockIdx * kBlockSize;
+    int blockEnd = std::min(blockStart + kBlockSize, (int)m_items.size());
+    for (int i = blockStart; i < msgIndex && i < blockEnd; ++i) {
+        absY += m_items[i].height;
+    }
+    return absY;
+}
+
+int ChatView::findByAbsY(int absY) const {
+    if (m_blocks.empty()) { return -1; }
+    if (absY < kPad) { return 0; }
+    if (absY >= m_totalHeight) { return -1; }
+    int lo = 0, hi = (int)m_blocks.size();
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        if (m_blocks[mid].cumulativeHeight <= absY) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    int blockIdx = lo - 1;
+    int absPos = m_blocks[blockIdx].cumulativeHeight;
+    int start = blockIdx * kBlockSize;
+    int end = std::min(start + kBlockSize, (int)m_items.size());
+    for (int i = start; i < end; ++i) {
+        int h = m_items[i].height;
+        if (absY >= absPos && absY < absPos + h) { return i; }
+        absPos += h;
+    }
+    return end - 1;
+}
+
 // 刷新策略：updateFull() 用于可视结构变化全量重绘，
 // updateRect() 用于脏矩形可精确定位的局部刷新。
 void ChatView::updateFull() {
@@ -1680,9 +1745,8 @@ void ChatView::updateFull() {
 }
 
 QRect ChatView::messageRect(int msgIndex) const {
-    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return QRect();
-    int y = kPad - m_scrollPos;
-    for (int i = 0; i < msgIndex; i++) { y += m_items[i].height; }
+    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) { return QRect(); }
+    int y = msgAbsY(msgIndex) - m_scrollPos;
     return QRect(0, y, contentWidth(), m_items[msgIndex].height);
 }
 
@@ -1741,6 +1805,17 @@ void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
 }
 
 void ChatView::appendMessage(const ChatElement& msg) {
+    // Block index maintenance: start a new block when the last one is full.
+    if (m_blocks.empty()) {
+        m_blocks.push_back({kPad});
+    } else {
+        int lastBlockStart = ((int)m_blocks.size() - 1) * kBlockSize;
+        int lastBlockCount = (int)m_items.size() - lastBlockStart;
+        if (lastBlockCount >= kBlockSize) {
+            m_blocks.push_back({m_totalHeight});
+        }
+    }
+
     int curVal = m_vScrollBar->value();
 #ifdef QT3_BUILD
     int oldMax = m_vScrollBar->maxValue();
@@ -1778,6 +1853,7 @@ void ChatView::appendMessage(const ChatElement& msg) {
 
 void ChatView::clearMessages() {
     m_items.clear();
+    m_blocks.clear();
     m_totalHeight = 0;
     m_scrollPos = 0;
     m_vScrollBar->setRange(0, 0);
@@ -1850,6 +1926,7 @@ void ChatView::relayout() {
     if (oldVal == oldMax && oldMax > 0) {
         m_vScrollBar->setValue(maxScroll);
     }
+    rebuildBlocks();
     updateFull();
 }
 
@@ -1936,13 +2013,7 @@ static void lineBoundaries(const QString& text, int pos, int& start, int& end) {
 
 // Find which message is at given y coordinate (relative to widget top)
 int ChatView::findMessageAtY(int y) const {
-    int curY = kPad - m_scrollPos;
-    for (size_t i = 0; i < m_items.size(); ++i) {
-        int h = m_items[i].height;
-        if (y >= curY && y < curY + h) { return (int)i; }
-        curY += h;
-    }
-    return -1;
+    return findByAbsY(m_scrollPos + y);
 }
 
 // Get character position in a message from local coordinates
@@ -2550,12 +2621,14 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
 }
 
 void ChatView::manageAnimations() {
-    int viewTop = m_scrollPos;
     int viewBottom = m_scrollPos + height();
-    int y = kPad - m_scrollPos;
-    for (size_t i = 0; i < m_items.size(); ++i) {
+    int first = findByAbsY(m_scrollPos);
+    if (first < 0) { first = 0; }
+    int absY = msgAbsY(first);
+    int y = absY - m_scrollPos;
+    for (size_t i = first; i < m_items.size(); ++i) {
         int h = m_items[i].height;
-        bool visible = (y + h > kPad - m_scrollPos) && (y < viewBottom);
+        bool visible = (absY + h > m_scrollPos) && (absY < viewBottom);
         if (m_items[i].etype == ChatElement::Gif) {
             if (visible) {
                 if (!m_items[i].movie) {
@@ -2565,7 +2638,8 @@ void ChatView::manageAnimations() {
                 m_items[i].stopAnimation();
             }
         }
-        if (y > viewBottom) { break; }
+        if (absY > viewBottom) { break; }
+        absY += h;
         y += h;
     }
 }
@@ -2573,15 +2647,13 @@ void ChatView::manageAnimations() {
 std::pair<int,int> ChatView::visibleMessageRange() const {
     int top = m_scrollPos;
     int bottom = top + height();
-    int y = 0;
-    int first = -1, last = -1;
-    for (int i = 0; i < (int)m_items.size(); i++) {
-        int h = m_items[i].height;
-        if (y + h > top && y < bottom) {
-            if (first < 0) { first = i; }
-            last = i;
-        }
-        y += h;
+    int first = findByAbsY(top);
+    if (first < 0) { return {-1, -1}; }
+    int absY = msgAbsY(first);
+    int last = first;
+    while (last + 1 < (int)m_items.size() && absY + m_items[last].height < bottom) {
+        absY += m_items[last].height;
+        last++;
     }
     return {first, last};
 }
@@ -2616,8 +2688,11 @@ void ChatView::paintEvent(QPaintEvent* event) {
         selRects = selectionRects(m_selMsgIndex);
     }
 
-    int y = kPad - m_scrollPos;
-    for (size_t i = 0; i < m_items.size(); ++i) {
+    int first = findByAbsY(m_scrollPos);
+    if (first < 0) { first = 0; }
+    int absY = msgAbsY(first);
+    int y = absY - m_scrollPos;
+    for (size_t i = first; i < m_items.size(); ++i) {
         int h = m_items[i].height;
         if (y + h >= 0 && y <= vpH) {
             m_items[i].paint(p, y, viewW, ((int)i == m_selMsgIndex), selRects,
@@ -2625,6 +2700,7 @@ void ChatView::paintEvent(QPaintEvent* event) {
         }
         if (y > vpH) { break; }
         y += h;
+        absY += h;
     }
     m_scrollDownPill.paint(p, rect(), currentPalette().windowBg, currentPalette().textPrimary);
 }
