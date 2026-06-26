@@ -146,40 +146,115 @@ static QString formatFileSize(int bytes) {
     return QString::number(mb, 'f', 1) + qFromUtf8(" MB");
 }
 
-struct DownloadBtnInfo {
-    QRect rect;
-    int height;
+struct DownloadBarInfo {
+    QRect downloadBtn;
+    QRect retryBtn;
 };
 
-static DownloadBtnInfo paintDownloadBtn(QPainter& p, int cx, int cy, int parentW,
-    const QFont& baseFont, const StyleParams::Palette& pal, int fileSize = 0)
+static DownloadBarInfo paintDownloadStatusBar(QPainter& p, const QRect& parentRect,
+    const QFont& baseFont, const StyleParams::Palette& pal,
+    ChatElement::DownloadState state, int fileSize)
 {
-    int btnH = 26;
+    const int kPad = 8, btnH = 26, retryBtnH = 22;
     QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true);
-    QString btnText = qFromUtf8("⬇ ") + qFromUtf8("下载");
+    QFontMetrics bfm(bf);
+
+    // ── Build text for each element ──
+    QString statusText;
+    QColor statusColor = pal.textMuted;
+    if (state == ChatElement::NotRequested) {
+        statusText = qFromUtf8("待下载");
+    } else if (state == ChatElement::Completed) {
+        statusText = qFromUtf8("✓ 已下载");
+        statusColor = QColor(80, 180, 80);
+    } else if (state == ChatElement::InProgress) {
+        statusText = qFromUtf8("⏳ 下载中");
+    } else if (state == ChatElement::Failed) {
+        statusText = qFromUtf8("✗ 失败");
+        statusColor = QColor(200, 50, 50);
+    }
+
+    QString dlText = qFromUtf8("⬇ 下载");
     if (fileSize > 0) {
         QString sz = formatFileSize(fileSize);
-        if (!sz.isEmpty()) { btnText += qFromUtf8(" ") + sz; }
+        if (!sz.isEmpty()) { dlText += qFromUtf8(" ") + sz; }
     }
-    QFontMetrics bfm(bf);
-    int btnW = std::max(110, bfm.width(btnText) + 24);
-    int bx = cx + (parentW - btnW) / 2;
-    int by = cy;
-    QRect btnR(bx, by, btnW, btnH);
-    p.setBrush(pal.accent);
+
+    QString errText;
+    QString retryText;
+    if (state == ChatElement::Failed) {
+        errText = qFromUtf8("⚠ 下载失败");
+        retryText = qFromUtf8("↻ 重试");
+    }
+
+    // ── Compute widths ──
+    int statusW = statusText.isEmpty() ? 0 : bfm.width(statusText) + 8;
+    int dlW     = bfm.width(dlText) + 20;
+    int retryW  = retryText.isEmpty() ? 0 : bfm.width(retryText) + 16;
+    int errW    = errText.isEmpty() ? 0 : bfm.width(errText);
+
+    // ── Right-to-left layout ──
+    int cursor = parentRect.right() - kPad;
+    int barY   = parentRect.bottom() - btnH - 4;
+
+    // 1. Status text (rightmost)
+    if (!statusText.isEmpty()) {
+        cursor -= statusW;
+        QRect sr(cursor, barY, statusW, btnH);
+        p.setPen(statusColor);
+        p.setFont(baseFont);
+        p.drawText(sr, Qt::AlignLeft | Qt::AlignVCenter, statusText);
+        cursor -= kPad;
+    }
+
+    // 2. Download button
+    cursor -= dlW;
+    QRect dlBtnR(cursor, barY, dlW, btnH);
+    p.setBrush(QColor(50, 50, 50));
     p.setPen(Qt::NoPen);
 #ifdef QT3_BUILD
-    p.drawRoundRect(btnR, 6, 6);
+    p.drawRoundRect(dlBtnR, 6, 6);
 #else
-    p.drawRoundedRect(btnR, 6, 6);
+    p.drawRoundedRect(dlBtnR, 6, 6);
 #endif
     p.setPen(Qt::white);
     p.setFont(bf);
-    p.drawText(btnR, Qt::AlignCenter, btnText);
+    p.drawText(dlBtnR, Qt::AlignCenter, dlText);
+    cursor -= kPad;
+
+    // 3. Retry button (only on failure)
+    QRect retBtnR;
+    if (!retryText.isEmpty()) {
+        cursor -= retryW;
+        int ry = barY + (btnH - retryBtnH) / 2;
+        retBtnR = QRect(cursor, ry, retryW, retryBtnH);
+        p.setBrush(QColor(50, 50, 50));
+        p.setPen(Qt::NoPen);
+#ifdef QT3_BUILD
+        p.drawRoundRect(retBtnR, 4, 3);
+#else
+        p.drawRoundedRect(retBtnR, 3, 3);
+#endif
+        p.setPen(Qt::white);
+        QFont rf = baseFont; rf.setPointSize(9); p.setFont(rf);
+        p.drawText(retBtnR, Qt::AlignCenter, retryText);
+        cursor -= kPad;
+    }
+
+    // 4. Error text (only on failure)
+    if (!errText.isEmpty()) {
+        cursor -= errW;
+        p.setPen(QColor(200, 50, 50));
+        QFont ef = baseFont; ef.setPointSize(10); p.setFont(ef);
+        p.drawText(cursor, barY, errW, btnH,
+                   Qt::AlignLeft | Qt::AlignVCenter, errText);
+    }
+
     p.setFont(baseFont);
-    DownloadBtnInfo info;
-    info.rect = btnR;
-    info.height = btnH + 4;
+
+    DownloadBarInfo info;
+    info.downloadBtn = dlBtnR;
+    info.retryBtn    = retBtnR;
     return info;
 }
 
@@ -188,8 +263,10 @@ static DownloadBtnInfo paintDownloadBtn(QPainter& p, int cx, int cy, int parentW
 static int paintThumbnail(QPainter& p, const QRect& imgRect,
     const QPixmap& thumb, int mediaW, int mediaH,
     const QFont& baseFont, const QFontMetrics& fm,
-    const StyleParams::Palette& pal, bool downloadFailed,
-    QRect* downloadBtnOut = nullptr, int fileSize = 0)
+    const StyleParams::Palette& pal,
+    ChatElement::DownloadState state,
+    QRect* downloadBtnOut = nullptr, QRect* retryBtnOut = nullptr,
+    int fileSize = 0)
 {
     int maxW = imgRect.width(), maxH = imgRect.height();
     int dw, dh;
@@ -239,54 +316,12 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
         p.drawText(pr, Qt::AlignCenter, dimText);
         p.setFont(baseFont);
 
-        if (downloadFailed) {
-            p.setPen(QColor(200, 50, 50));
-            QFont ef = baseFont; ef.setPointSize(10); p.setFont(ef);
-            p.drawText(pr, Qt::AlignBottom | Qt::AlignHCenter,
-                       qFromUtf8("⚠ ") + qFromUtf8("下载失败"));
-            p.setFont(baseFont);
-            int rw = 20, rh = 16;
-            QRect retryR(pr.right() - rw - 2, pr.bottom() - rh - 2, rw, rh);
-            p.setBrush(QColor(50, 50, 50));
-            p.setPen(Qt::NoPen);
-#ifdef QT3_BUILD
-            p.drawRoundRect(retryR, 4, 3);
-#else
-            p.drawRoundedRect(retryR, 3, 3);
-#endif
-            p.setPen(Qt::white);
-            QFont rf = baseFont; rf.setPointSize(9); rf.setBold(true); p.setFont(rf);
-            p.drawText(retryR, Qt::AlignCenter, qFromUtf8("↻"));
-            p.setFont(baseFont);
-        }
     }
-    // ── download button (always visible) ──
-    {
-        QFont bf = baseFont; bf.setPointSize(10); bf.setBold(true);
-        QString btnText = qFromUtf8("⬇ ") + qFromUtf8("下载");
-        if (fileSize > 0) {
-            QString sz = formatFileSize(fileSize);
-            if (!sz.isEmpty()) { btnText += qFromUtf8(" ") + sz; }
-        }
-        QFontMetrics bfm(bf);
-        int btnW = std::max(110, bfm.width(btnText) + 24);
-        int btnH = 26;
-        int bx = imgRect.x() + (imgRect.width() - btnW) / 2;
-        int by = imgRect.bottom() - btnH - 4;
-        QRect btnR(bx, by, btnW, btnH);
-        p.setBrush(QColor(50, 50, 50));
-        p.setPen(Qt::NoPen);
-#ifdef QT3_BUILD
-        p.drawRoundRect(btnR, 6, 6);
-#else
-        p.drawRoundedRect(btnR, 6, 6);
-#endif
-        p.setPen(Qt::white);
-        p.setFont(bf);
-        p.drawText(btnR, Qt::AlignCenter, btnText);
-        p.setFont(baseFont);
-        if (downloadBtnOut) { *downloadBtnOut = btnR; }
-    }
+    // ── 状态栏（右下角右对齐）──
+    DownloadBarInfo bi = paintDownloadStatusBar(p, imgRect, baseFont, pal,
+                                                state, fileSize);
+    if (downloadBtnOut) { *downloadBtnOut = bi.downloadBtn; }
+    if (retryBtnOut)    { *retryBtnOut    = bi.retryBtn; }
     return dh;
 }
 
@@ -297,8 +332,9 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
     QMovie* movie,
     const QFont& baseFont, const QFontMetrics& fm,
     int emojiW, const StyleParams::Palette& pal,
-    bool downloadFailed,
-    QRect* downloadBtnOut = nullptr, int fileSize = 0)
+    ChatElement::DownloadState state,
+    QRect* downloadBtnOut = nullptr, QRect* retryBtnOut = nullptr,
+    int fileSize = 0)
 {
     const int kBubbleHPad = 12, kBubbleVPad = 8, kPad = 8;
     QRect imgRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
@@ -313,7 +349,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 #endif
     }
     const QPixmap& src = !frame.isNull() ? frame : thumbnail;
-    int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed, downloadBtnOut, fileSize);
+    int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, state, downloadBtnOut, retryBtnOut, fileSize);
 
     // GIF badge
     if (etype == ChatElement::Gif) {
@@ -1209,8 +1245,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         }
         paintMediaContent(p, bubbleRect, etype, displayPixmap, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
-                          baseFont, fm, emojiW, pal, downloadFailed,
-                          &downloadBtnRect, fileSize);
+                          baseFont, fm, emojiW, pal, downloadState,
+                          &downloadBtnRect, &retryBtnRect, fileSize);
         break;
     }
     case Audio: {
@@ -1370,10 +1406,10 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
         paintAudioContent(p, bubbleRect, caption, durationSec, baseFont, fm, pal);
         {
-            int btnY = bubbleRect.bottom() - 4 - 26;
-            DownloadBtnInfo bi = paintDownloadBtn(p, bubbleRect.x(), btnY,
-                bubbleRect.width(), baseFont, pal, fileSize);
-            downloadBtnRect = bi.rect;
+            DownloadBarInfo bi = paintDownloadStatusBar(p, bubbleRect, baseFont, pal,
+                downloadState, fileSize);
+            downloadBtnRect = bi.downloadBtn;
+            retryBtnRect    = bi.retryBtn;
         }
         break;
     }
@@ -1677,10 +1713,10 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         }
         // 下载按钮
         {
-            int btnY = bubbleRect.bottom() - 4 - 26;
-            DownloadBtnInfo bi = paintDownloadBtn(p, bubbleRect.x(), btnY,
-                bubbleRect.width(), baseFont, pal, fileSize);
-            downloadBtnRect = bi.rect;
+            DownloadBarInfo bi = paintDownloadStatusBar(p, bubbleRect, baseFont, pal,
+                downloadState, fileSize);
+            downloadBtnRect = bi.downloadBtn;
+            retryBtnRect    = bi.retryBtn;
         }
         break;
     }
@@ -2525,16 +2561,18 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 
 void ChatView::mouseReleaseEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
-        // Download button click (all media types, always visible)
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
             ChatElement& el = m_items[msgIndex];
-            if ((el.etype == ChatElement::Image ||
-                 el.etype == ChatElement::Video ||
-                 el.etype == ChatElement::Gif ||
-                 el.etype == ChatElement::File ||
-                 el.etype == ChatElement::Audio) &&
+            // Download button (always)
+            if (!el.downloadBtnRect.isNull() &&
                 el.downloadBtnRect.contains(event->pos())) {
+                emit retryClicked(msgIndex, el.mediaUrl);
+                return;
+            }
+            // Retry button (only when failed)
+            if (!el.retryBtnRect.isNull() &&
+                el.retryBtnRect.contains(event->pos())) {
                 emit retryClicked(msgIndex, el.mediaUrl);
                 return;
             }
@@ -2548,17 +2586,7 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
                 updateRect(messageRect(oldIdx));
             }
         }
-        // Retry click for failed media downloads
-        if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
-            if ((m_items[msgIndex].etype == ChatElement::Image ||
-                 m_items[msgIndex].etype == ChatElement::Video ||
-                 m_items[msgIndex].etype == ChatElement::Gif) &&
-                m_items[msgIndex].downloadFailed &&
-                m_items[msgIndex].thumbnailRect.contains(event->pos())) {
-                emit retryClicked(msgIndex, m_items[msgIndex].mediaUrl);
-                return;
-            }
-        }
+        // Retry via status bar button replaces old thumbnail-area retry
     }
     QWidget::mouseReleaseEvent(event);
 }
@@ -2732,8 +2760,8 @@ void ChatView::triggerVisibleDownloads() {
     qWarning("[VisibleTrigger] visible range: %d ~ %d", first, last);
     for (int i = first; i <= last; i++) {
         ChatElement& el = m_items[i];
-        if (!el.downloadRequested && !el.downloadFailed && el.thumbnail.isNull()
-            && !el.mediaUrl.isEmpty()) {
+        if (!el.downloadRequested && el.downloadState == ChatElement::NotRequested
+            && el.thumbnail.isNull() && !el.mediaUrl.isEmpty()) {
             el.downloadRequested = true;
             qWarning("[VisibleTrigger] would download idx=%d type=%d url=%s",
                      i, (int)el.etype, qToUtf8(el.mediaUrl).data());

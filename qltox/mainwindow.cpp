@@ -319,7 +319,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
                     el.thumbnail.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
                     el.rawFileData = e->rawData;
-                    el.downloadFailed = false;
+                    el.downloadState = ChatElement::Completed;
                     chatWidget->triggerRelayout(e->msgIndex);
                 }
             } else {
@@ -327,7 +327,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                          e->chatId, e->chatType.c_str(), e->msgIndex, e->errorInfo.c_str());
                 if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
-                    el.downloadFailed = true;
+                    el.downloadState = ChatElement::Failed;
                     el.mediaUrl = qFromUtf8(e->mxcUrl);
                     chatWidget->triggerRelayout(e->msgIndex);
                 }
@@ -1191,6 +1191,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(msg);
                         int newIdx = chatWidget->messageCount() - 1;
                         if (!hm.mediaUrl.empty() && hm.msgtype != "file") {
+                            chatWidget->mutableMessageAt(newIdx).downloadState = ChatElement::InProgress;
                             ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
                         }
                     } else {
@@ -1828,6 +1829,8 @@ void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const Q
 void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
     if (currentChatId < 0) { return; }
+    chatWidget->mutableMessageAt(msgIndex).downloadState = ChatElement::InProgress;
+    chatWidget->triggerRelayout(msgIndex);
     ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
                           msgIndex, std::string(qToUtf8(mediaUrl).data()));
 }

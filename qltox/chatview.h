@@ -64,11 +64,13 @@ struct ChatElement {
     int     scaledForDispH;  // 缓存对应的绘制高度
     QString caption;
     QString mediaUrl;
-    bool downloadFailed;
+    enum DownloadState { NotRequested, InProgress, Completed, Failed };
+    DownloadState downloadState;
     bool downloadRequested;
     QRect thumbnailRect;
     int mediaWidth;
     QRect downloadBtnRect;
+    QRect retryBtnRect;
     int mediaHeight;
 
     // File only
@@ -93,7 +95,7 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , translationInProgress(false), downloadFailed(false), downloadRequested(false)
+        , translationInProgress(false), downloadState(NotRequested), downloadRequested(false)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , scaledForDispW(-1), scaledForDispH(-1), cachedWidth(-1), height(0) {}
