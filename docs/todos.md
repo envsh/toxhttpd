@@ -32,3 +32,4 @@
 - [ ] persist chat message history locally with bdb
 - [ ] maybe split msg parses to plugin is better
 - [ ] qltox memory keep increase
+- [ ] qltox中使用QT_VERSION检测版本

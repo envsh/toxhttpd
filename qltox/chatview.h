@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include "floatingpill.h"
 #include "StyleParams.h"
+#include "lambdaslot.h"
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -11,6 +12,10 @@
 #include <qrect.h>
 #include <qwidget.h>
 #include <qpainter.h>
+#include <qtimer.h>
+#ifndef QT3_BUILD
+#include <QTimer>
+#endif
 
 #if defined(QT3_BUILD)
 #include <qmovie.h>
@@ -98,7 +103,7 @@ struct ChatElement {
                const std::vector<QRect>& selRects,
                const QFontMetrics& fm, int emojiW,
                const QFont& baseFont, const StyleParams::Palette& pal);
-    void startAnimation(QWidget* parent);
+    void startAnimation(QWidget* parent, int msgIndex);
     void stopAnimation();
 };
 
@@ -124,6 +129,7 @@ public:
     int messageCount() const;
     void triggerRelayout(int msgIndex = -1);
     void triggerVisibleDownloads();
+    void onGifFrameUpdated(int msgIndex);
 
     static const int kAvatarSize   = 42;
     static const int kPad          = 8;
@@ -152,6 +158,7 @@ signals:
 
 private slots:
     void onScrollChanged(int value);
+    void onAnimTick();
 
 private:
     void relayout();
@@ -193,10 +200,12 @@ private:
     bool m_selecting;
 
     std::vector<ChatElement> m_items;
+    std::vector<char> m_gifFrameUpdated;
     int m_totalHeight;
     int m_scrollPos;
     std::vector<MsgBlock> m_blocks;
     LimeScrollBar* m_vScrollBar;
+    QTimer* m_animTimer;
     FloatingPill m_scrollDownPill;
 
     QFontMetrics m_fm;

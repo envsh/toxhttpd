@@ -11,6 +11,9 @@
 #include <cstdlib>
 #include "translator.h"
 
+// ── Media display sizing ──
+static const int kMaxMediaDim = 260;
+static const int kMinMediaH = 50;
 
 #ifdef QT3_BUILD
 #include <qpainter.h>
@@ -170,12 +173,16 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
     QRect* downloadBtnOut = nullptr)
 {
     int maxW = imgRect.width(), maxH = imgRect.height();
-    int dw = maxW, dh = maxH;
+    int dw, dh;
     if (mediaW > 0 && mediaH > 0) {
         double ratio = (double)mediaH / mediaW;
-        dh = (int)(maxW * ratio);
-        dw = maxW;
-        if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
+        dw = std::min(maxW, kMaxMediaDim);
+        dh = (int)(dw * ratio);
+        if (dh > kMaxMediaDim) { dh = kMaxMediaDim; dw = (int)(kMaxMediaDim / ratio); }
+        if (dh < kMinMediaH)   { dh = kMinMediaH;   dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
+    } else {
+        dw = std::min(maxW, kMaxMediaDim);
+        dh = 200;
     }
     if (!thumb.isNull()) {
         if (thumb.width() == dw && thumb.height() == dh) {
@@ -253,7 +260,7 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
         p.setFont(baseFont);
         if (downloadBtnOut) { *downloadBtnOut = btnR; }
     }
-    return (mediaW > 0 && mediaH > 0) ? dh : 0;
+    return dh;
 }
 
 static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
@@ -548,8 +555,6 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         if (bubbleW < 100) { bubbleW = contentW; }
         int imgMaxW = bubbleW - 2 * kBubbleHPad;
         int imgDispW, imgDispH;
-        const int kMaxMediaDim = 260;
-        const int kMinMediaH = 50;
         if (mediaWidth > 0 && mediaHeight > 0) {
             double ratio = (double)mediaHeight / mediaWidth;
             imgDispW = std::min(imgMaxW, kMaxMediaDim);
@@ -1147,20 +1152,18 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         // 预缩放缓存：避免每帧重新缩放全分辨率图片
         QPixmap displayPixmap = thumbnail;
         if (!thumbnail.isNull() && mediaWidth > 0 && mediaHeight > 0) {
-            int maxW = thumbnailRect.width(), maxH = thumbnailRect.height();
+            int maxW = thumbnailRect.width();
             // dw/dh 计算必须与 paintThumbnail() 一致，否则每帧 rescale
-            int dw = maxW, dh = maxH;
-            double ratio = (double)mediaHeight / mediaWidth;
-            if (mediaHeight > 0 && mediaWidth > 0) {
-                dh = (int)(maxW * ratio);
-                dw = maxW;
-                if (dh > maxH) { dh = maxH; dw = (int)(maxH / ratio); }
-            }
-            // kMinMediaH 保底（防止超宽图缩成细线）
-            {
-                const int kMinMediaH = 50;
-                const int kMaxMediaDim = 260;
-                if (dh < kMinMediaH) { dh = kMinMediaH; dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
+            int dw, dh;
+            if (mediaWidth > 0 && mediaHeight > 0) {
+                double ratio = (double)mediaHeight / mediaWidth;
+                dw = std::min(maxW, kMaxMediaDim);
+                dh = (int)(dw * ratio);
+                if (dh > kMaxMediaDim) { dh = kMaxMediaDim; dw = (int)(kMaxMediaDim / ratio); }
+                if (dh < kMinMediaH)   { dh = kMinMediaH;   dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
+            } else {
+                dw = std::min(maxW, kMaxMediaDim);
+                dh = 200;
             }
             if (dw != scaledForDispW || dh != scaledForDispH) {
 #ifdef QT3_BUILD
@@ -1657,14 +1660,20 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
     }
 }
 
-void ChatElement::startAnimation(QWidget* parent) {
+void ChatElement::startAnimation(QWidget* parent, int msgIndex) {
     if (etype != Gif || movie) { return; }
 #ifndef QT3_BUILD
     movie = new QMovie(gifPath);
-    QObject::connect(movie, SIGNAL(updated(const QRect&)), parent, SLOT(update(const QRect&)));
+    {
+        auto* slot = new LambdaSlot(movie, [parent, msgIndex]() {
+            static_cast<ChatView*>(parent)->onGifFrameUpdated(msgIndex);
+        });
+        QObject::connect(movie, SIGNAL(updated(const QRect&)), slot, SLOT(call()));
+    }
     movie->start();
 #else
     Q_UNUSED(parent);
+    Q_UNUSED(msgIndex);
     // Qt3 QMovie API differs; GIF animation deferred to Phase 4
 #endif
 }
@@ -1803,6 +1812,10 @@ ChatView::ChatView(QWidget* parent)
 #else
     setAttribute(Qt::WA_OpaquePaintEvent);
 #endif
+
+    m_animTimer = new QTimer(this);
+    QObject::connect(m_animTimer, SIGNAL(timeout()), this, SLOT(onAnimTick()));
+    m_animTimer->start(200);
 }
 
 ChatView::~ChatView() {
@@ -1812,6 +1825,7 @@ ChatView::~ChatView() {
 void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
     m_scrollDownPill.setCount(0);
     m_items = msgs;
+    m_gifFrameUpdated.assign(msgs.size(), 0);
     relayout();
     scrollToBottom();
 }
@@ -1839,6 +1853,7 @@ void ChatView::appendMessage(const ChatElement& msg) {
     int w = contentWidth();
     if (w <= 0) { w = 400; }
     m_items.push_back(msg);
+    m_gifFrameUpdated.push_back(0);
     ChatElement& el = m_items.back();
     el.height = el.calcHeight(w, m_fm, m_emojiW, font());
     el.cachedWidth = (short)w;
@@ -1864,7 +1879,9 @@ void ChatView::appendMessage(const ChatElement& msg) {
 }
 
 void ChatView::clearMessages() {
+    for (auto& el : m_items) { el.stopAnimation(); }
     m_items.clear();
+    m_gifFrameUpdated.clear();
     m_blocks.clear();
     m_totalHeight = 0;
     m_scrollPos = 0;
@@ -2641,7 +2658,11 @@ void ChatView::manageAnimations() {
         if (m_items[i].etype == ChatElement::Gif) {
             if (visible) {
                 if (!m_items[i].movie) {
-                    m_items[i].startAnimation(this);
+                    m_items[i].startAnimation(this, i);
+                }
+                if (m_items[i].movie && i < m_gifFrameUpdated.size() && m_gifFrameUpdated[i]) {
+                    m_gifFrameUpdated[i] = 0;
+                    update(QRect(0, y, width(), h));
                 }
             } else {
                 m_items[i].stopAnimation();
@@ -2650,6 +2671,16 @@ void ChatView::manageAnimations() {
         if (absY > viewBottom) { break; }
         absY += h;
         y += h;
+    }
+}
+
+void ChatView::onAnimTick() {
+    manageAnimations();
+}
+
+void ChatView::onGifFrameUpdated(int msgIndex) {
+    if (msgIndex >= 0 && msgIndex < (int)m_gifFrameUpdated.size()) {
+        m_gifFrameUpdated[msgIndex] = 1;
     }
 }
 
@@ -2684,7 +2715,6 @@ void ChatView::triggerVisibleDownloads() {
 }
 
 void ChatView::paintEvent(QPaintEvent* event) {
-    manageAnimations();
     QPainter p(this);
     p.setClipRect(event->rect());
     p.fillRect(event->rect(), currentPalette().windowBg);
