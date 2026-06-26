@@ -1791,6 +1791,11 @@ ChatView::ChatView(QWidget* parent)
         m_scrollDownPill.setCount(0);
         scrollToBottom();
     });
+#ifdef QT3_BUILD
+    setWFlags(getWFlags() | WNoAutoErase);
+#else
+    setAttribute(Qt::WA_OpaquePaintEvent);
+#endif
 }
 
 ChatView::~ChatView() {
@@ -2714,7 +2719,9 @@ void ChatView::resizeEvent(QResizeEvent* event) {
 }
 
 void ChatView::onScrollChanged(int value) {
+    int delta = m_scrollPos - value;
     m_scrollPos = value;
+    QWidget::scroll(0, delta, rect());
 #ifdef QT3_BUILD
     int maxVal = m_vScrollBar->maxValue();
 #else
@@ -2722,8 +2729,8 @@ void ChatView::onScrollChanged(int value) {
 #endif
     if (maxVal - value <= 20 && m_scrollDownPill.count() > 0) {
         m_scrollDownPill.setCount(0);
+        updateRect(m_scrollDownPill.rect());
     }
     m_vScrollBar->showTemporarily();
-    updateFull();
     triggerVisibleDownloads();
 }

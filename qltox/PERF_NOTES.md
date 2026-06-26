@@ -139,11 +139,11 @@ setAttribute(Qt::WA_OpaquePaintEvent);
 - 块索引（`MsgBlock` / `kBlockSize=50`）实现 O(log n) 二分查找，消除 6 处 O(n) 全量遍历
 - `updateRect()` / `updateFull()` 分离策略，局部修改用增量矩形
 - image preview 固定尺寸 260×260
+- **增量滚动（P0）**：`onScrollChanged` 用 `QWidget::scroll()` bit blit 替代 `updateFull()`，每帧只画新露出条带
+- **OpaquePaintEvent（P1）**：Qt3 `WNoAutoErase` / Qt4 `WA_OpaquePaintEvent`，消除系统擦除 + fillRect 双重重绘
 
 ### 待完成
 
-- `QWidget::scroll()` 增量滚动（P0）
-- `WA_OpaquePaintEvent`（P1）
-- GIF timer 分离（P2）
+- GIF timer 分离（P2）：`manageAnimations` 移出 `paintEvent`，改为每 200ms 的 `QTimer` 驱动
 - Phase 3: `QTextLayout` 富文本渲染
 - Phase 4: 嵌入媒体（MediaItem）
