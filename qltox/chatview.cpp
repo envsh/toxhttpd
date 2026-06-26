@@ -163,7 +163,7 @@ static DownloadBtnInfo paintDownloadBtn(QPainter& p, int cx, int cy, int parentW
 
 // ───── Media rendering helpers ─────
 
-static void paintThumbnail(QPainter& p, const QRect& imgRect,
+static int paintThumbnail(QPainter& p, const QRect& imgRect,
     const QPixmap& thumb, int mediaW, int mediaH,
     const QFont& baseFont, const QFontMetrics& fm,
     const StyleParams::Palette& pal, bool downloadFailed,
@@ -253,6 +253,7 @@ static void paintThumbnail(QPainter& p, const QRect& imgRect,
         p.setFont(baseFont);
         if (downloadBtnOut) { *downloadBtnOut = btnR; }
     }
+    return (mediaW > 0 && mediaH > 0) ? dh : 0;
 }
 
 static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
@@ -278,7 +279,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 #endif
     }
     const QPixmap& src = !frame.isNull() ? frame : thumbnail;
-    paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed, downloadBtnOut);
+    int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, downloadFailed, downloadBtnOut);
 
     // GIF badge
     if (etype == ChatElement::Gif) {
@@ -358,7 +359,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 
     // Caption
     if (!caption.isEmpty()) {
-        int captionY = imgRect.bottom() + kPad/2;
+        int captionY = imgRect.y() + imgDispH + kPad/2;
         p.setPen(pal.textMuted);
         QFont cf = baseFont; cf.setPointSize(10); p.setFont(cf);
         p.drawText(bubbleRect.x() + kBubbleHPad, captionY,
