@@ -146,6 +146,12 @@ private slots:
 
 private:
     void relayout();
+    /// 全量刷新：切换上下文、滚动、clearMessages、relayout、全选等结构变化场景
+    void updateFull();
+    /// 增量刷新：appendMessage、pill 悬浮/计数、selection 拖拽等局部脏矩形场景
+    void updateRect(const QRect& r);
+    /// 计算消息在视口中的矩形，msgIndex=-1 返回空矩形
+    QRect messageRect(int msgIndex) const;
     int contentWidth() const;
     int charWidth(uint32_t cp);
     void manageAnimations();

@@ -1644,7 +1644,7 @@ void ChatElement::startAnimation(QWidget* parent) {
     if (etype != Gif || movie) { return; }
 #ifndef QT3_BUILD
     movie = new QMovie(gifPath);
-    QObject::connect(movie, SIGNAL(updated(const QRect&)), parent, SLOT(update()));
+    QObject::connect(movie, SIGNAL(updated(const QRect&)), parent, SLOT(update(const QRect&)));
     movie->start();
 #else
     Q_UNUSED(parent);
@@ -1662,6 +1662,28 @@ void ChatElement::stopAnimation() {
 }
 
 // ───── ChatView ─────
+
+// 刷新策略：updateFull() 用于可视结构变化全量重绘，
+// updateRect() 用于脏矩形可精确定位的局部刷新。
+void ChatView::updateFull() {
+    QWidget::update();
+}
+
+QRect ChatView::messageRect(int msgIndex) const {
+    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return QRect();
+    int y = kPad - m_scrollPos;
+    for (int i = 0; i < msgIndex; i++) { y += m_items[i].height; }
+    return QRect(0, y, contentWidth(), m_items[msgIndex].height);
+}
+
+void ChatView::updateRect(const QRect& r) {
+    if (r.isEmpty()) {
+        qWarning("updateRect: empty rect (w=%d h=%d) — should use updateFull()",
+                 r.width(), r.height());
+        return;
+    }
+    QWidget::update(r);
+}
 
 ChatView::ChatView(QWidget* parent)
     : QWidget(parent)
@@ -1729,16 +1751,19 @@ void ChatView::appendMessage(const ChatElement& msg) {
     int maxScroll = std::max(0, m_totalHeight - vpH);
     m_vScrollBar->setRange(0, maxScroll);
     m_vScrollBar->setPageStep(vpH);
-    if (curVal == oldMax && oldMax > 0) {
-        m_vScrollBar->setValue(maxScroll);
-    }
 
     if (atBottom) {
-        scrollToBottom();
+        m_scrollPos = maxScroll;
+        m_vScrollBar->blockSignals(true);
+        m_vScrollBar->setValue(maxScroll);
+        m_vScrollBar->blockSignals(false);
+        m_vScrollBar->showTemporarily();
+        triggerVisibleDownloads();
+        updateFull();
     } else {
         m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
+        updateRect(QRect(width() - 150, height() - 40, 150, 40));
     }
-    update();
 }
 
 void ChatView::clearMessages() {
@@ -1749,7 +1774,7 @@ void ChatView::clearMessages() {
     m_selMsgIndex = -1;
     m_selStart = m_selEnd = 0;
     m_scrollDownPill.setCount(0);
-    update();
+    updateFull();
 }
 
 void ChatView::scrollToBottom() {
@@ -1815,7 +1840,7 @@ void ChatView::relayout() {
     if (oldVal == oldMax && oldMax > 0) {
         m_vScrollBar->setValue(maxScroll);
     }
-    update();
+    updateFull();
 }
 
 int ChatView::charWidth(uint32_t cp) {
@@ -2102,6 +2127,7 @@ QString ChatView::selectedText() const {
 
 void ChatView::selectWordAt(int msgIndex, int charPos) {
     if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return;
+    int oldIdx = m_selMsgIndex;
     const QString& text = m_items[msgIndex].messageText;
     int start, end;
     wordBoundaries(text, charPos, start, end);
@@ -2109,11 +2135,18 @@ void ChatView::selectWordAt(int msgIndex, int charPos) {
     m_selStart = start;
     m_selEnd = end;
     m_selecting = false;
-    update();
+    QRect dirty = messageRect(oldIdx);
+#ifdef QT3_BUILD
+    dirty = dirty.unite(messageRect(msgIndex));
+#else
+    dirty = dirty.united(messageRect(msgIndex));
+#endif
+    if (!dirty.isEmpty()) updateRect(dirty);
 }
 
 void ChatView::selectLineAt(int msgIndex, int charPos) {
     if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return;
+    int oldIdx = m_selMsgIndex;
     const QString& text = m_items[msgIndex].messageText;
     int start, end;
     lineBoundaries(text, charPos, start, end);
@@ -2121,7 +2154,13 @@ void ChatView::selectLineAt(int msgIndex, int charPos) {
     m_selStart = start;
     m_selEnd = end;
     m_selecting = false;
-    update();
+    QRect dirty = messageRect(oldIdx);
+#ifdef QT3_BUILD
+    dirty = dirty.unite(messageRect(msgIndex));
+#else
+    dirty = dirty.united(messageRect(msgIndex));
+#endif
+    if (!dirty.isEmpty()) updateRect(dirty);
 }
 
 void ChatView::copySelectedText() {
@@ -2234,17 +2273,19 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                     }
                 }
                 // Start selection
+                int oldIdx = m_selMsgIndex;
                 m_selMsgIndex = msgIndex;
                 m_selStart = charPos;
                 m_selEnd = charPos;
                 m_selecting = true;
-                update();
+                updateRect(messageRect(oldIdx));
             }
         } else {
             // Click outside messages, clear selection
             if (m_selMsgIndex != -1) {
+                int oldIdx = m_selMsgIndex;
                 m_selMsgIndex = -1;
-                update();
+                updateRect(messageRect(oldIdx));
             }
             m_clickCount = 0;
         }
@@ -2257,7 +2298,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
         && m_scrollDownPill.rect().contains(event->pos());
     if (overPill != m_scrollDownPill.isHovered()) {
         m_scrollDownPill.setHovered(overPill);
-        update();
+        updateRect(m_scrollDownPill.rect());
     }
     if (overPill) {
         setCursor(QCursor(Qt::PointingHandCursor));
@@ -2274,7 +2315,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
             int charPos = charPosAt(msgIndex, localX, localY);
             if (charPos >= 0) {
                 m_selEnd = charPos;
-                update(0, msgY, width(), m_items[m_selMsgIndex].height);
+                updateRect(QRect(0, msgY, width(), m_items[m_selMsgIndex].height));
             }
         }
     }
@@ -2368,8 +2409,9 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
             m_selecting = false;
             // If start and end are same, clear selection
             if (m_selStart == m_selEnd) {
+                int oldIdx = m_selMsgIndex;
                 m_selMsgIndex = -1;
-                update();
+                updateRect(messageRect(oldIdx));
             }
         }
         // Retry click for failed media downloads
@@ -2474,7 +2516,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selMsgIndex = 0;
         m_selStart = 0;
         m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
-        update();
+        updateFull();
     } else if (choice == copyNickId) {
         QApplication::clipboard()->setText(displayName);
     } else if (choice == mentionId) {
@@ -2488,7 +2530,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selMsgIndex = 0;
         m_selStart = 0;
         m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
-        update();
+        updateFull();
     } else if (chosen == copyNickAction) {
         QApplication::clipboard()->setText(displayName);
     } else if (chosen == mentionAction) {
@@ -2513,6 +2555,7 @@ void ChatView::manageAnimations() {
                 m_items[i].stopAnimation();
             }
         }
+        if (y > viewBottom) { break; }
         y += h;
     }
 }
@@ -2570,6 +2613,7 @@ void ChatView::paintEvent(QPaintEvent* event) {
             m_items[i].paint(p, y, viewW, ((int)i == m_selMsgIndex), selRects,
                              m_fm, m_emojiW, font(), currentPalette());
         }
+        if (y > vpH) { break; }
         y += h;
     }
     m_scrollDownPill.paint(p, rect(), currentPalette().windowBg, currentPalette().textPrimary);
@@ -2594,6 +2638,6 @@ void ChatView::onScrollChanged(int value) {
         m_scrollDownPill.setCount(0);
     }
     m_vScrollBar->showTemporarily();
-    update();
+    updateFull();
     triggerVisibleDownloads();
 }
