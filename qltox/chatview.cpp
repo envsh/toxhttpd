@@ -2416,6 +2416,17 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 return;
             }
 
+            // Check download button click (handled in release, prevent text selection)
+            if (!m_items[msgIndex].downloadBtnRect.isNull() &&
+                m_items[msgIndex].downloadBtnRect.contains(event->pos())) {
+                return;
+            }
+            // Check retry button click
+            if (!m_items[msgIndex].retryBtnRect.isNull() &&
+                m_items[msgIndex].retryBtnRect.contains(event->pos())) {
+                return;
+            }
+
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
             for (int i = 0; i < msgIndex; i++) { curY += m_items[i].height; }
@@ -2595,6 +2606,15 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+            // 双击下载/重试按钮时不打开 PhotoViewer、不进入选择
+            if (!m_items[msgIndex].downloadBtnRect.isNull() &&
+                m_items[msgIndex].downloadBtnRect.contains(event->pos())) {
+                return;
+            }
+            if (!m_items[msgIndex].retryBtnRect.isNull() &&
+                m_items[msgIndex].retryBtnRect.contains(event->pos())) {
+                return;
+            }
             // 双击媒体缩略图 → 打开 PhotoViewer
             if ((m_items[msgIndex].etype == ChatElement::Image ||
                  m_items[msgIndex].etype == ChatElement::Video ||
