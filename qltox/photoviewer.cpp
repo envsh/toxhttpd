@@ -33,7 +33,13 @@ PhotoCanvas::PhotoCanvas(QWidget* parent, const QPixmap& pixmap)
     , m_showHelp(false)
     , m_dragging(false)
 {
+#ifdef QT3_BUILD
+    setWFlags(getWFlags() | Qt::WNoAutoErase);
+#else
+    setAttribute(Qt::WA_OpaquePaintEvent, true);
+#endif
     fitToWindow();
+    rebuildCache();
 }
 
 void PhotoCanvas::fitToWindow() {
@@ -48,6 +54,7 @@ void PhotoCanvas::fitToWindow() {
     double sy = (double)height() / h;
     m_scale = min(sx, sy);
     centerImage();
+    rebuildCache();
     update();
 }
 
@@ -55,6 +62,7 @@ void PhotoCanvas::actualSize() {
     m_fitMode = false;
     m_scale = 1.0;
     centerImage();
+    rebuildCache();
     update();
 }
 
@@ -70,6 +78,7 @@ void PhotoCanvas::zoomIn() {
     m_fitMode = false;
     m_scale = m_scale * 1.25;
     if (m_scale < 0.05) { m_scale = 0.05; }
+    rebuildCache();
     update();
 }
 
@@ -77,6 +86,7 @@ void PhotoCanvas::zoomOut() {
     m_fitMode = false;
     m_scale = m_scale / 1.25;
     if (m_scale < 0.05) { m_scale = 0.05; }
+    rebuildCache();
     update();
 }
 
@@ -87,6 +97,7 @@ void PhotoCanvas::rotateCW() {
         fitToWindow();
     } else {
         centerImage();
+        rebuildCache();
         update();
     }
 }
@@ -98,6 +109,7 @@ void PhotoCanvas::rotateCCW() {
         fitToWindow();
     } else {
         centerImage();
+        rebuildCache();
         update();
     }
 }
@@ -133,32 +145,26 @@ void PhotoCanvas::updateCursor() {
     }
 }
 
+void PhotoCanvas::rebuildCache() {
+    if (m_pixmap.isNull()) { m_cachedPixmap = QPixmap(); return; }
+    double dw = (m_rotation == 90.0 || m_rotation == 270.0)
+                ? (double)m_pixmap.height() : (double)m_pixmap.width();
+    double dh = (m_rotation == 90.0 || m_rotation == 270.0)
+                ? (double)m_pixmap.width() : (double)m_pixmap.height();
+    m_cachedPixmap = QPixmap(qRound(dw * m_scale), qRound(dh * m_scale));
+    QPainter cp(&m_cachedPixmap);
+    cp.translate(dw * m_scale / 2.0, dh * m_scale / 2.0);
+    cp.rotate(m_rotation);
+    cp.translate(-m_pixmap.width() * m_scale / 2.0, -m_pixmap.height() * m_scale / 2.0);
+    cp.scale(m_scale, m_scale);
+    cp.drawPixmap(0, 0, m_pixmap);
+}
+
 void PhotoCanvas::paintEvent(QPaintEvent*) {
     QPainter p(this);
 
-#ifdef QT3_BUILD
-    p.fillRect(rect(), palette().active().background());
-#else
-    p.fillRect(rect(), palette().color(QPalette::Window));
-#endif
-
-    if (!m_pixmap.isNull()) {
-        p.save();
-
-        double iw = (double)m_pixmap.width();
-        double ih = (double)m_pixmap.height();
-        double dw = (m_rotation == 90.0 || m_rotation == 270.0) ? ih : iw;
-        double dh = (m_rotation == 90.0 || m_rotation == 270.0) ? iw : ih;
-
-        double cx = m_offX + dw * m_scale / 2.0;
-        double cy = m_offY + dh * m_scale / 2.0;
-
-        p.translate(cx, cy);
-        p.rotate(m_rotation);
-        p.translate(-iw * m_scale / 2.0, -ih * m_scale / 2.0);
-        p.scale(m_scale, m_scale);
-        p.drawPixmap(0, 0, m_pixmap);
-        p.restore();
+    if (!m_cachedPixmap.isNull()) {
+        p.drawPixmap(qRound(m_offX), qRound(m_offY), m_cachedPixmap);
     }
 
     if (m_showHelp) {
@@ -217,6 +223,7 @@ void PhotoCanvas::wheelEvent(QWheelEvent* event) {
 
     m_scale = newScale;
     m_fitMode = false;
+    rebuildCache();
     update();
 }
 
@@ -256,6 +263,9 @@ void PhotoCanvas::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
     if (m_fitMode) {
         fitToWindow();
+    } else {
+        rebuildCache();
+        update();
     }
 }
 

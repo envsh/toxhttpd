@@ -37,6 +37,7 @@ protected:
 private:
     void centerImage();
     void updateCursor();
+    void rebuildCache();
 
     QPixmap m_pixmap;
     double m_scale;
@@ -49,6 +50,7 @@ private:
     QPoint m_dragStart;
     double m_dragOffX;
     double m_dragOffY;
+    QPixmap m_cachedPixmap; // 按当前 scale/rotation 渲染好的离线缓冲图，拖动只改 offset 不复算变换
 };
 
 class PhotoViewer : public QDialog {

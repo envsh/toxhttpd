@@ -1918,10 +1918,15 @@ void MainWindow::openSettings() {
         "server/retryInterval", 5,
         qFromUtf8("连接重试间隔(秒)"), 1, 60, network);
     network->addLabeledControl(retryInterval->label(), retryInterval->spinBox());
+    IntConfigItem* httpParallel = new IntConfigItem(
+        "http_request_parral", 1,
+        qFromUtf8("HTTP请求并行数"), 1, 5, network);
+    network->addLabeledControl(httpParallel->label(), httpParallel->spinBox());
     network->addStretch();
     dlg->addCategory(qFromUtf8("网络"), network);
     dlg->registerConfigItem(timeout);
     dlg->registerConfigItem(retryInterval);
+    dlg->registerConfigItem(httpParallel);
 
     // --- 其他 ---
     CategoryPage* other = new CategoryPage(qFromUtf8("其他"), dlg);
@@ -1940,6 +1945,12 @@ void MainWindow::openSettings() {
         "sortbylastmsg", false,
         qFromUtf8("联系人排序最新消息优先"), other);
     other->addWidget(sortbylastmsg->checkBox());
+    QStringList toLangs;
+    toLangs << qFromUtf8("zh-CN") << qFromUtf8("zh-TW") << qFromUtf8("en-US");
+    SelectConfigItem* translateToLang = new SelectConfigItem(
+        "translate/tolang", "zh-CN",
+        qFromUtf8("翻译目标语言"), toLangs, other);
+    other->addLabeledControl(translateToLang->label(), translateToLang->comboBox());
     IntConfigItem* fontSize = new IntConfigItem(
         "chat/fontSize", 14,
         qFromUtf8("消息字体大小"), 8, 32, other);
@@ -1986,6 +1997,7 @@ void MainWindow::openSettings() {
     dlg->registerConfigItem(logLevel);
     dlg->registerConfigItem(autoConnect);
     dlg->registerConfigItem(sortbylastmsg);
+    dlg->registerConfigItem(translateToLang);
     dlg->registerConfigItem(fontSize);
     dlg->registerConfigItem(dispImg);
     dlg->registerConfigItem(dispFile);
