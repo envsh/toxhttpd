@@ -8,17 +8,14 @@
 #include <qpoint.h>
 #ifdef QT3_BUILD
 #include <qdatetime.h>
-#include <qlistview.h>
 #else
 #include <QDateTime>
-#include <QListView>
-#include <QAbstractListModel>
 #endif
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <memory>
 
-// Emoji constants defined in contactlist.cpp
 extern const char* EMOJI_FRIEND;
 extern const char* EMOJI_GROUP;
 extern const char* EMOJI_CONFERENCE;
@@ -30,10 +27,10 @@ extern const char* EMOJI_MATRIX;
 struct Contact {
     int id;
     QString name;
-    QString type; // "friend", "group", "conference"
-    QString status; // "online", "offline", "tcp"
-    QString chat_id; // public key
-    bool is_connected; // 群组/会议连接状态
+    QString type;
+    QString status;
+    QString chat_id;
+    bool is_connected;
     QString lastMessage;
     QString lastMessageTime;
     QDateTime lastActive;
@@ -41,16 +38,74 @@ struct Contact {
 
 typedef QPtrList<Contact> ContactList;
 
-#ifndef QT3_BUILD
-class ContactListModel;
-#endif
+struct RowData {
+    int id;
+    QString type;
+    QString name;
+    QString status;
+    QString chatId;
+    bool isConnected;
+    int unread;
+    QString lastMessage;
+    QString timeStr;
+    int index;
+    QString nameUpper;
+};
+
+class ContactListWidget;
+
+class ContactListView : public QWidget {
+public:
+    ContactListView(ContactListWidget* widget);
+    void setScrollBar(LimeScrollBar* sb) { m_scrollBar = sb; }
+    int selectedIndex() const { return m_selIdx; }
+    void setSelectedIndex(int idx);
+    int scrollY() const { return m_scrollY; }
+    void setScrollY(int y);
+protected:
+    void paintEvent(QPaintEvent* e);
+    void mousePressEvent(QMouseEvent* e);
+    void wheelEvent(QWheelEvent* e);
+    void resizeEvent(QResizeEvent* e);
+private:
+    int totalHeight() const;
+    int yToRow(int y) const;
+    ContactListWidget* m_widget;
+    LimeScrollBar* m_scrollBar;
+    int m_selIdx = -1;
+    int m_scrollY = 0;
+};
+
+class ContactListData {
+public:
+    RowData* get(int id, const QString& type);
+    RowData* addToEnd(std::unique_ptr<RowData> rd);
+    void remove(int id, const QString& type);
+    void adjustBySort(int idx);
+    void sort(const std::vector<QString>& criteria);
+    void freeze();
+    void unfreeze(const std::vector<QString>& criteria);
+    void clear();
+    void updateFrom(int startIdx);
+    int size() const { return m_rows.size(); }
+    RowData* at(int i) { return m_rows[i]; }
+    const RowData* at(int i) const { return m_rows[i]; }
+private:
+    static bool rowLess(const RowData* a, const RowData* b, const std::vector<QString>& criteria);
+    std::map<std::pair<int,QString>, std::unique_ptr<RowData>> m_map;
+    std::vector<RowData*> m_rows;
+    std::vector<QString> m_criteria;
+    bool m_frozen = false;
+    std::vector<int> m_pendingAdjust;
+};
 
 class ContactListWidget : public QWidget {
     Q_OBJECT
+    friend class ContactListView;
 public:
     explicit ContactListWidget(QWidget* parent = 0);
-    
-    void setContacts(const ContactList& contacts);
+
+    void setContacts(ContactList& contacts);
     void clear();
     void updateFriendName(int friendId, const QString& newName);
     void updateFriendConnectionStatus(int friendId, const QString& newStatus);
@@ -62,12 +117,24 @@ public:
                                   const QString& timeStr = QString());
     bool isFriendLoaded(int friendId);
     void retranslateUi();
-    
-    // 未读消息数
+
     void incrementUnread(int id, const QString& type, int count = 1);
     void resetUnread(int id, const QString& type);
     int unreadCount(int id, const QString& type) const;
-    
+
+    void beginBatch();
+    void endBatch();
+
+    int itemHeight() const { return m_itemHeight; }
+    bool matchesFilter(const RowData& rd) const {
+        if (m_searchText.isEmpty()) return true;
+        return rd.nameUpper.contains(qToUpper(m_searchText));
+    }
+    void handleContactSelected(int id, const QString& type, const QString& name) {
+        emit contactSelected(id, type, name);
+    }
+    void setViewScrollY(int y);
+
 signals:
     void contactSelected(int id, const QString& type, const QString& name);
     void viewInfoRequested(int id, const QString& type);
@@ -78,54 +145,46 @@ signals:
     void renameNickRequested(int groupId, const QString& groupName);
     void setGroupTopicRequested(int groupId);
     void setConferenceTitleRequested(int conferenceId);
-    
+
 private slots:
     void onSearchTextChanged(const QString& text);
     void onSortMenuClicked();
-    void showContextMenu(QPoint pos);
     void onJoinGroupClicked();
     void onAddFriendClicked();
     void onCreateConferenceClicked();
     void onCreateGroupClicked();
-    void onItemClicked(); // Qt4: QListView clicked(QModelIndex) -> reads currentIndex()
-#ifdef QT3_BUILD
-    void onSelectionChanged(); // Qt3: QListView selectionChanged
-#endif
-    
-private:
-    bool eventFilter(QObject* obj, QEvent* event);
+    void onScrollChanged(int value);
+
 public:
     void showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos);
-    
+
 private:
-    void findAndUpdateItem(int id, const QString& type);
-    void rebuildSortFilter();
-    
-    void* listWidget;  // QListView* (both Qt3 and Qt4)
+    void refreshView();
+    void resolveSelection();
+    void updateScrollBar();
+
+    ContactListView* m_view;
+    ContactListData m_list;
     LimeScrollBar* m_scrollBar;
-#ifndef QT3_BUILD
-    ContactListModel* m_model;
-#endif
-    ContactList allContacts;
-    int contextItemId;           // 右键选中的联系人ID
-    QString contextItemType;     // 右键选中的联系人类型
+    int m_batchLevel = 0;
+    int contextItemId;
+    QString contextItemType;
     PlaceholderLineEdit* addInput;
-    QPushButton* addBtn;        // 添加好友按钮
-    QPushButton* confBtn;       // 创建会议按钮
-    QPushButton* groupBtn;      // 创建群组按钮
-    PlaceholderLineEdit* joinGroupInput;  // 加入群组输入框
-    QPushButton* joinGroupBtn;  // 加入群组按钮
-    
-    // 未读消息数 map: key=(id, type)
+    QPushButton* addBtn;
+    QPushButton* confBtn;
+    QPushButton* groupBtn;
+    PlaceholderLineEdit* joinGroupInput;
+    QPushButton* joinGroupBtn;
+
     std::map<std::pair<int, std::string>, int> m_unreadCounts;
     std::map<std::pair<int, std::string>, QString> m_lastMessages;
     std::map<std::pair<int, std::string>, QString> m_lastMessageTimes;
-    
-    // 搜索与排序
+
     PlaceholderLineEdit* searchInput;
     QLabel* countLabel;
     QPushButton* sortBtn;
     QString m_searchText;
+    int m_itemHeight = 60;
     std::vector<QString> m_sortCriteria;
 };
 

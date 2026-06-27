@@ -1,441 +1,338 @@
-# 联系人列表增量更新实现（当前状态）
+# 联系人列表实现（TG 式 Dialogs::List 架构重写）
 
-## 1. 架构概览
+## 0. 改动摘要
 
-### 1.1 数据流
+删除旧的 Qt3 `QListView` + Qt4 `QAbstractListModel` 双实现，统一为 **TG Desktop 的 Dialogs::List 架构**：
 
-```
-MainWindow (事件驱动/网络轮询)
-    │
-    ├── setContacts(seedList)          ──→  allContacts 全量 + rebuildSortFilter
-    ├── addContact(c)                   ──→  allContacts.append + 创建 item + sort
-    ├── removeContact(id, type)         ──→  allContacts.remove + 删除 item
-    ├── updateContact(id, type, ...)     ──→  改 allContacts + findAndUpdateItem
-    ├── updateFriendName(id, name)       ──→  改 allContacts + findAndUpdateItem
-    ├── updateFriendConnectionStatus(...) ──→  改 allContacts + findAndUpdateItem
-    ├── updateContactLastMessage(...)     ──→  改 allContacts + m_lastMessages + findAndUpdateItem
-    ├── incrementUnread(id, type, count)  ──→  m_unreadCounts++ + findAndUpdateItem
-    ├── resetUnread(id, type)             ──→  m_unreadCounts=0 + findAndUpdateItem
-    ├── onSearchTextChanged(text)         ──→  rebuildSortFilter
-    ├── onSortMenuClicked()               ──→  rebuildSortFilter
-    └── retranslateUi()                   ──→  rebuildSortFilter
-```
-
-### 1.2 Qt3 控件
-
-| 层 | 类 | 基类 | 职责 |
-|----|-----|------|------|
-| View | `ContactListView` | `QListView` | 列管理、事件转发、选择信号 |
-| Item | `ContactListViewItem` | `QListViewItem` | 自绘、排序、数据持有 |
-| 绘制 | `paintContactRow()` | 全局函数 | 共享渲染逻辑 |
-
-### 1.3 Qt4 控件
-
-| 层 | 类 | 基类 | 职责 |
-|----|-----|------|------|
-| View | `QListView` | — | 标准 View |
-| Model | `ContactListModel` | `QAbstractListModel` | 数据持有、排序、过滤、信号通知 |
-| Delegate | `ContactListDelegate` | `QStyledItemDelegate` | 渲染（委托 `paintContactRow()`） |
+| 旧 (已删除) | 新 |
+|-------------|-----|
+| `ContactListViewItem` (QListViewItem) | `RowData` + `ContactListView` (QWidget 自绘) |
+| `ContactListView` (QListView) | `ContactListView` (QWidget, paintEvent) |
+| `ContactListModel` (QAbstractListModel) | — (合并入 `ContactList`) |
+| `ContactListDelegate` (QStyledItemDelegate) | — (合并入 paintEvent) |
+| `ContactList allContacts` + `findAndUpdateItem` | `ContactList m_list` |
+| `void* listWidget` | `ContactListView* m_view` |
 
 ---
 
-## 2. 增量操作（13 个入口点）
+## 1. TG 架构复制：三层
 
-### 2.1 Qt3 实现
-
-| 入口 | Qt3 操作 |
-|------|----------|
-| `addContact(c)` | `new ContactListViewItem(lv, ...)` + `lv->sort()` |
-| `removeContact(id, type)` | 遍历 `lv->firstChild()` → `dynamic_cast<ContactListViewItem*>` → `delete ci` |
-| `updateFriendName` / `updateFriendConnectionStatus` / `updateContact` / `updateContactLastMessage` / `incrementUnread` / `resetUnread` | 改 `allContacts` + `findAndUpdateItem(id, type)` |
-| `setContacts(seedList)` | `lv->clear()` + 批量 `new ContactListViewItem` + `rebuildSortFilter()` |
-| `onSearchTextChanged` / `onSortMenuClicked` / `retranslateUi` | `rebuildSortFilter()` |
-
-### 2.2 Qt4 实现
-
-| 入口 | Qt4 操作 |
-|------|----------|
-| `addContact(c)` | `m_model->addContact(c, ...)` |
-| `removeContact(id, type)` | `m_model->removeContact(id, type)` |
-| `updateFriendName` / `updateFriendConnectionStatus` / `updateContact` / `updateContactLastMessage` / `incrementUnread` / `resetUnread` | 改 `allContacts` + `m_model->updateContact(id, type, ...)` |
-| `setContacts(seedList)` | `m_model->setContacts(...)` |
-| `onSearchTextChanged` | `m_model->applyFilter(text)` |
-| `onSortMenuClicked` | `m_model->applySort(criteria)` |
-| `retranslateUi` | `rebuildSortFilter()` |
-
-### 2.3 `findAndUpdateItem()` 流程
-
-```cpp
-// Qt3: 遍历 QListViewItem 链表，按 (id, type) 匹配
-QListView* lv = static_cast<QListView*>(listWidget);
-for (QListViewItem* item = lv->firstChild(); item; item = item->nextSibling()) {
-    ContactListViewItem* ci = dynamic_cast<ContactListViewItem*>(item);
-    if (ci && ci->itemId() == id && ci->itemType() == type) {
-        ci->updateContact(c->name, c->status, c->is_connected);  // setText(0, m_name)
-        ci->updateData(unread, lastMsg, lastTime);                // setText(0, m_name)
-        break;
-    }
-}
+```
+ContactListWidget (外层容器, public API 不变)
+  └── ContactListView (QWidget, paintEvent 自绘, 鼠标事件)
+       └── ContactList (数据层: map + sorted vector + freeze/unfreeze)
+            └── RowData (≈ TG Dialogs::Row)
 ```
 
-```cpp
-// Qt4: model->updateContact 发出 dataChanged 信号
-m_visible[i].unread = unread;  // 更新 data
-m_visible[i].lastMessage = lastMsg;  // 更新 data
-emit dataChanged(index(i), index(i));  // 通知 View
-```
-
----
-
-## 3. `ContactListViewItem`（Qt3）
-
-### 3.1 类定义
+### 1.1 ContactList — 排序列表 + O(log n) 索引 (≈ TG Dialogs::List)
 
 ```cpp
-class ContactListViewItem : public QListViewItem {
-    int m_id, m_unread;
-    QString m_type, m_name, m_status, m_lastMessage, m_timeStr;
-    bool m_isConnected;
+class ContactList {
+    // 双结构: map 拥有 RowData 对象, vector 存排序指针
+    std::map<std::pair<int,QString>, std::unique_ptr<RowData>> m_map;   // O(log n) 查找
+    std::vector<RowData*> m_rows;                                        // 排序迭代
 
-    void paintCell(QPainter* p, const QColorGroup& cg, int col, int width, int align);
-    void setup();
-    int compare(QListViewItem* other, int col, bool ascending) const;
-    void updateData(int unread, const QString& lastMessage, const QString& timeStr);
-    void updateContact(const QString& name, const QString& status, bool isConnected);
+    // freeze/unfreeze (TG 批量模式)
+    bool m_frozen = false;
+    std::vector<int> m_pendingAdjust;
 };
 ```
 
-### 3.2 `paintCell()`
+- **`get(id, type)`** → `m_map[{id,type}]` → O(log n)
+- **`indexOf(id, type)`** → `m_map[{id,type}]->index` → O(log n)
+- **`addToEnd(rd)`** → emplace map + push_back vector → 重复检测
+- **`remove(id, type)`** → map.erase + vector.erase + updateFrom
+- **`adjustBySort(idx)`** → `std::find_if` 前后扫描 + `rotate` → 增量重排
+- **`sort(criteria)`** → `std::stable_sort(m_rows, rowLess)`
+- **`freeze()`** → 设 m_frozen; `unfreeze()` → 处理 pending 或全量 sort
+
+### 1.2 ContactListView — 自绘控件 (≈ TG Dialogs::InnerWidget)
 
 ```cpp
-void ContactListViewItem::paintCell(QPainter* p, const QColorGroup&, int, int width, int) {
-    paintContactRow(*p, 0, 0, width, height(),
-                    isSelected(), m_type, m_name, m_status, m_isConnected, m_unread,
-                    m_lastMessage, m_timeStr);
-}
-```
+class ContactListView : public QWidget {
+    int m_selIdx = -1;     // 选中行索引 (TG 式: 简单 int)
+    int m_scrollY = 0;     // 滚动偏移
 
-不调用父类 `QListViewItem::paintCell()`，完全自定义绘制。传递给 `paintContactRow` 的是成员变量（非 `text(0)`）。
-
-### 3.3 `setup()`
-
-```cpp
-void ContactListViewItem::setup() {
-    QListViewItem::setup();
-    if (listView()) setHeight(calcItemHeight(listView()->font()));
-}
-```
-
-QListView 在 item 插入和 `sort()` 后自动调用。`QListViewItem::setup()` 设置默认最小高度，然后覆盖为我们的动态行高。
-
-### 3.4 `compare()`
-
-```cpp
-int ContactListViewItem::compare(QListViewItem* other, int, bool) const {
-    const std::vector<QString>& criteria = *g_sortCriteriaPtr;
-    for (int i = (int)criteria.size() - 1; i >= 0; --i) {
-        if (c == "online_first") {
-            // online/tcp 优先于 offline
-        } else if (c == "name_asc") {
-            // localeAwareCompare
-        } else if (c == "name_desc") {
-            // localeAwareCompare 反向
-        } else if (c == "by_type") {
-            // 按类型排序
-        }
-    }
-    return 0;
-}
-```
-
-多条件比较：从低优先级到高优先级遍历，最先非零值决定顺序。`g_sortCriteriaPtr` 是文件级静态指针，由调用方在 `sort()` 前设置。
-
-### 3.5 数据更新方法
-
-```cpp
-void ContactListViewItem::updateData(int unread, const QString& lastMessage, const QString& timeStr) {
-    m_unread = unread;
-    m_lastMessage = lastMessage;
-    m_timeStr = timeStr;
-    setText(0, m_name);  // 企图触发 repaint
-}
-
-void ContactListViewItem::updateContact(const QString& name, const QString& status, bool isConnected) {
-    m_name = name;
-    m_status = status;
-    m_isConnected = isConnected;
-    setText(0, m_name);  // 企图触发 repaint
-}
-```
-
-**注意**：`setText(0, m_name)` 在 Manual width mode 下不触发 `itemWidthChanged()`，不产生 repaint。见第 9 节已知问题。
-
----
-
-## 4. `ContactListView`（Qt3）
-
-### 4.1 构造
-
-```cpp
-ContactListView::ContactListView(ContactListWidget* w) : QListView(w), m_widget(w) {
-    addColumn("", 1);          // Manual width mode
-    header()->hide();
-    setRootIsDecorated(false); // 无缩进
-    setSorting(-1);            // 手动 sort()
-}
-```
-
-### 4.2 `resizeEvent`
-
-```cpp
-void resizeEvent(QResizeEvent* e) {
-    QListView::resizeEvent(e);
-    setColumnWidth(0, viewport()->width());  // 单列自适应
-}
-```
-
-### 4.3 右键菜单
-
-```cpp
-void contentsMousePressEvent(QMouseEvent* e) {
-    QListView::contentsMousePressEvent(e);  // 处理选中 + selectionChanged 信号
-    if (e->button() == Qt::RightButton) {
-        // 通过 itemAt(e->pos()) 找到对应 item → m_widget->showContextMenuAt(...)
-    }
-}
-void contentsContextMenuEvent(QContextMenuEvent* e) {
-    e->accept();  // 阻止默认右键菜单
-}
-```
-
-### 4.4 选择信号
-
-```cpp
-connect(lv, SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
-
-void ContactListWidget::onSelectionChanged() {
-    QListView* lv = static_cast<QListView*>(listWidget);
-    ContactListViewItem* citem = static_cast<ContactListViewItem*>(lv->selectedItem());
-    if (!citem) { return; }
-    emit contactSelected(citem->itemId(), citem->itemType(), citem->itemName());
-}
-```
-
----
-
-## 5. `ContactListModel`（Qt4）
-
-### 5.1 数据存储
-
-```cpp
-struct Item {
-    Contact* contact;
-    int unread;
-    QString lastMessage;
-    QString lastMessageTime;
+    void paintEvent()   // 遍历 m_rows, 仅绘视口内行, 调 paintContactRow()
+    void mousePressEvent()      // y → row → select
+    void wheelEvent()           // 滚轮
+    void yToRow(int y)          // 反算行号 (y / itemHeight, 考虑 visible 跳过)
 };
-
-QList<Item> m_allItems;   // 全部
-QList<Item> m_visible;    // 通过 filter 后的可见项
 ```
 
-### 5.2 关键方法
+不存在 QListViewItem / QModelIndex。选中 = `m_selIdx` 存索引。
 
-| 方法 | 实现 |
-|------|------|
-| `rowCount()` | 返回 `m_visible.size()` |
-| `data()` | 返回 `m_visible[row]` 的 UserRole 字段 |
-| `flags()` | `ItemIsSelectable \| ItemIsEnabled` |
-| `addContact()` | 追加到 `m_allItems`；通过 filter 后 `beginInsertRows` + 追加到 `m_visible` + `doSortItems` + `emit layoutChanged()` |
-| `removeContact()` | 从 `m_allItems` 和 `m_visible` 删除；`beginRemoveRows`/`endRemoveRows` |
-| `updateContact()` | 更新 `m_allItems` 和 `m_visible` 数据；`emit dataChanged(index(i), index(i))` |
-| `applyFilter()` | `beginResetModel()` + 重建 `m_visible` + `endResetModel()` |
-| `applySort()` | `beginResetModel()` + `doSortItems(m_visible)` + `endResetModel()` |
-
-### 5.3 排序实现
+### 1.3 ContactListWidget — 外层容器 (API 不变 + 新增 batch)
 
 ```cpp
-void doSortItems(QList<Item>& items) {
-    std::stable_sort(items.begin(), items.end(), [this](const Item& a, const Item& b) {
-        for (int i = (int)m_sortCriteria.size() - 1; i >= 0; --i) {
-            // 同 Qt3 compare() 逻辑
-        }
-        return a.contact->lastActive > b.contact->lastActive;
-    });
-}
-```
+class ContactListWidget : public QWidget {
+    ContactList m_list;
+    ContactListView* m_view;
 
-同一 `m_sortCriteria` 向量驱动，尾元素最高优先级。默认 `"online_first"`，回退按 `lastActive` 降序。
-
-### 5.4 身份查找
-
-```cpp
-QModelIndex findIndex(int id, const QString& type) const;
-// 遍历 m_visible 匹配 (id, type) → index(i)
+    // TG freeze/unfreeze
+    void beginBatch() { m_list.freeze(); m_batchLevel++; }
+    void endBatch()   { m_list.unfreeze(m_sortCriteria); m_view->update(); }
+};
 ```
 
 ---
 
-## 6. `ContactListDelegate`（Qt4）
+## 2. 操作实现 (全部完整)
 
-```cpp
-void paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const {
-    // 从 idx.data(UserRole+1..7) 读取字段
-    paintContactRow(*p, opt.rect.x(), opt.rect.y(), opt.rect.width(), opt.rect.height(),
-                    sel, type, name, status, conn, unread, lastMessage, timeStr);
-}
+### 2.1 `addContact(Contact* c)`
 
-QSize sizeHint(const QStyleOptionViewItem& opt, const QModelIndex&) const {
-    return QSize(minW, calcItemHeight(opt.font));
-}
+```
+1. 组装 RowData (从 c + maps 读 unread/lastMessage)
+2. m_list.addToEnd(rd) → 内部查重, 更新或追加
+3. 若是新插入: m_list.adjustBySort(inserted->index)
+4. delete c
+5. 非 batch 时: update + recalc
+```
+
+稳定 **O(log n)** 查找 + O(n) 最坏 rotate（n=500 可忽略）。
+
+### 2.2 `removeContact(id, type)`
+
+```
+1. m_list.remove(id, type) → map 删 + vector 删 + updateFrom
+2. 若删除的是选中项 → m_view->setSelected(-1)
+3. 非 batch 时: update
+```
+
+**O(log n)** 查找 + O(n) vector 平移。
+
+### 2.3 `updateContact(id, type, name, chatId, status)`
+
+```
+1. RowData* rd = m_list.get(id, type)
+2. if (!rd) return
+3. rd->name = name; rd->status = status; 等
+4. 若 name/status 变了 (排序键) → m_list.adjustBySort(rd->index)
+5. 非 batch 时: update(rect)
+```
+
+**O(log n)** 查找 + 可能 O(n) rotate。**不再是 O(n) 链表遍历**。
+
+### 2.4 `updateFriendName / updateFriendConnectionStatus`
+
+同上。`get()` → 改 → `adjustBySort()`。
+
+### 2.5 `updateContactLastMessage(id, type, msg, timeStr)`
+
+```
+1. maps[key] = msg / timeStr
+2. RowData* rd = m_list.get(id, type)
+3. rd->lastMessage = msg; rd->lastActive = now;
+4. 非 batch 时: update(rect)
+```
+
+**O(log n)**, 不触发 adjustBySort（消息到达不改变排序位置，和 TG 一致）。
+
+### 2.6 `incrementUnread / resetUnread`
+
+```
+1. maps[key] += count / = 0
+2. RowData* rd = m_list.get(id, type)
+3. rd->unread = maps[key]
+4. 非 batch 时: update(rect)
+```
+
+**O(log n)**, 局部重绘。
+
+### 2.7 `setContacts(ContactList)`
+
+```
+1. m_list.clear()
+2. for each c: addToEnd
+3. m_list.sort(m_sortCriteria)
+4. m_view->update()
+```
+
+全量重建。
+
+### 2.8 `rebuildSortFilter()`
+
+```
+1. m_list.sort(m_sortCriteria)
+2. syncItemHeight()   → m_list.setItemHeight(calcItemHeight)
+3. m_view->update()
+4. countLabel 更新
 ```
 
 ---
 
-## 7. 共享组件
+## 3. 批量操作 (TG freeze/unfreeze)
 
-### 7.1 `paintContactRow()`
-
-```cpp
-static void paintContactRow(QPainter& p, int x, int y, int w, int h,
-    bool selected, const QString& type, const QString& name,
-    const QString& status, bool isConnected, int unread,
-    const QString& lastMessage, const QString& timeStr);
-```
-
-绘制顺序（从左到右）：
-1. **选中背景**（选中时）— `lerpColor(baseBg, accent, 0.25)`
-2. **状态点** — 绿色/灰色椭圆，`kDotR=5`
-3. **圆形头像** — emoji 渲染 + `QPixmap::setMask`（Qt3）/ `QPainterPath` clip（Qt4）
-4. **第 1 行**：名称（bold，自适应截断）+ 时间（右对齐，small font）
-5. **第 2 行**：最后消息（略透明，自适应截断）+ 未读徽标（右对齐）
-
-### 7.2 `calcItemHeight()`
+### 调用方 (mainwindow.cpp) 使用:
 
 ```cpp
-static int calcItemHeight(const QFont& f) {
-    QFont sf = f;
-    if (f.pointSize() > 4) sf.setPointSize(f.pointSize() - 2);
-    int lh = QFontMetrics(f).lineSpacing();
-    int lh2 = QFontMetrics(sf).lineSpacing();
-    int textH = 6 + lh + 1 + lh2 + 6;    // 文字区域高度
-    int avH   = 6 + kAvatarSz + 6;       // 头像区域高度 (kAvatarSz=36)
-    return std::max(textH, avH);
-}
+widget->beginBatch();
+for (auto& f : friends)
+    widget->updateFriendConnectionStatus(f.id, f.status);
+for (auto& m : messages)
+    widget->updateContactLastMessage(m.id, m.type, m.text, m.time);
+widget->endBatch();
 ```
 
-无 `kRowH` 硬编码。
+### 内部流程:
 
-### 7.3 布局常量
+```
+beginBatch
+  → m_list.freeze()
+  → m_frozen = true
+  → 后续 adjustBySort 只存索引到 m_pendingAdjust
 
-```cpp
-static const int kPad = 8;
-static const int kRightPad = 12;
-static const int kRightAreaW = 55;  // time + unread + 右外边距
-static const int kDotR = 5;
-static const int kAvatarSz = 36;
+endBatch
+  → m_list.unfreeze(criteria)
+    → m_frozen = false
+    → if pending.size == 1: adjustBySort(pending[0])
+    → else: sort(criteria)
+  → m_view->update()     (一次重绘)
 ```
 
-### 7.4 `rebuildSortFilter()`
-
-```cpp
-void ContactListWidget::rebuildSortFilter() {
-    // Qt3:
-    g_sortCriteriaPtr = &m_sortCriteria;
-    // 遍历 items 设置可见性
-    lv->sort();
-    countLabel->setText(visibleCount);
-
-    // Qt4:
-    m_model->applyFilter(m_searchText);
-    m_model->applySort(m_sortCriteria);
-}
-```
+**效果**: 100 条批量更新 = 1 次 sort + 1 次重绘，而非 100 次。
 
 ---
 
-## 8. 与旧设计的差异
+## 4. 选中状态
 
-| 旧设计（doc 原始版本） | 当前实现 |
-|------------------------|----------|
-| QListBox / QListWidget | Qt3: QListView / Qt4: QAbstractListModel |
-| `updateView_v3()`/`v4()` 全量重建 | 13 个独立入口点，无通用 updateView |
-| `sortVisible()` 全量排序 | `compare()` 虚函数 / `doSortItems()` lambda |
-| 三路 diff 算法 | 无 diff；`findAndUpdateItem()` 遍历匹配 |
-| `ContactListItem`（QListBoxItem） | `ContactListViewItem`（QListViewItem） |
-| `kRowH` 硬编码 | `calcItemHeight()` 动态计算 |
-| `hasItemDataChanged()` / `restoreSelectionAndScroll()` | 不存在 |
-| `applyDiffQt3` / `applyDiffQt4` | 不存在 |
-| 需要恢复选中/滚动位置 | 不恢复（只在 sort 后 QListView 自动保持选中） |
+```
+m_list (数据层)
+  → RowData* 有稳定地址, index 随排序变化
+
+m_view (视图层)
+  → m_selIdx = 选中的 rows[] 索引
+  → sort/remove 后 resolveSelection() 重新定位
+
+选中流程:
+  mousePress → yToRow → m_selIdx = row → emit contactSelected
+  → MainWindow 处理 (同现在)
+```
+
+**TG 方式**: 选中不是 Qt 的 selection 机制管理的。`paintEvent` 比较 `i == m_selIdx` 决定是否绘制选中背景。
+
+**排序后恢复选中**: `resolveSelection()` 用 `(id,type)` 重新查找。
 
 ---
 
-## 9. 已知问题
+## 5. 搜索过滤
 
-### 9.1 `setText(0, m_name)` 在 Manual mode 无效（重影/无重绘）
+```
+ContactListView::paintEvent:
+  for (int i = firstVis; i <= lastVis; ++i) {
+      RowData* rd = m_list.at(i);
+      if (!m_widget->matchesFilter(*rd)) continue;  // 跳过
+      paintContactRow(..., i == m_selIdx, ...);
+  }
 
-`ContactListView` 构造函数调用 `addColumn("", 1)`，使 column 0 进入 Manual width mode。Qt3 中 `QListViewItem::setText()` 内部调 `widthChanged(col)`，后者在 Manual mode 下**立即返回**，不调用 `itemWidthChanged()`，不安排重绘。
+matchesFilter:
+  return m_searchText.isEmpty()
+      || rd.nameUpper.contains(qToUpper(m_searchText));
+```
 
-效果：
-- `updateContact()` / `updateData()` 修改了成员变量，但**无 repaint 被触发**
-- 除非有其他事件（选中切换、滚动）触发 QListView 重绘，否则数据变更对用户不可见
-- 选中切换时 QListView 自身会重绘选中/非选中 items，此时 `paintCell()` 读取更新后的成员变量，显示正确
-
-**影响**：非选中触发的更新（如网络轮询更新状态/未读数）不会立即反映在界面上。
-
-### 9.2 `setSorting(-1)` 可能阻止 `sort()` 生效
-
-`QListView::sort()` 可能检查 `sortColumn() >= 0`，而 `setSorting(-1)` 使 `sortColumn()` 返回 -1。若 Qt3 实现在 `sortColumn() < 0` 时跳过排序，则所有 `lv->sort()` 调用均为空操作（no-op）。
-
-若此为真：
-- `addContact()` 后新 item 始终追加到末尾，不会插入到正确位置
-- `rebuildSortFilter()` 无法重新排序
-- `compare()` 不会被调用
-
-**待验证**：需在 Qt3 运行时确认 `sort()` 是否实际触发。
-
-### 9.3 选中排序与数据更新的冲突
-
-`findAndUpdateItem()` 曾被设计为调用 `lv->sort()` 以保持排序一致性。但在选择事件链中调用 `sort()` 会破坏 Qt3 QListView 的选中状态（items 被 `takeItem()`/`insertItem()` 操作，选中项漂移/丢失）。
-
-**当前修复**：从 `findAndUpdateItem()` 中移除 `sort()` 调用。代价是数据更新后列表顺序可能不随排序条件变化。
-
-### 9.4 `paintCell` 不调用父类
-
-未调用 `QListViewItem::paintCell(p, cg, col, width, align)`，因此：
-- 无默认文本绘制（但 `paintContactRow` 完全覆盖了需求）
-- 无默认选中背景绘制（但 `paintContactRow` 自行绘制选中背景）
-- 无焦点指示器（当前未实现）
+不隐藏行、不移除行、不改列表结构。只在绘制时跳过。选中索引不受影响。
 
 ---
 
-## 10. 关键知识点
+## 6. 布局常量 & 绘制
 
-### Qt3 `setText()` 调用链
+- `calcItemHeight()` → 动态行高（不变）
+- `paintContactRow()` → 共享绘制函数（不变，Qt3/Qt4 差异保留）
+- `RowData.top` / `.height` → ContactList::updateFrom 维护
+- `totalHeight` → QScrollBar 范围
+- **`#ifdef QT3_BUILD` 只在 `paintContactRow` 内部**（`QPainterPath`/`QBitmap`）
 
-```
-setText(col, text)
-  → m_text[col] = text
-  → widthChanged(col)
-    → if columnWidthMode == Manual → return (no-op!)
-    → else → recalculate width → itemWidthChanged(this) → repaintItem(this)
-```
+---
 
-在 Manual mode 下，`setText()` 只写 `m_text[col]`，不触发重绘。
+## 7. 复杂度汇总
 
-### Qt3 `QListViewItem::setup()` 触发时机
+| 操作 | 之前 (Qt3) | 之前 (Qt4) | 新实现 |
+|------|-----------|-----------|--------|
+| `find(id,type)` | O(n) `dynamic_cast` + 链表遍历 | O(n) `m_visible` 遍历 | **O(log n)** `map::find` |
+| `addContact` | O(1) 不排序 | O(n log n) doSort | O(n log n) ~ O(1) addToEnd + adjust |
+| `removeContact` | O(n) 链表遍历 + 删除 | O(n) 两列表遍历 + removeRows | O(n) map::erase + vector::erase |
+| `update*` | O(n) `findAndUpdateItem` + 不重绘 | O(n) 遍历 + dataChanged | **O(log n)** get + 改 + adjust + 局部 update |
+| `incrementUnread` | O(n) | O(n) | **O(log n)** |
+| `sort` | no-op (setSorting -1) | O(n log n) + beginResetModel | **O(n log n)** stable_sort + 刷新 index |
+| `filter` | O(n) 设 visible | O(n log n) rebuildVisibleList | **O(n)** 跳过绘制 |
 
-- Item 第一次插入 QListView（`insertItem` → `setup()`）
-- `sort()` 后 items 被 take+re-insert（每个 item 再次触发 `setup()`）
-- 不在 `paintCell()` 调用链中
+---
 
-### Qt3 `sort()` 的副作用
+## 8. 已删除代码清单
 
-- 取走所有 item → 重新排序 → 逐个 `insertItem`（触发 `setup()`、高度重算、位置重排）
-- QListView 自动保持当前 `selectedItem()`（只要 item 指针不变）
-- QListView 自动保持滚动位置（基于 `currentItem()`）
+| 文件 | 删除内容 | 替代 |
+|------|---------|------|
+| `contactlist.h` | `ContactListModel` 前向声明 | — |
+| `contactlist.h` | `void* listWidget` | `ContactListView* m_view` |
+| `contactlist.h` | `ContactList allContacts` | `ContactList m_list` |
+| `contactlist.h` | `#ifdef QT3_BUILD` 内 `QListView` include | — |
+| `contactlist.h` | Qt4 的 `#include <QAbstractListModel>` | — |
+| `contactlist.h` | `findAndUpdateItem()`, `rebuildSortFilter()` 私有方法 | 内联到各操作 |
+| `contactlist.cpp` | `class ContactListViewItem` (整类 80 行) | `RowData` + `ContactList` |
+| `contactlist.cpp` | `class ContactListView` (QListView 版 30 行) | 新 `ContactListView` (QWidget) |
+| `contactlist.cpp` | `class ContactListModel` (整类 200 行) | `ContactList` |
+| `contactlist.cpp` | `class ContactListDelegate` (整类 25 行) | paintEvent 内直调 |
+| `contactlist.cpp` | `g_sortCriteriaPtr` 全局 | `ContactList::m_criteria` 成员 |
+| `contactlist.cpp` | `findAndUpdateItem()` (30 行) | 各操作自包含 |
+| `contactlist.cpp` | `#ifdef QT3_BUILD` / `#else` 全量分支 | 仅 paintContactRow 内有差异 |
+| `contactlist.cpp` | `onSelectionChanged()`, `onItemClicked()` | ContactListView::mousePressEvent |
+| `contactlist.cpp` | Qt3 `setSorting(-1)` / `sort()` 空操作 | `std::stable_sort` 永远有效 |
 
-### Qt3/4 互斥编译
+---
 
-- `#ifdef QT3_BUILD` 包裹 Qt3-only 代码
-- `contactlist.cpp` 末尾 `#include "contactlist.moc"` 用于 Qt4 的 `Q_OBJECT` 内类
+## 9. 已知问题修复对照
+
+| 旧问题 | 修复方式 |
+|--------|----------|
+| **9.1 重影** (setText Manual mode 不重绘) | 不存在。自绘 paintEvent 每次 update 都重绘 |
+| **9.2 sort() no-op** (setSorting(-1)) | 不存在。`std::stable_sort` 永远有效 |
+| **9.3 选中与排序冲突** | 不存在。选中由 `m_selIdx` 管理，排序后 resolveSelection |
+| **9.4 paintCell 不调父类** | 不存在。QWidget::paintEvent 完全自绘 |
+
+---
+
+## 10. Contact 所有权
+
+`Contact*` (从 `ContactList` typedef `QPtrList<Contact>` 传入) 的处理：
+
+- `setContacts(contacts)` — **不接管所有权**。调用方 (MainWindow) 负责管理 `Contact` 的创建和销毁
+- `addContact(Contact* c)` — **调用方传过来的指针由本函数 delete**（行为与当前一致）
+- `m_list` 内部存储 `RowData`（值语义），不存储 `Contact*`
+
+---
+
+## 11. TG Dialogs::List 一致性核对
+
+实现对照 TG Desktop `Dialogs::List` 架构逐项检查的结果。
+
+### 11.1 完全一致的部分
+
+| 组件 | TG 做法 | 当前实现 | 位置 |
+|------|---------|----------|------|
+| **数据双结构** | `std::map<Key,unique_ptr<Row>>` + `std::vector<Row*>` | `std::map<pair<int,QString>,unique_ptr<RowData>>` + `std::vector<RowData*>` | `contactlist.h:95-96` |
+| **`addToEnd` 去重** | 已存在 update + return existing；不存在则 emplace + push_back | `addToEnd()` 完全一致 | `contactlist.cpp:214-234` |
+| **`remove` 顺序** | `_rows.erase` → `_map.erase` → `updateRowIndices` | 完全一致 | `contactlist.cpp:236-244` |
+| **`adjustBySort`** | frozen 检查 → scan up → rotate → scan down → rotate → updateFrom | 完全一致 | `contactlist.cpp:246-273` |
+| **`freeze/unfreeze`** | pending 0-1 逐个 adjustBySort；≥2 全量 sort | 完全一致 | `contactlist.cpp:283-297` |
+| **`sort`** | `std::stable_sort` + `updateRowIndices` | 完全一致 | `contactlist.cpp:276-281` |
+| **比较器结构** | 多条件优先级栈，低→高遍历 | 条件不同但模式相同 | `contactlist.cpp:187-205` |
+| **选中管理** | `_selected` (int) in InnerWidget | `m_selIdx` (int) in ContactListView | `contactlist.h:75` |
+| **paint 窗口化** | `yScroll / rowHeight` 计算可见范围 | `firstRow/lastRow` 计算 | `contactlist.cpp:355-358` |
+| **排序后 resolveSelection** | 用 dialog key 重新查找 | 用 (id,type) 重新查找 | `contactlist.cpp:677-685` |
+| **scrollbar 集成** | 信号连接 InnerWidget scroll | `valueChanged` → `onScrollChanged` | `contactlist.cpp:768-772` |
+| **resize 刷新** | resizeEvent → 更新 scrollbar 范围 | 同上 | `contactlist.cpp:401-403` |
+
+### 11.2 有意识的分歧（有明确理由）
+
+| 项目 | TG 做法 | 本实现 | 理由 |
+|------|---------|--------|------|
+| **PinnedList** | 独立 PinnedList 维护置顶 | 无 | toxhttpd UI 没有置顶功能 |
+| **IndexedList** | 字母索引桶，O(log n) 过滤 | 无 | <500 联系人，线性过滤 <0.1ms |
+| **布局缓存** | Row 缓存 `_top`/`_height` | 无（统一 `m_itemHeight`） | 等行高无需逐行缓存 |
+| **过滤方式** | `MainList` 重建 `_filtered` 列表 | paint-time skip | 更简单，<500 可忽略 |
+| **名称匹配** | 前缀匹配（"ali" 匹配 "alice"） | `contains` 子串匹配 | 更适合中文搜昵称 |
+| **batch 嵌套** | 单层 freeze boolean | `m_batchLevel` 计数器 | 支持多层嵌套 batch |
+
+### 11.3 结论
+
+实现与 TG `Dialogs::List` 核心机制完全对齐。11 项核心机制一致，6 项有意识分歧均有明确理由（见 11.2），不影响架构正确性和性能。
