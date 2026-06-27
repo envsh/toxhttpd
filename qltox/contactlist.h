@@ -75,7 +75,12 @@ private:
     ContactListWidget* m_widget;
     LimeScrollBar* m_scrollBar;
     int m_selIdx = -1;
+    int m_selId = -1;
+    QString m_selType;
     int m_scrollY = 0;
+public:
+    int selectedId() const { return m_selId; }
+    QString selectedType() const { return m_selType; }
 };
 
 class ContactListData {

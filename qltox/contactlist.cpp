@@ -327,6 +327,13 @@ ContactListView::ContactListView(ContactListWidget* widget)
 
 void ContactListView::setSelectedIndex(int idx) {
     m_selIdx = idx;
+    if (idx >= 0 && idx < m_widget->m_list.size()) {
+        RowData* rd = m_widget->m_list.at(idx);
+        if (rd) { m_selId = rd->id; m_selType = rd->type; }
+        else { m_selId = -1; m_selType = QString(); }
+    } else {
+        m_selId = -1; m_selType = QString();
+    }
     update();
 }
 
@@ -382,6 +389,8 @@ void ContactListView::mousePressEvent(QMouseEvent* e) {
     RowData* rd = m_widget->m_list.at(row);
     if (!rd || !m_widget->matchesFilter(*rd)) return;
     m_selIdx = row;
+    m_selId = rd->id;
+    m_selType = rd->type;
     update();
     if (e->button() == Qt::RightButton) {
         m_widget->showContextMenuAt(rd->id, rd->type, rd->name, e->globalPos());
@@ -709,12 +718,9 @@ void ContactListWidget::refreshView() {
 }
 
 void ContactListWidget::resolveSelection() {
-    int oldSel = m_view->selectedIndex();
-    if (oldSel < 0 || oldSel >= m_list.size()) return;
-    RowData* rd = m_list.at(oldSel);
-    if (!rd) { m_view->setSelectedIndex(-1); return; }
-    int id = rd->id;
-    QString type = rd->type;
+    int id = m_view->selectedId();
+    if (id < 0) return;
+    QString type = m_view->selectedType();
     RowData* newRd = m_list.get(id, type);
     m_view->setSelectedIndex(newRd ? newRd->index : -1);
 }
