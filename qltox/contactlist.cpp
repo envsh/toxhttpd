@@ -51,7 +51,7 @@ static uint32_t typeToEmojiCp(const QString& type) {
 static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     bool selected, const QString& type, const QString& name,
     const QString& status, bool isConnected, int unread,
-    const QString& lastMessage, const QString& timeStr)
+    const QString& lastMessage, const QString& timeStr, int pinnedIndex)
 {
     if (selected) {
         QColor selBg = lerpColor(currentPalette().baseBg, currentPalette().accent, 0.25f);
@@ -128,6 +128,13 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     p.setFont(boldFont);
     p.drawText(cx, y + 6, nameW, lh, Qt::AlignLeft | Qt::AlignVCenter, displayName);
     p.setFont(normalFont);
+
+    if (pinnedIndex != 0) {
+        QString pinStr = " 📌";
+        int pw = p.fontMetrics().width(pinStr);
+        p.setPen(QColor(255, 193, 7));
+        p.drawText(cx + nameW - pw, y + 6, pw, lh, Qt::AlignLeft | Qt::AlignVCenter, pinStr);
+    }
 
     if (!timeStr.isEmpty()) {
         p.setPen(QColor(160, 160, 160
@@ -377,7 +384,7 @@ void ContactListView::paintEvent(QPaintEvent*) {
         int y = i * h - m_scrollY;
         paintContactRow(p, 0, y, width(), h,
                         i == m_selIdx, rd->type, rd->name, rd->status,
-                        rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr);
+                        rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr, rd->pinnedIndex);
     }
 }
 
@@ -505,6 +512,8 @@ void ContactListWidget::setContacts(ContactList& contacts) {
         rd->lastMessage = (lit != m_lastMessages.end()) ? lit->second : c->lastMessage;
         auto tit = m_lastMessageTimes.find(key);
         rd->timeStr = (tit != m_lastMessageTimes.end()) ? tit->second : c->lastMessageTime;
+        auto pit = m_pinnedIndices.find(key);
+        if (pit != m_pinnedIndices.end()) rd->pinnedIndex = pit->second;
         m_list.addToEnd(std::move(rd));
         delete c;
     }
@@ -576,6 +585,9 @@ void ContactListWidget::addContact(Contact* c) {
     rd->unread = unread;
     rd->lastMessage = lastMsg;
     rd->timeStr = lastTime;
+
+    auto pit = m_pinnedIndices.find(key);
+    if (pit != m_pinnedIndices.end()) rd->pinnedIndex = pit->second;
 
     RowData* result = m_list.addToEnd(std::move(rd));
     delete c;
@@ -666,7 +678,7 @@ void ContactListWidget::togglePin(int id, const QString& type) {
         m_pinnedIndices[key] = rd->pinnedIndex;
     }
 
-    m_list.adjustBySort(rd->index);
+    m_list.sort(m_sortCriteria);
     if (!m_batchLevel) { resolveSelection(); refreshView(); }
 }
 
@@ -736,7 +748,7 @@ void ContactListWidget::onSortMenuClicked() {
 #else
     QMenu menu(this);
 #endif
-    menu.setMinimumWidth(200);
+    menu.setMinimumWidth(150);
 
     struct SortItem { const char* key; const char* labelKey; };
     SortItem items[] = {
@@ -831,20 +843,26 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 
 #ifdef QT3_BUILD
     QPopupMenu menu(0);
+    menu.setCheckable(true);
+    menu.setMinimumWidth(150);
 #else
     QMenu menu(this);
+    menu.setMinimumWidth(150);
 #endif
 
 #ifdef QT3_BUILD
     menu.insertItem(_("context_menu.view_info"), 0);
-    menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 4);
 #else
     QAction* viewInfoAction = menu.addAction(_("context_menu.view_info"));
     QAction* pinAction = menu.addAction(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"));
+    pinAction->setCheckable(true);
+    pinAction->setChecked(rd && rd->pinnedIndex != 0);
 #endif
 
     if (type == "friend") {
 #ifdef QT3_BUILD
+        menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 4);
+        if (rd) menu.setItemChecked(4, rd->pinnedIndex != 0);
         menu.insertSeparator();
         menu.insertItem(_("context_menu.invite_to_conference"), 1);
         menu.insertItem(_("context_menu.invite_to_group"), 2);
@@ -873,6 +891,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.view_members"), 1);
         menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 4);
+        if (rd) menu.setItemChecked(4, rd->pinnedIndex != 0);
         menu.insertItem(_("context_menu.set_title"), 2);
         menu.insertSeparator();
         menu.insertItem(_("context_menu.leave_conference"), 3);
@@ -885,6 +904,8 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 #else
         QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
         QAction* pinAction2 = menu.addAction(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"));
+        pinAction2->setCheckable(true);
+        pinAction2->setChecked(rd && rd->pinnedIndex != 0);
         QAction* setTitleAction = menu.addAction(_("context_menu.set_title"));
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_conference"));
@@ -899,6 +920,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.view_members"), 1);
         menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 5);
+        if (rd) menu.setItemChecked(5, rd->pinnedIndex != 0);
         menu.insertItem(_("context_menu.rename_nick"), 2);
         menu.insertItem(_("context_menu.set_topic"), 3);
         menu.insertSeparator();
@@ -926,11 +948,15 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 #endif
     } else {
 #ifdef QT3_BUILD
+        menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 4);
+        if (rd) menu.setItemChecked(4, rd->pinnedIndex != 0);
         int choice = menu.exec(globalPos);
         if (choice == 0) { emit viewInfoRequested(id, type); }
+        else if (choice == 4) { togglePin(id, type); }
 #else
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
+        else if (selected == pinAction) { togglePin(id, type); }
 #endif
     }
 }
