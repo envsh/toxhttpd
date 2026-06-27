@@ -9,11 +9,10 @@
 #include <algorithm>
 #include <qpainter.h>
 #ifdef QT3_BUILD
-#include <qlistbox.h>
 #include <qregion.h>
 #include <qbitmap.h>
+#include <qheader.h>
 #else
-#include <qlistwidget.h>
 #include <QStyledItemDelegate>
 #include <QPainterPath>
 #include <QBitmap>
@@ -32,9 +31,9 @@ const char* STATUS_OFFLINE = "○";
 
 // ---- 公共辅助函数 ----
 
-static const int kRowH = 54;
 static const int kPad = 8;
 static const int kRightPad = 12;
+static const int kRightAreaW = 55;  // time + unread + right margin reserved
 static const int kDotR = 5;
 static const int kAvatarSz = 36;
 
@@ -63,7 +62,6 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
         p.fillRect(x, y, w, h, selBg);
     }
 
-    int rh = kRowH;
     int rp = kPad;
 
     int cx = x + rp;
@@ -127,8 +125,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     QFont smallFont = normalFont;
     if (normalFont.pointSize() > 4) smallFont.setPointSize(normalFont.pointSize() - 2);
     int lh = p.fontMetrics().lineSpacing();
-    int rightAreaW = 55; // time + unread + right margin conservative area
-    int nameW = w - (cx - x) - kRightPad - rightAreaW;
+    int nameW = w - (cx - x) - kRightPad - kRightAreaW;
     if (nameW < 20) { nameW = 20; }
 
     QString displayName = name.isEmpty() ? _("no_name") : name;
@@ -162,7 +159,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     msg.replace('\n', ' ');
 
     if (!msg.isEmpty()) {
-        int msgW = w - (cx - x) - kRightPad - rightAreaW;
+        int msgW = w - (cx - x) - kRightPad - kRightAreaW;
 
         // qWarning("paintContactRow: id=%s name=[%s] lastMsg=[%s] msg=[%s] w=%d h=%d msgY=%d msgW=%d lh=%d cx=%d",
         //          qToUtf8(type).data(), qToUtf8(displayName).data(),
@@ -195,55 +192,127 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     }
 }
 
-#ifdef QT3_BUILD
-// ---- Qt3: ContactListItem ----
+// ---- 动态行高计算（共用，无 kRowH 硬编码）----
+static int calcItemHeight(const QFont& f) {
+    QFont sf = f;
+    if (f.pointSize() > 4) sf.setPointSize(f.pointSize() - 2);
+    int lh = QFontMetrics(f).lineSpacing();
+    int lh2 = QFontMetrics(sf).lineSpacing();
+    int textH = 6 + lh + 1 + lh2 + 6;
+    int avH   = 6 + kAvatarSz + 6;
+    return std::max(textH, avH);
+}
 
-class ContactListItem : public QListBoxItem {
+// ---- 排序比较所需的多条件向量（文件静态，供 compare() 访问）----
+static std::vector<QString>* g_sortCriteriaPtr = nullptr;
+
+#ifdef QT3_BUILD
+// ---- Qt3: ContactListViewItem ----
+
+class ContactListViewItem : public QListViewItem {
 public:
-    ContactListItem(QListBox* lb, int id, const QString& type,
-                    const QString& name, const QString& status,
-                    bool isConnected, int unread,
-                    const QString& lastMessage, const QString& timeStr);
-    void paint(QPainter* p);
-    int height(const QListBox*) const { return 54; }
+    ContactListViewItem(QListView* parent, int id, const QString& type,
+                        const QString& name, const QString& status,
+                        bool isConnected, int unread,
+                        const QString& lastMessage, const QString& timeStr);
+    void paintCell(QPainter* p, const QColorGroup& cg, int col, int width, int align);
+    void setup();
+    int compare(QListViewItem* other, int col, bool ascending) const;
+
+    void updateData(int unread, const QString& lastMessage, const QString& timeStr);
+    void updateContact(const QString& name, const QString& status, bool isConnected);
+
     int itemId() const { return m_id; }
     const QString& itemType() const { return m_type; }
     const QString& itemName() const { return m_name; }
+    const QString& itemStatus() const { return m_status; }
 private:
     int m_id, m_unread;
     QString m_type, m_name, m_status, m_lastMessage, m_timeStr;
     bool m_isConnected;
-    QListBox* m_lb;
 };
 
-ContactListItem::ContactListItem(QListBox* lb, int id, const QString& type,
+ContactListViewItem::ContactListViewItem(QListView* parent, int id, const QString& type,
     const QString& name, const QString& status,
     bool isConnected, int unread,
     const QString& lastMessage, const QString& timeStr)
-    : QListBoxItem(lb), m_id(id), m_unread(unread),
+    : QListViewItem(parent), m_id(id), m_unread(unread),
       m_type(type), m_name(name), m_status(status),
-      m_isConnected(isConnected), m_lb(lb),
-      m_lastMessage(lastMessage), m_timeStr(timeStr) {}
+      m_isConnected(isConnected),
+      m_lastMessage(lastMessage), m_timeStr(timeStr)
+{
+}
 
-void ContactListItem::paint(QPainter* p) {
-    bool sel = m_lb->isSelected(this);
-    paintContactRow(*p, 0, 0, m_lb->width(), kRowH,
-                    sel, m_type, m_name, m_status, m_isConnected, m_unread,
+void ContactListViewItem::setup() {
+    QListViewItem::setup();
+    if (listView()) setHeight(calcItemHeight(listView()->font()));
+}
+
+void ContactListViewItem::paintCell(QPainter* p, const QColorGroup&, int, int width, int) {
+    paintContactRow(*p, 0, 0, width, height(),
+                    isSelected(), m_type, m_name, m_status, m_isConnected, m_unread,
                     m_lastMessage, m_timeStr);
 }
 
-// ---- Qt3: ContactListBox（右键菜单由 contentsMousePressEvent 直接处理）----
+int ContactListViewItem::compare(QListViewItem* other, int, bool) const {
+    const ContactListViewItem* o = static_cast<const ContactListViewItem*>(other);
+    if (!g_sortCriteriaPtr) { return 0; }
+    const std::vector<QString>& criteria = *g_sortCriteriaPtr;
+    for (int i = (int)criteria.size() - 1; i >= 0; --i) {
+        const QString& c = criteria[i];
+        if (c == "name_asc") {
+            int d = m_name.localeAwareCompare(o->m_name);
+            if (d != 0) return d;
+        } else if (c == "name_desc") {
+            int d = o->m_name.localeAwareCompare(m_name);
+            if (d != 0) return d;
+        } else if (c == "online_first") {
+            bool aOn = (m_status == "online" || m_status == "tcp");
+            bool bOn = (o->m_status == "online" || o->m_status == "tcp");
+            if (aOn != bOn) { return aOn ? -1 : 1; }
+        } else if (c == "by_type") {
+            int d = m_type.localeAwareCompare(o->m_type);
+            if (d != 0) return d;
+        }
+    }
+    return 0;
+}
 
-class ContactListBox : public QListBox {
+void ContactListViewItem::updateData(int unread, const QString& lastMessage, const QString& timeStr) {
+    m_unread = unread;
+    m_lastMessage = lastMessage;
+    m_timeStr = timeStr;
+    setText(0, m_name);
+}
+
+void ContactListViewItem::updateContact(const QString& name, const QString& status, bool isConnected) {
+    m_name = name;
+    m_status = status;
+    m_isConnected = isConnected;
+    setText(0, m_name);
+}
+
+// ---- Qt3: ContactListView（右键菜单由 contentsMousePressEvent 直接处理）----
+
+class ContactListView : public QListView {
 public:
-    ContactListBox(ContactListWidget* w) : QListBox(w), m_widget(w) {}
+    ContactListView(ContactListWidget* w) : QListView(w), m_widget(w) {
+        addColumn("", 1);  // single column, Manual mode; resizeEvent fixes width
+        header()->hide();
+        setRootIsDecorated(false);
+        setSorting(-1);    // manual sort via sort()
+    }
 protected:
+    void resizeEvent(QResizeEvent* e) {
+        QListView::resizeEvent(e);
+        setColumnWidth(0, viewport()->width());
+    }
     void contentsMousePressEvent(QMouseEvent* e) {
-        QListBox::contentsMousePressEvent(e);
+        QListView::contentsMousePressEvent(e);
         if (e->button() == Qt::RightButton) {
-            QListBoxItem* qitem = itemAt(e->pos());
+            QListViewItem* qitem = itemAt(e->pos());
             if (!qitem) { return; }
-            ContactListItem* item = dynamic_cast<ContactListItem*>(qitem);
+            ContactListViewItem* item = dynamic_cast<ContactListViewItem*>(qitem);
             if (!item) { e->accept(); return; }
             m_widget->showContextMenuAt(
                 item->itemId(), item->itemType(), item->itemName(),
@@ -259,14 +328,228 @@ private:
 };
 
 #else
+// ---- Qt4: ContactListModel ----
+
+class ContactListModel : public QAbstractListModel {
+    Q_OBJECT
+public:
+    struct Item {
+        Contact* contact;
+        int unread;
+        QString lastMessage;
+        QString lastMessageTime;
+    };
+
+    ContactListModel(QObject* parent = 0) : QAbstractListModel(parent) {}
+
+    int rowCount(const QModelIndex& parent = QModelIndex()) const;
+    QVariant data(const QModelIndex& idx, int role = Qt::DisplayRole) const;
+    Qt::ItemFlags flags(const QModelIndex& idx) const;
+
+    void setContacts(const ContactList& contacts,
+                     const std::map<std::pair<int,std::string>,int>& unreadCounts,
+                     const std::map<std::pair<int,std::string>,QString>& lastMessages,
+                     const std::map<std::pair<int,std::string>,QString>& lastMessageTimes);
+    void addContact(Contact* c, int unread,
+                    const QString& lastMsg, const QString& lastTime);
+    void removeContact(int id, const QString& type);
+    void updateContact(int id, const QString& type, int unread,
+                       const QString& lastMsg, const QString& lastTime);
+    void applyFilter(const QString& filterText);
+    void applySort(const std::vector<QString>& criteria);
+    QModelIndex findIndex(int id, const QString& type) const;
+
+    const QList<Item>& items() const { return m_visible; }
+
+private:
+    QList<Item> m_allItems;
+    QList<Item> m_visible;
+    QString m_filterText;
+    std::vector<QString> m_sortCriteria;
+
+    bool matchesFilter(const Item& item) const;
+    void rebuildVisibleList();
+    void doSortItems(QList<Item>& items);
+};
+
+int ContactListModel::rowCount(const QModelIndex& parent) const {
+    if (parent.isValid()) { return 0; }
+    return m_visible.size();
+}
+
+QVariant ContactListModel::data(const QModelIndex& idx, int role) const {
+    if (!idx.isValid() || idx.row() < 0 || idx.row() >= m_visible.size())
+        return QVariant();
+    const Item& item = m_visible[idx.row()];
+    if (role == Qt::UserRole)     return item.contact->id;
+    if (role == Qt::UserRole + 1) return item.contact->type;
+    if (role == Qt::UserRole + 2) return item.contact->name;
+    if (role == Qt::UserRole + 3) return item.unread;
+    if (role == Qt::UserRole + 4) return item.contact->is_connected;
+    if (role == Qt::UserRole + 5) return item.contact->status;
+    if (role == Qt::UserRole + 6) return item.lastMessage;
+    if (role == Qt::UserRole + 7) return item.lastMessageTime;
+    return QVariant();
+}
+
+Qt::ItemFlags ContactListModel::flags(const QModelIndex& idx) const {
+    if (!idx.isValid()) { return Qt::NoItemFlags; }
+    return Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+}
+
+bool ContactListModel::matchesFilter(const Item& item) const {
+    if (m_filterText.isEmpty()) { return true; }
+    return qToUpper(item.contact->name).contains(qToUpper(m_filterText));
+}
+
+void ContactListModel::doSortItems(QList<Item>& items) {
+    std::stable_sort(items.begin(), items.end(),
+        [this](const Item& a, const Item& b) {
+            for (int i = (int)m_sortCriteria.size() - 1; i >= 0; --i) {
+                const QString& c = m_sortCriteria[i];
+                if (c == "name_asc") {
+                    int d = a.contact->name.localeAwareCompare(b.contact->name);
+                    if (d != 0) { return d < 0; }
+                } else if (c == "name_desc") {
+                    int d = b.contact->name.localeAwareCompare(a.contact->name);
+                    if (d != 0) { return d < 0; }
+                } else if (c == "online_first") {
+                    bool aOn = (a.contact->status == "online" || a.contact->status == "tcp");
+                    bool bOn = (b.contact->status == "online" || b.contact->status == "tcp");
+                    if (aOn != bOn) { return aOn; }
+                } else if (c == "by_type") {
+                    int d = a.contact->type.localeAwareCompare(b.contact->type);
+                    if (d != 0) { return d < 0; }
+                }
+            }
+            return a.contact->lastActive > b.contact->lastActive;
+        });
+}
+
+void ContactListModel::rebuildVisibleList() {
+    m_visible.clear();
+    for (int i = 0; i < m_allItems.size(); ++i) {
+        if (matchesFilter(m_allItems[i])) {
+            m_visible.append(m_allItems[i]);
+        }
+    }
+    doSortItems(m_visible);
+}
+
+void ContactListModel::setContacts(const ContactList& contacts,
+    const std::map<std::pair<int,std::string>,int>& unreadCounts,
+    const std::map<std::pair<int,std::string>,QString>& lastMessages,
+    const std::map<std::pair<int,std::string>,QString>& lastMessageTimes)
+{
+    beginResetModel();
+    m_allItems.clear();
+    for (uint i = 0; i < contacts.count(); ++i) {
+        Contact* c = contacts.at(i);
+        auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
+        Item item;
+        item.contact = c;
+        auto uit = unreadCounts.find(key);
+        item.unread = (uit != unreadCounts.end()) ? uit->second : 0;
+        auto lit = lastMessages.find(key);
+        item.lastMessage = (lit != lastMessages.end()) ? lit->second : QString();
+        auto tit = lastMessageTimes.find(key);
+        item.lastMessageTime = (tit != lastMessageTimes.end()) ? tit->second : QString();
+        m_allItems.append(item);
+    }
+    rebuildVisibleList();
+    endResetModel();
+}
+
+void ContactListModel::addContact(Contact* c, int unread,
+                                   const QString& lastMsg, const QString& lastTime) {
+    Item item;
+    item.contact = c;
+    item.unread = unread;
+    item.lastMessage = lastMsg;
+    item.lastMessageTime = lastTime;
+    m_allItems.append(item);
+    if (!matchesFilter(item)) { return; }
+    int row = m_visible.size();
+    beginInsertRows(QModelIndex(), row, row);
+    m_visible.append(item);
+    endInsertRows();
+    doSortItems(m_visible);
+    // After sort, the item may have moved. Signal full layout change.
+    emit layoutChanged();
+}
+
+void ContactListModel::removeContact(int id, const QString& type) {
+    for (int i = 0; i < m_allItems.size(); ++i) {
+        if (m_allItems[i].contact->id == id && m_allItems[i].contact->type == type) {
+            m_allItems.removeAt(i);
+            break;
+        }
+    }
+    for (int i = 0; i < m_visible.size(); ++i) {
+        if (m_visible[i].contact->id == id && m_visible[i].contact->type == type) {
+            beginRemoveRows(QModelIndex(), i, i);
+            m_visible.removeAt(i);
+            endRemoveRows();
+            return;
+        }
+    }
+}
+
+void ContactListModel::updateContact(int id, const QString& type, int unread,
+                                      const QString& lastMsg, const QString& lastTime) {
+    for (int i = 0; i < m_allItems.size(); ++i) {
+        if (m_allItems[i].contact->id == id && m_allItems[i].contact->type == type) {
+            m_allItems[i].unread = unread;
+            m_allItems[i].lastMessage = lastMsg;
+            m_allItems[i].lastMessageTime = lastTime;
+            break;
+        }
+    }
+    for (int i = 0; i < m_visible.size(); ++i) {
+        if (m_visible[i].contact->id == id && m_visible[i].contact->type == type) {
+            m_visible[i].unread = unread;
+            m_visible[i].lastMessage = lastMsg;
+            m_visible[i].lastMessageTime = lastTime;
+            emit dataChanged(index(i), index(i));
+            return;
+        }
+    }
+}
+
+void ContactListModel::applyFilter(const QString& filterText) {
+    m_filterText = filterText;
+    beginResetModel();
+    rebuildVisibleList();
+    endResetModel();
+}
+
+void ContactListModel::applySort(const std::vector<QString>& criteria) {
+    m_sortCriteria = criteria;
+    beginResetModel();
+    doSortItems(m_visible);
+    endResetModel();
+}
+
+QModelIndex ContactListModel::findIndex(int id, const QString& type) const {
+    for (int i = 0; i < m_visible.size(); ++i) {
+        if (m_visible[i].contact->id == id && m_visible[i].contact->type == type) {
+            return index(i);
+        }
+    }
+    return QModelIndex();
+}
+
 // ---- Qt4: ContactListDelegate ----
 
 class ContactListDelegate : public QStyledItemDelegate {
 public:
     ContactListDelegate(QObject* parent = 0) : QStyledItemDelegate(parent) {}
     void paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const;
-    QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const {
-        return QSize(100, 54);
+    QSize sizeHint(const QStyleOptionViewItem& opt, const QModelIndex&) const {
+        QFontMetrics fm(opt.font);
+        int iconArea = kPad + kDotR*2 + kPad + kAvatarSz + kPad;
+        int minW = iconArea + fm.width("W") * 3 + kRightAreaW + kRightPad;
+        return QSize(minW, calcItemHeight(opt.font));
     }
 };
 
@@ -313,19 +596,27 @@ ContactListWidget::ContactListWidget(QWidget* parent) : QWidget(parent), context
     
     // 联系人列表
 #ifdef QT3_BUILD
-    listWidget = new ContactListBox(this);
-    ((ContactListBox*)listWidget)->setSelectionMode(QListBox::Single);
-    connect(((ContactListBox*)listWidget), SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
-    ((QListBox*)listWidget)->installEventFilter(this);
+    {
+        ContactListView* lv = new ContactListView(this);
+        listWidget = lv;
+        lv->setSelectionMode(QListView::Single);
+        connect(lv, SIGNAL(selectionChanged()), this, SLOT(onSelectionChanged()));
+        lv->installEventFilter(this);
+    }
 #else
-    listWidget = new QListWidget(this);
-    ((QListWidget*)listWidget)->setSelectionMode(QAbstractItemView::SingleSelection);
-    connect(((QListWidget*)listWidget), SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(onItemClicked()));
-    ((QListWidget*)listWidget)->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(((QListWidget*)listWidget), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showContextMenu(QPoint)));
-    m_scrollBar = new LimeScrollBar(Qt::Vertical, (QListWidget*)listWidget);
-    ((QListWidget*)listWidget)->setVerticalScrollBar(m_scrollBar);
-    ((QListWidget*)listWidget)->setItemDelegate(new ContactListDelegate((QListWidget*)listWidget));
+    {
+        QListView* lv = new QListView(this);
+        listWidget = lv;
+        m_model = new ContactListModel(this);
+        lv->setModel(m_model);
+        lv->setSelectionMode(QAbstractItemView::SingleSelection);
+        connect(lv, SIGNAL(clicked(const QModelIndex&)), this, SLOT(onItemClicked()));
+        lv->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(lv, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(showContextMenu(QPoint)));
+        m_scrollBar = new LimeScrollBar(Qt::Vertical, lv);
+        lv->setVerticalScrollBar(m_scrollBar);
+        lv->setItemDelegate(new ContactListDelegate(lv));
+    }
 #endif
     layout->addWidget((QWidget*)listWidget, 1); // stretch
     
@@ -370,19 +661,44 @@ void ContactListWidget::setContacts(const ContactList& contacts) {
         delete allContacts.at(i);
     allContacts.clear();
     allContacts = contacts;
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
+#ifdef QT3_BUILD
+    {
+        QListView* lv = static_cast<QListView*>(listWidget);
+        lv->clear();
+        g_sortCriteriaPtr = &m_sortCriteria;
+        for (uint i = 0; i < allContacts.count(); ++i) {
+            Contact* c = allContacts.at(i);
+            auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
+            auto uit = m_unreadCounts.find(key);
+            int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
+            QString lastMsg = c->lastMessage;
+            if (lastMsg.isEmpty()) {
+                auto lit = m_lastMessages.find(key);
+                if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
+            }
+            QString lastTime = c->lastMessageTime;
+            if (lastTime.isEmpty()) {
+                auto tit = m_lastMessageTimes.find(key);
+                if (tit != m_lastMessageTimes.end()) { lastTime = tit->second; }
+            }
+            new ContactListViewItem(lv, c->id, c->type, c->name, c->status,
+                                    c->is_connected, unread, lastMsg, lastTime);
+        }
+    }
+#else
+    m_model->setContacts(allContacts, m_unreadCounts, m_lastMessages, m_lastMessageTimes);
 #endif
+    // Apply search and sort
+    rebuildSortFilter();
 }
 
 void ContactListWidget::clear() {
-    allContacts.clear();
 #ifdef QT3_BUILD
-    ((QListBox*)listWidget)->clear();
+    static_cast<QListView*>(listWidget)->clear();
 #else
-    ((QListWidget*)listWidget)->clear();
+    m_model->setContacts(ContactList(), m_unreadCounts, m_lastMessages, m_lastMessageTimes);
 #endif
+    allContacts.clear();
 }
 
 void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
@@ -393,10 +709,7 @@ void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
             break;
         }
     }
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    findAndUpdateItem(friendId, "friend");
 }
 
 void ContactListWidget::updateContact(int id, const QString& type, const QString& name,
@@ -410,21 +723,47 @@ void ContactListWidget::updateContact(int id, const QString& type, const QString
             break;
         }
     }
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    findAndUpdateItem(id, type);
 }
 
 void ContactListWidget::addContact(Contact* c) {
-    allContacts.append(c);
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
+    auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
+    auto uit = m_unreadCounts.find(key);
+    int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
+    auto lit = m_lastMessages.find(key);
+    QString lastMsg = (lit != m_lastMessages.end()) ? lit->second : c->lastMessage;
+    auto tit = m_lastMessageTimes.find(key);
+    QString lastTime = (tit != m_lastMessageTimes.end()) ? tit->second : c->lastMessageTime;
+#ifdef QT3_BUILD
+    {
+        QListView* lv = static_cast<QListView*>(listWidget);
+        g_sortCriteriaPtr = &m_sortCriteria;
+        new ContactListViewItem(lv, c->id, c->type,
+            c->name, c->status, c->is_connected, unread, lastMsg, lastTime);
+    }
+#else
+    m_model->addContact(c, unread, lastMsg, lastTime);
 #endif
+    allContacts.append(c);
 }
 
 void ContactListWidget::removeContact(int id, const QString& type) {
+    // Remove from model/view first (before deleting Contact*)
+#ifdef QT3_BUILD
+    {
+        QListView* lv = static_cast<QListView*>(listWidget);
+        for (QListViewItem* item = lv->firstChild(); item; item = item->nextSibling()) {
+            ContactListViewItem* ci = dynamic_cast<ContactListViewItem*>(item);
+            if (ci && ci->itemId() == id && ci->itemType() == type) {
+                delete ci;
+                break;
+            }
+        }
+    }
+#else
+    m_model->removeContact(id, type);
+#endif
+    // Then remove from allContacts
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
         if (c->id == id && c->type == type) {
@@ -437,10 +776,6 @@ void ContactListWidget::removeContact(int id, const QString& type) {
             break;
         }
     }
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
 }
 
 bool ContactListWidget::isFriendLoaded(int friendId) {
@@ -456,19 +791,13 @@ bool ContactListWidget::isFriendLoaded(int friendId) {
 void ContactListWidget::incrementUnread(int id, const QString& type, int count) {
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
     m_unreadCounts[key] += count;
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    findAndUpdateItem(id, type);
 }
 
 void ContactListWidget::resetUnread(int id, const QString& type) {
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
     m_unreadCounts[key] = 0;
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    findAndUpdateItem(id, type);
 }
 
 int ContactListWidget::unreadCount(int id, const QString& type) const {
@@ -488,16 +817,11 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
             break;
         }
     }
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    findAndUpdateItem(friendId, "friend");
 }
 
 void ContactListWidget::updateContactLastMessage(int id, const QString& type, const QString& msg,
                                                   const QString& timeStr) {
-    // qWarning("updateContactLastMessage: id=%d type=%s msg=[%s]",
-    //          id, qToUtf8(type).data(), qToUtf8(msg).data());
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
     m_lastMessages[key] = msg;
     m_lastMessageTimes[key] = timeStr;
@@ -510,18 +834,12 @@ void ContactListWidget::updateContactLastMessage(int id, const QString& type, co
             break;
         }
     }
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    findAndUpdateItem(id, type);
 }
 
 void ContactListWidget::onSearchTextChanged(const QString& text) {
     m_searchText = text;
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    rebuildSortFilter();
 }
 
 void ContactListWidget::onSortMenuClicked() {
@@ -595,32 +913,25 @@ void ContactListWidget::onSortMenuClicked() {
     }
 #endif
     
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    rebuildSortFilter();
 }
 
-void ContactListWidget::onSelectionChanged() {
 #ifdef QT3_BUILD
-    QListBox* lb = (QListBox*)listWidget;
-    ContactListItem* citem = (ContactListItem*)lb->selectedItem();
+void ContactListWidget::onSelectionChanged() {
+    QListView* lv = static_cast<QListView*>(listWidget);
+    ContactListViewItem* citem = static_cast<ContactListViewItem*>(lv->selectedItem());
     if (!citem) { return; }
     emit contactSelected(citem->itemId(), citem->itemType(), citem->itemName());
-#endif
 }
+#endif
 
 void ContactListWidget::onItemClicked() {
-#ifdef QT3_BUILD
-    // Qt3: onSelectionChanged handles it
-#else
-    // Qt4: get current item
-    QListWidget* lw = (QListWidget*)listWidget;
-    QListWidgetItem* item = lw->currentItem();
-    if (!item) { return; }
-    int id = item->data(Qt::UserRole).toInt();
-    QString type = item->data(Qt::UserRole + 1).toString();
-    // find name
+#ifndef QT3_BUILD
+    QListView* lv = static_cast<QListView*>(listWidget);
+    QModelIndex index = lv->currentIndex();
+    if (!index.isValid()) { return; }
+    int id = index.data(Qt::UserRole).toInt();
+    QString type = index.data(Qt::UserRole + 1).toString();
     QString name;
     for (uint i = 0; i < allContacts.count(); ++i) {
         Contact* c = allContacts.at(i);
@@ -633,237 +944,62 @@ void ContactListWidget::onItemClicked() {
 #endif
 }
 
-void ContactListWidget::updateView_v3() {
+void ContactListWidget::findAndUpdateItem(int id, const QString& type) {
+    auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+    auto uit = m_unreadCounts.find(key);
+    int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
+    auto lit = m_lastMessages.find(key);
+    QString lastMsg = (lit != m_lastMessages.end()) ? lit->second : QString();
+    auto tit = m_lastMessageTimes.find(key);
+    QString lastTime = (tit != m_lastMessageTimes.end()) ? tit->second : QString();
 #ifdef QT3_BUILD
-    QListBox* lb = (QListBox*)listWidget;
-    
-    // 收集并过滤联系人
-    std::vector<Contact*> visible;
-    for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact* c = allContacts.at(i);
-        if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
-        visible.push_back(c);
-    }
-    sortVisible(visible);
-    
-    // 更新计数标签
-    countLabel->setText(QString::number(visible.size()));
-    
-    // 保存当前选中的联系人信息
-    int selectedId = -1;
-    QString selectedType;
-    QListBoxItem* selItem = lb->selectedItem();
-    if (selItem) {
-        ContactListItem* citem = (ContactListItem*)selItem;
-        selectedId = citem->itemId();
-        selectedType = citem->itemType();
-    }
-    
-    // 保存滚动位置（从 visible 向量读 id/type，不碰 QListBoxItem 的 QString）
-    int scrollId = -1;
-    QString scrollType;
-    int scrollTopIdx = lb->topItem();
-    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < visible.size()) {
-        Contact* c = visible[scrollTopIdx];
-        scrollId = c->id;
-        scrollType = c->type;
-    }
-    
-    lb->clear();
-    
-    ContactListItem* targetItem = NULL;
-    for (uint i = 0; i < visible.size(); ++i) {
-        Contact* c = visible[i];
-        
-        auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
-        auto uit = m_unreadCounts.find(key);
-        int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
-
-        QString lastMsg = c->lastMessage;
-        if (lastMsg.isEmpty()) {
-            // qWarning("updateView_v3: id=%d type=%s name=[%s] c->lastMessage EMPTY, trying m_lastMessages",
-            //          c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data());
-            auto lit = m_lastMessages.find(key);
-            if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
-        }
-
-        QString lastTime = c->lastMessageTime;
-        if (lastTime.isEmpty()) {
-            auto tit = m_lastMessageTimes.find(key);
-            if (tit != m_lastMessageTimes.end()) { lastTime = tit->second; }
-        }
-
-        // qWarning("updateView_v3: id=%d type=%s name=[%s] lastMsg=[%s]",
-        //          c->id, qToUtf8(c->type).data(), qToUtf8(c->name).data(),
-        //          qToUtf8(lastMsg).data());
-
-        ContactListItem* item = new ContactListItem(lb, c->id, c->type,
-            c->name, c->status, c->is_connected, unread,
-            lastMsg, lastTime);
-        
-        if (c->id == selectedId && c->type == selectedType) {
-            targetItem = item;
-        }
-    }
-    
-    if (lb->count() == 0) {
-        lb->insertItem(_("no_contacts"));
-    } else if (targetItem) {
-        lb->setSelected(targetItem, TRUE);
-    }
-    
-    // 恢复滚动位置
-    if (scrollId >= 0 && !scrollType.isEmpty()) {
-        for (uint i = 0; i < lb->count(); ++i) {
-            ContactListItem* item = (ContactListItem*)lb->item(i);
-            if (item && item->itemId() == scrollId && item->itemType() == scrollType) {
-                lb->setTopItem(i);
-                break;
+    QListView* lv = static_cast<QListView*>(listWidget);
+    for (QListViewItem* item = lv->firstChild(); item; item = item->nextSibling()) {
+        ContactListViewItem* ci = dynamic_cast<ContactListViewItem*>(item);
+        if (ci && ci->itemId() == id && ci->itemType() == type) {
+            // Update contact-level fields from allContacts
+            for (uint i = 0; i < allContacts.count(); ++i) {
+                Contact* c = allContacts.at(i);
+                if (c->id == id && c->type == type) {
+                    ci->updateContact(c->name, c->status, c->is_connected);
+                    ci->updateData(unread, lastMsg, lastTime);
+                    break;
+                }
             }
+            break;
         }
     }
-    // 确保选中项可见
-    {
-        ContactListItem* selItem = (ContactListItem*)lb->selectedItem();
-        if (selItem) {
-            int selIdx = lb->index(selItem);
-            int topIdx = lb->topItem();
-            int visRows = lb->height() / kRowH;
-            if (visRows < 2) visRows = 2;
-            if (selIdx < topIdx)
-                lb->setTopItem(selIdx);
-            else if (selIdx >= topIdx + visRows)
-                lb->setTopItem(selIdx - visRows + 1);
-        }
-    }
+#else
+    m_model->updateContact(id, type, unread, lastMsg, lastTime);
 #endif
 }
 
-void ContactListWidget::updateView_v4() {
-#ifndef QT3_BUILD
-    QListWidget* lw = (QListWidget*)listWidget;
-    
-    // 收集并过滤联系人
-    std::vector<Contact*> visible;
-    for (uint i = 0; i < allContacts.count(); ++i) {
-        Contact* c = allContacts.at(i);
-        if (!m_searchText.isEmpty() && !qToUpper(c->name).contains(qToUpper(m_searchText))) { continue; }
-        visible.push_back(c);
-    }
-    sortVisible(visible);
-    
-    // 更新计数标签
-    countLabel->setText(QString::number(visible.size()));
-    
-    int selectedId = -1;
-    QString selectedType;
-    QListWidgetItem* selItem = lw->currentItem();
-    if (selItem) {
-        selectedId = selItem->data(Qt::UserRole).toInt();
-        selectedType = selItem->data(Qt::UserRole + 1).toString();
-    }
-    
-    // 保存滚动位置（顶部可见项的联系人 ID，而非像素偏移）
-    int scrollId = -1;
-    QString scrollType;
-    int scrollTopIdx = lw->verticalScrollBar()->value() / kRowH;
-    if (scrollTopIdx >= 0 && (uint)scrollTopIdx < lw->count()) {
-        QListWidgetItem* topItem = lw->item(scrollTopIdx);
-        if (topItem) {
-            scrollId = topItem->data(Qt::UserRole).toInt();
-            scrollType = topItem->data(Qt::UserRole + 1).toString();
-        }
-    }
-    
-    lw->clear();
-    for (uint i = 0; i < visible.size(); ++i) {
-        Contact* c = visible[i];
-        
-        auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
-        auto uit = m_unreadCounts.find(key);
-        int unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
+void ContactListWidget::rebuildSortFilter() {
+#ifdef QT3_BUILD
+    QListView* lv = static_cast<QListView*>(listWidget);
+    g_sortCriteriaPtr = &m_sortCriteria;
 
-        QString lastMsg = c->lastMessage;
-        if (lastMsg.isEmpty()) {
-            auto lit = m_lastMessages.find(key);
-            if (lit != m_lastMessages.end()) { lastMsg = lit->second; }
+    // Apply search visibility
+    for (QListViewItem* item = lv->firstChild(); item; item = item->nextSibling()) {
+        ContactListViewItem* ci = dynamic_cast<ContactListViewItem*>(item);
+        if (!ci) { continue; }
+        if (m_searchText.isEmpty()) {
+            item->setVisible(true);
+        } else {
+            item->setVisible(qToUpper(ci->itemName()).contains(qToUpper(m_searchText)));
         }
+    }
 
-        QString lastTime = c->lastMessageTime;
-        if (lastTime.isEmpty()) {
-            auto tit = m_lastMessageTimes.find(key);
-            if (tit != m_lastMessageTimes.end()) { lastTime = tit->second; }
-        }
-
-        QListWidgetItem* item = new QListWidgetItem();
-        item->setData(Qt::UserRole,     c->id);
-        item->setData(Qt::UserRole + 1, c->type);
-        item->setData(Qt::UserRole + 2, c->name);
-        item->setData(Qt::UserRole + 3, unread);
-        item->setData(Qt::UserRole + 4, c->is_connected);
-        item->setData(Qt::UserRole + 5, c->status);
-        item->setData(Qt::UserRole + 6, lastMsg);
-        item->setData(Qt::UserRole + 7, lastTime);
-        lw->addItem(item);
-        
-        if (c->id == selectedId && c->type == selectedType) {
-            item->setSelected(true);
-        }
+    // Update count label: count visible items
+    int visibleCount = 0;
+    for (QListViewItem* item = lv->firstChild(); item; item = item->nextSibling()) {
+        if (item->isVisible()) { ++visibleCount; }
     }
-    
-    if (lw->count() == 0) {
-        lw->addItem(new QListWidgetItem(_("no_contacts")));
-    }
-    
-    // 恢复滚动位置（按联系人 ID 找新位置）
-    if (scrollId >= 0) {
-        for (uint i = 0; i < lw->count(); ++i) {
-            QListWidgetItem* item = lw->item(i);
-            if (item && item->data(Qt::UserRole).toInt() == scrollId
-                    && item->data(Qt::UserRole+1).toString() == scrollType) {
-                lw->verticalScrollBar()->setValue(i * kRowH);
-                break;
-            }
-        }
-    }
-    // 确保选中项可见
-    {
-        QList<QListWidgetItem*> selItems = lw->selectedItems();
-        if (!selItems.isEmpty()) {
-            lw->scrollToItem(selItems.first(), QAbstractItemView::EnsureVisible);
-        }
-    }
+    countLabel->setText(QString::number(visibleCount));
+#else
+    m_model->applyFilter(m_searchText);
+    m_model->applySort(m_sortCriteria);
 #endif
-}
-
-void ContactListWidget::sortVisible(std::vector<Contact*>& visible) {
-    // 最高优先级：按 lastActive 降序，最近消息的联系人置顶
-    std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
-        return a->lastActive > b->lastActive;
-    });
-    // 反向迭代：低优先级先排，高优先级后排
-    for (int i = (int)m_sortCriteria.size() - 1; i >= 0; --i) {
-        const QString& criterion = m_sortCriteria[i];
-        if (criterion == "name_asc") {
-            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
-                return qToUpper(a->name) < qToUpper(b->name);
-            });
-        } else if (criterion == "name_desc") {
-            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
-                return qToUpper(a->name) > qToUpper(b->name);
-            });
-        } else if (criterion == "online_first") {
-            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
-                bool aOnline = (a->status == "online" || a->status == "tcp" || a->status == "udp");
-                bool bOnline = (b->status == "online" || b->status == "tcp" || b->status == "udp");
-                return aOnline && !bOnline;
-            });
-        } else if (criterion == "by_type") {
-            std::stable_sort(visible.begin(), visible.end(), [](Contact* a, Contact* b) {
-                return a->type < b->type;
-            });
-        }
-    }
 }
 
 void ContactListWidget::retranslateUi() {
@@ -884,23 +1020,19 @@ void ContactListWidget::retranslateUi() {
     if (groupBtn) { groupBtn->setText(_("buttons.create_group")); }
     
     // 重新更新视图
-    updateView_v3();
-#ifndef QT3_BUILD
-    updateView_v4();
-#endif
+    rebuildSortFilter();
 }
 
 #ifndef QT3_BUILD
 // Qt4: 右键菜单
 void ContactListWidget::showContextMenu(QPoint pos) {
-    QListWidget* lw = (QListWidget*)listWidget;
-    QListWidgetItem* item = lw->itemAt(pos);
-    if (!item) { return; }
-    
-    int id = item->data(Qt::UserRole).toInt();
-    QString type = item->data(Qt::UserRole + 1).toString();
-    QString name = item->data(Qt::UserRole + 2).toString();
-    QPoint globalPos = lw->mapToGlobal(pos);
+    QListView* lv = static_cast<QListView*>(listWidget);
+    QModelIndex idx = lv->indexAt(pos);
+    if (!idx.isValid()) { return; }
+    int id = idx.data(Qt::UserRole).toInt();
+    QString type = idx.data(Qt::UserRole + 1).toString();
+    QString name = idx.data(Qt::UserRole + 2).toString();
+    QPoint globalPos = lv->mapToGlobal(pos);
     showContextMenuAt(id, type, name, globalPos);
 }
 
@@ -908,13 +1040,13 @@ bool ContactListWidget::eventFilter(QObject*, QEvent*) {
     return false;
 }
 #else
-// Qt3: 事件过滤器—透传（右键由 ContactListBox 处理）
+// Qt3: 事件过滤器—透传（右键由 ContactListView 处理）
 bool ContactListWidget::eventFilter(QObject*, QEvent*) {
     return false;
 }
 
 void ContactListWidget::showContextMenu(QPoint) {
-    // Qt3 通过 ContactListBox 处理，此函数不使用
+    // Qt3 通过 ContactListView 处理，此函数不使用
 }
 #endif
 
@@ -1087,3 +1219,7 @@ void ContactListWidget::onCreateGroupClicked() {
                               _("group_create_failed"));
     }
 }
+
+#ifndef QT3_BUILD
+#include "contactlist.moc"
+#endif

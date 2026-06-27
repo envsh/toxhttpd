@@ -8,11 +8,15 @@
 #include <qpoint.h>
 #ifdef QT3_BUILD
 #include <qdatetime.h>
+#include <qlistview.h>
 #else
 #include <QDateTime>
+#include <QListView>
+#include <QAbstractListModel>
 #endif
 #include <map>
 #include <vector>
+#include <algorithm>
 
 // Emoji constants defined in contactlist.cpp
 extern const char* EMOJI_FRIEND;
@@ -36,6 +40,10 @@ struct Contact {
 };
 
 typedef QPtrList<Contact> ContactList;
+
+#ifndef QT3_BUILD
+class ContactListModel;
+#endif
 
 class ContactListWidget : public QWidget {
     Q_OBJECT
@@ -74,14 +82,15 @@ signals:
 private slots:
     void onSearchTextChanged(const QString& text);
     void onSortMenuClicked();
-    void onItemClicked();  // Qt3: QListBox selectionChanged -> call this
-                               // Qt4: QListWidget itemClicked -> call this
-    void onSelectionChanged(); // Qt3 only: QListBox selectionChanged
-    void showContextMenu(QPoint pos); // Qt4: right-click menu
+    void showContextMenu(QPoint pos);
     void onJoinGroupClicked();
     void onAddFriendClicked();
     void onCreateConferenceClicked();
     void onCreateGroupClicked();
+    void onItemClicked(); // Qt4: QListView clicked(QModelIndex) -> reads currentIndex()
+#ifdef QT3_BUILD
+    void onSelectionChanged(); // Qt3: QListView selectionChanged
+#endif
     
 private:
     bool eventFilter(QObject* obj, QEvent* event);
@@ -89,12 +98,14 @@ public:
     void showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos);
     
 private:
-    void updateView_v3();
-    void updateView_v4();
-    void sortVisible(std::vector<Contact*>& visible);
+    void findAndUpdateItem(int id, const QString& type);
+    void rebuildSortFilter();
     
-    void* listWidget;  // QListBox* (Qt3) or QListWidget* (Qt4)
+    void* listWidget;  // QListView* (both Qt3 and Qt4)
     LimeScrollBar* m_scrollBar;
+#ifndef QT3_BUILD
+    ContactListModel* m_model;
+#endif
     ContactList allContacts;
     int contextItemId;           // 右键选中的联系人ID
     QString contextItemType;     // 右键选中的联系人类型
