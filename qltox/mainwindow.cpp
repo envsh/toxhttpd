@@ -1936,6 +1936,10 @@ void MainWindow::openSettings() {
         "startup/autoConnect", true,
         qFromUtf8("启动时自动连接"), other);
     other->addWidget(autoConnect->checkBox());
+    BoolConfigItem* sortbylastmsg = new BoolConfigItem(
+        "sortbylastmsg", false,
+        qFromUtf8("联系人排序最新消息优先"), other);
+    other->addWidget(sortbylastmsg->checkBox());
     IntConfigItem* fontSize = new IntConfigItem(
         "chat/fontSize", 14,
         qFromUtf8("消息字体大小"), 8, 32, other);
@@ -1981,6 +1985,7 @@ void MainWindow::openSettings() {
     dlg->addCategory(qFromUtf8("其他"), other);
     dlg->registerConfigItem(logLevel);
     dlg->registerConfigItem(autoConnect);
+    dlg->registerConfigItem(sortbylastmsg);
     dlg->registerConfigItem(fontSize);
     dlg->registerConfigItem(dispImg);
     dlg->registerConfigItem(dispFile);
