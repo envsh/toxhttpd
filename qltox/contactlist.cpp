@@ -202,6 +202,11 @@ bool ContactListData::rowLess(const RowData* a, const RowData* b, const std::vec
             if (d != 0) return d < 0;
         } else if (c == "last_active") {
             if (a->lastActive != b->lastActive) return a->lastActive > b->lastActive;
+        } else if (c == "pinned_first") {
+            bool aPin = (a->pinnedIndex != 0);
+            bool bPin = (b->pinnedIndex != 0);
+            if (aPin != bPin) return aPin;
+            if (aPin && bPin) return a->pinnedIndex < b->pinnedIndex;
         }
     }
     return false;
@@ -427,6 +432,7 @@ ContactListWidget::ContactListWidget(QWidget* parent)
 
     m_sortCriteria.push_back("last_active");
     m_sortCriteria.push_back("online_first");
+    m_sortCriteria.push_back("pinned_first");
 
     m_itemHeight = calcItemHeight(font());
 
@@ -634,6 +640,27 @@ int ContactListWidget::unreadCount(int id, const QString& type) const {
     return (it != m_unreadCounts.end()) ? it->second : 0;
 }
 
+void ContactListWidget::togglePin(int id, const QString& type) {
+    RowData* rd = m_list.get(id, type);
+    if (!rd) return;
+    auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+
+    if (rd->pinnedIndex != 0) {
+        rd->pinnedIndex = 0;
+        m_pinnedIndices.erase(key);
+    } else {
+        int maxPin = 0;
+        for (auto& kv : m_pinnedIndices) {
+            if (kv.second > maxPin) maxPin = kv.second;
+        }
+        rd->pinnedIndex = maxPin + 1;
+        m_pinnedIndices[key] = rd->pinnedIndex;
+    }
+
+    m_list.adjustBySort(rd->index);
+    if (!m_batchLevel) { resolveSelection(); refreshView(); }
+}
+
 void ContactListWidget::beginBatch() {
     ++m_batchLevel;
     m_list.freeze();
@@ -794,6 +821,7 @@ void ContactListWidget::retranslateUi() {
 void ContactListWidget::showContextMenuAt(int id, const QString& type, const QString& name, const QPoint& globalPos) {
     contextItemId = id;
     contextItemType = type;
+    RowData* rd = m_list.get(id, type);
 
 #ifdef QT3_BUILD
     QPopupMenu menu(0);
@@ -803,8 +831,10 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
 
 #ifdef QT3_BUILD
     menu.insertItem(_("context_menu.view_info"), 0);
+    menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 4);
 #else
     QAction* viewInfoAction = menu.addAction(_("context_menu.view_info"));
+    QAction* pinAction = menu.addAction(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"));
 #endif
 
     if (type == "friend") {
@@ -816,6 +846,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         menu.insertItem(_("context_menu.delete_friend"), 3);
         int choice = menu.exec(globalPos);
         if (choice == 0) { emit viewInfoRequested(id, type); }
+        else if (choice == 4) { togglePin(id, type); }
         else if (choice == 1) emit inviteToConferenceRequested(id);
         else if (choice == 2) emit inviteToGroupRequested(id);
         else if (choice == 3) emit deleteOrLeaveRequested(id, type);
@@ -827,6 +858,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         QAction* deleteAction = menu.addAction(_("context_menu.delete_friend"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
+        else if (selected == pinAction) { togglePin(id, type); }
         else if (selected == inviteConfAction) emit inviteToConferenceRequested(id);
         else if (selected == inviteGroupAction) emit inviteToGroupRequested(id);
         else if (selected == deleteAction) emit deleteOrLeaveRequested(id, type);
@@ -834,21 +866,25 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
     } else if (type == "conference") {
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.view_members"), 1);
+        menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 4);
         menu.insertItem(_("context_menu.set_title"), 2);
         menu.insertSeparator();
         menu.insertItem(_("context_menu.leave_conference"), 3);
         int choice = menu.exec(globalPos);
         if (choice == 0) { emit viewInfoRequested(id, type); }
+        else if (choice == 4) { togglePin(id, type); }
         else if (choice == 1) emit viewMembersRequested(id, type);
         else if (choice == 2) emit setConferenceTitleRequested(id);
         else if (choice == 3) emit deleteOrLeaveRequested(id, type);
 #else
         QAction* viewMembersAction = menu.addAction(_("context_menu.view_members"));
+        QAction* pinAction2 = menu.addAction(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"));
         QAction* setTitleAction = menu.addAction(_("context_menu.set_title"));
         menu.addSeparator();
         QAction* leaveAction = menu.addAction(_("context_menu.leave_conference"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
+        else if (selected == pinAction2) { togglePin(id, type); }
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
         else if (selected == setTitleAction) emit setConferenceTitleRequested(id);
         else if (selected == leaveAction) emit deleteOrLeaveRequested(id, type);
@@ -856,12 +892,14 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
     } else if (type == "group") {
 #ifdef QT3_BUILD
         menu.insertItem(_("context_menu.view_members"), 1);
+        menu.insertItem(rd && rd->pinnedIndex != 0 ? _("context_menu.unpin") : _("context_menu.pin"), 5);
         menu.insertItem(_("context_menu.rename_nick"), 2);
         menu.insertItem(_("context_menu.set_topic"), 3);
         menu.insertSeparator();
         menu.insertItem(_("context_menu.leave_group"), 4);
         int choice = menu.exec(globalPos);
         if (choice == 0) { emit viewInfoRequested(id, type); }
+        else if (choice == 5) { togglePin(id, type); }
         else if (choice == 1) emit viewMembersRequested(id, type);
         else if (choice == 2) emit renameNickRequested(id, name);
         else if (choice == 3) emit setGroupTopicRequested(id);
@@ -874,6 +912,7 @@ void ContactListWidget::showContextMenuAt(int id, const QString& type, const QSt
         QAction* leaveAction = menu.addAction(_("context_menu.leave_group"));
         QAction* selected = menu.exec(globalPos);
         if (selected == viewInfoAction) { emit viewInfoRequested(id, type); }
+        else if (selected == pinAction) { togglePin(id, type); }
         else if (selected == viewMembersAction) emit viewMembersRequested(id, type);
         else if (selected == renameAction) emit renameNickRequested(id, name);
         else if (selected == setTopicAction) emit setGroupTopicRequested(id);

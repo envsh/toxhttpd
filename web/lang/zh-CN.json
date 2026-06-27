@@ -126,6 +126,8 @@
     "connect_failed": "连接失败",
     "context_menu": {
         "view_info": "查看信息",
+        "pin": "置顶",
+        "unpin": "取消置顶",
         "delete_friend": "删除好友",
         "leave_conference": "离开会议",
         "leave_group": "离开群组",

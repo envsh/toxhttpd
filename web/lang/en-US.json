@@ -126,6 +126,8 @@
     "connect_failed": "Connect failed",
     "context_menu": {
         "view_info": "View Info",
+        "pin": "Pin to Top",
+        "unpin": "Unpin",
         "delete_friend": "Delete Friend",
         "leave_conference": "Leave Conference",
         "leave_group": "Leave Group",

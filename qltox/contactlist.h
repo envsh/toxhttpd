@@ -50,6 +50,7 @@ struct RowData {
     QString timeStr;
     int index;
     uint lastActive = 0;
+    int pinnedIndex = 0;
     QString nameUpper;
 };
 
@@ -125,6 +126,7 @@ public:
 
     void beginBatch();
     void endBatch();
+    void togglePin(int id, const QString& type);
 
     int itemHeight() const { return m_itemHeight; }
     bool matchesFilter(const RowData& rd) const {
@@ -180,6 +182,7 @@ private:
     std::map<std::pair<int, std::string>, int> m_unreadCounts;
     std::map<std::pair<int, std::string>, QString> m_lastMessages;
     std::map<std::pair<int, std::string>, QString> m_lastMessageTimes;
+    std::map<std::pair<int, std::string>, int> m_pinnedIndices;
 
     PlaceholderLineEdit* searchInput;
     QLabel* countLabel;
