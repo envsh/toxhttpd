@@ -200,6 +200,8 @@ bool ContactListData::rowLess(const RowData* a, const RowData* b, const std::vec
         } else if (c == "by_type") {
             int d = a->type.localeAwareCompare(b->type);
             if (d != 0) return d < 0;
+        } else if (c == "last_active") {
+            if (a->lastActive != b->lastActive) return a->lastActive > b->lastActive;
         }
     }
     return false;
@@ -423,6 +425,7 @@ ContactListWidget::ContactListWidget(QWidget* parent)
     searchRow->addWidget(sortBtn);
     layout->addLayout(searchRow);
 
+    m_sortCriteria.push_back("last_active");
     m_sortCriteria.push_back("online_first");
 
     m_itemHeight = calcItemHeight(font());
@@ -479,6 +482,7 @@ void ContactListWidget::setContacts(ContactList& contacts) {
         rd->status = c->status;
         rd->chatId = c->chat_id;
         rd->isConnected = c->is_connected;
+        rd->lastActive = c->lastActive.toTime_t();
         auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
         auto uit = m_unreadCounts.find(key);
         rd->unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
@@ -553,6 +557,7 @@ void ContactListWidget::addContact(Contact* c) {
     rd->status = c->status;
     rd->chatId = c->chat_id;
     rd->isConnected = c->is_connected;
+    rd->lastActive = c->lastActive.toTime_t();
     rd->unread = unread;
     rd->lastMessage = lastMsg;
     rd->timeStr = lastTime;
@@ -600,6 +605,8 @@ void ContactListWidget::updateContactLastMessage(int id, const QString& type, co
     if (!rd) return;
     rd->lastMessage = msg;
     rd->timeStr = timeStr;
+    rd->lastActive = QDateTime::currentDateTime().toTime_t();
+    m_list.adjustBySort(rd->index);
     if (!m_batchLevel) refreshView();
 }
 

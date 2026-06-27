@@ -49,6 +49,7 @@ struct RowData {
     QString lastMessage;
     QString timeStr;
     int index;
+    uint lastActive = 0;
     QString nameUpper;
 };
 

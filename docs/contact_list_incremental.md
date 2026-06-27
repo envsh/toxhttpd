@@ -126,7 +126,7 @@ class ContactListWidget : public QWidget {
 4. 非 batch 时: update(rect)
 ```
 
-**O(log n)**, 不触发 adjustBySort（消息到达不改变排序位置，和 TG 一致）。
+**O(log n)**, 触发 adjustBySort（消息到达后重新定位到顶部，和 TG 一致）。
 
 ### 2.6 `incrementUnread / resetUnread`
 
