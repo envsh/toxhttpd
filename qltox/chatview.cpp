@@ -1962,6 +1962,7 @@ void ChatView::scrollToBottom() {
     int maxScroll = m_vScrollBar->maximum();
 #endif
     m_vScrollBar->setValue(maxScroll);
+    m_scrollPos = maxScroll;
 }
 
 ChatElement& ChatView::messageAt(int index) {
@@ -2798,9 +2799,12 @@ void ChatView::triggerVisibleDownloads() {
 }
 
 void ChatView::paintEvent(QPaintEvent* event) {
-    QPainter p(this);
-    p.setClipRect(event->rect());
-    p.fillRect(event->rect(), currentPalette().windowBg);
+    if (m_backBuffer.size() != size()) {
+        m_backBuffer = QPixmap(size());
+    }
+    QPainter bp(&m_backBuffer);
+    bp.setClipRect(event->rect());
+    bp.fillRect(event->rect(), currentPalette().windowBg);
 
     int viewW = contentWidth();
     int vpH = height();
@@ -2817,18 +2821,23 @@ void ChatView::paintEvent(QPaintEvent* event) {
     for (size_t i = first; i < m_items.size(); ++i) {
         int h = m_items[i].height;
         if (y + h >= 0 && y <= vpH) {
-            m_items[i].paint(p, y, viewW, ((int)i == m_selMsgIndex), selRects,
+            m_items[i].paint(bp, y, viewW, ((int)i == m_selMsgIndex), selRects,
                              m_fm, m_emojiW, font(), currentPalette());
         }
         if (y > vpH) { break; }
         y += h;
         absY += h;
     }
-    m_scrollDownPill.paint(p, rect(), currentPalette().windowBg, currentPalette().textPrimary);
+    m_scrollDownPill.paint(bp, rect(), currentPalette().windowBg, currentPalette().textPrimary);
+    bp.end();
+
+    QPainter p(this);
+    p.drawPixmap(0, 0, m_backBuffer);
 }
 
 void ChatView::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    m_backBuffer = QPixmap();
     int sbw = m_vScrollBar->sizeHint().width();
     m_vScrollBar->setGeometry(width() - sbw, 0, sbw, height());
     relayout();
@@ -2836,9 +2845,8 @@ void ChatView::resizeEvent(QResizeEvent* event) {
 }
 
 void ChatView::onScrollChanged(int value) {
-    int delta = m_scrollPos - value;
     m_scrollPos = value;
-    QWidget::scroll(0, delta, rect());
+    update();
 #ifdef QT3_BUILD
     int maxVal = m_vScrollBar->maxValue();
 #else

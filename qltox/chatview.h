@@ -209,6 +209,7 @@ private:
     LimeScrollBar* m_vScrollBar;
     QTimer* m_animTimer;
     FloatingPill m_scrollDownPill;
+    QPixmap m_backBuffer;
 
     QFontMetrics m_fm;
     int m_emojiW;
