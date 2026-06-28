@@ -6,6 +6,7 @@
 #ifdef QT3_BUILD
 #include <qbitmap.h>
 #include <qimage.h>
+#include <qbuffer.h>
 #else
 #include <qpainterpath.h>
 #include <QBuffer>
@@ -96,16 +97,27 @@ void AvatarManager::store(const QString& mxcUrl, const QPixmap& source, int size
     m_cache[mxcUrl] = circle;
 #endif
 
-#ifndef QT3_BUILD
     QByteArray pngBytes;
+#ifdef QT3_BUILD
+    QBuffer buf(pngBytes);
+    buf.open(IO_WriteOnly);
+#else
     QBuffer buf(&pngBytes);
     buf.open(QIODevice::WriteOnly);
+#endif
     source.save(&buf, "PNG");
     buf.close();
+#ifdef QT3_BUILD
+    pngBytes = buf.buffer();
+#endif
     Storage::instance().cacheDb()->put(
         mediaCacheKey("avatar", mxcUrl).c_str(),
-        pngBytes.constData(), pngBytes.size(), "image/png", 1);
+#ifdef QT3_BUILD
+        pngBytes.data(),
+#else
+        pngBytes.constData(),
 #endif
+        pngBytes.size(), "image/png", 1);
 }
 
 void AvatarManager::clear() {
