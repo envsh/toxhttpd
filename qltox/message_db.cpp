@@ -12,6 +12,7 @@ public:
     SqliteDb& db() { return *m_conn->get(); }
 
     int64_t insert_message(const MessageRow& row) override {
+        SlowGuard _w("msg::insert", 200);
         auto stmt = db().prepare(
             "INSERT INTO messages "
             "(event_id,chanid,data,etype,"
@@ -65,6 +66,7 @@ public:
     }
 
     bool update_message(int64_t rowid, const MessageUpdate& upd) override {
+        SlowGuard _w("msg::update", 200);
         std::string sql = "UPDATE messages SET ";
         int n = 0;
         auto addField = [&](const char* name) {
@@ -120,6 +122,7 @@ public:
     }
 
     bool delete_message(int64_t rowid) override {
+        SlowGuard _w("msg::delete", 200);
         auto stmt = db().prepare("DELETE FROM messages WHERE rowid=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, rowid)) { return false; }
@@ -127,6 +130,7 @@ public:
     }
 
     std::unique_ptr<MessageRow> get_message(int64_t rowid) override {
+        SlowGuard _w("msg::get", 200);
         auto stmt = db().prepare(
             "SELECT rowid,event_id,chanid,data,etype,"
             " sender_name,sender_nick,peer_number,sender_pubkey,"
@@ -177,6 +181,7 @@ public:
     }
 
     std::vector<MessageRow> load_messages(const char* chanid, int limit) override {
+        SlowGuard _w("msg::load", 200);
         std::vector<MessageRow> rows;
         auto stmt = db().prepare(
             "SELECT rowid,event_id,chanid,data,etype,"
@@ -201,6 +206,7 @@ public:
 
     std::vector<MessageRow> load_messages_before(
         const char* chanid, int64_t before_rowid, int limit) override {
+        SlowGuard _w("msg::load_before", 200);
         std::vector<MessageRow> rows;
         auto stmt = db().prepare(
             "SELECT rowid,event_id,chanid,data,etype,"

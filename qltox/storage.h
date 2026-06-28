@@ -9,6 +9,24 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
+
+struct SlowGuard {
+    const char* op;
+    int thresholdMs;
+    std::chrono::steady_clock::time_point start;
+    SlowGuard(const char* op, int thresholdMs)
+        : op(op), thresholdMs(thresholdMs)
+        , start(std::chrono::steady_clock::now()) {}
+    ~SlowGuard() {
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count();
+        if (ms > thresholdMs) {
+            qWarning("[SLOW] %s took %lldms (threshold %dms)",
+                     op, (long long)ms, thresholdMs);
+        }
+    }
+};
 
 class SqliteStatement {
     sqlite3_stmt* m_stmt = nullptr;

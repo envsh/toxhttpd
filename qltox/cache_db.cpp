@@ -16,6 +16,7 @@ public:
 
     bool put(const char* key, const void* data, size_t size,
              const char* mime, int tag) override {
+        SlowGuard _w("cache::put", 200);
         auto stmt = cacheDb().prepare(
             "INSERT OR REPLACE INTO cache "
             "(key,data,mime_type,tag,access_time,size) "
@@ -35,6 +36,7 @@ public:
     }
 
     std::vector<uint8_t> get(const char* key, std::string* out_mime) override {
+        SlowGuard _w("cache::get", 200);
         std::vector<uint8_t> result;
         auto stmt = cacheDb().prepare(
             "SELECT data,mime_type FROM cache WHERE key=?1");
@@ -108,6 +110,7 @@ public:
 
     bool put_ref(const char* key, const char* file_path,
                  const char* mime, int tag, int64_t size) override {
+        SlowGuard _w("cache::put_ref", 200);
         auto stmt = cacheDb().prepare(
             "INSERT OR REPLACE INTO file_refs "
             "(key,file_path,mime_type,tag,access_time,size) "
@@ -123,6 +126,7 @@ public:
     }
 
     std::string get_ref_path(const char* key) override {
+        SlowGuard _w("cache::get_ref", 200);
         auto stmt = cacheDb().prepare(
             "SELECT file_path FROM file_refs WHERE key=?1");
         if (!stmt.isPrepared()) { return {}; }
@@ -148,6 +152,7 @@ public:
 
     bool put_big_ref(const char* key, const char* file_path,
                      const char* mime, int tag, int64_t size) override {
+        SlowGuard _w("cache::put_big", 200);
         auto stmt = bigDb().prepare(
             "INSERT OR REPLACE INTO big_cache "
             "(key,file_path,mime_type,tag,access_time,size) "
@@ -163,6 +168,7 @@ public:
     }
 
     std::string get_big_path(const char* key) override {
+        SlowGuard _w("cache::get_big", 200);
         auto stmt = bigDb().prepare(
             "SELECT file_path FROM big_cache WHERE key=?1");
         if (!stmt.isPrepared()) { return {}; }
@@ -193,6 +199,7 @@ public:
     }
 
     bool evict(int64_t target_size) override {
+        SlowGuard _w("cache::evict", 500);
         int64_t now = (int64_t)std::time(nullptr);
         int64_t total = total_cache_size();
 
