@@ -10,14 +10,18 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
              friendinfodialog.cpp memberlistdialog.cpp logindialog.cpp \
              messageinput.cpp sound.c loadingbar.cpp \
-             unknownparser.cpp photoviewer.cpp avatar_manager.cpp
+             unknownparser.cpp photoviewer.cpp avatar_manager.cpp \
+              channel_db.cpp message_db.cpp \
+             pending_db.cpp cache_db.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
              chatwidget.h chatview.h contactlist.h selfinfo.h \
              editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
              friendinfodialog.h memberlistdialog.h logindialog.h \
               messageinput.h sound.h loadingbar.h \
-              unknownparser.h photoviewer.h avatar_manager.h
+              unknownparser.h photoviewer.h avatar_manager.h \
+              channel_db.h message_db.h \
+              pending_db.h cache_db.h
             
 include(../qlcomp/qlite.pri)
 

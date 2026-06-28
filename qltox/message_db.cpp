@@ -1,0 +1,745 @@
+#include "message_db.h"
+#include <algorithm>
+
+namespace {
+
+class MessageDbSync final : public MessageDbSyncInterface {
+    std::shared_ptr<SqliteConnectionSafe> m_conn;
+public:
+    explicit MessageDbSync(std::shared_ptr<SqliteConnectionSafe> conn)
+        : m_conn(std::move(conn)) {}
+
+    SqliteDb& db() { return *m_conn->get(); }
+
+    int64_t insert_message(const MessageRow& row) override {
+        auto stmt = db().prepare(
+            "INSERT INTO messages "
+            "(event_id,chanid,data,etype,"
+            " sender_name,sender_nick,peer_number,sender_pubkey,"
+            " signature,avatar_url,time_text,ip_address,"
+            " category,caption,media_url,media_mime,"
+            " media_width,media_height,file_name,file_size,"
+            " duration_sec,local_path,gif_path,thumbnail_key,"
+            " cache_tag,send_state,reply_to_rowid,edited,"
+            " forwarded_from,mention) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,"
+            "?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,"
+            "?21,?22,?23,?24,?25,?26,?27,?28,?29,?30)");
+        if (!stmt.isPrepared()) { return 0; }
+        int i = 1;
+        if (!stmt.bind(i++, row.event_id.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.chanid.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.data.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.etype)) { return 0; }
+        if (!stmt.bind(i++, row.sender_name.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.sender_nick.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.peer_number)) { return 0; }
+        if (!stmt.bind(i++, row.sender_pubkey.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.signature.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.avatar_url.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.time_text.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.ip_address.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.category.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.caption.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.media_url.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.media_mime.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.media_width)) { return 0; }
+        if (!stmt.bind(i++, row.media_height)) { return 0; }
+        if (!stmt.bind(i++, row.file_name.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.file_size)) { return 0; }
+        if (!stmt.bind(i++, row.duration_sec)) { return 0; }
+        if (!stmt.bind(i++, row.local_path.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.gif_path.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.thumbnail_key.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.cache_tag)) { return 0; }
+        if (!stmt.bind(i++, row.send_state)) { return 0; }
+        if (!stmt.bind(i++, row.reply_to_rowid)) { return 0; }
+        if (!stmt.bind(i++, row.edited)) { return 0; }
+        if (!stmt.bind(i++, row.forwarded_from.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.mention)) { return 0; }
+        if (!stmt.step()) {
+            qWarning("MessageDb::insert_message failed");
+            return 0;
+        }
+        return sqlite3_last_insert_rowid(db().raw());
+    }
+
+    bool update_message(int64_t rowid, const MessageUpdate& upd) override {
+        std::string sql = "UPDATE messages SET ";
+        int n = 0;
+        auto addField = [&](const char* name) {
+            if (n++ > 0) { sql += ","; }
+            char idx[8]; snprintf(idx, sizeof(idx), "?%d", n + 1);
+            sql += name; sql += "="; sql += idx;
+        };
+        if (upd.hasEtype)        addField("etype");
+        if (upd.hasSenderName)   addField("sender_name");
+        if (upd.hasSenderNick)   addField("sender_nick");
+        if (upd.hasPeerNumber)   addField("peer_number");
+        if (upd.hasCategory)     addField("category");
+        if (upd.hasCaption)      addField("caption");
+        if (upd.hasMediaUrl)     addField("media_url");
+        if (upd.hasMediaMime)    addField("media_mime");
+        if (upd.hasMediaWidth)   addField("media_width");
+        if (upd.hasMediaHeight)  addField("media_height");
+        if (upd.hasFileName)     addField("file_name");
+        if (upd.hasFileSize)     addField("file_size");
+        if (upd.hasDurationSec)  addField("duration_sec");
+        if (upd.hasLocalPath)    addField("local_path");
+        if (upd.hasThumbnailKey) addField("thumbnail_key");
+        if (upd.hasSendState)    addField("send_state");
+        if (upd.hasEdited)       addField("edited");
+        if (upd.hasForwardedFrom) addField("forwarded_from");
+        if (upd.hasMention)      addField("mention");
+        if (n == 0) { return true; }
+        sql += " WHERE rowid=?1";
+        auto stmt = db().prepare(sql.c_str());
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, rowid)) { return false; }
+        int idx = 2;
+        if (upd.hasEtype)        { stmt.bind(idx++, upd.etype); }
+        if (upd.hasSenderName)   { stmt.bind(idx++, upd.sender_name.c_str()); }
+        if (upd.hasSenderNick)   { stmt.bind(idx++, upd.sender_nick.c_str()); }
+        if (upd.hasPeerNumber)   { stmt.bind(idx++, upd.peer_number); }
+        if (upd.hasCategory)     { stmt.bind(idx++, upd.category.c_str()); }
+        if (upd.hasCaption)      { stmt.bind(idx++, upd.caption.c_str()); }
+        if (upd.hasMediaUrl)     { stmt.bind(idx++, upd.media_url.c_str()); }
+        if (upd.hasMediaMime)    { stmt.bind(idx++, upd.media_mime.c_str()); }
+        if (upd.hasMediaWidth)   { stmt.bind(idx++, upd.media_width); }
+        if (upd.hasMediaHeight)  { stmt.bind(idx++, upd.media_height); }
+        if (upd.hasFileName)     { stmt.bind(idx++, upd.file_name.c_str()); }
+        if (upd.hasFileSize)     { stmt.bind(idx++, upd.file_size); }
+        if (upd.hasDurationSec)  { stmt.bind(idx++, upd.duration_sec); }
+        if (upd.hasLocalPath)    { stmt.bind(idx++, upd.local_path.c_str()); }
+        if (upd.hasThumbnailKey) { stmt.bind(idx++, upd.thumbnail_key.c_str()); }
+        if (upd.hasSendState)    { stmt.bind(idx++, upd.send_state); }
+        if (upd.hasEdited)       { stmt.bind(idx++, upd.edited); }
+        if (upd.hasForwardedFrom) { stmt.bind(idx++, upd.forwarded_from.c_str()); }
+        if (upd.hasMention)      { stmt.bind(idx++, upd.mention); }
+        return stmt.step();
+    }
+
+    bool delete_message(int64_t rowid) override {
+        auto stmt = db().prepare("DELETE FROM messages WHERE rowid=?1");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, rowid)) { return false; }
+        return stmt.step();
+    }
+
+    std::unique_ptr<MessageRow> get_message(int64_t rowid) override {
+        auto stmt = db().prepare(
+            "SELECT rowid,event_id,chanid,data,etype,"
+            " sender_name,sender_nick,peer_number,sender_pubkey,"
+            " signature,avatar_url,time_text,ip_address,"
+            " category,caption,media_url,media_mime,"
+            " media_width,media_height,file_name,file_size,"
+            " duration_sec,local_path,gif_path,thumbnail_key,"
+            " cache_tag,send_state,reply_to_rowid,edited,"
+            " forwarded_from,mention "
+            "FROM messages WHERE rowid=?1");
+        if (!stmt.isPrepared()) { return nullptr; }
+        if (!stmt.bind(1, rowid)) { return nullptr; }
+        if (!stmt.stepRow()) { return nullptr; }
+        auto row = std::unique_ptr<MessageRow>(new MessageRow());
+        int i = 0;
+        row->rowid          = stmt.columnInt64(i++);
+        row->event_id       = stmt.columnText(i++);
+        row->chanid         = stmt.columnText(i++);
+        row->data           = stmt.columnText(i++);
+        row->etype          = stmt.columnInt(i++);
+        row->sender_name    = stmt.columnText(i++);
+        row->sender_nick    = stmt.columnText(i++);
+        row->peer_number    = stmt.columnInt(i++);
+        row->sender_pubkey  = stmt.columnText(i++);
+        row->signature      = stmt.columnText(i++);
+        row->avatar_url     = stmt.columnText(i++);
+        row->time_text      = stmt.columnText(i++);
+        row->ip_address     = stmt.columnText(i++);
+        row->category       = stmt.columnText(i++);
+        row->caption        = stmt.columnText(i++);
+        row->media_url      = stmt.columnText(i++);
+        row->media_mime     = stmt.columnText(i++);
+        row->media_width    = stmt.columnInt(i++);
+        row->media_height   = stmt.columnInt(i++);
+        row->file_name      = stmt.columnText(i++);
+        row->file_size      = stmt.columnInt(i++);
+        row->duration_sec   = stmt.columnInt(i++);
+        row->local_path     = stmt.columnText(i++);
+        row->gif_path       = stmt.columnText(i++);
+        row->thumbnail_key  = stmt.columnText(i++);
+        row->cache_tag      = stmt.columnInt(i++);
+        row->send_state     = stmt.columnInt(i++);
+        row->reply_to_rowid = stmt.columnInt64(i++);
+        row->edited         = stmt.columnInt(i++);
+        row->forwarded_from = stmt.columnText(i++);
+        row->mention        = stmt.columnInt(i++);
+        return row;
+    }
+
+    std::vector<MessageRow> load_messages(const char* chanid, int limit) override {
+        std::vector<MessageRow> rows;
+        auto stmt = db().prepare(
+            "SELECT rowid,event_id,chanid,data,etype,"
+            " sender_name,sender_nick,peer_number,sender_pubkey,"
+            " signature,avatar_url,time_text,ip_address,"
+            " category,caption,media_url,media_mime,"
+            " media_width,media_height,file_name,file_size,"
+            " duration_sec,local_path,gif_path,thumbnail_key,"
+            " cache_tag,send_state,reply_to_rowid,edited,"
+            " forwarded_from,mention "
+            "FROM messages WHERE chanid=?1 "
+            "ORDER BY rowid DESC LIMIT ?2");
+        if (!stmt.isPrepared()) { return rows; }
+        if (!stmt.bind(1, chanid)) { return rows; }
+        if (!stmt.bind(2, limit)) { return rows; }
+        while (stmt.stepRow()) {
+            rows.push_back(readRow(stmt));
+        }
+        std::reverse(rows.begin(), rows.end());
+        return rows;
+    }
+
+    std::vector<MessageRow> load_messages_before(
+        const char* chanid, int64_t before_rowid, int limit) override {
+        std::vector<MessageRow> rows;
+        auto stmt = db().prepare(
+            "SELECT rowid,event_id,chanid,data,etype,"
+            " sender_name,sender_nick,peer_number,sender_pubkey,"
+            " signature,avatar_url,time_text,ip_address,"
+            " category,caption,media_url,media_mime,"
+            " media_width,media_height,file_name,file_size,"
+            " duration_sec,local_path,gif_path,thumbnail_key,"
+            " cache_tag,send_state,reply_to_rowid,edited,"
+            " forwarded_from,mention "
+            "FROM messages WHERE chanid=?1 AND rowid<?2 "
+            "ORDER BY rowid DESC LIMIT ?3");
+        if (!stmt.isPrepared()) { return rows; }
+        if (!stmt.bind(1, chanid)) { return rows; }
+        if (!stmt.bind(2, before_rowid)) { return rows; }
+        if (!stmt.bind(3, limit)) { return rows; }
+        while (stmt.stepRow()) {
+            rows.push_back(readRow(stmt));
+        }
+        std::reverse(rows.begin(), rows.end());
+        return rows;
+    }
+
+    std::vector<int64_t> search_messages(const char* query, int limit) override {
+        std::vector<int64_t> ids;
+        auto stmt = db().prepare(
+            "SELECT rowid FROM messages_fts "
+            "WHERE messages_fts MATCH ?1 "
+            "ORDER BY rank LIMIT ?2");
+        if (!stmt.isPrepared()) { return ids; }
+        if (!stmt.bind(1, query)) { return ids; }
+        if (!stmt.bind(2, limit)) { return ids; }
+        while (stmt.stepRow()) {
+            ids.push_back(stmt.columnInt64(0));
+        }
+        return ids;
+    }
+
+    bool add_reaction(int64_t msg_rowid, const char* emoji,
+                      const char* sender) override {
+        auto stmt = db().prepare(
+            "INSERT OR IGNORE INTO reactions "
+            "(message_rowid,emoji,sender_name) VALUES (?1,?2,?3)");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, msg_rowid)) { return false; }
+        if (!stmt.bind(2, emoji)) { return false; }
+        if (!stmt.bind(3, sender)) { return false; }
+        return stmt.step();
+    }
+
+    bool remove_reaction(int64_t msg_rowid, const char* emoji,
+                         const char* sender) override {
+        auto stmt = db().prepare(
+            "DELETE FROM reactions "
+            "WHERE message_rowid=?1 AND emoji=?2 AND sender_name=?3");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, msg_rowid)) { return false; }
+        if (!stmt.bind(2, emoji)) { return false; }
+        if (!stmt.bind(3, sender)) { return false; }
+        return stmt.step();
+    }
+
+    std::vector<ReactionRow> get_reactions(int64_t msg_rowid) override {
+        std::vector<ReactionRow> rows;
+        auto stmt = db().prepare(
+            "SELECT message_rowid,emoji,sender_name FROM reactions "
+            "WHERE message_rowid=?1");
+        if (!stmt.isPrepared()) { return rows; }
+        if (!stmt.bind(1, msg_rowid)) { return rows; }
+        while (stmt.stepRow()) {
+            ReactionRow r;
+            r.message_rowid = stmt.columnInt64(0);
+            r.emoji = stmt.columnText(1);
+            r.sender_name = stmt.columnText(2);
+            rows.push_back(std::move(r));
+        }
+        return rows;
+    }
+
+    bool set_translation(const TranslationRow& row) override {
+        auto stmt = db().prepare(
+            "INSERT OR REPLACE INTO translations "
+            "(message_rowid,target_lang,translated_text,"
+            " translated_entities,source_lang,provider) "
+            "VALUES (?1,?2,?3,?4,?5,?6)");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, row.message_rowid)) { return false; }
+        if (!stmt.bind(2, row.target_lang.c_str())) { return false; }
+        if (!stmt.bind(3, row.translated_text.c_str())) { return false; }
+        if (!stmt.bind(4, row.translated_entities.c_str())) { return false; }
+        if (!stmt.bind(5, row.source_lang.c_str())) { return false; }
+        if (!stmt.bind(6, row.provider.c_str())) { return false; }
+        return stmt.step();
+    }
+
+    std::unique_ptr<TranslationRow> get_translation(
+        int64_t msg_rowid, const char* lang) override {
+        auto stmt = db().prepare(
+            "SELECT message_rowid,target_lang,translated_text,"
+            " translated_entities,source_lang,provider "
+            "FROM translations WHERE message_rowid=?1 AND target_lang=?2");
+        if (!stmt.isPrepared()) { return nullptr; }
+        if (!stmt.bind(1, msg_rowid)) { return nullptr; }
+        if (!stmt.bind(2, lang)) { return nullptr; }
+        if (!stmt.stepRow()) { return nullptr; }
+        auto row = std::unique_ptr<TranslationRow>(new TranslationRow());
+        row->message_rowid = stmt.columnInt64(0);
+        row->target_lang = stmt.columnText(1);
+        row->translated_text = stmt.columnText(2);
+        row->translated_entities = stmt.columnText(3);
+        row->source_lang = stmt.columnText(4);
+        row->provider = stmt.columnText(5);
+        return row;
+    }
+
+    bool clear_translations_by_lang(const char* lang) override {
+        auto stmt = db().prepare(
+            "DELETE FROM translations WHERE target_lang=?1");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, lang)) { return false; }
+        return stmt.step();
+    }
+
+    bool add_bookmark(int64_t msg_rowid, const char* chanid,
+                      const char* note) override {
+        auto stmt = db().prepare(
+            "INSERT OR IGNORE INTO bookmarks "
+            "(message_rowid,chanid,note) VALUES (?1,?2,?3)");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, msg_rowid)) { return false; }
+        if (!stmt.bind(2, chanid)) { return false; }
+        if (!stmt.bind(3, note)) { return false; }
+        return stmt.step();
+    }
+
+    bool remove_bookmark(int64_t msg_rowid) override {
+        auto stmt = db().prepare(
+            "DELETE FROM bookmarks WHERE message_rowid=?1");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, msg_rowid)) { return false; }
+        return stmt.step();
+    }
+
+    std::unique_ptr<BookmarkRow> get_bookmark(int64_t msg_rowid) override {
+        auto stmt = db().prepare(
+            "SELECT id,message_rowid,chanid,note,tag "
+            "FROM bookmarks WHERE message_rowid=?1");
+        if (!stmt.isPrepared()) { return nullptr; }
+        if (!stmt.bind(1, msg_rowid)) { return nullptr; }
+        if (!stmt.stepRow()) { return nullptr; }
+        auto row = std::unique_ptr<BookmarkRow>(new BookmarkRow());
+        row->id = stmt.columnInt64(0);
+        row->message_rowid = stmt.columnInt64(1);
+        row->chanid = stmt.columnText(2);
+        row->note = stmt.columnText(3);
+        row->tag = stmt.columnText(4);
+        return row;
+    }
+
+    bool clear_channel(const char* chanid) override {
+        auto s1 = db().prepare(
+            "DELETE FROM reactions WHERE message_rowid IN "
+            "(SELECT rowid FROM messages WHERE chanid=?1)");
+        if (s1.isPrepared()) { s1.bind(1, chanid); s1.step(); }
+
+        auto s2 = db().prepare("DELETE FROM bookmarks WHERE chanid=?1");
+        if (s2.isPrepared()) { s2.bind(1, chanid); s2.step(); }
+
+        auto s3 = db().prepare("DELETE FROM messages WHERE chanid=?1");
+        if (s3.isPrepared()) { s3.bind(1, chanid); s3.step(); }
+
+        return true;
+    }
+
+    bool begin_write_transaction() override { return db().beginTransaction(); }
+    bool commit_transaction() override { return db().commitTransaction(); }
+
+private:
+    static MessageRow readRow(SqliteStatement& stmt) {
+        MessageRow row;
+        int i = 0;
+        row.rowid          = stmt.columnInt64(i++);
+        row.event_id       = stmt.columnText(i++);
+        row.chanid         = stmt.columnText(i++);
+        row.data           = stmt.columnText(i++);
+        row.etype          = stmt.columnInt(i++);
+        row.sender_name    = stmt.columnText(i++);
+        row.sender_nick    = stmt.columnText(i++);
+        row.peer_number    = stmt.columnInt(i++);
+        row.sender_pubkey  = stmt.columnText(i++);
+        row.signature      = stmt.columnText(i++);
+        row.avatar_url     = stmt.columnText(i++);
+        row.time_text      = stmt.columnText(i++);
+        row.ip_address     = stmt.columnText(i++);
+        row.category       = stmt.columnText(i++);
+        row.caption        = stmt.columnText(i++);
+        row.media_url      = stmt.columnText(i++);
+        row.media_mime     = stmt.columnText(i++);
+        row.media_width    = stmt.columnInt(i++);
+        row.media_height   = stmt.columnInt(i++);
+        row.file_name      = stmt.columnText(i++);
+        row.file_size      = stmt.columnInt(i++);
+        row.duration_sec   = stmt.columnInt(i++);
+        row.local_path     = stmt.columnText(i++);
+        row.gif_path       = stmt.columnText(i++);
+        row.thumbnail_key  = stmt.columnText(i++);
+        row.cache_tag      = stmt.columnInt(i++);
+        row.send_state     = stmt.columnInt(i++);
+        row.reply_to_rowid = stmt.columnInt64(i++);
+        row.edited         = stmt.columnInt(i++);
+        row.forwarded_from = stmt.columnText(i++);
+        row.mention        = stmt.columnInt(i++);
+        return row;
+    }
+};
+
+class MessageDbSyncSafe final : public MessageDbSyncSafeInterface {
+    std::shared_ptr<SqliteConnectionSafe> m_conn;
+    MessageDbSync m_impl;
+public:
+    explicit MessageDbSyncSafe(std::shared_ptr<SqliteConnectionSafe> conn)
+        : m_conn(conn), m_impl(conn) {}
+    MessageDbSyncInterface& get() override { return m_impl; }
+};
+
+class MessageDbAsync final : public MessageDbAsyncInterface {
+    std::shared_ptr<MessageDbSyncSafeInterface> m_sync;
+    std::shared_ptr<WriteQueue> m_queue;
+public:
+    MessageDbAsync(std::shared_ptr<MessageDbSyncSafeInterface> sync,
+                   std::shared_ptr<WriteQueue> queue)
+        : m_sync(std::move(sync)), m_queue(std::move(queue)) {}
+
+    void post(std::function<void()> task) { m_queue->post(std::move(task)); }
+
+    void insert_message(MessageRow row, std::function<void(int64_t)> done) override {
+        auto sync = m_sync;
+        post([sync, row, done]() {
+            int64_t id = sync->get().insert_message(row);
+            if (done) { done(id); }
+        });
+    }
+
+    void update_message(int64_t rowid, MessageUpdate upd,
+                        std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, rowid, upd, done]() {
+            bool ok = sync->get().update_message(rowid, upd);
+            if (done) { done(ok); }
+        });
+    }
+
+    void delete_message(int64_t rowid, std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, rowid, done]() {
+            bool ok = sync->get().delete_message(rowid);
+            if (done) { done(ok); }
+        });
+    }
+
+    void get_message(int64_t rowid,
+                     std::function<void(std::unique_ptr<MessageRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, rowid, done]() {
+            auto row = sync->get().get_message(rowid);
+            if (done) { done(std::move(row)); }
+        });
+    }
+
+    void load_messages(std::string chanid, int limit,
+                       std::function<void(std::vector<MessageRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, limit, done]() {
+            auto rows = sync->get().load_messages(chanid.c_str(), limit);
+            if (done) { done(std::move(rows)); }
+        });
+    }
+
+    void load_messages_before(std::string chanid, int64_t before_rowid,
+                              int limit,
+                              std::function<void(std::vector<MessageRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, before_rowid, limit,
+              done]() {
+            auto rows = sync->get().load_messages_before(chanid.c_str(), before_rowid, limit);
+            if (done) { done(std::move(rows)); }
+        });
+    }
+
+    void search_messages(std::string query, int limit,
+                         std::function<void(std::vector<int64_t>)> done) override {
+        auto sync = m_sync;
+        post([sync, query, limit, done]() {
+            auto ids = sync->get().search_messages(query.c_str(), limit);
+            if (done) { done(std::move(ids)); }
+        });
+    }
+
+    void add_reaction(int64_t msg_rowid, std::string emoji,
+                      std::string sender,
+                      std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, emoji,
+              sender, done]() {
+            bool ok = sync->get().add_reaction(msg_rowid, emoji.c_str(), sender.c_str());
+            if (done) { done(ok); }
+        });
+    }
+
+    void remove_reaction(int64_t msg_rowid, std::string emoji,
+                         std::string sender,
+                         std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, emoji,
+              sender, done]() {
+            bool ok = sync->get().remove_reaction(msg_rowid, emoji.c_str(), sender.c_str());
+            if (done) { done(ok); }
+        });
+    }
+
+    void get_reactions(int64_t msg_rowid,
+                       std::function<void(std::vector<ReactionRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, done]() {
+            auto rows = sync->get().get_reactions(msg_rowid);
+            if (done) { done(std::move(rows)); }
+        });
+    }
+
+    void set_translation(TranslationRow row,
+                         std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, row, done]() {
+            bool ok = sync->get().set_translation(row);
+            if (done) { done(ok); }
+        });
+    }
+
+    void get_translation(int64_t msg_rowid, std::string lang,
+                         std::function<void(std::unique_ptr<TranslationRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, lang, done]() {
+            auto row = sync->get().get_translation(msg_rowid, lang.c_str());
+            if (done) { done(std::move(row)); }
+        });
+    }
+
+    void clear_translations_by_lang(std::string lang,
+                                    std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, lang, done]() {
+            bool ok = sync->get().clear_translations_by_lang(lang.c_str());
+            if (done) { done(ok); }
+        });
+    }
+
+    void add_bookmark(int64_t msg_rowid, std::string chanid,
+                      std::string note,
+                      std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, chanid,
+              note, done]() {
+            bool ok = sync->get().add_bookmark(msg_rowid, chanid.c_str(), note.c_str());
+            if (done) { done(ok); }
+        });
+    }
+
+    void remove_bookmark(int64_t msg_rowid,
+                         std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, done]() {
+            bool ok = sync->get().remove_bookmark(msg_rowid);
+            if (done) { done(ok); }
+        });
+    }
+
+    void get_bookmark(int64_t msg_rowid,
+                      std::function<void(std::unique_ptr<BookmarkRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, msg_rowid, done]() {
+            auto row = sync->get().get_bookmark(msg_rowid);
+            if (done) { done(std::move(row)); }
+        });
+    }
+
+    void clear_channel(std::string chanid,
+                       std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, done]() {
+            bool ok = sync->get().clear_channel(chanid.c_str());
+            if (done) { done(ok); }
+        });
+    }
+
+    void close(std::function<void()> done) override {
+        auto sync = m_sync;
+        post([sync, done]() {
+            if (done) { done(); }
+        });
+    }
+};
+
+}  // namespace
+
+std::shared_ptr<MessageDbSyncSafeInterface> create_message_db(
+    std::shared_ptr<SqliteConnectionSafe> conn) {
+    return std::make_shared<MessageDbSyncSafe>(std::move(conn));
+}
+
+std::shared_ptr<MessageDbAsyncInterface> create_message_db_async(
+    std::shared_ptr<MessageDbSyncSafeInterface> sync,
+    std::shared_ptr<WriteQueue> queue) {
+    return std::make_shared<MessageDbAsync>(std::move(sync), std::move(queue));
+}
+
+bool init_message_db(SqliteDb& db) {
+    // messages + reactions + translations + bookmarks + FTS
+    if (!db.exec(
+        "CREATE TABLE IF NOT EXISTS messages ("
+        "  rowid       INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  event_id    TEXT UNIQUE,"
+        "  chanid      TEXT NOT NULL REFERENCES channels(chanid),"
+        "  data        TEXT NOT NULL,"
+        "  etype       INTEGER DEFAULT 0,"
+        "  sender_name TEXT DEFAULT '',"
+        "  sender_nick TEXT DEFAULT '',"
+        "  peer_number INTEGER DEFAULT -1,"
+        "  sender_pubkey TEXT DEFAULT '',"
+        "  signature   TEXT DEFAULT '',"
+        "  avatar_url  TEXT DEFAULT '',"
+        "  time_text   TEXT DEFAULT '',"
+        "  ip_address  TEXT DEFAULT '',"
+        "  category    TEXT DEFAULT '',"
+        "  caption     TEXT DEFAULT '',"
+        "  media_url   TEXT,"
+        "  media_mime  TEXT,"
+        "  media_width INTEGER DEFAULT 0,"
+        "  media_height INTEGER DEFAULT 0,"
+        "  file_name   TEXT,"
+        "  file_size   INTEGER DEFAULT 0,"
+        "  duration_sec INTEGER DEFAULT 0,"
+        "  local_path  TEXT,"
+        "  gif_path    TEXT DEFAULT '',"
+        "  thumbnail_key TEXT,"
+        "  cache_tag   INTEGER DEFAULT 0,"
+        "  send_state  INTEGER DEFAULT 0,"
+        "  reply_to_rowid INTEGER DEFAULT 0,"
+        "  edited      INTEGER DEFAULT 0,"
+        "  deleted_at  TIMESTAMP,"
+        "  forwarded_from TEXT DEFAULT '',"
+        "  mention     INTEGER DEFAULT 0,"
+        "  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ")")) { return false; }
+
+    db.exec("CREATE INDEX IF NOT EXISTS idx_messages_chanid"
+            "  ON messages(chanid, rowid DESC)");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_messages_media_url"
+            "  ON messages(media_url) WHERE media_url IS NOT NULL");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_messages_send_state"
+            "  ON messages(chanid, send_state)");
+
+    if (!db.exec(
+        "CREATE TABLE IF NOT EXISTS reactions ("
+        "  message_rowid  INTEGER NOT NULL REFERENCES messages(rowid),"
+        "  emoji          TEXT NOT NULL,"
+        "  sender_name    TEXT DEFAULT '',"
+        "  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  PRIMARY KEY (message_rowid, emoji, sender_name)"
+        ")")) { return false; }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_reactions_message"
+            "  ON reactions(message_rowid)");
+
+    if (!db.exec(
+        "CREATE TABLE IF NOT EXISTS translations ("
+        "  message_rowid    INTEGER NOT NULL REFERENCES messages(rowid) ON DELETE CASCADE,"
+        "  target_lang      TEXT NOT NULL,"
+        "  translated_text  TEXT NOT NULL,"
+        "  translated_entities TEXT,"
+        "  source_lang      TEXT,"
+        "  provider         TEXT DEFAULT 'builtin',"
+        "  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  PRIMARY KEY (message_rowid, target_lang)"
+        ")")) { return false; }
+
+    if (!db.exec(
+        "CREATE TABLE IF NOT EXISTS bookmarks ("
+        "  id             INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  message_rowid  INTEGER NOT NULL,"
+        "  chanid         TEXT NOT NULL REFERENCES channels(chanid),"
+        "  note           TEXT DEFAULT '',"
+        "  tag            TEXT DEFAULT '',"
+        "  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  UNIQUE(message_rowid)"
+        ")")) { return false; }
+
+    // FTS — try trigram first, fallback to unicode61
+    if (!db.tryExec(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5("
+        "  content,"
+        "  tokenize='trigram case_sensitive 0',"
+        "  content='messages',"
+        "  content_rowid='rowid')")) {
+        qWarning("Trigram not available, falling back to unicode61");
+        if (!db.tryExec(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5("
+            "  content,"
+            "  tokenize='unicode61',"
+            "  content='messages',"
+            "  content_rowid='rowid')")) {
+            qWarning("FTS5 not available, message search disabled");
+        }
+    }
+
+    db.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_insert"
+            " AFTER INSERT ON messages BEGIN"
+            "  INSERT INTO messages_fts(rowid, content)"
+            "  VALUES (NEW.rowid, NEW.data);"
+            " END");
+    db.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_delete"
+            " AFTER DELETE ON messages BEGIN"
+            "  INSERT INTO messages_fts(messages_fts, rowid, content)"
+            "  VALUES('delete', OLD.rowid, OLD.data);"
+            " END");
+    db.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_update"
+            " AFTER UPDATE ON messages BEGIN"
+            "  INSERT INTO messages_fts(messages_fts, rowid, content)"
+            "  VALUES('delete', OLD.rowid, OLD.data);"
+            "  INSERT INTO messages_fts(rowid, content)"
+            "  VALUES (NEW.rowid, NEW.data);"
+            " END");
+
+    return true;
+}
+
+bool drop_message_db(SqliteDb& db) {
+    db.exec("DROP TABLE IF EXISTS messages_fts");
+    db.exec("DROP TABLE IF EXISTS bookmarks");
+    db.exec("DROP TABLE IF EXISTS translations");
+    db.exec("DROP TABLE IF EXISTS reactions");
+    db.exec("DROP TABLE IF EXISTS messages");
+    return true;
+}
