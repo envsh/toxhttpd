@@ -64,6 +64,7 @@ public:
     void setSelectedIndex(int idx);
     int scrollY() const { return m_scrollY; }
     void setScrollY(int y);
+    void scrollBy(int delta);
 protected:
     void paintEvent(QPaintEvent* e);
     void mousePressEvent(QMouseEvent* e);

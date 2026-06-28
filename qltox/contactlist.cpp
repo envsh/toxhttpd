@@ -369,6 +369,47 @@ int ContactListView::yToRow(int y) const {
     return row;
 }
 
+void ContactListView::scrollBy(int delta) {
+    if (delta == 0) { return; }
+    int h = m_widget->itemHeight();
+    int viewH = height();
+    if (m_backBuffer.size() != size()) {
+        m_backBuffer = QPixmap(size());
+        int totalH = totalHeight();
+        int maxScroll = totalH > viewH ? totalH - viewH : 0;
+        m_scrollY = std::max(0, std::min(m_scrollY, maxScroll));
+        update();
+        return;
+    }
+    QPixmap tmp(m_backBuffer);
+    QPainter bp(&m_backBuffer);
+    QRect dirty;
+    if (delta > 0) {
+        bp.drawPixmap(0, delta, tmp, 0, 0, width(), viewH - delta);
+        dirty = QRect(0, 0, width(), delta);
+    } else {
+        bp.drawPixmap(0, 0, tmp, 0, -delta, width(), viewH + delta);
+        dirty = QRect(0, viewH + delta, width(), -delta);
+    }
+    bp.setClipRect(dirty);
+    bp.fillRect(dirty, currentPalette().windowBg);
+    int firstRow = dirty.y() / h;
+    int lastRow = (dirty.y() + dirty.height() - 1) / h;
+    int sz = m_widget->m_list.size();
+    if (lastRow >= sz) { lastRow = sz - 1; }
+    for (int i = firstRow; i <= lastRow; ++i) {
+        RowData* rd = m_widget->m_list.at(i);
+        if (!rd || !m_widget->matchesFilter(*rd)) { continue; }
+        int y = i * h - m_scrollY;
+        paintContactRow(bp, 0, y, width(), h,
+                        i == m_selIdx, rd->type, rd->name, rd->status,
+                        rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr, rd->pinnedIndex);
+    }
+    bp.end();
+    QPainter p(this);
+    p.drawPixmap(0, 0, m_backBuffer);
+}
+
 void ContactListView::paintEvent(QPaintEvent*) {
     if (m_backBuffer.size() != size()) {
         m_backBuffer = QPixmap(size());
@@ -431,11 +472,16 @@ void ContactListView::wheelEvent(QWheelEvent* e) {
     int totalH = totalHeight();
     int viewH = height();
     int maxScroll = totalH > viewH ? totalH - viewH : 0;
+    int oldY = m_scrollY;
     m_scrollY = std::max(0, std::min(newY, maxScroll));
+    int delta = oldY - m_scrollY;
+    if (delta == 0) { return; }
     if (m_scrollBar) {
+        m_scrollBar->blockSignals(true);
         m_scrollBar->setValue(m_scrollY);
+        m_scrollBar->blockSignals(false);
     }
-    update();
+    scrollBy(delta);
 }
 
 void ContactListView::resizeEvent(QResizeEvent* e) {
@@ -837,8 +883,9 @@ void ContactListWidget::onSortMenuClicked() {
 
 void ContactListWidget::onScrollChanged(int value) {
     if (m_view->scrollY() != value) {
+        int delta = m_view->scrollY() - value;
         m_view->setScrollY(value);
-        m_view->update();
+        m_view->scrollBy(delta);
     }
 }
 
