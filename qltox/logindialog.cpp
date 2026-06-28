@@ -48,7 +48,7 @@ static cJSON* loadConfig() {
 static bool saveConfig(cJSON* root) {
     std::string path = configFilePath();
     std::string dir = path.substr(0, path.rfind('/'));
-    system(("mkdir -p " + dir).c_str());
+    qMkdir(qFromUtf8(dir));
     char* jsonStr = cJSON_Print(root);
     std::ofstream ofs(path);
     bool ok = ofs.is_open();

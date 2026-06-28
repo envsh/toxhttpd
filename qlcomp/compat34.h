@@ -160,4 +160,6 @@ inline std::string timeSince(const TimePoint& start) {
 
 void qActivateWindow(QWidget* w);
 
+bool qMkdir(const QString& path, bool recursive = true);
+
 #endif  // COMPAT34_H

@@ -723,3 +723,23 @@ void qActivateWindow(QWidget* w) {
     w->activateWindow();
 #endif
 }
+
+bool qMkdir(const QString& path, bool recursive) {
+#ifdef QT3_BUILD
+    if (recursive) {
+        // QDir::mkdirs 在旧版 Qt3 不可用，手动逐级创建
+        QString p = path;
+        if (p.endsWith("/")) { p.truncate(p.length() - 1); }
+        int slashPos = 0;
+        while ((slashPos = p.find("/", slashPos + 1)) != -1) {
+            QString sub = p.left(slashPos);
+            QDir().mkdir(sub);
+        }
+        return QDir().mkdir(p);
+    }
+    return QDir().mkdir(path);
+#else
+    if (recursive) return QDir().mkpath(path);
+    return QDir().mkdir(path);
+#endif
+}
