@@ -17,6 +17,7 @@ public:
     bool requestDownload(const QString& mxcUrl);
 
     void store(const QString& mxcUrl, const QPixmap& source, int size);
+    void removePending(const QString& mxcUrl);
     void clear();
 
 private:

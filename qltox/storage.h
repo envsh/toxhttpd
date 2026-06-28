@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include <sqlite3.h>
 #include <qglobal.h>
 #include <qmutex.h>
@@ -76,6 +77,13 @@ public:
     bool commitTransaction();
     bool rollbackTransaction();
 };
+
+inline const char* sqliteError(sqlite3_stmt* stmt) {
+    return sqlite3_errmsg(sqlite3_db_handle(stmt));
+}
+inline const char* sqliteError(SqliteDb& db) {
+    return sqlite3_errmsg(db.raw());
+}
 
 class SqliteConnectionSafe;
 
@@ -166,7 +174,8 @@ private:
     Storage& operator=(const Storage&) = delete;
 
     bool openDb(const char* path);
-    bool initDomains();
+    bool initSyncDomains();
+    bool initAsyncDomains();
     void checkFeatures();
 
     SqliteDb m_msgDb;

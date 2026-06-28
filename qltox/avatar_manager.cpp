@@ -110,14 +110,17 @@ void AvatarManager::store(const QString& mxcUrl, const QPixmap& source, int size
 #ifdef QT3_BUILD
     pngBytes = buf.buffer();
 #endif
-    Storage::instance().cacheDb()->put(
-        mediaCacheKey("avatar", mxcUrl).c_str(),
-#ifdef QT3_BUILD
-        pngBytes.data(),
-#else
-        pngBytes.constData(),
-#endif
-        pngBytes.size(), "image/png", 1);
+    {
+        std::string key = mediaCacheKey("avatar", mxcUrl);
+        const auto* raw = reinterpret_cast<const uint8_t*>(pngBytes.data());
+        std::vector<uint8_t> data(raw, raw + pngBytes.size());
+        Storage::instance().cacheDbAsync()->put(
+            std::move(key), std::move(data), "image/png", 1, nullptr);
+    }
+}
+
+void AvatarManager::removePending(const QString& mxcUrl) {
+    m_pending.erase(mxcUrl);
 }
 
 void AvatarManager::clear() {

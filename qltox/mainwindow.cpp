@@ -333,9 +333,13 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     el.thumbnail.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
                     el.rawFileData = e->rawData;
 
-                    Storage::instance().cacheDb()->put(
-                        mediaCacheKey("file", qFromUtf8(e->mxcUrl)).c_str(),
-                        e->rawData.data(), e->rawData.size(), "", 2);
+                    {
+                        std::string key = mediaCacheKey("file", qFromUtf8(e->mxcUrl));
+                        const auto& rd = e->rawData;
+                        std::vector<uint8_t> data(rd.begin(), rd.end());
+                        Storage::instance().cacheDbAsync()->put(
+                            std::move(key), std::move(data), "", 2, nullptr);
+                    }
 
                     el.downloadState = ChatElement::Completed;
                     chatWidget->triggerRelayout(e->msgIndex);
@@ -369,6 +373,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
         } else {
             qWarning("AvatarManager: download failed for [%s] reason: [%s]",
                      e->mxcUrl.c_str(), e->errorInfo.c_str());
+            AvatarManager::inst().removePending(key);
         }
         return;
     }

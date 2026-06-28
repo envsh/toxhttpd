@@ -51,19 +51,27 @@ SqliteStatement& SqliteStatement::operator=(SqliteStatement&& other) noexcept {
 
 bool SqliteStatement::bind(int idx, int val) {
     if (!m_stmt) { return false; }
-    if (sqlite3_bind_int(m_stmt, idx, val) != SQLITE_OK) { return false; }
+    if (sqlite3_bind_int(m_stmt, idx, val) != SQLITE_OK) {
+        qWarning("SqliteStatement::bind(%d) failed: %s", idx, sqliteError(m_stmt));
+        return false;
+    }
     return true;
 }
 
 bool SqliteStatement::bind(int idx, int64_t val) {
     if (!m_stmt) { return false; }
-    if (sqlite3_bind_int64(m_stmt, idx, val) != SQLITE_OK) { return false; }
+    if (sqlite3_bind_int64(m_stmt, idx, val) != SQLITE_OK) {
+        qWarning("SqliteStatement::bind(%d) failed: %s", idx, sqliteError(m_stmt));
+        return false;
+    }
     return true;
 }
 
 bool SqliteStatement::bind(int idx, const char* val) {
     if (!m_stmt) { return false; }
-    if (sqlite3_bind_text(m_stmt, idx, val, -1, SQLITE_TRANSIENT) != SQLITE_OK) {
+    int rc = sqlite3_bind_text(m_stmt, idx, val, -1, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        qWarning("SqliteStatement::bind(%d) failed: %s", idx, sqliteError(m_stmt));
         return false;
     }
     return true;
@@ -71,7 +79,9 @@ bool SqliteStatement::bind(int idx, const char* val) {
 
 bool SqliteStatement::bind(int idx, const void* data, int len) {
     if (!m_stmt) { return false; }
-    if (sqlite3_bind_blob(m_stmt, idx, data, len, SQLITE_TRANSIENT) != SQLITE_OK) {
+    int rc = sqlite3_bind_blob(m_stmt, idx, data, len, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        qWarning("SqliteStatement::bind(%d) failed: %s", idx, sqliteError(m_stmt));
         return false;
     }
     return true;
@@ -79,7 +89,10 @@ bool SqliteStatement::bind(int idx, const void* data, int len) {
 
 bool SqliteStatement::bindNull(int idx) {
     if (!m_stmt) { return false; }
-    if (sqlite3_bind_null(m_stmt, idx) != SQLITE_OK) { return false; }
+    if (sqlite3_bind_null(m_stmt, idx) != SQLITE_OK) {
+        qWarning("SqliteStatement::bindNull(%d) failed: %s", idx, sqliteError(m_stmt));
+        return false;
+    }
     return true;
 }
 
@@ -87,10 +100,9 @@ bool SqliteStatement::step() {
     if (!m_stmt) { return false; }
     int rc = sqlite3_step(m_stmt);
     if (rc == SQLITE_ROW) { return true; }
-    if (rc != SQLITE_DONE) {
-        qWarning("SqliteStatement step error: %s",
-                 sqlite3_errmsg(sqlite3_db_handle(m_stmt)));
-    }
+    if (rc == SQLITE_DONE) { return true; }
+    qWarning("SqliteStatement step error: %s",
+             sqlite3_errmsg(sqlite3_db_handle(m_stmt)));
     return false;
 }
 
@@ -155,6 +167,7 @@ bool SqliteDb::tryExec(const char* sql) {
     char* err = nullptr;
     int rc = sqlite3_exec(m_db, sql, nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {
+        qWarning("SqliteDb tryExec failed: %s\nSQL: %s", err ? err : "unknown", sql);
         sqlite3_free(err);
         return false;
     }
@@ -244,11 +257,13 @@ bool Storage::init(const char *dataDir) {
     m_cacheConn = std::make_shared<SqliteConnectionSafe>(m_cacheDb.raw());
     m_bigConn = std::make_shared<SqliteConnectionSafe>(m_bigCacheDb.raw());
 
-    if (!initDomains()) { return false; }
-
-    checkFeatures();
+    if (!initSyncDomains()) { return false; }
 
     m_queue = std::make_shared<WriteQueue>();
+
+    if (!initAsyncDomains()) { return false; }
+
+    checkFeatures();
 
     qDebug("Storage init complete in %lldms", elapsedMs(totalStart));
     return true;
@@ -321,7 +336,7 @@ bool Storage::openDb(const char *path) {
     return true;
 }
 
-bool Storage::initDomains() {
+bool Storage::initSyncDomains() {
     auto start = std::chrono::steady_clock::now();
 
     if (!init_channel_db(m_msgDb))   { return false; }
@@ -343,14 +358,16 @@ bool Storage::initDomains() {
     m_pendingDb = create_pending_db(m_msgConn);
     m_cacheDbObj = create_cache_db(m_cacheConn, m_bigConn);
 
-    // 创建 async 实例
+    qDebug("Domain layer init complete in %lldms (4 domains, 10 tables)",
+           elapsedMs(start));
+    return true;
+}
+
+bool Storage::initAsyncDomains() {
     m_channelDbAsync = create_channel_db_async(m_channelDb, m_queue);
     m_messageDbAsync = create_message_db_async(m_messageDb, m_queue);
     m_pendingDbAsync = create_pending_db_async(m_pendingDb, m_queue);
     m_cacheDbAsync   = create_cache_db_async(m_cacheDbObj, m_queue);
-
-    qDebug("Domain layer init complete in %lldms (4 domains, 10 tables)",
-           elapsedMs(start));
     return true;
 }
 
