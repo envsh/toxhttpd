@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include "placeholderlineedit.h"
 #include "LimeScrollBar.h"
+#include <stdint.h>
 #include <qwidget.h>
 #include <qpoint.h>
 #ifdef QT3_BUILD
@@ -15,6 +16,7 @@
 #include <vector>
 #include <algorithm>
 #include <memory>
+#include <map>
 
 extern const char* EMOJI_FRIEND;
 extern const char* EMOJI_GROUP;
@@ -52,9 +54,17 @@ struct RowData {
     uint lastActive = 0;
     int pinnedIndex = 0;
     QString nameUpper;
+    QString truncatedName;
+    QString truncatedMsg;
+    int cachedWidth = 0;
 };
 
 class ContactListWidget;
+
+struct RowPixmapCache {
+    QPixmap pix;
+    int width = 0;
+};
 
 class ContactListView : public QWidget {
 public:
@@ -64,7 +74,9 @@ public:
     void setSelectedIndex(int idx);
     int scrollY() const { return m_scrollY; }
     void setScrollY(int y);
-    void scrollBy(int delta);
+    void invalidateTruncation();
+    void truncateRowData(RowData* rd, int w);
+    QPixmap getCircularAvatar(uint32_t cp, int size);
 protected:
     void paintEvent(QPaintEvent* e);
     void mousePressEvent(QMouseEvent* e);
@@ -79,10 +91,15 @@ private:
     int m_selId = -1;
     QString m_selType;
     int m_scrollY = 0;
-    QPixmap m_backBuffer;
+    std::map<uint32_t, QPixmap> m_circularAvatarCache;
+    std::vector<RowPixmapCache> m_rowCache;
+    int m_avatarSize = 0;
 public:
     int selectedId() const { return m_selId; }
     QString selectedType() const { return m_selType; }
+    void renderRowToCache(int i, int w);
+    void invalidateRowCache(int i);
+    void invalidateAllCaches();
 };
 
 class ContactListData {

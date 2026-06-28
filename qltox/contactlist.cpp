@@ -18,6 +18,7 @@
 #include <QWheelEvent>
 #endif
 
+
 const char* EMOJI_FRIEND =   "👤";
 const char* EMOJI_GROUP = "👥";
 const char* EMOJI_CONFERENCE = "🎙";
@@ -51,7 +52,9 @@ static uint32_t typeToEmojiCp(const QString& type) {
 static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     bool selected, const QString& type, const QString& name,
     const QString& status, bool isConnected, int unread,
-    const QString& lastMessage, const QString& timeStr, int pinnedIndex)
+    const QString& lastMessage, const QString& timeStr, int pinnedIndex,
+    const QString& truncatedName, const QString& truncatedMsg,
+    const QPixmap& circularAvatar)
 {
     if (selected) {
         QColor selBg = lerpColor(currentPalette().baseBg, currentPalette().accent, 0.25f);
@@ -72,40 +75,15 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     cx += kDotR * 2 + rp;
 
     int avatarY = y + 6;
-    uint32_t cp = typeToEmojiCp(type);
-    QPixmap pm = EmojiRenderer::instance().renderEmoji(cp, kAvatarSz - 4);
-
-#ifdef QT3_BUILD
-    if (!pm.isNull()) {
-        QBitmap mask(pm.width(), pm.height(), true);
-        QPainter mp(&mask);
-        mp.setBrush(Qt::color1);
-        mp.setPen(Qt::NoPen);
-        mp.drawEllipse(0, 0, pm.width(), pm.height());
-        mp.end();
-        pm.setMask(mask);
-    }
-#endif
-
-    p.save();
-    p.setBrush(QColor(224, 224, 224));
-    p.setPen(Qt::NoPen);
-#ifndef QT3_BUILD
-    {
-        QPainterPath clipPath;
-        clipPath.addEllipse(cx, avatarY, kAvatarSz, kAvatarSz);
-        p.setClipPath(clipPath);
-#endif
+    if (!circularAvatar.isNull()) {
+        p.drawPixmap(cx, avatarY, circularAvatar);
+    } else {
+        p.save();
+        p.setBrush(QColor(224, 224, 224));
+        p.setPen(Qt::NoPen);
         p.drawEllipse(cx, avatarY, kAvatarSz, kAvatarSz);
-        if (!pm.isNull()) {
-            int pmx = cx + (kAvatarSz - pm.width()) / 2;
-            int pmy = avatarY + (kAvatarSz - pm.height()) / 2;
-            p.drawPixmap(pmx, pmy, pm);
-        }
-#ifndef QT3_BUILD
+        p.restore();
     }
-#endif
-    p.restore();
     cx += kAvatarSz + rp;
 
     QFont normalFont = p.font();
@@ -117,12 +95,7 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     int nameW = w - (cx - x) - kRightPad - kRightAreaW;
     if (nameW < 20) { nameW = 20; }
 
-    QString displayName = name.isEmpty() ? _("no_name") : name;
-    if (p.fontMetrics().width(displayName) > nameW) {
-        while (!displayName.isEmpty() && p.fontMetrics().width(displayName + "...") > nameW)
-            displayName.truncate(displayName.length() - 1);
-        displayName += "...";
-    }
+    QString displayName = truncatedName.isEmpty() ? name : truncatedName;
 
     p.setPen(currentPalette().textPrimary);
     p.setFont(boldFont);
@@ -149,18 +122,12 @@ static void paintContactRow(QPainter& p, int x, int y, int w, int h,
     }
 
     int msgY = y + 6 + lh + 1;
-    QString msg = lastMessage.isEmpty() ? displayName : lastMessage;
-    msg.replace('\n', ' ');
+    QString msg = truncatedMsg.isEmpty() ? lastMessage : truncatedMsg;
 
     if (!msg.isEmpty()) {
         int msgW = w - (cx - x) - kRightPad - kRightAreaW;
         if (msgW < 20) { msgW = 20; }
         p.setFont(smallFont);
-        if (p.fontMetrics().width(msg) > msgW) {
-            while (!msg.isEmpty() && p.fontMetrics().width(msg + "...") > msgW)
-                msg.truncate(msg.length() - 1);
-            msg += "...";
-        }
         p.setPen(QColor(150, 150, 150
 #ifndef QT3_BUILD
             , 180
@@ -187,6 +154,98 @@ static int calcItemHeight(const QFont& f) {
     int textH = 6 + lh + 1 + lh2 + 6;
     int avH   = 6 + kAvatarSz + 6;
     return std::max(textH, avH);
+}
+
+// ========== ContactListView helpers ==========
+
+QPixmap ContactListView::getCircularAvatar(uint32_t cp, int size) {
+    if (size != m_avatarSize) {
+        m_circularAvatarCache.clear();
+        m_avatarSize = size;
+    }
+    auto it = m_circularAvatarCache.find(cp);
+    if (it != m_circularAvatarCache.end()) {
+        return it->second;
+    }
+    QPixmap raw = EmojiRenderer::instance().renderEmoji(cp, size);
+    if (raw.isNull()) {
+        m_circularAvatarCache[cp] = raw;
+        return raw;
+    }
+#ifdef QT3_BUILD
+    QBitmap mask(raw.width(), raw.height(), true);
+    {
+        QPainter mp(&mask);
+        mp.setBrush(Qt::color1);
+        mp.setPen(Qt::NoPen);
+        mp.drawEllipse(0, 0, raw.width(), raw.height());
+        mp.end();
+    }
+    QPixmap masked = raw;
+    masked.setMask(mask);
+    m_circularAvatarCache[cp] = masked;
+    return masked;
+#else
+    QPixmap result(size, size);
+    result.fill(Qt::transparent);
+    QPainter rp(&result);
+    rp.setBrush(QColor(224, 224, 224));
+    rp.setPen(Qt::NoPen);
+    rp.drawEllipse(0, 0, size, size);
+    {
+        QPainterPath clipPath;
+        clipPath.addEllipse(0, 0, size, size);
+        rp.setClipPath(clipPath);
+        int pmx = (size - raw.width()) / 2;
+        int pmy = (size - raw.height()) / 2;
+        rp.drawPixmap(pmx, pmy, raw);
+    }
+    rp.end();
+    m_circularAvatarCache[cp] = result;
+    return result;
+#endif
+}
+
+void ContactListView::truncateRowData(RowData* rd, int w) {
+    QFont normalFont = font();
+    QFont smallFont = normalFont;
+    if (normalFont.pointSize() > 4) {
+        smallFont.setPointSize(normalFont.pointSize() - 2);
+    }
+    QFontMetrics fm(normalFont);
+    QFontMetrics sfm(smallFont);
+
+    int cx = kPad + kDotR * 2 + kPad + kAvatarSz + kPad;
+    int nameW = w - cx - kRightPad - kRightAreaW;
+    if (nameW < 20) { nameW = 20; }
+
+    QString displayName = rd->name.isEmpty() ? _("no_name") : rd->name;
+    if (fm.width(displayName) > nameW) {
+        while (!displayName.isEmpty() && fm.width(displayName + "...") > nameW) {
+            displayName.truncate(displayName.length() - 1);
+        }
+        displayName += "...";
+    }
+    rd->truncatedName = displayName;
+
+    QString msg = rd->lastMessage.isEmpty() ? displayName : rd->lastMessage;
+    msg.replace('\n', ' ');
+    int msgW = w - cx - kRightPad - kRightAreaW;
+    if (msgW < 20) { msgW = 20; }
+    if (!msg.isEmpty() && sfm.width(msg) > msgW) {
+        while (!msg.isEmpty() && sfm.width(msg + "...") > msgW) {
+            msg.truncate(msg.length() - 1);
+        }
+        msg += "...";
+    }
+    rd->truncatedMsg = msg;
+    rd->cachedWidth = w;
+}
+
+void ContactListView::invalidateTruncation() {
+    for (int i = 0; i < m_widget->m_list.size(); ++i) {
+        m_widget->m_list.at(i)->cachedWidth = 0;
+    }
 }
 
 // ========== ContactListData ==========
@@ -369,81 +428,53 @@ int ContactListView::yToRow(int y) const {
     return row;
 }
 
-void ContactListView::scrollBy(int delta) {
-    if (delta == 0) { return; }
-    int h = m_widget->itemHeight();
-    int viewH = height();
-    if (m_backBuffer.size() != size()) {
-        m_backBuffer = QPixmap(size());
-        int totalH = totalHeight();
-        int maxScroll = totalH > viewH ? totalH - viewH : 0;
-        m_scrollY = std::max(0, std::min(m_scrollY, maxScroll));
-        update();
-        return;
-    }
-    QPixmap tmp(m_backBuffer);
-    QPainter bp(&m_backBuffer);
-    QRect dirty;
-    if (delta > 0) {
-        bp.drawPixmap(0, delta, tmp, 0, 0, width(), viewH - delta);
-        dirty = QRect(0, 0, width(), delta);
-    } else {
-        bp.drawPixmap(0, 0, tmp, 0, -delta, width(), viewH + delta);
-        dirty = QRect(0, viewH + delta, width(), -delta);
-    }
-    bp.setClipRect(dirty);
-    bp.fillRect(dirty, currentPalette().windowBg);
-    int firstRow = dirty.y() / h;
-    int lastRow = (dirty.y() + dirty.height() - 1) / h;
-    int sz = m_widget->m_list.size();
-    if (lastRow >= sz) { lastRow = sz - 1; }
-    for (int i = firstRow; i <= lastRow; ++i) {
-        RowData* rd = m_widget->m_list.at(i);
-        if (!rd || !m_widget->matchesFilter(*rd)) { continue; }
-        int y = i * h - m_scrollY;
-        paintContactRow(bp, 0, y, width(), h,
-                        i == m_selIdx, rd->type, rd->name, rd->status,
-                        rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr, rd->pinnedIndex);
-    }
-    bp.end();
-    QPainter p(this);
-    p.drawPixmap(0, 0, m_backBuffer);
-}
-
 void ContactListView::paintEvent(QPaintEvent*) {
-    if (m_backBuffer.size() != size()) {
-        m_backBuffer = QPixmap(size());
-    }
-    QPainter bp(&m_backBuffer);
-    bp.fillRect(rect(), currentPalette().windowBg);
-
-    int h = m_widget->itemHeight();
-    if (h <= 0) return;
-    int totalH = totalHeight();
-    int viewH = height();
-    if (totalH <= viewH) {
-        m_scrollY = 0;
-    } else if (m_scrollY > totalH - viewH) {
-        m_scrollY = totalH - viewH;
-    }
-
-    int firstRow = m_scrollY / h;
-    int lastRow = (m_scrollY + viewH - 1) / h;
-    int sz = m_widget->m_list.size();
-    if (lastRow >= sz) lastRow = sz - 1;
-
-    for (int i = firstRow; i <= lastRow; ++i) {
-        RowData* rd = m_widget->m_list.at(i);
-        if (!rd || !m_widget->matchesFilter(*rd)) continue;
-        int y = i * h - m_scrollY;
-        paintContactRow(bp, 0, y, width(), h,
-                        i == m_selIdx, rd->type, rd->name, rd->status,
-                        rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr, rd->pinnedIndex);
-    }
-    bp.end();
-
     QPainter p(this);
-    p.drawPixmap(0, 0, m_backBuffer);
+    p.fillRect(rect(), currentPalette().windowBg);
+    int h = m_widget->itemHeight();
+    if (h > 0) {
+        int totalH = totalHeight();
+        int viewH = height();
+        if (totalH <= viewH) {
+            m_scrollY = 0;
+        } else if (m_scrollY > totalH - viewH) {
+            m_scrollY = totalH - viewH;
+        }
+        int firstRow = m_scrollY / h;
+        int lastRow = (m_scrollY + viewH - 1) / h;
+        int sz = m_widget->m_list.size();
+        if (lastRow >= sz) lastRow = sz - 1;
+        for (int i = firstRow; i <= lastRow; ++i) {
+            RowData* rd = m_widget->m_list.at(i);
+            if (!rd || !m_widget->matchesFilter(*rd)) continue;
+            int y = i * h - m_scrollY;
+#ifdef QT3_BUILD
+            Q_UNUSED(m_rowCache);
+            uint32_t cp_emoji = typeToEmojiCp(rd->type);
+            QPixmap av = getCircularAvatar(cp_emoji, kAvatarSz - 4);
+            paintContactRow(p, 0, y, width(), h,
+                            i == m_selIdx, rd->type, rd->name, rd->status,
+                            rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr,
+                            rd->pinnedIndex, rd->truncatedName, rd->truncatedMsg, av);
+#else
+            if (i == m_selIdx) {
+                uint32_t cp_emoji = typeToEmojiCp(rd->type);
+                QPixmap av = getCircularAvatar(cp_emoji, kAvatarSz - 4);
+                paintContactRow(p, 0, y, width(), h,
+                                true, rd->type, rd->name, rd->status,
+                                rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr,
+                                rd->pinnedIndex, rd->truncatedName, rd->truncatedMsg, av);
+            } else {
+                if (i >= (int)m_rowCache.size() || m_rowCache[i].width != width()) {
+                    renderRowToCache(i, width());
+                }
+                if (!m_rowCache[i].pix.isNull()) {
+                    p.drawPixmap(0, y, m_rowCache[i].pix);
+                }
+            }
+#endif
+        }
+    }
 }
 
 void ContactListView::mousePressEvent(QMouseEvent* e) {
@@ -467,27 +498,66 @@ void ContactListView::mousePressEvent(QMouseEvent* e) {
 void ContactListView::wheelEvent(QWheelEvent* e) {
     int h = m_widget->itemHeight();
     if (h <= 0) return;
-    int step = h * 5;
+    int step = h * 3;
     int newY = m_scrollY + (e->delta() > 0 ? -step : step);
     int totalH = totalHeight();
     int viewH = height();
     int maxScroll = totalH > viewH ? totalH - viewH : 0;
-    int oldY = m_scrollY;
-    m_scrollY = std::max(0, std::min(newY, maxScroll));
-    int delta = oldY - m_scrollY;
-    if (delta == 0) { return; }
-    if (m_scrollBar) {
-        m_scrollBar->blockSignals(true);
-        m_scrollBar->setValue(m_scrollY);
-        m_scrollBar->blockSignals(false);
-    }
-    scrollBy(delta);
+    int clamped = std::max(0, std::min(newY, maxScroll));
+    m_scrollY = clamped;
+    m_scrollBar->blockSignals(true);
+    m_scrollBar->setValue(m_scrollY);
+    m_scrollBar->blockSignals(false);
+    update();
 }
 
 void ContactListView::resizeEvent(QResizeEvent* e) {
     QWidget::resizeEvent(e);
-    m_backBuffer = QPixmap();
+    invalidateTruncation();
     m_widget->updateScrollBar();
+}
+
+
+void ContactListView::renderRowToCache(int i, int w) {
+    RowData* rd = m_widget->m_list.at(i);
+    if (!rd) return;
+    int h = m_widget->itemHeight();
+    if (i >= (int)m_rowCache.size()) { m_rowCache.resize(i + 1); }
+    RowPixmapCache& rc = m_rowCache[i];
+    if (rc.width == w && !rc.pix.isNull()) return;
+
+#ifdef QT3_BUILD
+    QPixmap pm(w, h, 32);
+    pm.fill(currentPalette().windowBg);
+    QPainter cp(&pm);
+#else
+    QImage img(w, h, QImage::Format_ARGB32);
+    img.fill(qRgba(0, 0, 0, 0));
+    QPainter cp(&img);
+#endif
+    uint32_t cp_emoji = typeToEmojiCp(rd->type);
+    QPixmap av = getCircularAvatar(cp_emoji, kAvatarSz - 4);
+    paintContactRow(cp, 0, 0, w, h,
+                    false, rd->type, rd->name, rd->status,
+                    rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr,
+                    rd->pinnedIndex, rd->truncatedName, rd->truncatedMsg, av);
+    cp.end();
+#ifdef QT3_BUILD
+    rc.pix = pm;
+#else
+    rc.pix = QPixmap::fromImage(img);
+#endif
+    rc.width = w;
+}
+
+void ContactListView::invalidateRowCache(int i) {
+    if (i < (int)m_rowCache.size()) {
+        m_rowCache[i] = RowPixmapCache();
+    }
+}
+
+void ContactListView::invalidateAllCaches() {
+    m_rowCache.clear();
 }
 
 // ========== ContactListWidget ==========
@@ -582,6 +652,7 @@ void ContactListWidget::setContacts(ContactList& contacts) {
         delete c;
     }
     m_list.sort(m_sortCriteria);
+    m_view->invalidateTruncation();
     refreshView();
 }
 
@@ -596,6 +667,7 @@ void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
     if (!rd) return;
     rd->name = newName;
     rd->nameUpper = qToUpper(newName);
+    rd->cachedWidth = 0;
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
         refreshView();
@@ -606,6 +678,7 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
     RowData* rd = m_list.get(friendId, "friend");
     if (!rd) return;
     rd->status = newStatus;
+    rd->cachedWidth = 0;
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
         refreshView();
@@ -621,7 +694,7 @@ void ContactListWidget::updateContact(int id, const QString& type, const QString
         rd->nameUpper = qToUpper(name);
     }
     if (!chatId.isEmpty()) rd->chatId = chatId;
-    if (!status.isEmpty()) rd->status = status;
+    if (!status.isEmpty()) { rd->status = status; rd->cachedWidth = 0; }
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
         refreshView();
@@ -697,6 +770,7 @@ void ContactListWidget::updateContactLastMessage(int id, const QString& type, co
     rd->lastMessage = msg;
     rd->timeStr = timeStr;
     rd->lastActive = QDateTime::currentDateTime().toTime_t();
+    rd->cachedWidth = 0;
     m_list.adjustBySort(rd->index);
     if (!m_batchLevel) refreshView();
 }
@@ -707,6 +781,7 @@ void ContactListWidget::incrementUnread(int id, const QString& type, int count) 
     RowData* rd = m_list.get(id, type);
     if (!rd) return;
     rd->unread = m_unreadCounts[key];
+    rd->cachedWidth = 0;
     if (!m_batchLevel) refreshView();
 }
 
@@ -716,6 +791,7 @@ void ContactListWidget::resetUnread(int id, const QString& type) {
     RowData* rd = m_list.get(id, type);
     if (!rd) return;
     rd->unread = 0;
+    rd->cachedWidth = 0;
     if (!m_batchLevel) refreshView();
 }
 
@@ -743,6 +819,7 @@ void ContactListWidget::togglePin(int id, const QString& type) {
     }
 
     m_list.sort(m_sortCriteria);
+    m_view->invalidateTruncation();
     if (!m_batchLevel) { resolveSelection(); refreshView(); }
 }
 
@@ -781,6 +858,13 @@ void ContactListWidget::updateScrollBar() {
 void ContactListWidget::refreshView() {
     resolveSelection();
     updateScrollBar();
+    int w = m_view->width();
+    for (int i = 0; i < m_list.size(); ++i) {
+        RowData* rd = m_list.at(i);
+        if (rd->cachedWidth != w) {
+            m_view->truncateRowData(rd, w);
+        }
+    }
     int visible = 0;
     if (m_searchText.isEmpty()) {
         visible = m_list.size();
@@ -882,11 +966,8 @@ void ContactListWidget::onSortMenuClicked() {
 }
 
 void ContactListWidget::onScrollChanged(int value) {
-    if (m_view->scrollY() != value) {
-        int delta = m_view->scrollY() - value;
-        m_view->setScrollY(value);
-        m_view->scrollBy(delta);
-    }
+    m_view->setScrollY(value);
+    m_view->update();
 }
 
 void ContactListWidget::retranslateUi() {
