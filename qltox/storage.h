@@ -191,3 +191,5 @@ private:
     bool m_hasFts5 = false;
     bool m_hasTrigram = false;
 };
+
+std::string mediaCacheKey(const char* prefix, const QString& mxcUrl);

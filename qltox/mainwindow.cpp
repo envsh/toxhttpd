@@ -11,6 +11,7 @@
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"
 #include "storage.h"
+#include "cache_db.h"
 #include "cJSON.h"
 #include "jsonview.h"
 #include "appsetup.h"
@@ -331,6 +332,11 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
                     el.thumbnail.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
                     el.rawFileData = e->rawData;
+
+                    Storage::instance().cacheDb()->put(
+                        mediaCacheKey("file", qFromUtf8(e->mxcUrl)).c_str(),
+                        e->rawData.data(), e->rawData.size(), "", 2);
+
                     el.downloadState = ChatElement::Completed;
                     chatWidget->triggerRelayout(e->msgIndex);
                 }
@@ -1203,7 +1209,22 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(msg);
                         int newIdx = chatWidget->messageCount() - 1;
                         if (!hm.mediaUrl.empty() && hm.msgtype != "file") {
-                            chatWidget->mutableMessageAt(newIdx).downloadState = ChatElement::InProgress;
+                            QString mxc = qFromUtf8(hm.mediaUrl);
+                            ChatElement& el = chatWidget->mutableMessageAt(newIdx);
+                            bool memDone = (el.downloadState == ChatElement::Completed);
+                            auto dbData = Storage::instance().cacheDb()->get(
+                                mediaCacheKey("file", mxc).c_str());
+                            bool dbDone = !dbData.empty();
+
+                            if (dbDone && !memDone) {
+                                qWarning("File in DB but not completed in mem: %s", qToUtf8(mxc).data());
+                            } else if (!dbDone && memDone) {
+                                qWarning("File completed in mem but not in DB: %s", qToUtf8(mxc).data());
+                            } else if (dbDone && memDone) {
+                                ;  // consistent
+                            }
+
+                            el.downloadState = ChatElement::InProgress;
                             ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
                         }
                     } else {
@@ -1841,7 +1862,22 @@ void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const Q
 void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
     if (currentChatId < 0) { return; }
-    chatWidget->mutableMessageAt(msgIndex).downloadState = ChatElement::InProgress;
+
+    ChatElement& el = chatWidget->mutableMessageAt(msgIndex);
+    bool memDone = (el.downloadState == ChatElement::Completed);
+    auto dbData = Storage::instance().cacheDb()->get(
+        mediaCacheKey("file", mediaUrl).c_str());
+    bool dbDone = !dbData.empty();
+
+    if (dbDone && !memDone) {
+        qWarning("File in DB but not completed in mem: %s", qToUtf8(mediaUrl).data());
+    } else if (!dbDone && memDone) {
+        qWarning("File completed in mem but not in DB: %s", qToUtf8(mediaUrl).data());
+    } else if (dbDone && memDone) {
+        ;  // consistent
+    }
+
+    el.downloadState = ChatElement::InProgress;
     chatWidget->triggerRelayout(msgIndex);
     ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
                           msgIndex, std::string(qToUtf8(mediaUrl).data()));

@@ -3,6 +3,25 @@
 #include "message_db.h"
 #include "pending_db.h"
 #include "cache_db.h"
+#include <qstring.h>
+
+std::string mediaCacheKey(const char* prefix, const QString& mxcUrl) {
+#ifdef QT3_BUILD
+    int slash = mxcUrl.findRev('/');
+    if (slash < 0) return {};
+    QString id = mxcUrl.mid(slash + 1);
+    int q = id.find('?');
+    if (q >= 0) id = id.left(q);
+    return std::string(prefix) + "_" + std::string(id.utf8());
+#else
+    int slash = mxcUrl.lastIndexOf('/');
+    if (slash < 0) return {};
+    QString id = mxcUrl.mid(slash + 1);
+    int q = id.indexOf('?');
+    if (q >= 0) id = id.left(q);
+    return std::string(prefix) + "_" + std::string(id.toUtf8().data());
+#endif
+}
 
 // ── SqliteStatement ──
 
