@@ -326,10 +326,18 @@ void ContactListData::updateFrom(int startIdx) {
 // ========== ContactListView ==========
 
 ContactListView::ContactListView(ContactListWidget* widget)
-    : QWidget(widget), m_widget(widget), m_scrollBar(nullptr)
+    : QWidget(widget
+#ifdef QT3_BUILD
+      , nullptr, WNoAutoErase
+#endif
+      )
+    , m_widget(widget), m_scrollBar(nullptr)
 {
     setMouseTracking(false);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+#ifndef QT3_BUILD
+    setAttribute(Qt::WA_OpaquePaintEvent);
+#endif
 }
 
 void ContactListView::setSelectedIndex(int idx) {
@@ -362,7 +370,12 @@ int ContactListView::yToRow(int y) const {
 }
 
 void ContactListView::paintEvent(QPaintEvent*) {
-    QPainter p(this);
+    if (m_backBuffer.size() != size()) {
+        m_backBuffer = QPixmap(size());
+    }
+    QPainter bp(&m_backBuffer);
+    bp.fillRect(rect(), currentPalette().windowBg);
+
     int h = m_widget->itemHeight();
     if (h <= 0) return;
     int totalH = totalHeight();
@@ -382,10 +395,14 @@ void ContactListView::paintEvent(QPaintEvent*) {
         RowData* rd = m_widget->m_list.at(i);
         if (!rd || !m_widget->matchesFilter(*rd)) continue;
         int y = i * h - m_scrollY;
-        paintContactRow(p, 0, y, width(), h,
+        paintContactRow(bp, 0, y, width(), h,
                         i == m_selIdx, rd->type, rd->name, rd->status,
                         rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr, rd->pinnedIndex);
     }
+    bp.end();
+
+    QPainter p(this);
+    p.drawPixmap(0, 0, m_backBuffer);
 }
 
 void ContactListView::mousePressEvent(QMouseEvent* e) {
@@ -423,6 +440,7 @@ void ContactListView::wheelEvent(QWheelEvent* e) {
 
 void ContactListView::resizeEvent(QResizeEvent* e) {
     QWidget::resizeEvent(e);
+    m_backBuffer = QPixmap();
     m_widget->updateScrollBar();
 }
 

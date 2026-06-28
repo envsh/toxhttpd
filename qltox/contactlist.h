@@ -78,6 +78,7 @@ private:
     int m_selId = -1;
     QString m_selType;
     int m_scrollY = 0;
+    QPixmap m_backBuffer;
 public:
     int selectedId() const { return m_selId; }
     QString selectedType() const { return m_selType; }

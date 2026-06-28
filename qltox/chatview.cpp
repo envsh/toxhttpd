@@ -1839,7 +1839,11 @@ void ChatView::updateRect(const QRect& r) {
 }
 
 ChatView::ChatView(QWidget* parent)
-    : QWidget(parent)
+    : QWidget(parent
+#ifdef QT3_BUILD
+      , nullptr, WNoAutoErase
+#endif
+      )
     , m_clickCount(0), m_clickMsgIndex(-1)
     , m_selMsgIndex(-1), m_selStart(0), m_selEnd(0), m_selecting(false)
     , m_fm(font()), m_emojiW(0), m_bmpW(NULL)
@@ -1870,9 +1874,7 @@ ChatView::ChatView(QWidget* parent)
         m_scrollDownPill.setCount(0);
         scrollToBottom();
     });
-#ifdef QT3_BUILD
-    setWFlags(getWFlags() | WNoAutoErase);
-#else
+#ifndef QT3_BUILD
     setAttribute(Qt::WA_OpaquePaintEvent);
 #endif
 
