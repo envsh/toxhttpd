@@ -84,8 +84,7 @@ cache.db 上限选取理由：
 
 ```
 ~/.config/toxhttpd/
-├── message.db          # 消息历史 + 媒体引用 + 草稿 (WAL 模式)
-└── channel_000001.db   # 未来：按 channel 分库（可选）
+└── message.db          # 消息历史 + 媒体引用 + 草稿 + 收藏 + 发送队列 (WAL 模式)
 
 ~/.cache/toxhttpd/
 ├── cache.db            # 小文件缓存 (≤1MB inline BLOB, WAL 模式)
@@ -206,17 +205,178 @@ void Storage::checkpoint() {
 }
 ```
 
+### 3.5 线程模型（TG 方案）
+
+参考 Telegram Desktop 的 `internal::Database` + Postbox 的 single-writer-queue 架构。
+
+#### 3.5.1 设计原则
+
+| 原则 | 说明 |
+|------|------|
+| 单写者队列 | 所有写操作串行在一条专用线程上，消除写冲突 |
+| WAL 并发读 | UI 线程可直接读（WAL 模式读不阻塞写） |
+| Write-behind | 内存累积变更，commit 时一次性批量写入 |
+| 写不阻塞 UI | 写请求投递到队列后立即返回，结果通过信号/回调通知 |
+
+#### 3.5.2 架构图
+
+```
+┌─────────────────────────────────────────────────┐
+│  UI Thread (MainWindow)                          │
+│                                                   │
+│  读: sqlite3_prepare + step + finalize            │
+│      (直接读 DB，WAL 不阻塞)                       │
+│                                                   │
+│  写: Storage::postWrite([]{ db->exec(...); })     │
+│      └──→ 投递到写队列，立即返回                    │
+└──────────────────┬──────────────────────────────┘
+                   │ 写请求队列（线程安全）
+                   ▼
+┌─────────────────────────────────────────────────┐
+│  Writer Thread (StorageWorker)                   │
+│                                                   │
+│  while (true) {                                   │
+│    auto task = queue.pop();  // 阻塞等待           │
+│    task();                   // 执行 SQL          │
+│    notify(result);           // 回调 UI 线程       │
+│  }                                                 │
+│                                                   │
+│  Write-behind: 每 N 条或每 100ms flush 一次事务    │
+└─────────────────────────────────────────────────┘
+```
+
+#### 3.5.3 Storage 类设计
+
+```cpp
+class Storage : public QObject {
+    Q_OBJECT
+public:
+    static Storage& instance();
+
+    bool init(const QString& dbPath);
+    void close();
+
+    // 读操作（UI 线程直接调用）
+    TranslationRecord getTranslation(int64_t msgRowid, const QString& lang);
+    bool hasTranslation(int64_t msgRowid, const QString& lang);
+
+    // 写操作（投递到写线程）
+    void setTranslationAsync(int64_t msgRowid, const QString& lang,
+                             const QString& text, ...);
+    void clearLangTranslationsAsync(const QString& lang);
+
+signals:
+    void translationStored(int64_t msgRowid, const QString& lang);
+
+private:
+    void writerThreadLoop();            // 写线程主循环
+    void flushWriteBatch();             // write-behind flush
+
+    sqlite3* m_readDb;                  // 只读连接（UI 线程）
+    sqlite3* m_writeDb;                 // 只写连接（写线程）
+    QThread* m_writerThread;
+    QMutex m_queueMutex;
+    QWaitCondition m_queueCond;
+    std::vector<std::function<void()>> m_writeQueue;
+};
+```
+
+> **为什么双连接**: SQLite 同一文件可用多个连接。读连接 `SQLITE_OPEN_READONLY`，写连接 `SQLITE_OPEN_READWRITE`。WAL 模式下，读连接不阻塞写连接，写连接不阻塞读连接。
+
+#### 3.5.4 Read-Write 分离示例
+
+```cpp
+// UI 线程：读翻译缓存（直接查，不阻塞）
+TranslationRecord Storage::getTranslation(int64_t msgRowid, const QString& lang) {
+    auto stmt = prepare(m_readDb,
+        "SELECT translated_text, source_lang FROM translations "
+        "WHERE message_rowid=?1 AND target_lang=?2");
+    bindInt64(stmt, 1, msgRowid);
+    bindText(stmt, 2, lang);
+    if (step(stmt) == SQLITE_ROW) {
+        return { msgRowid, lang, columnText(stmt, 0), columnText(stmt, 1) };
+    }
+    return {};
+}
+
+// UI 线程：投递写请求（立即返回）
+void Storage::setTranslationAsync(...) {
+    QMutexLocker lock(&m_queueMutex);
+    m_writeQueue.push_back([=] {
+        auto stmt = prepare(m_writeDb,
+            "INSERT OR REPLACE INTO translations "
+            "(message_rowid, target_lang, translated_text, source_lang) "
+            "VALUES (?1, ?2, ?3, ?4)");
+        bindInt64(stmt, 1, msgRowid);
+        bindText(stmt, 2, lang);
+        bindText(stmt, 3, text);
+        bindTextOrNull(stmt, 4, sourceLang);
+        step(stmt);
+    });
+    m_queueCond.wakeOne();
+}
+```
+
+#### 3.5.5 Write-behind 批处理
+
+累积少量写入后在事务中批量提交，避免每条 INSERT 单独开事务：
+
+```cpp
+void Storage::flushWriteBatch() {
+    std::vector<std::function<void()>> batch;
+    {
+        QMutexLocker lock(&m_queueMutex);
+        batch.swap(m_writeQueue);  // 取出所有待处理任务
+    }
+    if (batch.empty()) return;
+
+    sqlite3_exec(m_writeDb, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
+    for (auto& task : batch) task();
+    sqlite3_exec(m_writeDb, "COMMIT", nullptr, nullptr, nullptr);
+}
+```
+
+触发策略：
+- 每收到 N 条写请求（例如 N=16）
+- 或每 100ms 定时器
+- 或 writer thread 空闲时立即 flush
+
+#### 3.5.6 translations 表的适用性
+
+| 操作 | 线程 | 原因 |
+|------|------|------|
+| `SELECT` 翻译 | UI 线程直读 | PK 查找 < 0.1ms，WAL 不阻塞 |
+| `INSERT` 翻译 | 投递写队列 | 保证写串行，UI 零等待 |
+| 批量清空 | 投递写队列 | 写队列串行执行 |
+| 切换语种 | 投递写队列 | DELETE 在写线程执行 |
+
+#### 3.5.7 与 TG Desktop 的差异
+
+| 项目 | TG Desktop | qltox |
+|------|-----------|-------|
+| 写队列 | 显式 single writer queue | 同上 |
+| WAL | 是 | 是 |
+| Write-behind | Storage::Local::beforeCommit() | flushWriteBatch() + 定时器 |
+| 双连接 | 读/写分离（SQLCipher） | 读/写分离 |
+| 连接池 | 无（单连接读+单连接写） | 同上 |
+| 加密 | SQLCipher 256-bit AES | 无加密（tox 协议无要求） |
+
 ## 4. message.db 表结构
 
 ### 4.1 建表 SQL
 
 ```sql
--- 通道表
+-- 会话元数据（联系人/群聊/会议）
 CREATE TABLE IF NOT EXISTS channels (
-    chanid      TEXT PRIMARY KEY,   -- "friend:0", "group:1", "conference:2"
-    last_rowid  INTEGER NOT NULL DEFAULT 0,
-    unread      INTEGER NOT NULL DEFAULT 0,   -- 未读数（当前 session 覆盖）
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    chanid             TEXT PRIMARY KEY,   -- "friend:0", "group:1", "conference:2"
+    proto_type         TEXT DEFAULT 'tox', -- "tox", "matrix"
+    last_message_rowid INTEGER NOT NULL DEFAULT 0,
+    last_read_rowid    INTEGER NOT NULL DEFAULT 0,
+    unread_count       INTEGER DEFAULT 0,
+    pinned_order       INTEGER DEFAULT 0,  -- 0=未置顶, >0=置顶排序
+    draft_text         TEXT DEFAULT '',
+    muted              INTEGER DEFAULT 0,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 消息表
@@ -228,6 +388,16 @@ CREATE TABLE IF NOT EXISTS messages (
     data        TEXT NOT NULL,
     -- 媒体字段（反范式化，避免 JOIN）
     etype       INTEGER DEFAULT 0,          -- 0=text, 1=image, 2=file, 3=video, 4=gif, 5=audio
+    sender_name TEXT DEFAULT '',
+    sender_nick TEXT DEFAULT '',
+    peer_number INTEGER DEFAULT -1,
+    sender_pubkey TEXT DEFAULT '',           -- 发送者公钥（签名验证身份）
+    signature   TEXT DEFAULT '',             -- 消息签名
+    avatar_url  TEXT DEFAULT '',
+    time_text   TEXT DEFAULT '',
+    ip_address  TEXT DEFAULT '',
+    category    TEXT DEFAULT '',
+    caption     TEXT DEFAULT '',
     media_url   TEXT,                        -- MXC URL
     media_mime  TEXT,                        -- "image/png" / "video/mp4"
     media_width INTEGER DEFAULT 0,
@@ -236,22 +406,115 @@ CREATE TABLE IF NOT EXISTS messages (
     file_size   INTEGER DEFAULT 0,          -- 字节数
     duration_sec INTEGER DEFAULT 0,         -- 视频/音频时长
     local_path  TEXT,                        -- 已下载到本地的完整路径
+    gif_path    TEXT DEFAULT '',
     thumbnail_key TEXT,                      -- cache.db 中的缩略图 key
     cache_tag   INTEGER DEFAULT 0,          -- 0=none, 1=avatar, 2=image, 3=gif, 4=video, 5=file
+    send_state  INTEGER DEFAULT 0,          -- 0=unknown, 1=sent, 2=delivered, 3=read, 4=failed
+    reply_to_rowid INTEGER DEFAULT 0,       -- 回复目标 rowid, 0=无
+    edited      INTEGER DEFAULT 0,
+    deleted_at  TIMESTAMP,
+    forwarded_from TEXT DEFAULT '',
+    mention     INTEGER DEFAULT 0,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 索引
+-- messages 索引
 CREATE INDEX IF NOT EXISTS idx_messages_chanid
     ON messages(chanid, rowid DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_media_url
     ON messages(media_url) WHERE media_url IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_messages_send_state
+    ON messages(chanid, send_state);
 
--- 草稿表
-CREATE TABLE IF NOT EXISTS drafts (
-    chanid      TEXT PRIMARY KEY REFERENCES channels(chanid),
-    draft_text  TEXT NOT NULL DEFAULT '',
-    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- trigram tokenizer，同时支持 CJK 和拉丁（需 SQLite ≥ 3.34.0）
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+    content,
+    tokenize='trigram case_sensitive 0',
+    content='messages',
+    content_rowid='rowid'
+);
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_insert
+AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts(rowid, content)
+    VALUES (NEW.rowid, NEW.data);
+END;
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_delete
+AFTER DELETE ON messages BEGIN
+    INSERT INTO messages_fts(messages_fts, rowid, content)
+    VALUES('delete', OLD.rowid, OLD.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_update
+AFTER UPDATE ON messages BEGIN
+    INSERT INTO messages_fts(messages_fts, rowid, content)
+    VALUES('delete', OLD.rowid, OLD.content);
+    INSERT INTO messages_fts(rowid, content)
+    VALUES (NEW.rowid, NEW.data);
+END;
+
+-- 参与者信息缓存
+CREATE TABLE IF NOT EXISTS peers (
+    peer_number  INTEGER PRIMARY KEY,
+    public_key   TEXT DEFAULT '',
+    name         TEXT DEFAULT '',
+    nickname     TEXT DEFAULT '',
+    avatar_url   TEXT DEFAULT '',
+    status_text  TEXT DEFAULT '',
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 收藏表
+CREATE TABLE IF NOT EXISTS bookmarks (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_rowid  INTEGER NOT NULL,
+    chanid         TEXT NOT NULL REFERENCES channels(chanid),
+    note           TEXT DEFAULT '',
+    tag            TEXT DEFAULT '',
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(message_rowid)
+);
+
+-- 发送队列（待发送/发送中/失败）
+CREATE TABLE IF NOT EXISTS pending_messages (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    chanid         TEXT NOT NULL,
+    peer_number    INTEGER DEFAULT -1,
+    data           TEXT NOT NULL,
+    etype          INTEGER DEFAULT 0,
+    message_text   TEXT DEFAULT '',
+    media_url      TEXT DEFAULT '',
+    file_name      TEXT DEFAULT '',
+    file_size      INTEGER DEFAULT 0,
+    retry_count    INTEGER DEFAULT 0,
+    max_retries    INTEGER DEFAULT 3,
+    last_error     TEXT DEFAULT '',
+    status         INTEGER DEFAULT 0,    -- 0=pending, 1=in_flight, 2=failed
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_messages(status);
+
+-- 消息表情回应
+CREATE TABLE IF NOT EXISTS reactions (
+    message_rowid  INTEGER NOT NULL REFERENCES messages(rowid),
+    emoji          TEXT NOT NULL,
+    sender_name    TEXT DEFAULT '',
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (message_rowid, emoji, sender_name)
+);
+CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions(message_rowid);
+
+-- 消息翻译缓存
+CREATE TABLE IF NOT EXISTS translations (
+    message_rowid    INTEGER NOT NULL REFERENCES messages(rowid) ON DELETE CASCADE,
+    target_lang      TEXT NOT NULL,           -- "zh-CN", "en-US"
+    translated_text  TEXT NOT NULL,           -- 翻译后的纯文本
+    translated_entities TEXT,                 -- 可选：样式实体 JSON（TG entity 模型）
+    source_lang      TEXT,                    -- 检测到的源语种
+    provider         TEXT DEFAULT 'builtin',  -- 翻译提供方
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (message_rowid, target_lang)
 );
 
 -- Schema 版本表（用于迁移）
@@ -259,8 +522,10 @@ CREATE TABLE IF NOT EXISTS schema_version (
     version     INTEGER PRIMARY KEY,
     applied_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-INSERT OR IGNORE INTO schema_version(version) VALUES(1);
+INSERT OR IGNORE INTO schema_version(version) VALUES(3);
 ```
+
+> pending 消息不混入历史，由 ChatView 在底部单独渲染（类似 Telegram 输入框上方的"等待中"区域）。发送成功后转为 messages 并追加到历史，发送失败保留在 pending_messages 表并标记 status=2。
 
 ### 4.2 消息 data 字段设计
 
@@ -306,6 +571,12 @@ INSERT OR IGNORE INTO schema_version(version) VALUES(1);
 |------|------|
 | `idx_messages_chanid(chanid, rowid DESC)` | 按通道加载消息历史（分页查询） |
 | `idx_messages_media_url(media_url) WHERE media_url IS NOT NULL` | 按媒体 URL 查询（去重/检查已缓存） |
+| `idx_messages_send_state(chanid, send_state)` | 按发送状态过滤（如查找失败消息） |
+| `idx_reactions_message(message_rowid)` | 按消息查询表情回应 |
+| `channels(chanid)` (PK 自带) | 按 chanid 查会话元数据 |
+| `channels(pinned_order)` | 获取置顶排序列表 |
+| `messages_fts` (trigram FTS5) | 全文搜索，支持 CJK 和拉丁 |
+| `translations(message_rowid)` (PK 自带) | 按消息查询所有语种的翻译 |
 
 ### 4.4 查询示例
 
@@ -330,6 +601,46 @@ ORDER BY rowid ASC;
 -- 获取某个 channel 更早的一条消息（用于恢复滚动位置）
 SELECT * FROM messages
 WHERE chanid = 'friend:0' AND rowid = 9999;
+
+-- 按发送状态过滤（查找发送失败的消息）
+SELECT * FROM messages
+WHERE chanid = 'friend:0' AND send_state = 4
+ORDER BY rowid DESC;
+
+-- 获取某个会话未读数
+SELECT COUNT(*) FROM messages
+WHERE chanid = 'friend:0' AND send_state != 0 AND rowid > (
+    SELECT COALESCE(last_read_rowid, 0) FROM channels WHERE chanid = 'friend:0'
+);
+
+-- 获取置顶联系人列表
+SELECT chanid, pinned_order FROM channels
+WHERE pinned_order > 0
+ORDER BY pinned_order ASC;
+
+-- 全文搜索消息
+SELECT rowid, * FROM messages
+WHERE rowid IN (
+    SELECT rowid FROM messages_fts
+    WHERE messages_fts MATCH '搜索关键词'
+)
+ORDER BY rowid DESC LIMIT 50;
+
+-- 写入翻译缓存
+INSERT OR REPLACE INTO translations
+    (message_rowid, target_lang, translated_text, translated_entities, source_lang, provider)
+VALUES (12345, 'zh-CN', '你好世界', '[{"type":"bold","offset":0,"length":2}]', 'en', 'libre');
+
+-- 读取翻译缓存
+SELECT translated_text, translated_entities, source_lang
+FROM translations
+WHERE message_rowid = 12345 AND target_lang = 'zh-CN';
+
+-- 清空某个语种的所有翻译（切换目标语种时）
+DELETE FROM translations WHERE target_lang = 'zh-CN';
+
+-- 清空所有翻译缓存
+DELETE FROM translations;
 ```
 
 ## 5. cache.db 表结构
@@ -634,8 +945,8 @@ void Storage::appendMessageBatch(const QString& chanid,
 | 数据库 | 自动 LRU 驱逐 | 用户手动清理 | 被动删除 |
 |--------|--------------|-------------|---------|
 | message.db | ❌ 永久保留 | ❌ 不提供 | ✅ 删好友/群组时 clearChannel() |
-| cache.db   | ✅ 达 200MB 或 30 天 | ✅ 按 tag 选择清除 | ❌ 自动处理 |
-| big_cache.db | ✅ 达 500MB 或 7 天 | ✅ 全部清除 | ❌ 自动处理 |
+| cache.db   | ✅ 达 200MB 或 300 天 | ✅ 按 tag 选择清除 | ❌ 自动处理 |
+| big_cache.db | ✅ 达 500MB 或 70 天 | ✅ 全部清除 | ❌ 自动处理 |
 
 - **自动 LRU 驱逐**：后台定时器检查上限，超出则按 access_time 删最旧文件
 - **用户手动清理**：设置页提供"清除头像缓存""清除图片缓存""清除所有缓存"按钮
@@ -710,16 +1021,16 @@ void Storage::clearCacheByTag(CacheTag tag); // 0=全部清除
 
 ### 8.5 频道数据删除
 
-用户删除好友/群组时连带清理对应数据：
+用户删除好友/群组时连带清理对应数据（`translations` 由 `ON DELETE CASCADE` 自动清理，无需显式 DELETE）：
 
 ```cpp
 void Storage::clearChannel(const QString& chanid) {
-    // 1. 删除消息
     exec("DELETE FROM messages WHERE chanid = ?", chanid);
-    // 2. 删除频道记录
+    exec("DELETE FROM bookmarks WHERE chanid = ?", chanid);
+    exec("DELETE FROM reactions WHERE message_rowid IN "
+         "(SELECT rowid FROM messages WHERE chanid = ?)", chanid);
+    exec("DELETE FROM pending_messages WHERE chanid = ?", chanid);
     exec("DELETE FROM channels WHERE chanid = ?", chanid);
-    // 3. 删除草稿
-    exec("DELETE FROM drafts WHERE chanid = ?", chanid);
 }
 ```
 
@@ -735,7 +1046,144 @@ void Storage::removeBigFile(const QString& key) {
 }
 ```
 
-## 9. LoadToCacheSetting 枚举
+## 9. SQLite 版本要求与安装方案
+
+### 9.1 版本要求
+
+| 功能 | 最低版本 | 引入 |
+|------|---------|------|
+| WAL 模式 | 3.7.0 (2010) | 基础存储 |
+| FTS5 + trigram CJK 搜索 | 3.34.0 (2020-12) | 全文搜索 |
+
+### 9.2 方案总览
+
+两种方案，`.pro` 编译时自动检测：
+
+| 方案 | 条件 | 说明 |
+|------|------|------|
+| A：系统 libsqlite3 | 系统 SQLite ≥ 3.34.0 + FTS5 启用 | 优先使用 |
+| B：Bundled Amalgamation | 系统 SQLite 过旧 | 静态编译 sqlite3.c |
+
+主流 IM（Telegram、Signal、Chrome）均采用方案 B。
+
+### 9.3 编译时自动检测
+
+```qmake
+# qltox.pro — SQLite 方案自动选择
+system("echo 'CREATE VIRTUAL TABLE t USING fts5(c,tokenize=trigram);' | \
+        cc -x c -include sqlite3.h -lsqlite3 - -o /dev/null 2>/dev/null") {
+    message("System libsqlite3 >= 3.34.0 with FTS5, using system library")
+    LIBS += -lsqlite3
+    DEFINES += HAVE_SQLITE_FTS5
+} else {
+    message("System SQLite too old, using bundled sqlite3.c")
+    INCLUDEPATH += sqlite3
+    SOURCES += sqlite3/sqlite3.c
+    DEFINES += SQLITE_ENABLE_FTS5
+}
+```
+
+### 9.4 方案 A：系统 libsqlite3
+
+```bash
+# 安装
+sudo apt install libsqlite3-dev          # Debian/Ubuntu
+sudo dnf install libsqlite3x-devel       # RHEL/Fedora
+
+# 验证
+sqlite3 --version                                    # ≥ 3.34.0
+sqlite3 :memory: "CREATE VIRTUAL TABLE t USING fts5(c, tokenize='trigram');"  # 无报错
+```
+
+### 9.5 方案 B：Bundled Amalgamation
+
+```bash
+# 1. 下载
+wget https://www.sqlite.org/2026/sqlite-autoconf-3490100.tar.gz
+tar xzf sqlite-autoconf-3490100.tar.gz
+
+# 2. 提取到项目
+cp sqlite-autoconf-3490100/sqlite3.c    qltox/sqlite3/
+cp sqlite-autoconf-3490100/sqlite3.h    qltox/sqlite3/
+cp sqlite-autoconf-3490100/sqlite3ext.h qltox/sqlite3/
+
+# 3. 编译（自动检测到 bundled）
+cd qltox && bash buildqt3.sh
+
+# 验证 bundled
+ldd qltox | grep sqlite     # 不应显示 libsqlite3.so
+```
+
+### 9.6 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `qltox/sqlite3/sqlite3.c` | 融合源码（~8MB，从官网下载） |
+| `qltox/sqlite3/sqlite3.h` | 头文件 |
+| `qltox/sqlite3/sqlite3ext.h` | FTS5 扩展接口 |
+
+### 9.7 运行时检测
+
+```cpp
+// Storage::init() 中调用
+void checkSqliteFeatures() {
+    // 1. 版本
+    QString ver = query("SELECT sqlite_version()").toString();
+    qDebug() << "SQLite version:" << ver;
+    if (ver < "3.34.0")
+        qWarning() << "SQLite < 3.34.0, trigram not available";
+
+    // 2. FTS5
+    bool fts5 = exec("CREATE VIRTUAL TABLE IF NOT EXISTS _t_fts USING fts5(c)")
+                == SQLITE_OK;
+    exec("DROP TABLE IF EXISTS _t_fts");
+    if (!fts5) qWarning() << "FTS5 not available, message search disabled";
+
+    // 3. Trigram
+    bool tri = exec("CREATE VIRTUAL TABLE IF NOT EXISTS _t_tri USING fts5(c, tokenize='trigram')")
+               == SQLITE_OK;
+    exec("DROP TABLE IF EXISTS _t_tri");
+    if (!tri) qWarning() << "Trigram not available, CJK search degraded";
+
+    // 4. Triggers（content 同步）
+    exec("CREATE VIRTUAL TABLE IF NOT EXISTS _t_ft2 USING fts5(c, content='_t_src', content_rowid='rowid')");
+    exec("CREATE TABLE IF NOT EXISTS _t_src (rowid INTEGER PRIMARY KEY, c TEXT)");
+    bool trigOk = exec("CREATE TRIGGER IF NOT EXISTS _t_trig AFTER INSERT ON _t_src BEGIN "
+                       "INSERT INTO _t_ft2(rowid, c) VALUES (NEW.rowid, NEW.c); END;")
+                  == SQLITE_OK;
+    exec("DROP TRIGGER IF EXISTS _t_trig");
+    exec("DROP TABLE IF EXISTS _t_ft2");
+    exec("DROP TABLE IF EXISTS _t_src");
+    if (!trigOk) qWarning() << "FTS5 content triggers not available";
+}
+```
+
+### 9.8 启动日志示例
+
+```
+SQLite version: 3.45.1
+FTS5: OK
+Trigram tokenizer: OK
+FTS5 content sync triggers: OK
+→ 全部通过，使用系统 libsqlite3
+```
+
+```
+SQLite version: 3.7.17
+FTS5: NOT AVAILABLE - no such module: fts5
+→ 需要升级 SQLite 或改用 bundled
+```
+
+### 9.9 `.gitignore` 建议
+
+```
+qltox/sqlite3/*.c
+qltox/sqlite3/*.o
+```
+
+大文件不提交，由开发者手动下载或 CI 脚本自动获取。
+
+## 10. LoadToCacheSetting 枚举
 
 参考 TG 的 `LoadToCacheAsWell` / `LoadToCacheNotRequired`：
 
@@ -753,7 +1201,7 @@ enum LoadToCache {
 - 视频 → `LoadToCacheSkip`（太大，stream 模式，播放完可丢弃）
 - 链接预览缩略图 → `LoadToCacheAsWell`：存 thumbnail_key
 
-## 10. 统计 + 设置 UI 映射
+## 11. 统计 + 设置 UI 映射
 
 ### 10.1 统计接口
 
@@ -807,7 +1255,7 @@ StorageStats Storage::getStats() {
 | "清除所有缓存" | `clearAllCache()` | 同上 |
 | "自动清理" | `CacheSettings` 保存在 QSettings | BoolConfigItem |
 
-## 12. 集成到现有的 ChatElement
+## 13. 集成到现有的 ChatElement
 
 ### 12.1 消息接收流程（新）
 
@@ -862,7 +1310,7 @@ if (!Storage::instance().init(
 }
 ```
 
-## 13. 文件改动清单
+## 14. 文件改动清单
 
 ### 新增文件
 
@@ -890,7 +1338,7 @@ if (!Storage::instance().init(
 | `translator.h/cpp` | 无关 |
 | `LimeStyle.*` | 无关 |
 | `AvatarManager` | 只负责缩放+圆形裁剪，存储由 Storage 处理 |
-## 14. 与现有 AvatarManager 的关系
+## 15. 与现有 AvatarManager 的关系
 
 `AvatarManager` 目前是内存缓存 + identicon fallback。与 `Storage` 的职责划分：
 
@@ -914,7 +1362,7 @@ AvatarManager           Storage
 3. identicon fallback（无缓存时）
 ```
 
-## 15. 实施步骤
+## 16. 实施步骤
 
 ### 第一阶段：基础设施（第 1–3 天）
 
@@ -957,7 +1405,7 @@ AvatarManager           Storage
 8. 切换 channel → 检查消息是否从 DB 加载
 9. 删除好友/群组 → 检查对应消息是否清除
 
-## 16. 时间估算汇总
+## 17. 时间估算汇总
 
 | 阶段 | 时间 |
 |------|------|
@@ -969,7 +1417,7 @@ AvatarManager           Storage
 | 缓冲 | 2 天 |
 | **总计** | **20 天** |
 
-## 17. 风险点
+## 18. 风险点
 
 | 风险 | 严重度 | 应对 |
 |------|--------|------|
@@ -980,7 +1428,7 @@ AvatarManager           Storage
 | 磁盘占满 | 低 | LRU 驱逐保证缓存不超限；启动时检查磁盘空间 |
 | Qt3/Qt4 DB 相关 API 差异 | 中 | Database 封装层已隔离；`.pro` 区分 |
 
-## 18. 验证方式
+## 19. 验证方式
 
 ```bash
 # 编译验证
