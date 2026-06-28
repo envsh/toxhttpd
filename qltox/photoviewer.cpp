@@ -23,7 +23,11 @@ using std::max;
 // ============================================================
 
 PhotoCanvas::PhotoCanvas(QWidget* parent, const QPixmap& pixmap)
-    : QWidget(parent)
+    : QWidget(parent
+#ifdef QT3_BUILD
+      , nullptr, WNoAutoErase
+#endif
+      )
     , m_pixmap(pixmap)
     , m_scale(1.0)
     , m_rotation(0.0)
@@ -33,9 +37,7 @@ PhotoCanvas::PhotoCanvas(QWidget* parent, const QPixmap& pixmap)
     , m_showHelp(false)
     , m_dragging(false)
 {
-#ifdef QT3_BUILD
-    setWFlags(getWFlags() | Qt::WNoAutoErase);
-#else
+#ifndef QT3_BUILD
     setAttribute(Qt::WA_OpaquePaintEvent, true);
 #endif
     fitToWindow();
