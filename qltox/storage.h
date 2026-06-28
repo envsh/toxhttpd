@@ -29,6 +29,18 @@ struct SlowGuard {
     }
 };
 
+struct TimedReadGuard {
+    TimedReadGuard(sqlite3* db, int timeoutMs);
+    ~TimedReadGuard();
+    bool timedOut() const { return m_timedOut; }
+private:
+    static int onProgress(void* ptr);
+    sqlite3* m_db;
+    std::chrono::steady_clock::time_point m_start;
+    int m_timeoutMs;
+    bool m_timedOut = false;
+};
+
 class SqliteStatement {
     sqlite3_stmt* m_stmt = nullptr;
 public:

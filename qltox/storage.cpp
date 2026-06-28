@@ -470,3 +470,26 @@ void WriteQueue::run() {
         task();
     }
 }
+
+// ── TimedReadGuard ──
+
+int TimedReadGuard::onProgress(void* ptr) {
+    auto* self = static_cast<TimedReadGuard*>(ptr);
+    auto elapsed = std::chrono::steady_clock::now() - self->m_start;
+    if (elapsed > std::chrono::milliseconds(self->m_timeoutMs)) {
+        self->m_timedOut = true;
+        return 1;
+    }
+    return 0;
+}
+
+TimedReadGuard::TimedReadGuard(sqlite3* db, int timeoutMs)
+    : m_db(db), m_start(std::chrono::steady_clock::now())
+    , m_timeoutMs(timeoutMs)
+{
+    sqlite3_progress_handler(m_db, 10, onProgress, this);
+}
+
+TimedReadGuard::~TimedReadGuard() {
+    sqlite3_progress_handler(m_db, 0, nullptr, nullptr);
+}

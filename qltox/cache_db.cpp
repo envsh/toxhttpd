@@ -38,12 +38,16 @@ public:
 
     std::vector<uint8_t> get(const char* key, std::string* out_mime) override {
         SlowGuard _w("cache::get", 30);
+        TimedReadGuard _t(cacheDb().raw(), 50);
         std::vector<uint8_t> result;
         auto stmt = cacheDb().prepare(
             "SELECT data,mime_type FROM cache WHERE key=?1");
         if (!stmt.isPrepared()) { return result; }
         if (!stmt.bind(1, key)) { return result; }
-        if (!stmt.stepRow()) { return result; }
+        if (!stmt.stepRow()) {
+            if (_t.timedOut()) { qWarning("cache::get timed out for '%s'", key); }
+            return result;
+        }
 
         int bytes = stmt.columnBytes(0);
         const void* blob = stmt.columnBlob(0);
@@ -128,11 +132,15 @@ public:
 
     std::string get_ref_path(const char* key) override {
         SlowGuard _w("cache::get_ref", 30);
+        TimedReadGuard _t(cacheDb().raw(), 50);
         auto stmt = cacheDb().prepare(
             "SELECT file_path FROM file_refs WHERE key=?1");
         if (!stmt.isPrepared()) { return {}; }
         if (!stmt.bind(1, key)) { return {}; }
-        if (!stmt.stepRow()) { return {}; }
+        if (!stmt.stepRow()) {
+            if (_t.timedOut()) { qWarning("cache::get_ref timed out for '%s'", key); }
+            return {};
+        }
         // 更新 access_time
         auto upd = cacheDb().prepare(
             "UPDATE file_refs SET access_time=?1 WHERE key=?2");
@@ -170,11 +178,15 @@ public:
 
     std::string get_big_path(const char* key) override {
         SlowGuard _w("cache::get_big", 30);
+        TimedReadGuard _t(bigDb().raw(), 50);
         auto stmt = bigDb().prepare(
             "SELECT file_path FROM big_cache WHERE key=?1");
         if (!stmt.isPrepared()) { return {}; }
         if (!stmt.bind(1, key)) { return {}; }
-        if (!stmt.stepRow()) { return {}; }
+        if (!stmt.stepRow()) {
+            if (_t.timedOut()) { qWarning("cache::get_big timed out for '%s'", key); }
+            return {};
+        }
         auto upd = bigDb().prepare(
             "UPDATE big_cache SET access_time=?1 WHERE key=?2");
         if (upd.isPrepared()) {
