@@ -3,6 +3,7 @@
 #include "message_db.h"
 #include "pending_db.h"
 #include "cache_db.h"
+#include "cache_fs.h"
 #include <qstring.h>
 
 std::string mediaCacheKey(const char* prefix, const QString& mxcUrl) {
@@ -243,19 +244,17 @@ static std::string pathFor(const char *dir, const char *name) {
 bool Storage::init(const char *dataDir) {
     auto totalStart = std::chrono::steady_clock::now();
 
+    m_dataDir = dataDir;
     mkdirRecursive(dataDir);
+    initCacheFsDirs(dataDir);
 
     std::string msgPath = pathFor(dataDir, "message.db");
     std::string cachePath = pathFor(dataDir, "cache.db");
-    std::string bigCachePath = pathFor(dataDir, "big_cache.db");
-
     if (!openDb(msgPath.c_str()))      { return false; }
     if (!openDb(cachePath.c_str()))    { return false; }
-    if (!openDb(bigCachePath.c_str())) { return false; }
 
     m_msgConn = std::make_shared<SqliteConnectionSafe>(m_msgDb.raw());
     m_cacheConn = std::make_shared<SqliteConnectionSafe>(m_cacheDb.raw());
-    m_bigConn = std::make_shared<SqliteConnectionSafe>(m_bigCacheDb.raw());
 
     if (!initSyncDomains()) { return false; }
 
@@ -283,14 +282,11 @@ void Storage::close() {
 
     m_msgConn.reset();
     m_cacheConn.reset();
-    m_bigConn.reset();
 
     if (m_msgDb.raw())     { sqlite3_close(m_msgDb.raw()); }
     if (m_cacheDb.raw())   { sqlite3_close(m_cacheDb.raw()); }
-    if (m_bigCacheDb.raw()) { sqlite3_close(m_bigCacheDb.raw()); }
     m_msgDb = SqliteDb();
     m_cacheDb = SqliteDb();
-    m_bigCacheDb = SqliteDb();
 }
 
 bool Storage::openDb(const char *path) {
@@ -310,7 +306,6 @@ bool Storage::openDb(const char *path) {
     SqliteDb* target = nullptr;
     if (strcmp(name, "message.db") == 0)         { target = &m_msgDb; }
     else if (strcmp(name, "cache.db") == 0)      { target = &m_cacheDb; }
-    else if (strcmp(name, "big_cache.db") == 0)  { target = &m_bigCacheDb; }
 
     if (target) {
         *target = SqliteDb(db);
@@ -343,7 +338,6 @@ bool Storage::initSyncDomains() {
     if (!init_message_db(m_msgDb))   { return false; }
     if (!init_pending_db(m_msgDb))   { return false; }
     if (!init_cache_db(m_cacheDb))   { return false; }
-    if (!init_big_cache_db(m_bigCacheDb)) { return false; }
 
     // schema_version
     m_msgDb.exec("CREATE TABLE IF NOT EXISTS schema_version ("
@@ -356,7 +350,7 @@ bool Storage::initSyncDomains() {
     m_channelDb = create_channel_db(m_msgConn);
     m_messageDb = create_message_db(m_msgConn);
     m_pendingDb = create_pending_db(m_msgConn);
-    m_cacheDbObj = create_cache_db(m_cacheConn, m_bigConn);
+    m_cacheDbObj = create_cache_db(m_cacheConn, m_dataDir.c_str());
 
     qDebug("Domain layer init complete in %lldms (4 domains, 10 tables)",
            elapsedMs(start));

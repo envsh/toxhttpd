@@ -337,7 +337,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                         std::string key = mediaCacheKey("file", qFromUtf8(e->mxcUrl));
                         const auto& rd = e->rawData;
                         std::vector<uint8_t> data(rd.begin(), rd.end());
-                        Storage::instance().cacheDbAsync()->put(
+                        Storage::instance().cacheDbAsync()->storeMedia(
                             std::move(key), std::move(data), "", 2, nullptr);
                     }
 
@@ -1217,7 +1217,7 @@ void MainWindow::handleEvents(const EventList& events) {
                             QString mxc = qFromUtf8(hm.mediaUrl);
                             ChatElement& el = chatWidget->mutableMessageAt(newIdx);
                             bool memDone = (el.downloadState == ChatElement::Completed);
-                            auto dbData = Storage::instance().cacheDb()->get(
+                            auto dbData = Storage::instance().cacheDb()->loadMedia(
                                 mediaCacheKey("file", mxc).c_str());
                             bool dbDone = !dbData.empty();
 
@@ -1870,7 +1870,7 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
 
     ChatElement& el = chatWidget->mutableMessageAt(msgIndex);
     bool memDone = (el.downloadState == ChatElement::Completed);
-    auto dbData = Storage::instance().cacheDb()->get(
+    auto dbData = Storage::instance().cacheDb()->loadMedia(
         mediaCacheKey("file", mediaUrl).c_str());
     bool dbDone = !dbData.empty();
 

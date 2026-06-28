@@ -20,18 +20,17 @@ public:
     virtual bool clear_by_tag(int tag) = 0;
     virtual int64_t total_cache_size() = 0;
 
-    // file_refs 表（中型文件 1MB–30MB 路径索引）
+    // file_refs 表（>1MB 文件路径索引）
     virtual bool put_ref(const char* key, const char* file_path,
                          const char* mime, int tag, int64_t size) = 0;
     virtual std::string get_ref_path(const char* key) = 0;
     virtual bool remove_ref(const char* key) = 0;
 
-    // big_cache 表（大文件 >30MB 路径索引）
-    virtual bool put_big_ref(const char* key, const char* file_path,
-                             const char* mime, int tag, int64_t size) = 0;
-    virtual std::string get_big_path(const char* key) = 0;
-    virtual bool remove_big_ref(const char* key) = 0;
-    virtual int64_t total_big_cache_size() = 0;
+    // 统一存取：≤1MB → cache 表内联 BLOB；>1MB → 文件系统 + file_refs
+    virtual bool storeMedia(const char* key, const void* data, size_t size,
+                            const char* mime, int tag) = 0;
+    virtual std::vector<uint8_t> loadMedia(const char* key,
+                                           std::string* out_mime = nullptr) = 0;
 
     // 维护
     virtual bool evict(int64_t target_size) = 0;
@@ -68,11 +67,11 @@ public:
                          std::function<void(bool)> done) = 0;
     virtual void get_ref_path(std::string key,
                               std::function<void(std::string)> done) = 0;
-    virtual void put_big_ref(std::string key, std::string file_path,
-                             std::string mime, int tag, int64_t size,
-                             std::function<void(bool)> done) = 0;
-    virtual void get_big_path(std::string key,
-                              std::function<void(std::string)> done) = 0;
+    virtual void storeMedia(std::string key, std::vector<uint8_t> data,
+                            std::string mime, int tag,
+                            std::function<void(bool)> done) = 0;
+    virtual void loadMedia(std::string key,
+                           std::function<void(std::vector<uint8_t>, std::string)> done) = 0;
     virtual void evict(int64_t target_size,
                        std::function<void(bool)> done) = 0;
     virtual void close(std::function<void()> done) = 0;
@@ -80,13 +79,11 @@ public:
 
 std::shared_ptr<CacheDbSyncSafeInterface> create_cache_db(
     std::shared_ptr<SqliteConnectionSafe> cache_conn,
-    std::shared_ptr<SqliteConnectionSafe> big_cache_conn);
+    const char* baseDir);
 
 std::shared_ptr<CacheDbAsyncInterface> create_cache_db_async(
     std::shared_ptr<CacheDbSyncSafeInterface> sync,
     std::shared_ptr<WriteQueue> queue);
 
 bool init_cache_db(SqliteDb& db);
-bool init_big_cache_db(SqliteDb& db);
 bool drop_cache_db(SqliteDb& db);
-bool drop_big_cache_db(SqliteDb& db);

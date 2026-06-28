@@ -173,7 +173,6 @@ public:
     // 工具
     SqliteDb& msgDb()          { return m_msgDb; }
     SqliteDb& cacheDbConn()    { return m_cacheDb; }
-    SqliteDb& bigCacheDb()     { return m_bigCacheDb; }
 
     const char* sqliteVersion() const { return m_sqliteVersion.c_str(); }
     bool hasFts5() const    { return m_hasFts5; }
@@ -192,11 +191,9 @@ private:
 
     SqliteDb m_msgDb;
     SqliteDb m_cacheDb;
-    SqliteDb m_bigCacheDb;
 
     std::shared_ptr<SqliteConnectionSafe> m_msgConn;
     std::shared_ptr<SqliteConnectionSafe> m_cacheConn;
-    std::shared_ptr<SqliteConnectionSafe> m_bigConn;
     std::shared_ptr<WriteQueue> m_queue;
 
     std::shared_ptr<ChannelDbSyncSafeInterface> m_channelDb;
@@ -208,6 +205,7 @@ private:
     std::shared_ptr<CacheDbSyncSafeInterface>   m_cacheDbObj;
     std::shared_ptr<CacheDbAsyncInterface>      m_cacheDbAsync;
 
+    std::string m_dataDir;
     std::string m_sqliteVersion;
     bool m_hasFts5 = false;
     bool m_hasTrigram = false;
