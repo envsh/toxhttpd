@@ -33,4 +33,5 @@
 - [ ] maybe split msg parses to plugin is better
 - [ ] qltox memory keep increase
 - [ ] qltox中使用QT_VERSION检测版本
+- [ ] c++/qt彩色日志
 - [ ] rich text: Markdown→Entities 解析器 + ChatElement entities + drawRichText + 链接点击

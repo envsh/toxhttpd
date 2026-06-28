@@ -10,6 +10,7 @@
 #include "groupinvitedialog.h"
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"
+#include "storage.h"
 #include "cJSON.h"
 #include "jsonview.h"
 #include "appsetup.h"
@@ -148,7 +149,17 @@ MainWindow::MainWindow(QWidget* parent)
     // 设置窗口
     qSetWindowTitle(this, _("app_title"));
     setGeometry(100, 50, 1100, 680);
-    
+
+    // 初始化本地存储
+    QString dataDir = qGetHomePath() + "/.cache/toxhttpd";
+    Storage::instance().init(
+#ifdef QT3_BUILD
+        dataDir.utf8()
+#else
+        dataDir.toUtf8().constData()
+#endif
+    );
+
     // 设置 UTF-8 编解码器
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     
@@ -298,6 +309,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow() {
     ToxAPI::stopPollEvent();
     EventPoller::stop();
+    Storage::instance().close();
 }
 
 void MainWindow::customEvent(CustomEventBase* event) {

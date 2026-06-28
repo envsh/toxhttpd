@@ -5,19 +5,19 @@ CONFIG += moc
 CONFIG += sdk_no_version_check
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.7
 
-SOURCES = main.cpp mainwindow.cpp restapi.cpp eventpoller.cpp \
+SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
              chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
              friendinfodialog.cpp memberlistdialog.cpp logindialog.cpp \
              messageinput.cpp sound.c loadingbar.cpp \
              unknownparser.cpp photoviewer.cpp avatar_manager.cpp
 
-HEADERS = mainwindow.h restapi.h eventpoller.h \
-            chatwidget.h chatview.h contactlist.h selfinfo.h \
-            editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
-            friendinfodialog.h memberlistdialog.h logindialog.h \
-             messageinput.h sound.h loadingbar.h \
-             unknownparser.h photoviewer.h avatar_manager.h
+HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
+             chatwidget.h chatview.h contactlist.h selfinfo.h \
+             editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
+             friendinfodialog.h memberlistdialog.h logindialog.h \
+              messageinput.h sound.h loadingbar.h \
+              unknownparser.h photoviewer.h avatar_manager.h
             
 include(../qlcomp/qlite.pri)
 
@@ -84,6 +84,17 @@ FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
     LIBS += -lcurl -lfreetype
     message("FreeType2: pkg-config not found, using fallback paths")
 }
+
+# SQLite 依赖检测
+SQLITE_CFLAGS = $$system(pkg-config --cflags sqlite3 2>/dev/null)
+SQLITE_LIBS = $$system(pkg-config --libs sqlite3 2>/dev/null)
+isEmpty(SQLITE_LIBS) {
+    error("sqlite3 not found. Install libsqlite3-dev (Debian) or libsqlite3x-devel (RHEL)")
+}
+message("SQLite: $$SQLITE_LIBS")
+INCLUDEPATH += $$SQLITE_CFLAGS
+LIBS += $$SQLITE_LIBS
+DEFINES += HAVE_SQLITE
 
 # 库路径和链接
 # QMAKE_LIBDIR_FLAGS += -L/opt/qt338sh/lib
