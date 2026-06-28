@@ -2014,11 +2014,15 @@ void ChatView::relayout() {
     int oldVal = m_vScrollBar->value();
 #endif
     rebuildBlocks();
+    // block signals to prevent double scroll from setRange/setValue
+    // https://doc.qt.io/qt-6/qabstractslider.html#valueChanged
+    m_vScrollBar->blockSignals(true);
     m_vScrollBar->setRange(0, maxScroll);
     m_vScrollBar->setPageStep(vpH);
     if (oldVal == oldMax && oldMax > 0) {
         m_vScrollBar->setValue(maxScroll);
     }
+    m_vScrollBar->blockSignals(false);
     updateFull();
 }
 
