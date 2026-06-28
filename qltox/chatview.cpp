@@ -2013,12 +2013,12 @@ void ChatView::relayout() {
     int oldMax = m_vScrollBar->maximum();
     int oldVal = m_vScrollBar->value();
 #endif
+    rebuildBlocks();
     m_vScrollBar->setRange(0, maxScroll);
     m_vScrollBar->setPageStep(vpH);
     if (oldVal == oldMax && oldMax > 0) {
         m_vScrollBar->setValue(maxScroll);
     }
-    rebuildBlocks();
     updateFull();
 }
 
@@ -2774,6 +2774,10 @@ std::pair<int,int> ChatView::visibleMessageRange() const {
 }
 
 void ChatView::triggerVisibleDownloads() {
+    if (m_items.empty()) {
+        qWarning("[VisibleTrigger] empty items, skipping");
+        return;
+    }
     auto range = visibleMessageRange();
     int first = range.first, last = range.second;
     if (first < 0) { return; }
