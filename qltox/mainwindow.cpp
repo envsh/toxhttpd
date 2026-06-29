@@ -11,6 +11,7 @@
 #include "friendinfodialog.h"
 #include "memberlistdialog.h"
 #include "storage.h"
+#include "channel_db.h"
 #include "cache_db.h"
 #include "cJSON.h"
 #include "jsonview.h"
@@ -34,6 +35,90 @@
 static const int VIRTUAL_UNKNOWN_ID = -100;
 static const int VIRTUAL_SYSEVENT_ID = -101;
 static const int VIRTUAL_REDDIT_ID = -102;
+
+// ── peer 持久化 helpers ──
+// key 格式: "friend_N", "group_N_M", "conference_N_M", "unknown_*"
+struct PeerKey {
+    std::string chanid;
+    int peerNum = 0;
+    bool valid = false;
+};
+static PeerKey parsePeerKey(const std::string& key, const PeerInfo& pi) {
+    PeerKey ret;
+    if (key.compare(0, 7, "friend_") == 0) {
+        ret.chanid = "friend:" + key.substr(7);
+        ret.peerNum = pi.peerNumber;
+        ret.valid = true;
+    } else if (key.compare(0, 6, "group_") == 0) {
+        size_t us = key.find('_', 6);
+        if (us == std::string::npos) { return ret; }
+        ret.chanid = "group:" + key.substr(6, us - 6);
+        ret.peerNum = pi.peerNumber;
+        ret.valid = true;
+    } else if (key.compare(0, 11, "conference_") == 0) {
+        size_t us = key.find('_', 11);
+        if (us == std::string::npos) { return ret; }
+        ret.chanid = "conference:" + key.substr(11, us - 11);
+        ret.peerNum = pi.peerNumber;
+        ret.valid = true;
+    } else if (key.compare(0, 8, "unknown_") == 0) {
+        ret.chanid = "unknown:" + key.substr(8);
+        ret.peerNum = 0;
+        ret.valid = true;
+    }
+    return ret;
+}
+
+static void addPeerToDb(const std::string& key, const PeerInfo& pi) {
+    PeerKey pk = parsePeerKey(key, pi);
+    if (!pk.valid) { return; }
+    PeerRow row;
+    row.chanid = pk.chanid;
+    row.peer_number = pk.peerNum;
+    row.public_key = pi.publicKey;
+    row.name = pi.name;
+    row.nickname = pi.nickname;
+    row.avatar_url = pi.iconUrl;
+    row.status_text = pi.statusText;
+    row.status_str = pi.statusStr;
+    row.user_status = pi.userStatus;
+    row.peer_ip = pi.peerIp;
+    row.role = pi.role;
+    row.role_str = pi.roleStr;
+    row.is_self = pi.isSelf;
+    row.last_seen = (int64_t)pi.lastSeen;
+    row.status = pi.status;
+    auto* async = Storage::instance().channelDbAsync();
+    if (async) {
+        async->add_peer(std::move(row), nullptr);
+    }
+}
+
+static void updatePeerInDb(const std::string& key, const PeerInfo& pi) {
+    PeerKey pk = parsePeerKey(key, pi);
+    if (!pk.valid) { return; }
+    if (pk.chanid.compare(0, 8, "unknown:") == 0) { return; } // unknown 不走部分更新
+    PeerRow row;
+    row.chanid = pk.chanid;
+    row.peer_number = pk.peerNum;
+    row.public_key = pi.publicKey;
+    row.name = pi.name;
+    row.nickname = pi.nickname;
+    row.avatar_url = pi.iconUrl;
+    row.status_text = pi.statusText;
+    row.status_str = pi.statusStr;
+    row.user_status = pi.userStatus;
+    row.peer_ip = pi.peerIp;
+    row.role = pi.role;
+    row.role_str = pi.roleStr;
+    row.is_self = pi.isSelf;
+    row.last_seen = (int64_t)pi.lastSeen;
+    row.status = pi.status;
+    auto* async = Storage::instance().channelDbAsync();
+    if (async) {
+        async->update_peer(std::move(row), nullptr);
+    }
+}
 
 static QString timenowhm() {
 #ifdef QT3_BUILD
@@ -436,6 +521,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                             peerInfoMap[key].status = 0;
                             peerInfoMap[key].statusStr = "none";
                         }
+                        addPeerToDb(key, peerInfoMap[key]);
                     }
                 }
                 ContactList cl;
@@ -526,6 +612,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 peerInfoMap[key].peerIp = evt->peerIp;
                 peerInfoMap[key].userStatus = evt->userStatus;
                 peerInfoMap[key].lastSeen = evt->lastSeen;
+                addPeerToDb(key, peerInfoMap[key]);
             }
             return;
         }
@@ -583,6 +670,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 for (const auto& m : evt->members) {
                     std::string key = evt->contactType + "_" + std::to_string(evt->contactId) + "_" + std::to_string(m.peerNumber);
                     peerInfoMap[key] = m;
+                    addPeerToDb(key, m);
                 }
             }
             return;
@@ -860,9 +948,10 @@ void MainWindow::handleEvents(const EventList& events) {
                         std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
                         peerInfoMap[key].name = std::string(cJSON_GetStringValue(peerNameItem));
                         peerInfoMap[key].peerNumber = peerNumber;
+                        updatePeerInDb(key, peerInfoMap[key]);
                     }
-                    
-                    qWarning("confNumber=%d, currentChatId=%d, currentChatType=%s, match=%d", 
+
+                    qWarning("confNumber=%d, currentChatId=%d, currentChatType=%s, match=%d",
                              confNumber, currentChatId, qToUtf8(currentChatType).data(),
                              (confNumber == currentChatId && currentChatType == "conference"));
                     
@@ -926,8 +1015,9 @@ void MainWindow::handleEvents(const EventList& events) {
                         std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
                         peerInfoMap[key].name = std::string(cJSON_GetStringValue(peerNameItem));
                         peerInfoMap[key].peerNumber = peerNumber;
+                        updatePeerInDb(key, peerInfoMap[key]);
                     }
-                    
+
                     if (groupNumber == currentChatId && currentChatType == "group") {
                         // 查询缓存获取 peer 名字和 IP
                         std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
@@ -962,6 +1052,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         + "_" + std::to_string(peerNumberItem->valueint);
                     peerInfoMap[key].name = std::string(cJSON_GetStringValue(nameItem));
                     peerInfoMap[key].peerNumber = peerNumberItem->valueint;
+                    updatePeerInDb(key, peerInfoMap[key]);
                 }
                 cJSON_Delete(root);
             }
@@ -976,6 +1067,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         + "_" + std::to_string(peerNumberItem->valueint);
                     peerInfoMap[key].name = std::string(cJSON_GetStringValue(nameItem));
                     peerInfoMap[key].peerNumber = peerNumberItem->valueint;
+                    updatePeerInDb(key, peerInfoMap[key]);
                 }
                 cJSON_Delete(root);
             }
@@ -989,6 +1081,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     std::string newName = cJSON_GetStringValue(nameItem);
                     std::string key = "friend_" + std::to_string(friendId);
                     peerInfoMap[key].name = newName;
+                    updatePeerInDb(key, peerInfoMap[key]);
                     contactListWidget->updateFriendName(friendId, qFromUtf8(newName));
                 }
                 cJSON_Delete(root);
@@ -1003,6 +1096,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     int s = statusItem->valueint;
                     std::string key = "friend_" + std::to_string(friendId);
                     peerInfoMap[key].status = s;
+                    updatePeerInDb(key, peerInfoMap[key]);
                 }
                 cJSON_Delete(root);
             }
@@ -1017,6 +1111,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     std::string key = "friend_" + std::to_string(friendId);
                     peerInfoMap[key].status = (statusStr == "udp") ? 2 : (statusStr == "tcp") ? 1 : 0;
                     peerInfoMap[key].statusStr = statusStr;
+                    updatePeerInDb(key, peerInfoMap[key]);
                     contactListWidget->updateFriendConnectionStatus(friendId, qFromUtf8(statusStr));
                 }
                 cJSON_Delete(root);
@@ -1067,6 +1162,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 for (const auto& p : pr.peers) {
                     std::string key = "unknown_" + p.publicKey;
                     peerInfoMap[key] = p;
+                    addPeerToDb(key, p);
                 }
                 for (const auto& p : pr.peers) {
                     QString mxc = qFromUtf8(p.iconUrl);
@@ -1787,7 +1883,6 @@ void MainWindow::onSwitchAccount() {
     currentChatId = -1;
     currentChatType = "";
     selfPubkey.clear();
-    peerInfoMap.clear();
     contactListWidget->clear();
     chatWidget->clearMessages();
     chatWidget->setHeaderText("");

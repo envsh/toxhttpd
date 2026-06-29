@@ -344,7 +344,7 @@ bool Storage::initSyncDomains() {
                  "  version     INTEGER PRIMARY KEY,"
                  "  applied_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
                  ")");
-    m_msgDb.exec("INSERT OR IGNORE INTO schema_version(version) VALUES(3)");
+    m_msgDb.exec("INSERT OR IGNORE INTO schema_version(version) VALUES(4)");
 
     // 创建域实例
     m_channelDb = create_channel_db(m_msgConn);

@@ -115,33 +115,137 @@ public:
     bool add_peer(const PeerRow& row) override {
         auto stmt = db().prepare(
             "INSERT OR REPLACE INTO peers "
-            "(peer_number,public_key,name,nickname,avatar_url,status_text) "
-            "VALUES (?1,?2,?3,?4,?5,?6)");
+            "(chanid,peer_number,public_key,name,nickname,"
+            " avatar_url,status_text,status_str,user_status,"
+            " peer_ip,role,role_str,is_self,last_seen,status) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)");
         if (!stmt.isPrepared()) { return false; }
-        if (!stmt.bind(1, row.peer_number)) { return false; }
-        if (!stmt.bind(2, row.public_key.c_str())) { return false; }
-        if (!stmt.bind(3, row.name.c_str())) { return false; }
-        if (!stmt.bind(4, row.nickname.c_str())) { return false; }
-        if (!stmt.bind(5, row.avatar_url.c_str())) { return false; }
-        if (!stmt.bind(6, row.status_text.c_str())) { return false; }
+        if (!stmt.bind(1, row.chanid.c_str())) { return false; }
+        if (!stmt.bind(2, row.peer_number)) { return false; }
+        if (!stmt.bind(3, row.public_key.c_str())) { return false; }
+        if (!stmt.bind(4, row.name.c_str())) { return false; }
+        if (!stmt.bind(5, row.nickname.c_str())) { return false; }
+        if (!stmt.bind(6, row.avatar_url.c_str())) { return false; }
+        if (!stmt.bind(7, row.status_text.c_str())) { return false; }
+        if (!stmt.bind(8, row.status_str.c_str())) { return false; }
+        if (!stmt.bind(9, row.user_status.c_str())) { return false; }
+        if (!stmt.bind(10, row.peer_ip.c_str())) { return false; }
+        if (!stmt.bind(11, row.role)) { return false; }
+        if (!stmt.bind(12, row.role_str.c_str())) { return false; }
+        if (!stmt.bind(13, (int)row.is_self)) { return false; }
+        if (!stmt.bind(14, row.last_seen)) { return false; }
+        if (!stmt.bind(15, row.status)) { return false; }
         return stmt.step();
     }
 
-    std::unique_ptr<PeerRow> get_peer(int peer_number) override {
+    bool update_peer(const PeerRow& row) override {
         auto stmt = db().prepare(
-            "SELECT peer_number,public_key,name,nickname,avatar_url,status_text "
-            "FROM peers WHERE peer_number=?1");
+            "INSERT INTO peers "
+            "(chanid,peer_number,public_key,name,nickname,"
+            " avatar_url,status_text,status_str,user_status,"
+            " peer_ip,role,role_str,is_self,last_seen,status) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15) "
+            "ON CONFLICT(chanid,peer_number) DO UPDATE SET "
+            "public_key=COALESCE(excluded.public_key,peers.public_key),"
+            "name=COALESCE(excluded.name,peers.name),"
+            "nickname=COALESCE(excluded.nickname,peers.nickname),"
+            "avatar_url=COALESCE(excluded.avatar_url,peers.avatar_url),"
+            "status_text=COALESCE(excluded.status_text,peers.status_text),"
+            "status_str=COALESCE(excluded.status_str,peers.status_str),"
+            "user_status=COALESCE(excluded.user_status,peers.user_status),"
+            "peer_ip=COALESCE(excluded.peer_ip,peers.peer_ip),"
+            "role=excluded.role,"
+            "role_str=COALESCE(excluded.role_str,peers.role_str),"
+            "is_self=excluded.is_self,"
+            "last_seen=excluded.last_seen,"
+            "status=excluded.status");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, row.chanid.c_str())) { return false; }
+        if (!stmt.bind(2, row.peer_number)) { return false; }
+        if (!stmt.bind(3, row.public_key.c_str())) { return false; }
+        if (!stmt.bind(4, row.name.c_str())) { return false; }
+        if (!stmt.bind(5, row.nickname.c_str())) { return false; }
+        if (!stmt.bind(6, row.avatar_url.c_str())) { return false; }
+        if (!stmt.bind(7, row.status_text.c_str())) { return false; }
+        if (!stmt.bind(8, row.status_str.c_str())) { return false; }
+        if (!stmt.bind(9, row.user_status.c_str())) { return false; }
+        if (!stmt.bind(10, row.peer_ip.c_str())) { return false; }
+        if (!stmt.bind(11, row.role)) { return false; }
+        if (!stmt.bind(12, row.role_str.c_str())) { return false; }
+        if (!stmt.bind(13, (int)row.is_self)) { return false; }
+        if (!stmt.bind(14, row.last_seen)) { return false; }
+        if (!stmt.bind(15, row.status)) { return false; }
+        return stmt.step();
+    }
+
+    std::unique_ptr<PeerRow> get_chan_peer(const char* chanid, int peer_number) override {
+        auto stmt = db().prepare(
+            "SELECT chanid,peer_number,public_key,name,nickname,"
+            " avatar_url,status_text,status_str,user_status,"
+            " peer_ip,role,role_str,is_self,last_seen,status "
+            "FROM peers WHERE chanid=?1 AND peer_number=?2");
         if (!stmt.isPrepared()) { return nullptr; }
-        if (!stmt.bind(1, peer_number)) { return nullptr; }
+        if (!stmt.bind(1, chanid)) { return nullptr; }
+        if (!stmt.bind(2, peer_number)) { return nullptr; }
         if (!stmt.stepRow()) { return nullptr; }
         auto row = std::unique_ptr<PeerRow>(new PeerRow());
-        row->peer_number = stmt.columnInt(0);
-        row->public_key = stmt.columnText(1);
-        row->name = stmt.columnText(2);
-        row->nickname = stmt.columnText(3);
-        row->avatar_url = stmt.columnText(4);
-        row->status_text = stmt.columnText(5);
+        int i = 0;
+        row->chanid       = stmt.columnText(i++);
+        row->peer_number  = stmt.columnInt(i++);
+        row->public_key   = stmt.columnText(i++);
+        row->name         = stmt.columnText(i++);
+        row->nickname     = stmt.columnText(i++);
+        row->avatar_url   = stmt.columnText(i++);
+        row->status_text  = stmt.columnText(i++);
+        row->status_str   = stmt.columnText(i++);
+        row->user_status  = stmt.columnText(i++);
+        row->peer_ip      = stmt.columnText(i++);
+        row->role         = stmt.columnInt(i++);
+        row->role_str     = stmt.columnText(i++);
+        row->is_self      = stmt.columnInt(i++) != 0;
+        row->last_seen    = stmt.columnInt64(i++);
+        row->status       = stmt.columnInt(i++);
         return row;
+    }
+
+    std::vector<PeerRow> load_chan_peers(const char* chanid) override {
+        std::vector<PeerRow> rows;
+        auto stmt = db().prepare(
+            "SELECT chanid,peer_number,public_key,name,nickname,"
+            " avatar_url,status_text,status_str,user_status,"
+            " peer_ip,role,role_str,is_self,last_seen,status "
+            "FROM peers WHERE chanid=?1 "
+            "ORDER BY peer_number ASC");
+        if (!stmt.isPrepared()) { return rows; }
+        if (!stmt.bind(1, chanid)) { return rows; }
+        while (stmt.stepRow()) {
+            PeerRow row;
+            int i = 0;
+            row.chanid       = stmt.columnText(i++);
+            row.peer_number  = stmt.columnInt(i++);
+            row.public_key   = stmt.columnText(i++);
+            row.name         = stmt.columnText(i++);
+            row.nickname     = stmt.columnText(i++);
+            row.avatar_url   = stmt.columnText(i++);
+            row.status_text  = stmt.columnText(i++);
+            row.status_str   = stmt.columnText(i++);
+            row.user_status  = stmt.columnText(i++);
+            row.peer_ip      = stmt.columnText(i++);
+            row.role         = stmt.columnInt(i++);
+            row.role_str     = stmt.columnText(i++);
+            row.is_self      = stmt.columnInt(i++) != 0;
+            row.last_seen    = stmt.columnInt64(i++);
+            row.status       = stmt.columnInt(i++);
+            rows.push_back(std::move(row));
+        }
+        return rows;
+    }
+
+    bool remove_chan_peers(const char* chanid) override {
+        auto stmt = db().prepare("DELETE FROM peers WHERE chanid=?1");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, chanid)) { return false; }
+        return stmt.step();
     }
 
     bool begin_write_transaction() override { return db().beginTransaction(); }
@@ -218,12 +322,38 @@ public:
         });
     }
 
-    void get_peer(int peer_number,
-                  std::function<void(std::unique_ptr<PeerRow>)> done) override {
+    void update_peer(PeerRow row, std::function<void(bool)> done) override {
         auto sync = m_sync;
-        post([sync, peer_number, done]() {
-            auto row = sync->get().get_peer(peer_number);
+        post([sync, row, done]() {
+            bool ok = sync->get().update_peer(row);
+            if (done) { done(ok); }
+        });
+    }
+
+    void get_chan_peer(std::string chanid, int peer_number,
+                       std::function<void(std::unique_ptr<PeerRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, peer_number, done]() {
+            auto row = sync->get().get_chan_peer(chanid.c_str(), peer_number);
             if (done) { done(std::move(row)); }
+        });
+    }
+
+    void load_chan_peers(std::string chanid,
+                         std::function<void(std::vector<PeerRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, done]() {
+            auto rows = sync->get().load_chan_peers(chanid.c_str());
+            if (done) { done(std::move(rows)); }
+        });
+    }
+
+    void remove_chan_peers(std::string chanid,
+                           std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, done]() {
+            bool ok = sync->get().remove_chan_peers(chanid.c_str());
+            if (done) { done(ok); }
         });
     }
 
@@ -249,7 +379,7 @@ std::shared_ptr<ChannelDbAsyncInterface> create_channel_db_async(
 }
 
 bool init_channel_db(SqliteDb& db) {
-    return db.exec(
+    bool ok = db.exec(
         "CREATE TABLE IF NOT EXISTS channels ("
         "  chanid             TEXT PRIMARY KEY,"
         "  proto_type         TEXT DEFAULT 'tox',"
@@ -260,17 +390,30 @@ bool init_channel_db(SqliteDb& db) {
         "  draft_text         TEXT DEFAULT '',"
         "  muted              INTEGER DEFAULT 0,"
         "  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-        ")") &&
-        db.exec(
-        "CREATE TABLE IF NOT EXISTS peers ("
-        "  peer_number  INTEGER PRIMARY KEY,"
-        "  public_key   TEXT DEFAULT '',"
-        "  name         TEXT DEFAULT '',"
-        "  nickname     TEXT DEFAULT '',"
-        "  avatar_url   TEXT DEFAULT '',"
-        "  status_text  TEXT DEFAULT '',"
-        "  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")");
+    // peers v2: drop old single-key table, recreate with composite PK
+    db.exec("DROP TABLE IF EXISTS peers");
+    ok = ok && db.exec(
+        "CREATE TABLE IF NOT EXISTS peers ("
+        "  chanid        TEXT NOT NULL,"
+        "  peer_number   INTEGER NOT NULL,"
+        "  public_key    TEXT DEFAULT '',"
+        "  name          TEXT DEFAULT '',"
+        "  nickname      TEXT DEFAULT '',"
+        "  avatar_url    TEXT DEFAULT '',"
+        "  status_text   TEXT DEFAULT '',"
+        "  status_str    TEXT DEFAULT '',"
+        "  user_status   TEXT DEFAULT '',"
+        "  peer_ip       TEXT DEFAULT '',"
+        "  role          INTEGER DEFAULT 0,"
+        "  role_str      TEXT DEFAULT '',"
+        "  is_self       INTEGER DEFAULT 0,"
+        "  last_seen     INTEGER DEFAULT 0,"
+        "  status        INTEGER DEFAULT 0,"
+        "  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  PRIMARY KEY (chanid, peer_number)"
+        ")");
+    return ok;
 }
 
 bool drop_channel_db(SqliteDb& db) {

@@ -27,12 +27,21 @@ struct ChannelUpdate {
 };
 
 struct PeerRow {
+    std::string chanid;
     int peer_number;
     std::string public_key;
     std::string name;
     std::string nickname;
     std::string avatar_url;
     std::string status_text;
+    std::string status_str;
+    std::string user_status;
+    std::string peer_ip;
+    int role = 0;
+    std::string role_str;
+    bool is_self = false;
+    int64_t last_seen = 0;
+    int status = 0;
 };
 
 class ChannelDbSyncInterface {
@@ -46,7 +55,10 @@ public:
     virtual std::vector<ChannelRow> load_pinned() = 0;
 
     virtual bool add_peer(const PeerRow& row) = 0;
-    virtual std::unique_ptr<PeerRow> get_peer(int peer_number) = 0;
+    virtual bool update_peer(const PeerRow& row) = 0;
+    virtual std::unique_ptr<PeerRow> get_chan_peer(const char* chanid, int peer_number) = 0;
+    virtual std::vector<PeerRow> load_chan_peers(const char* chanid) = 0;
+    virtual bool remove_chan_peers(const char* chanid) = 0;
 
     virtual bool begin_write_transaction() = 0;
     virtual bool commit_transaction() = 0;
@@ -71,8 +83,13 @@ public:
     virtual void delete_channel(std::string chanid, std::function<void(bool)> done) = 0;
     virtual void load_pinned(std::function<void(std::vector<ChannelRow>)> done) = 0;
     virtual void add_peer(PeerRow row, std::function<void(bool)> done) = 0;
-    virtual void get_peer(int peer_number,
-                          std::function<void(std::unique_ptr<PeerRow>)> done) = 0;
+    virtual void update_peer(PeerRow row, std::function<void(bool)> done) = 0;
+    virtual void get_chan_peer(std::string chanid, int peer_number,
+                               std::function<void(std::unique_ptr<PeerRow>)> done) = 0;
+    virtual void load_chan_peers(std::string chanid,
+                                 std::function<void(std::vector<PeerRow>)> done) = 0;
+    virtual void remove_chan_peers(std::string chanid,
+                                   std::function<void(bool)> done) = 0;
     virtual void close(std::function<void()> done) = 0;
 };
 
