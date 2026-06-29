@@ -22,6 +22,7 @@ public:
 
 private:
     AvatarManager() = default;
+    static QPixmap makeThumbnail(const QPixmap& source, int size);
     std::map<QString, QPixmap> m_cache;
     std::set<QString> m_pending;
 };
