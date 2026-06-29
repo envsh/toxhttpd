@@ -2026,6 +2026,7 @@ void ChatView::relayout() {
         m_vScrollBar->setValue(maxScroll);
     }
     m_vScrollBar->blockSignals(false);
+    m_scrollPos = m_vScrollBar->value();
     updateFull();
 }
 
