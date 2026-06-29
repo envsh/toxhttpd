@@ -18,9 +18,10 @@ public:
              const char* mime, int tag) override {
         SlowGuard _w("cache::put", 60);
         auto stmt = cacheDb().prepare(
-            "INSERT OR REPLACE INTO cache "
+            "INSERT INTO cache "
             "(key,data,mime_type,tag,access_time,size) "
-            "VALUES (?1,?2,?3,?4,?5,?6)");
+            "VALUES (?1,?2,?3,?4,?5,?6) "
+            "ON CONFLICT(key) DO UPDATE SET access_time=excluded.access_time");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, key)) { return false; }
         if (!stmt.bind(2, data, (int)size)) { return false; }
@@ -108,9 +109,10 @@ public:
                  const char* mime, int tag, int64_t size) override {
         SlowGuard _w("cache::put_ref", 60);
         auto stmt = cacheDb().prepare(
-            "INSERT OR REPLACE INTO file_refs "
+            "INSERT INTO file_refs "
             "(key,file_path,mime_type,tag,access_time,size) "
-            "VALUES (?1,?2,?3,?4,?5,?6)");
+            "VALUES (?1,?2,?3,?4,?5,?6) "
+            "ON CONFLICT(key) DO UPDATE SET access_time=excluded.access_time");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, key)) { return false; }
         if (!stmt.bind(2, file_path)) { return false; }
