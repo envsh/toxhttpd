@@ -19,6 +19,7 @@ bool ToxAPI::s_loadingAllData = false;
 bool ToxAPI::s_reloadPending = false;
 static bool s_useNdjson = true; // true=auto s/ Content-Type 分派; false=强制旧 JSON 数组
 static const char* kEventTopic = "topic=reddit,hacknews,twitter";
+static std::unordered_set<std::string> s_seenUnknownLines;
 
 // ── Helpers ──
 
@@ -143,8 +144,7 @@ static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vec
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
         if (e.id == 0 || e.type.empty()) {
-            static std::unordered_set<std::string> seen;
-            if (seen.insert(line).second) {
+            if (s_seenUnknownLines.insert(line).second) {
                 Event synth;
                 synth.id = 0;
                 synth.type = "unknown";

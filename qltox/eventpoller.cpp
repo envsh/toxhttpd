@@ -158,4 +158,5 @@ void EventPoller::run() {
             }
         }
     }
+    ALOG_INFO("EventPoller thread exited");
 }

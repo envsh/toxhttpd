@@ -67,6 +67,7 @@ void QtappSetup::onTimerTimeout() {
 }
 
 void QtappSetup::onAppQuit() {
+    qDebug("onAppQuit: %zu exit callbacks", exitCallbacks_.size());
     for (auto& cb : exitCallbacks_) {
         cb();
     }
@@ -75,7 +76,7 @@ void QtappSetup::onAppQuit() {
 	#if QT_VERSION < 0x050000
 	if (g_quitOnExit) {
 		// 但进程不会终止，直到所有非守护线程都结束
-		exit(0);
+		// exit(0);
 	}
 	#endif
 }

@@ -457,7 +457,10 @@ void WriteQueue::run() {
             while (m_queue.empty() && !m_stopped) {
                 m_cond.wait(&m_mutex);
             }
-            if (m_stopped && m_queue.empty()) { return; }
+            if (m_stopped && m_queue.empty()) {
+                qDebug("WriteQueue thread exited");
+                return;
+            }
             task = std::move(m_queue.front());
             m_queue.pop();
         }
