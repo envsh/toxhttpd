@@ -9,7 +9,7 @@
 - 离线访问：已加载的消息和媒体离线可看
 - 内存效率：只保留当前可见的消息在内存，历史消息按需从 SQLite 加载
 - TG 级性能：write-behind 批量写入、WAL 并发读、LRU 自动驱逐
-- 缓存有上限：默认 cache.db ≤200MB、big_cache.db ≤500MB，超出自动 LRU 驱逐至 80%
+- 缓存有上限：默认 cache.db ≤200MB，超出自动 LRU 驱逐至 80%
 
 ### 1.2 非目标
 
@@ -66,7 +66,6 @@ struct ChatElement {
 |--------|---------|---------|---------|
 | message.db | 无上限 | ❌ 永不自动删除 | ❌ |
 | cache.db | 200 MB | LRU 超出后驱逐至 80% | ✅ 设置页"缓存上限"滑块 |
-| big_cache.db | 500 MB | LRU 超出后驱逐至 80% | ✅ 同上 |
 
 cache.db 上限选取理由：
 - 主流聊天场景：按每天 50 条图片/表情，约 5MB/天 → 200MB ≈ 40 天会话
@@ -80,21 +79,19 @@ cache.db 上限选取理由：
 
 ## 2. 整体架构
 
-### 2.1 三库架构（TG 参考）
+### 2.1 双库架构（简化版）
 
 ```
 ~/.config/toxhttpd/
 └── message.db          # 消息历史 + 媒体引用 + 草稿 + 收藏 + 发送队列 (WAL 模式)
 
 ~/.cache/toxhttpd/
-├── cache.db            # 小文件缓存 (≤1MB inline BLOB, WAL 模式)
-└── big_cache.db        # 大文件路径索引 (WAL 模式)
+└── cache.db            # 文件缓存 (≤30MB inline BLOB + file_refs, WAL 模式)
 ```
 
-为什么要三个库：
+为什么要两个库：
 - **message.db**：结构化数据，需要强一致性、外键、事务
 - **cache.db**：缓存数据，可丢失，重点是快速读写、LRU 驱逐
-- **big_cache.db**：大文件索引，只存路径，不存文件内容
 
 ### 2.2 文件归类示意图
 
@@ -109,12 +106,7 @@ cache.db 上限选取理由：
     │
     ├── GIF/视频 (1MB–30MB)
     │   ├── thumbnail ──→ cache.db
-    │   └── full ──→ ~/.cache/toxhttpd/files/<hash>.ext
-    │               └── big_cache.db (key=file_<hash> → path)
-    │
-    ├── 大文件 (>30MB)
-    │   └── full ──→ ~/.cache/toxhttpd/big/<hash>.ext
-    │               └── big_cache.db (key=big_<hash> → path)
+    │   └── full ──→ cache.db (key=file_<hash>, >1MB 走 file_refs 路径索引)
     │
     └── avatar ──→ cache.db (key=avatar_<mxc_hash>)
 ```
@@ -131,8 +123,7 @@ Storage 类 (qltox)
     └── 维护: vacuum, checkpoint, integrityCheck
         │
         ├── message.db ──→ SQLite (消息)
-        ├── cache.db   ──→ SQLite + BLOB (小文件)
-        └── big_cache.db ──→ SQLite + filesystem (大文件)
+        └── cache.db   ──→ SQLite + BLOB + file_refs (缓存)
 ```
 
 ## 3. SQLite 全局优化
@@ -200,7 +191,7 @@ PRAGMA wal_checkpoint(TRUNCATE);
 
 ```cpp
 void Storage::checkpoint() {
-    for (auto* db : {m_messageDb, m_cacheDb, m_bigCacheDb})
+    for (auto* db : {m_messageDb, m_cacheDb})
         db->exec("PRAGMA wal_checkpoint(TRUNCATE)");
 }
 ```
@@ -456,13 +447,23 @@ END;
 
 -- 参与者信息缓存
 CREATE TABLE IF NOT EXISTS peers (
-    peer_number  INTEGER PRIMARY KEY,
-    public_key   TEXT DEFAULT '',
-    name         TEXT DEFAULT '',
-    nickname     TEXT DEFAULT '',
-    avatar_url   TEXT DEFAULT '',
-    status_text  TEXT DEFAULT '',
-    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    chanid        TEXT NOT NULL,
+    peer_number   INTEGER NOT NULL,
+    public_key    TEXT DEFAULT '',
+    name          TEXT DEFAULT '',
+    nickname      TEXT DEFAULT '',
+    avatar_url    TEXT DEFAULT '',
+    status_text   TEXT DEFAULT '',
+    status_str    TEXT DEFAULT '',
+    user_status   TEXT DEFAULT '',
+    peer_ip       TEXT DEFAULT '',
+    role          INTEGER DEFAULT 0,
+    role_str      TEXT DEFAULT '',
+    is_self       INTEGER DEFAULT 0,
+    last_seen     INTEGER DEFAULT 0,
+    status        INTEGER DEFAULT 0,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (chanid, peer_number)
 );
 
 -- 收藏表
@@ -694,15 +695,14 @@ enum CacheTag : uint8 {
 
 key 格式：`<type>_<hash>`，其中：
 
-- type: `avatar` / `thumb` / `file` / `big`
+- type: `avatar` / `thumb` / `file`
 - hash: SHA256 of MXC URL 的前 32 字符（MXC URL 本身已经内容寻址，
   但用 SHA256 作为 key 可以统一处理，长度固定）
 
 ```
 avatar_a1b2c3d4e5f6...   → 头像
 thumb_a1b2c3d4...         → 缩略图
-file_a1b2c3d4...          → 完整文件（≤1MB 或 路径引用）
-big_a1b2c3d4...           → 大文件路径引用
+file_a1b2c3d4...          → 完整文件（inline BLOB 或 file_refs 路径）
 ```
 
 ### 5.4 缓存大小阈值
@@ -711,8 +711,7 @@ big_a1b2c3d4...           → 大文件路径引用
 // TG 参考值：kMaxFileInMemory = 10MB, kUseBigFilesFrom = 30MB
 // 我们的调整：
 constexpr int64_t kMaxSmallFileSize    = 1 * 1024 * 1024;     // ≤1MB → cache.db inline BLOB
-constexpr int64_t kMediumFileThreshold = 30 * 1024 * 1024;    // 1MB–30MB → filesystem + cache.db 路径
-constexpr int64_t kBigFileThreshold    = 30 * 1024 * 1024;    // ≥30MB → filesystem + big_cache.db
+constexpr int64_t kMediumFileThreshold = 30 * 1024 * 1024;    // 1MB–30MB → filesystem + file_refs 路径
 ```
 
 为什么用 1MB 而不是 TG 的 10MB：
@@ -730,54 +729,9 @@ UPDATE cache SET access_time = ? WHERE key = ?;
 UPDATE file_refs SET access_time = ? WHERE key = ?;
 ```
 
-`big_cache.db` 同理：
+## 6. Write-behind Batching（Postbox 模式）
 
-```sql
-UPDATE big_cache SET access_time = ? WHERE key = ?;
-```
-
-## 6. big_cache.db 表结构
-
-### 6.1 建表 SQL
-
-```sql
--- 大文件索引表
-CREATE TABLE IF NOT EXISTS big_cache (
-    key         TEXT PRIMARY KEY,       -- "big_<hash>"
-    file_path   TEXT NOT NULL,          -- 绝对路径
-    mime_type   TEXT DEFAULT '',
-    tag         INTEGER DEFAULT 0,
-    access_time INTEGER NOT NULL,
-    size        INTEGER NOT NULL,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_bigcache_tag ON big_cache(tag);
-CREATE INDEX IF NOT EXISTS idx_bigcache_access ON big_cache(access_time);
-```
-
-### 6.2 文件系统目录结构
-
-```
-~/.cache/toxhttpd/
-├── files/          # 中型文件 (1MB–30MB)
-│   ├── a1/
-│   │   └── a1b2c3d4e5f6....jpg
-│   └── b2/
-│       └── b2c3d4e5f6....gif
-├── big/            # 大文件 (>30MB)
-│   ├── c3/
-│   │   └── c3d4e5f6....mp4
-│   └── d4/
-│       └── d4e5f6....pdf
-└── cache.db        # 小文件缓存
-```
-
-子目录用 hash 前两个字符分片，避免单目录内有太多文件。
-
-## 7. Write-behind Batching（Postbox 模式）
-
-### 7.1 为什么需要 write-behind
+### 6.1 为什么需要 write-behind
 
 如果每次收到消息都立刻写 SQLite：
 
@@ -793,7 +747,7 @@ Write-behind 模式：
               → 1次 fsync → <1ms
 ```
 
-### 7.2 Storage 类设计
+### 6.2 Storage 类设计
 
 ```cpp
 class Storage {
@@ -875,7 +829,7 @@ private:
 };
 ```
 
-### 7.3 写入流程
+### 6.3 写入流程
 
 ```
 主线程：
@@ -893,7 +847,7 @@ MainWindow::handleEvents → 收到消息
         → clear pending list
 ```
 
-### 7.4 读流程（直接读 DB）
+### 6.4 读流程（直接读 DB）
 
 ```cpp
 std::vector<ChatElement> Storage::loadMessages(const QString& chanid, int limit) {
@@ -922,7 +876,7 @@ std::vector<ChatElement> Storage::loadMessages(const QString& chanid, int limit)
 }
 ```
 
-### 7.5 事务合并
+### 6.5 事务合并
 
 对于高频写入的场景（如批量收到 50 条历史消息），全部 append 后再一次性 commit：
 
@@ -938,34 +892,31 @@ void Storage::appendMessageBatch(const QString& chanid,
 }
 ```
 
-## 8. 缓存上限与清理策略
+## 7. 缓存上限与清理策略
 
-### 8.1 清理范围
+### 7.1 清理范围
 
 | 数据库 | 自动 LRU 驱逐 | 用户手动清理 | 被动删除 |
 |--------|--------------|-------------|---------|
 | message.db | ❌ 永久保留 | ❌ 不提供 | ✅ 删好友/群组时 clearChannel() |
 | cache.db   | ✅ 达 200MB 或 300 天 | ✅ 按 tag 选择清除 | ❌ 自动处理 |
-| big_cache.db | ✅ 达 500MB 或 70 天 | ✅ 全部清除 | ❌ 自动处理 |
 
 - **自动 LRU 驱逐**：后台定时器检查上限，超出则按 access_time 删最旧文件
 - **用户手动清理**：设置页提供"清除头像缓存""清除图片缓存""清除所有缓存"按钮
 - **被动删除**：用户删除好友/群组时连带清空对应消息和媒体缓存
 
-> **message.db 不受影响。** 以下驱逐逻辑仅针对 cache.db 和 big_cache.db。
+> **message.db 不受影响。** 以下驱逐逻辑仅针对 cache.db。
 
-### 8.2 自动驱逐配置
+### 7.2 自动驱逐配置
 
 ```cpp
 struct CacheSettings {
     int64_t totalSizeLimit   = 200 * 1024 * 1024;     // 200MB
     int64_t totalTimeLimit   = 30 * 24 * 60 * 60;     // 30天（秒）
-    int64_t bigTotalSizeLimit = 500 * 1024 * 1024;     // 500MB
-    int64_t bigTotalTimeLimit = 7 * 24 * 60 * 60;      // 7天（大文件占空间）
 };
 ```
 
-### 8.3 LRU 驱逐算法
+### 7.3 LRU 驱逐算法
 
 定时执行（QTimer 每 5 分钟 + 写入后检查）：
 
@@ -988,28 +939,9 @@ void Storage::evictIfNeeded() {
         step(stmt);
         finalize(stmt);
     }
-
-    // big_cache.db 大文件驱逐（先删文件，再删索引）
-    int64_t bigTotalSize = getBigCacheSize();
-    if (bigTotalSize > m_settings.bigTotalSizeLimit) {
-        int64_t targetSize = m_settings.bigTotalSizeLimit * 0.8;
-        sqlite3_stmt* stmt = prepare(
-            "SELECT key, file_path FROM big_cache"
-            "  WHERE access_time < ?"
-            "  ORDER BY access_time ASC LIMIT 100"
-        );
-        bindInt64(stmt, 1, time(nullptr) - m_settings.bigTotalTimeLimit);
-        while (step(stmt) == SQLITE_ROW) {
-            QFile::remove(columnText(stmt, 1));            // 删文件
-            exec("DELETE FROM big_cache WHERE key = ?",
-                 columnText(stmt, 0));                     // 删索引
-        }
-        finalize(stmt);
-    }
-}
 ```
 
-### 8.4 手动清理
+### 7.4 手动清理
 
 ```cpp
 // 清空所有缓存
@@ -1019,7 +951,7 @@ void Storage::clearAllCache();
 void Storage::clearCacheByTag(CacheTag tag); // 0=全部清除
 ```
 
-### 8.5 频道数据删除
+### 7.5 频道数据删除
 
 用户删除好友/群组时连带清理对应数据（`translations` 由 `ON DELETE CASCADE` 自动清理，无需显式 DELETE）：
 
@@ -1034,28 +966,16 @@ void Storage::clearChannel(const QString& chanid) {
 }
 ```
 
-### 8.6 文件系统清理
+## 8. SQLite 版本要求与安装方案
 
-当 `big_cache.db` 中驱逐一条记录时，同时删除文件系统中的文件：
-
-```cpp
-void Storage::removeBigFile(const QString& key) {
-    QString filePath = getBigFilePath(key);
-    QFile::remove(filePath);
-    exec("DELETE FROM big_cache WHERE key = ?", key);
-}
-```
-
-## 9. SQLite 版本要求与安装方案
-
-### 9.1 版本要求
+### 8.1 版本要求
 
 | 功能 | 最低版本 | 引入 |
 |------|---------|------|
 | WAL 模式 | 3.7.0 (2010) | 基础存储 |
 | FTS5 + trigram CJK 搜索 | 3.34.0 (2020-12) | 全文搜索 |
 
-### 9.2 方案总览
+### 8.2 方案总览
 
 两种方案，`.pro` 编译时自动检测：
 
@@ -1066,7 +986,7 @@ void Storage::removeBigFile(const QString& key) {
 
 主流 IM（Telegram、Signal、Chrome）均采用方案 B。
 
-### 9.3 编译时自动检测
+### 8.3 编译时自动检测
 
 ```qmake
 # qltox.pro — SQLite 方案自动选择
@@ -1083,7 +1003,7 @@ system("echo 'CREATE VIRTUAL TABLE t USING fts5(c,tokenize=trigram);' | \
 }
 ```
 
-### 9.4 方案 A：系统 libsqlite3
+### 8.4 方案 A：系统 libsqlite3
 
 ```bash
 # 安装
@@ -1095,7 +1015,7 @@ sqlite3 --version                                    # ≥ 3.34.0
 sqlite3 :memory: "CREATE VIRTUAL TABLE t USING fts5(c, tokenize='trigram');"  # 无报错
 ```
 
-### 9.5 方案 B：Bundled Amalgamation
+### 8.5 方案 B：Bundled Amalgamation
 
 ```bash
 # 1. 下载
@@ -1114,7 +1034,7 @@ cd qltox && bash buildqt3.sh
 ldd qltox | grep sqlite     # 不应显示 libsqlite3.so
 ```
 
-### 9.6 新增文件
+### 8.6 新增文件
 
 | 文件 | 说明 |
 |------|------|
@@ -1122,7 +1042,7 @@ ldd qltox | grep sqlite     # 不应显示 libsqlite3.so
 | `qltox/sqlite3/sqlite3.h` | 头文件 |
 | `qltox/sqlite3/sqlite3ext.h` | FTS5 扩展接口 |
 
-### 9.7 运行时检测
+### 8.7 运行时检测
 
 ```cpp
 // Storage::init() 中调用
@@ -1158,7 +1078,7 @@ void checkSqliteFeatures() {
 }
 ```
 
-### 9.8 启动日志示例
+### 8.8 启动日志示例
 
 ```
 SQLite version: 3.45.1
@@ -1174,7 +1094,7 @@ FTS5: NOT AVAILABLE - no such module: fts5
 → 需要升级 SQLite 或改用 bundled
 ```
 
-### 9.9 `.gitignore` 建议
+### 8.9 `.gitignore` 建议
 
 ```
 qltox/sqlite3/*.c
@@ -1183,7 +1103,7 @@ qltox/sqlite3/*.o
 
 大文件不提交，由开发者手动下载或 CI 脚本自动获取。
 
-## 10. LoadToCacheSetting 枚举
+## 9. LoadToCacheSetting 枚举
 
 参考 TG 的 `LoadToCacheAsWell` / `LoadToCacheNotRequired`：
 
@@ -1201,7 +1121,7 @@ enum LoadToCache {
 - 视频 → `LoadToCacheSkip`（太大，stream 模式，播放完可丢弃）
 - 链接预览缩略图 → `LoadToCacheAsWell`：存 thumbnail_key
 
-## 11. 统计 + 设置 UI 映射
+## 10. 统计 + 设置 UI 映射
 
 ### 10.1 统计接口
 
@@ -1213,15 +1133,7 @@ struct TagStats {
 
 struct StorageStats {
     TagStats byTag[6];         // 0=total, 1-5=各 tag
-    TagStats bigFiles;
     int64_t messageCount = 0;
-
-    // 总缓存大小
-    int64_t totalCacheSize() const {
-        int64_t sum = 0;
-        for (int i = 0; i < 6; ++i) sum += byTag[i].totalSize;
-        return sum + bigFiles.totalSize;
-    }
 };
 
 StorageStats Storage::getStats() {
@@ -1231,11 +1143,6 @@ StorageStats Storage::getStats() {
         [&](sqlite3_stmt* s) {
             int tag = columnInt(s, 0);
             stats.byTag[tag] = {columnInt64(s, 1), columnInt(s, 2)};
-        });
-    // big_cache.db 汇总
-    sql("SELECT SUM(size), COUNT(*) FROM big_cache",
-        [&](sqlite3_stmt* s) {
-            stats.bigFiles = {columnInt64(s, 0), columnInt(s, 1)};
         });
     // message count
     stats.messageCount = queryInt("SELECT COUNT(*) FROM messages");
@@ -1255,9 +1162,9 @@ StorageStats Storage::getStats() {
 | "清除所有缓存" | `clearAllCache()` | 同上 |
 | "自动清理" | `CacheSettings` 保存在 QSettings | BoolConfigItem |
 
-## 13. 集成到现有的 ChatElement
+## 11. 集成到现有的 ChatElement
 
-### 12.1 消息接收流程（新）
+### 11.1 消息接收流程（新）
 
 ```
 收到消息（handleEvents）
@@ -1275,7 +1182,7 @@ StorageStats Storage::getStats() {
     └──→ 显示消息
 ```
 
-### 12.2 切换 channel 流程（新）
+### 11.2 切换 channel 流程（新）
 
 ```
 onContactSelected(id, type)
@@ -1289,7 +1196,7 @@ onContactSelected(id, type)
     └──→ ChatView::restoreMessages(msgs)
 ```
 
-### 12.3 媒体下载完成流程（新）
+### 11.3 媒体下载完成流程（新）
 
 ```
 AvatarDownloadEvent (success)
@@ -1299,7 +1206,7 @@ AvatarDownloadEvent (success)
     └──→ Storage::storeMedia("avatar_<hash>", pixmapBytes, "image/png", kAvatarCacheTag)
 ```
 
-### 12.4 启动初始化
+### 11.4 启动初始化
 
 ```cpp
 // main.cpp 或 MainWindow 构造函数
@@ -1310,7 +1217,7 @@ if (!Storage::instance().init(
 }
 ```
 
-## 14. 文件改动清单
+## 12. 文件改动清单
 
 ### 新增文件
 
@@ -1338,7 +1245,7 @@ if (!Storage::instance().init(
 | `translator.h/cpp` | 无关 |
 | `LimeStyle.*` | 无关 |
 | `AvatarManager` | 只负责缩放+圆形裁剪，存储由 Storage 处理 |
-## 15. 与现有 AvatarManager 的关系
+## 13. 与现有 AvatarManager 的关系
 
 `AvatarManager` 目前是内存缓存 + identicon fallback。与 `Storage` 的职责划分：
 
@@ -1362,7 +1269,7 @@ AvatarManager           Storage
 3. identicon fallback（无缓存时）
 ```
 
-## 16. 实施步骤
+## 14. 实施步骤
 
 ### 第一阶段：基础设施（第 1–3 天）
 
@@ -1386,38 +1293,29 @@ AvatarManager           Storage
 3. 实现缩略图缓存逻辑
 4. 集成 `AvatarManager` 读取 Storage
 
-### 第四阶段：big_cache.db + 驱逐（第 11–13 天）
-
-1. 设计并创建 big_cache.db schema
-2. 实现文件系统目录管理
-3. 实现 LRU 驱逐 + 定时器
-4. 实现统计接口
-
-### 第六阶段：测试+调试（5 天）
+### 第四阶段：测试+调试（5 天）
 
 1. Qt3 编译测试
 2. Qt4 编译测试
 3. 发送消息 → 检查 message.db 是否写入
 4. 重启客户端 → 检查消息是否恢复
 5. 发送图片 → 检查 cache.db 是否缓存
-6. 发送大文件 → 检查 big_cache.db 是否索引 + 文件落盘
-7. 缓存满 → 检查 LRU 驱逐
-8. 切换 channel → 检查消息是否从 DB 加载
-9. 删除好友/群组 → 检查对应消息是否清除
+6. 缓存满 → 检查 LRU 驱逐
+7. 切换 channel → 检查消息是否从 DB 加载
+8. 删除好友/群组 → 检查对应消息是否清除
 
-## 17. 时间估算汇总
+## 15. 时间估算汇总
 
 | 阶段 | 时间 |
 |------|------|
 | 第一阶段：基础设施（Database 封装 + WAL） | 3 天 |
 | 第二阶段：message.db + write-behind | 4 天 |
 | 第三阶段：cache.db + 媒体缓存 | 3 天 |
-| 第四阶段：big_cache.db + LRU 驱逐 | 3 天 |
-| 第六阶段：测试调试 | 5 天 |
+| 第四阶段：测试调试 | 5 天 |
 | 缓冲 | 2 天 |
-| **总计** | **20 天** |
+| **总计** | **17 天** |
 
-## 18. 风险点
+## 16. 风险点
 
 | 风险 | 严重度 | 应对 |
 |------|--------|------|
@@ -1428,7 +1326,7 @@ AvatarManager           Storage
 | 磁盘占满 | 低 | LRU 驱逐保证缓存不超限；启动时检查磁盘空间 |
 | Qt3/Qt4 DB 相关 API 差异 | 中 | Database 封装层已隔离；`.pro` 区分 |
 
-## 19. 验证方式
+## 17. 验证方式
 
 ```bash
 # 编译验证
