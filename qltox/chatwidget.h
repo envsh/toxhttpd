@@ -43,6 +43,7 @@ signals:
     void languageChanged(const QString& langCode);
     void fileSendRequested(const QString& filePath);
     void translateRequested(int msgIndex, const QString& text, const QString& targetLang);
+    void translateForSendRequested(const QString& text, const QString& targetLang);
     void sourceClicked(int msgIndex);
     void retryClicked(int msgIndex, const QString& mediaUrl);
 
@@ -55,6 +56,7 @@ private slots:
     void onEmojiInsert(const QString& emoji);
     void onFileClicked();
     void onFilePaste(const QString& filePath);
+    void onSendEnClicked();
     void onTranslateClicked(int msgIndex);
     void onMentionClicked(const QString& username);
     void hideUnreadBanner();
@@ -78,6 +80,7 @@ private:
     EmojiPushButton* emojiBtn;
     EmojiPushButton* fileBtn;
     QPushButton* sendBtn;
+    QPushButton* m_sendEnBtn;
     EmojiPicker* emojiPicker;
     std::string m_targetLang;
 };

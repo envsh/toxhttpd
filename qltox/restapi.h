@@ -79,6 +79,7 @@ public:
     static void getRandomName();
     static void setSelfInfo(const std::string& name, const std::string& statusMessage);
     static void translate(const std::string& text, const std::string& toLang, int msgIndex);
+    static void translateForSend(const std::string& text, const std::string& toLang);
     static void lazyLoadFriendDetail(int friendId);
     static std::string urlEncode(const std::string& str);
 

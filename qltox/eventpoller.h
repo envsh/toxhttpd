@@ -43,6 +43,7 @@ enum ApiRequestType {
     ApiAddFriend,
     ApiJoinConference,
     ApiTranslate,
+    ApiTranslateForSend,
     ApiSetSelfInfo,
     ApiDeleteFriend,
     ApiCreateConference,
@@ -212,6 +213,14 @@ class TranslateResultEvent : public ApiResultEvent {
 public:
     TranslateResultEvent() : ApiResultEvent(ApiTranslate) {}
     int msgIndex = 0;
+    bool success = false;
+    std::string translatedText;
+    std::string errorMessage;
+};
+
+class TranslateForSendResultEvent : public ApiResultEvent {
+public:
+    TranslateForSendResultEvent() : ApiResultEvent(ApiTranslateForSend) {}
     bool success = false;
     std::string translatedText;
     std::string errorMessage;

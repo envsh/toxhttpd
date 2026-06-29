@@ -44,6 +44,7 @@ public:
     void onSwitchAccount();
     void loadMessageHistory();
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
+    void onTranslateForSendRequested(const QString& text, const QString& targetLang);
     void onSourceClicked(int msgIndex);
     void onRetryClicked(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);

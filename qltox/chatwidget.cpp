@@ -110,6 +110,11 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     sendBtn->setFixedSize(twoLineH, twoLineH);
     inputGrid->addMultiCellWidget(sendBtn, 0, 1, 2, 2);
     inputGrid->setColStretch(0, 1);
+
+    m_sendEnBtn = new QPushButton("Send EN", this);
+    m_sendEnBtn->setFixedWidth(60);
+    m_sendEnBtn->setFixedHeight(twoLineH);
+    inputGrid->addMultiCellWidget(m_sendEnBtn, 0, 1, 3, 3);
 #else
     QGridLayout* inputGrid = new QGridLayout();
     inputGrid->setSpacing(2);
@@ -128,6 +133,11 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     sendBtn->setFixedSize(twoLineH, twoLineH);
     inputGrid->addWidget(sendBtn, 0, 2, 2, 1);
     inputGrid->setColumnStretch(0, 1);
+
+    m_sendEnBtn = new QPushButton("Send EN", this);
+    m_sendEnBtn->setFixedWidth(60);
+    m_sendEnBtn->setFixedHeight(twoLineH);
+    inputGrid->addWidget(m_sendEnBtn, 0, 3, 2, 1);
 #endif
 
         inputEdit->setPlaceholderText(_("placeholders.type_message"));
@@ -137,6 +147,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     connect(emojiPicker, SIGNAL(emojiSelected(const QString&)), this, SLOT(onEmojiInsert(const QString&)));
     
     connect(sendBtn, SIGNAL(clicked()), this, SLOT(onSendClicked()));
+    connect(m_sendEnBtn, SIGNAL(clicked()), this, SLOT(onSendEnClicked()));
     connect(inputEdit, SIGNAL(sendRequested()), this, SLOT(onSendClicked()));
     connect(emojiBtn, SIGNAL(clicked()), this, SLOT(onEmojiClicked()));
     connect(fileBtn, SIGNAL(clicked()), this, SLOT(onFileClicked()));
@@ -261,6 +272,28 @@ void ChatWidget::onSendClicked() {
     cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
     cursor.removeSelectedText();
 #endif
+}
+
+void ChatWidget::onSendEnClicked() {
+#ifdef QT3_BUILD
+    QString msg = qTrim(inputEdit->text());
+#else
+    QString msg = qTrim(inputEdit->toPlainText());
+#endif
+    if (msg.isEmpty()) return;
+
+    inputEdit->saveToHistory(msg);
+    appendMessage(msg, "self", "Me", QString(), -1, getCurrentTime());
+#ifdef QT3_BUILD
+    inputEdit->selectAll();
+    inputEdit->removeSelectedText();
+#else
+    QTextCursor cursor = inputEdit->textCursor();
+    cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+    cursor.removeSelectedText();
+#endif
+    emit translateForSendRequested(msg, "en");
 }
 
 void ChatWidget::retranslateUi() {

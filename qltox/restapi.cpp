@@ -401,6 +401,14 @@ void ToxAPI::translate(const std::string& text, const std::string& toLang, int m
     request({"/api/translate", "POST", postData}, ctx);
 }
 
+void ToxAPI::translateForSend(const std::string& text, const std::string& toLang) {
+    auto* ctx = new ApiCtx(ApiTranslateForSend);
+    ctx->str1 = text;
+    ctx->str2 = toLang;
+    std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
+    request({"/api/translate", "POST", postData}, ctx);
+}
+
 void ToxAPI::lazyLoadFriendDetail(int friendId) {
     auto* ctx = new ApiCtx(ApiLoadFriendDetail, friendId);
     request({"/api/friend", "POST",
@@ -1031,6 +1039,34 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         auto* ev = new TranslateResultEvent();
         ev->elapsedMs = resp.elapsedMs;
         ev->msgIndex = ctx->id;
+        if (resp.httpCode != 200 || resp.body.empty()) {
+            ev->errorMessage = "NETWORK_ERROR: cannot connect to server";
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* root = cJSON_Parse(resp.body.c_str());
+        if (!root) {
+            ev->errorMessage = "PARSE_ERROR: invalid server response";
+            QApplication::postEvent(s_target, ev);
+            break;
+        }
+        cJSON* t = cJSON_GetObjectItem(root, "translated_text");
+        if (t && cJSON_IsString(t)) {
+            ev->success = true;
+            ev->translatedText = cJSON_GetStringValue(t);
+        } else {
+            std::string err = jsonStr(cJSON_GetObjectItem(root, "error"));
+            std::string code = jsonStr(cJSON_GetObjectItem(root, "code"));
+            ev->errorMessage = (code.empty() ? "UNKNOWN" : code) + ": " + (err.empty() ? "translate failed" : err);
+        }
+        cJSON_Delete(root);
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiTranslateForSend: {
+        auto* ev = new TranslateForSendResultEvent();
+        ev->elapsedMs = resp.elapsedMs;
         if (resp.httpCode != 200 || resp.body.empty()) {
             ev->errorMessage = "NETWORK_ERROR: cannot connect to server";
             QApplication::postEvent(s_target, ev);

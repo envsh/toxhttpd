@@ -390,6 +390,8 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onLanguageChanged(const QString&)));
     connect(chatWidget, SIGNAL(translateRequested(int, const QString&, const QString&)),
             this, SLOT(onTranslateRequested(int, const QString&, const QString&)));
+    connect(chatWidget, SIGNAL(translateForSendRequested(const QString&, const QString&)),
+            this, SLOT(onTranslateForSendRequested(const QString&, const QString&)));
     connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
     connect(chatWidget, SIGNAL(retryClicked(int, const QString&)), this, SLOT(onRetryClicked(int, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
@@ -773,6 +775,31 @@ void MainWindow::customEvent(CustomEventBase* event) {
             chatWidget->onTranslateResult(tev->msgIndex, tev->success,
                 qFromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()),
                 qFromUtf8(tev->errorMessage.data(), (int)tev->errorMessage.size()));
+            return;
+        }
+
+        // Send EN 翻译结果
+        if (e->type == ApiTranslateForSend) {
+            TranslateForSendResultEvent* tev = static_cast<TranslateForSendResultEvent*>(event);
+            if (tev->success) {
+                chatWidget->loadingBar()->showLoading(kLoadSendMsg,
+                    _("sending_message"));
+                std::string type = std::string(qToUtf8(currentChatType).data());
+                std::string idOverride;
+                if (type == kGomuksRoomType || type == kUnktoxConferenceType
+                    || type == kUnktoxFriendType || type == kUnktoxGroupType) {
+                    for (const auto& cd : m_accumulatedContactData) {
+                        if (cd.id == currentChatId && cd.type == type) {
+                            idOverride = cd.chatId;
+                            break;
+                        }
+                    }
+                }
+                ToxAPI::sendMessage(currentChatId, type, tev->translatedText, idOverride);
+            } else {
+                chatWidget->loadingBar()->hideLoading(kLoadSendMsg);
+                ToastWidget::show(chatWidget, "翻译失败", 8000);
+            }
             return;
         }
     }
@@ -2188,6 +2215,10 @@ void MainWindow::loadMessageHistory() {
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
     ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)), msgIndex);
+}
+
+void MainWindow::onTranslateForSendRequested(const QString& text, const QString& targetLang) {
+    ToxAPI::translateForSend(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)));
 }
 
 void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
