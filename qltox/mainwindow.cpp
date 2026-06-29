@@ -43,23 +43,23 @@ struct PeerKey {
     int peerNum = 0;
     bool valid = false;
 };
-static PeerKey parsePeerKey(const std::string& key, const PeerInfo& pi) {
+static PeerKey parsePeerKey(const std::string& key) {
     PeerKey ret;
     if (key.compare(0, 7, "friend_") == 0) {
         ret.chanid = "friend:" + key.substr(7);
-        ret.peerNum = pi.peerNumber;
+        ret.peerNum = std::stoi(key.substr(7));
         ret.valid = true;
     } else if (key.compare(0, 6, "group_") == 0) {
         size_t us = key.find('_', 6);
         if (us == std::string::npos) { return ret; }
         ret.chanid = "group:" + key.substr(6, us - 6);
-        ret.peerNum = pi.peerNumber;
+        ret.peerNum = std::stoi(key.substr(us + 1));
         ret.valid = true;
     } else if (key.compare(0, 11, "conference_") == 0) {
         size_t us = key.find('_', 11);
         if (us == std::string::npos) { return ret; }
         ret.chanid = "conference:" + key.substr(11, us - 11);
-        ret.peerNum = pi.peerNumber;
+        ret.peerNum = std::stoi(key.substr(us + 1));
         ret.valid = true;
     } else if (key.compare(0, 8, "unknown_") == 0) {
         ret.chanid = "unknown:" + key.substr(8);
@@ -69,9 +69,46 @@ static PeerKey parsePeerKey(const std::string& key, const PeerInfo& pi) {
     return ret;
 }
 
-static void addPeerToDb(const std::string& key, const PeerInfo& pi) {
-    PeerKey pk = parsePeerKey(key, pi);
-    if (!pk.valid) { return; }
+// Row→PeerInfo 转换 + 写入 peerInfoMap + 可选 avatar 下载
+// 返回 map iterator，失败返回 end()
+static std::map<std::string, PeerInfo>::iterator
+loadRowToMap(std::map<std::string, PeerInfo>& m,
+             const std::string& key,
+             std::unique_ptr<PeerRow> row)
+{
+    if (!row) return m.end();
+    PeerInfo pi;
+    pi.peerNumber = row->peer_number;
+    pi.publicKey  = row->public_key;
+    pi.name       = row->name;
+    pi.nickname   = row->nickname;
+    pi.iconUrl    = row->avatar_url;
+    pi.statusText = row->status_text;
+    pi.statusStr  = row->status_str;
+    pi.userStatus = row->user_status;
+    pi.peerIp     = row->peer_ip;
+    pi.role       = row->role;
+    pi.roleStr    = row->role_str;
+    pi.isSelf     = row->is_self;
+    pi.lastSeen   = (time_t)row->last_seen;
+    pi.status     = row->status;
+    auto result = m.insert({key, pi});
+    if (result.second && !pi.iconUrl.empty()) {
+        QString mxc = qFromUtf8(pi.iconUrl);
+        if (AvatarManager::inst().requestDownload(mxc)) {
+            ToxAPI::downloadAvatar(pi.iconUrl);
+        }
+    }
+    return result.first;
+}
+
+static bool addPeerToDb(const std::string& key, const PeerInfo& pi) {
+    PeerKey pk = parsePeerKey(key);
+    if (!pk.valid) { return false; }
+    if (pi.nickname.empty() && pi.iconUrl.empty()) {
+        qWarning("addPeerToDb: skip, key=%s", key.c_str());
+        return false;
+    }
     PeerRow row;
     row.chanid = pk.chanid;
     row.peer_number = pk.peerNum;
@@ -92,10 +129,11 @@ static void addPeerToDb(const std::string& key, const PeerInfo& pi) {
     if (async) {
         async->add_peer(std::move(row), nullptr);
     }
+    return true;
 }
 
 static void updatePeerInDb(const std::string& key, const PeerInfo& pi) {
-    PeerKey pk = parsePeerKey(key, pi);
+    PeerKey pk = parsePeerKey(key);
     if (!pk.valid) { return; }
     if (pk.chanid.compare(0, 8, "unknown:") == 0) { return; } // unknown 不走部分更新
     PeerRow row;
@@ -943,29 +981,62 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString message = qFromUtf8(cJSON_GetStringValue(messageItem));
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
-                    // 更新 peer info 缓存
-                    if (peerNameItem && cJSON_IsString(peerNameItem)) {
-                        std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
-                        peerInfoMap[key].name = std::string(cJSON_GetStringValue(peerNameItem));
-                        peerInfoMap[key].peerNumber = peerNumber;
-                        updatePeerInDb(key, peerInfoMap[key]);
+                    std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
+                    auto it = peerInfoMap.find(key);
+
+                    if (it == peerInfoMap.end()) {
+                        qWarning("conference_message: peer record load, key=%s", key.c_str());
+                        PeerKey pk = parsePeerKey(key);
+                        if (pk.valid) {
+                            auto row = Storage::instance().channelDb()->get_chan_peer(
+                                pk.chanid.c_str(), pk.peerNum);
+                            it = loadRowToMap(peerInfoMap, key, std::move(row));
+                        }
+                        if (it == peerInfoMap.end()) {
+                            it = peerInfoMap.insert({key, PeerInfo()}).first;
+                        }
+                    } else {
+                        // 第二层：key 已存在，逐个检查缺失字段
+                        bool needsNick = it->second.nickname.empty();
+                        bool needsAvatar = it->second.iconUrl.empty();
+                        if (needsNick || needsAvatar) {
+                            qWarning("conference_message: peer field fill, key=%s nick=%s avatar=%s",
+                                     key.c_str(), needsNick?"miss":"hit", needsAvatar?"miss":"hit");
+                            PeerKey pk = parsePeerKey(key);
+                            if (pk.valid) {
+                                auto row = Storage::instance().channelDb()->get_chan_peer(
+                                    pk.chanid.c_str(), pk.peerNum);
+                                if (row) {
+                                    if (needsNick && !row->nickname.empty()) {
+                                        it->second.nickname = row->nickname;
+                                    }
+                                    if (needsAvatar && !row->avatar_url.empty()) {
+                                        it->second.iconUrl = row->avatar_url;
+                                        QString mxc = qFromUtf8(it->second.iconUrl);
+                                        if (AvatarManager::inst().requestDownload(mxc)) {
+                                            ToxAPI::downloadAvatar(it->second.iconUrl);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+
+                    if (peerNameItem && cJSON_IsString(peerNameItem)) {
+                        it->second.name = std::string(cJSON_GetStringValue(peerNameItem));
+                        it->second.peerNumber = peerNumber;
+                    }
+                    updatePeerInDb(key, it->second);
 
                     qWarning("confNumber=%d, currentChatId=%d, currentChatType=%s, match=%d",
                              confNumber, currentChatId, qToUtf8(currentChatType).data(),
                              (confNumber == currentChatId && currentChatType == "conference"));
                     
                     if (confNumber == currentChatId && currentChatType == "conference") {
-                        // 查询缓存获取 peer 名字
-                        std::string key = "conference_" + std::to_string(confNumber) + "_" + std::to_string(peerNumber);
-                        auto it = peerInfoMap.find(key);
-                        QString senderName;
+                        QString senderName = qFromUtf8(it->second.name);
                         QString senderNickname;
-                        if (it != peerInfoMap.end()) {
-                            senderName = qFromUtf8(it->second.name);
-                            if (!it->second.nickname.empty())
-                                senderNickname = qFromUtf8(it->second.nickname);
-                        }
+                        if (!it->second.nickname.empty())
+                            senderNickname = qFromUtf8(it->second.nickname);
                         qWarning("Appending conference message: %s", qToUtf8(message).data());
                         chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime());
                     } else {
@@ -1010,27 +1081,59 @@ void MainWindow::handleEvents(const EventList& events) {
                     QString message = qFromUtf8(cJSON_GetStringValue(messageItem));
                     int peerNumber = peerNumberItem ? peerNumberItem->valueint : -1;
                     
-                    // 更新 peer info 缓存
-                    if (peerNameItem && cJSON_IsString(peerNameItem)) {
-                        std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
-                        peerInfoMap[key].name = std::string(cJSON_GetStringValue(peerNameItem));
-                        peerInfoMap[key].peerNumber = peerNumber;
-                        updatePeerInDb(key, peerInfoMap[key]);
+                    std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
+                    auto it = peerInfoMap.find(key);
+
+                    if (it == peerInfoMap.end()) {
+                        qWarning("group_message: peer record load, key=%s", key.c_str());
+                        PeerKey pk = parsePeerKey(key);
+                        if (pk.valid) {
+                            auto row = Storage::instance().channelDb()->get_chan_peer(
+                                pk.chanid.c_str(), pk.peerNum);
+                            it = loadRowToMap(peerInfoMap, key, std::move(row));
+                        }
+                        if (it == peerInfoMap.end()) {
+                            it = peerInfoMap.insert({key, PeerInfo()}).first;
+                        }
+                    } else {
+                        // 第二层：key 已存在，逐个检查缺失字段
+                        bool needsNick = it->second.nickname.empty();
+                        bool needsAvatar = it->second.iconUrl.empty();
+                        if (needsNick || needsAvatar) {
+                            qWarning("group_message: peer field fill, key=%s nick=%s avatar=%s",
+                                     key.c_str(), needsNick?"miss":"hit", needsAvatar?"miss":"hit");
+                            PeerKey pk = parsePeerKey(key);
+                            if (pk.valid) {
+                                auto row = Storage::instance().channelDb()->get_chan_peer(
+                                    pk.chanid.c_str(), pk.peerNum);
+                                if (row) {
+                                    if (needsNick && !row->nickname.empty()) {
+                                        it->second.nickname = row->nickname;
+                                    }
+                                    if (needsAvatar && !row->avatar_url.empty()) {
+                                        it->second.iconUrl = row->avatar_url;
+                                        QString mxc = qFromUtf8(it->second.iconUrl);
+                                        if (AvatarManager::inst().requestDownload(mxc)) {
+                                            ToxAPI::downloadAvatar(it->second.iconUrl);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
+                    if (peerNameItem && cJSON_IsString(peerNameItem)) {
+                        it->second.name = std::string(cJSON_GetStringValue(peerNameItem));
+                        it->second.peerNumber = peerNumber;
+                    }
+                    updatePeerInDb(key, it->second);
+
                     if (groupNumber == currentChatId && currentChatType == "group") {
-                        // 查询缓存获取 peer 名字和 IP
-                        std::string key = "group_" + std::to_string(groupNumber) + "_" + std::to_string(peerNumber);
-                        auto it = peerInfoMap.find(key);
-                        QString senderName;
+                        QString senderName = qFromUtf8(it->second.name);
                         QString senderNickname;
-                        QString ipAddress;
-                        if (it != peerInfoMap.end()) {
-                            senderName = qFromUtf8(it->second.name);
-                            if (!it->second.nickname.empty())
-                                senderNickname = qFromUtf8(it->second.nickname);
-                            ipAddress = qFromUtf8(it->second.peerIp);
-                        }
+                        QString ipAddress = qFromUtf8(it->second.peerIp);
+                        if (!it->second.nickname.empty())
+                            senderNickname = qFromUtf8(it->second.nickname);
                         chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime(), "", ipAddress);
                     } else {
                         contactListWidget->incrementUnread(groupNumber, "group");
@@ -1225,6 +1328,14 @@ void MainWindow::handleEvents(const EventList& events) {
                         if (senderLabel.isEmpty()) {
                             std::string key = "unknown_" + hm.sender_pubkey;
                             auto it = peerInfoMap.find(key);
+                            if (it == peerInfoMap.end()) {
+                                PeerKey pk = parsePeerKey(key);
+                                if (pk.valid) {
+                                    auto row = Storage::instance().channelDb()->get_chan_peer(
+                                        pk.chanid.c_str(), pk.peerNum);
+                                    it = loadRowToMap(peerInfoMap, key, std::move(row));
+                                }
+                            }
                             if (it != peerInfoMap.end()) {
                                 userName = qFromUtf8(it->second.name);
                                 senderLabel = !it->second.nickname.empty()
@@ -1425,6 +1536,14 @@ void MainWindow::onViewInfoRequested(int id, const QString& type) {
     if (type == "friend") {
         std::string key = "friend_" + std::to_string(id);
         auto it = peerInfoMap.find(key);
+        if (it == peerInfoMap.end()) {
+            PeerKey pk = parsePeerKey(key);
+            if (pk.valid) {
+                auto row = Storage::instance().channelDb()->get_chan_peer(
+                    pk.chanid.c_str(), pk.peerNum);
+                it = loadRowToMap(peerInfoMap, key, std::move(row));
+            }
+        }
         if (it != peerInfoMap.end()) {
             if (it->second.statusText.empty())
                 ToxAPI::lazyLoadFriendDetail(id);
@@ -1908,6 +2027,14 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
             if (currentChatType == "friend") {
                 std::string key = "friend_" + std::to_string(currentChatId);
                 auto it = peerInfoMap.find(key);
+                if (it == peerInfoMap.end()) {
+                    PeerKey pk = parsePeerKey(key);
+                    if (pk.valid) {
+                        auto row = Storage::instance().channelDb()->get_chan_peer(
+                            pk.chanid.c_str(), pk.peerNum);
+                        it = loadRowToMap(peerInfoMap, key, std::move(row));
+                    }
+                }
                 if (it != peerInfoMap.end()) {
                     senderLabel = qFromUtf8(it->second.name);
                     if (!it->second.nickname.empty()) {
@@ -1915,11 +2042,38 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
                         senderNickname = n;
                     }
                 }
+            } else if (currentChatType == "unknown") {
+                std::string key = "unknown_" + msg.sender_pubkey;
+                auto it = peerInfoMap.find(key);
+                if (it == peerInfoMap.end()) {
+                    PeerKey pk = parsePeerKey(key);
+                    if (pk.valid) {
+                        auto row = Storage::instance().channelDb()->get_chan_peer(
+                            pk.chanid.c_str(), pk.peerNum);
+                        it = loadRowToMap(peerInfoMap, key, std::move(row));
+                    }
+                }
+                if (it != peerInfoMap.end()) {
+                    senderLabel = qFromUtf8(it->second.name);
+                    if (!it->second.nickname.empty()) {
+                        QString n = qFromUtf8(it->second.nickname);
+                        senderNickname = n;
+                    }
+                    ipAddress = qFromUtf8(it->second.peerIp);
+                }
             } else {
                 std::string key = std::string(qToUtf8(currentChatType).data())
                     + "_" + std::to_string(currentChatId)
                     + "_" + std::to_string(msg.sender_number);
                 auto it = peerInfoMap.find(key);
+                if (it == peerInfoMap.end()) {
+                    PeerKey pk = parsePeerKey(key);
+                    if (pk.valid) {
+                        auto row = Storage::instance().channelDb()->get_chan_peer(
+                            pk.chanid.c_str(), pk.peerNum);
+                        it = loadRowToMap(peerInfoMap, key, std::move(row));
+                    }
+                }
                 if (it != peerInfoMap.end()) {
                     senderLabel = qFromUtf8(it->second.name);
                     if (!it->second.nickname.empty()) {

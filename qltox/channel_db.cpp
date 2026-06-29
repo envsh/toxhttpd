@@ -146,16 +146,16 @@ public:
             " peer_ip,role,role_str,is_self,last_seen,status) "
             "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15) "
             "ON CONFLICT(chanid,peer_number) DO UPDATE SET "
-            "public_key=COALESCE(excluded.public_key,peers.public_key),"
-            "name=COALESCE(excluded.name,peers.name),"
-            "nickname=COALESCE(excluded.nickname,peers.nickname),"
-            "avatar_url=COALESCE(excluded.avatar_url,peers.avatar_url),"
-            "status_text=COALESCE(excluded.status_text,peers.status_text),"
-            "status_str=COALESCE(excluded.status_str,peers.status_str),"
-            "user_status=COALESCE(excluded.user_status,peers.user_status),"
-            "peer_ip=COALESCE(excluded.peer_ip,peers.peer_ip),"
+            "public_key=CASE WHEN excluded.public_key!='' THEN excluded.public_key ELSE peers.public_key END,"
+            "name=CASE WHEN excluded.name!='' THEN excluded.name ELSE peers.name END,"
+            "nickname=CASE WHEN excluded.nickname!='' THEN excluded.nickname ELSE peers.nickname END,"
+            "avatar_url=CASE WHEN excluded.avatar_url!='' THEN excluded.avatar_url ELSE peers.avatar_url END,"
+            "status_text=CASE WHEN excluded.status_text!='' THEN excluded.status_text ELSE peers.status_text END,"
+            "status_str=CASE WHEN excluded.status_str!='' THEN excluded.status_str ELSE peers.status_str END,"
+            "user_status=CASE WHEN excluded.user_status!='' THEN excluded.user_status ELSE peers.user_status END,"
+            "peer_ip=CASE WHEN excluded.peer_ip!='' THEN excluded.peer_ip ELSE peers.peer_ip END,"
             "role=excluded.role,"
-            "role_str=COALESCE(excluded.role_str,peers.role_str),"
+            "role_str=CASE WHEN excluded.role_str!='' THEN excluded.role_str ELSE peers.role_str END,"
             "is_self=excluded.is_self,"
             "last_seen=excluded.last_seen,"
             "status=excluded.status");
@@ -392,7 +392,7 @@ bool init_channel_db(SqliteDb& db) {
         "  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")");
     // peers v2: drop old single-key table, recreate with composite PK
-    db.exec("DROP TABLE IF EXISTS peers");
+    // db.exec("DROP TABLE IF EXISTS peers");
     ok = ok && db.exec(
         "CREATE TABLE IF NOT EXISTS peers ("
         "  chanid        TEXT NOT NULL,"
