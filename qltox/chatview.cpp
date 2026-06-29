@@ -2546,6 +2546,26 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
             }
         }
 
+        // Debug: hover avatar to see identicon seed info
+        {
+            const auto& item = m_items[msgIndex];
+            int msgY = msgAbsY(msgIndex) - m_scrollPos;
+            int ax = (item.category == "self")
+                ? (width() - kPad - kAvatarSize) : kPad;
+            QRect avatarRect(ax, msgY + kPad, kAvatarSize, kAvatarSize);
+            if (avatarRect.contains(event->pos())) {
+                QString s = item.senderName.isEmpty()
+                    ? QString::number(item.peerNumber)
+                    : QString::number(item.peerNumber) + "|" + item.senderName;
+                showTempTooltip(this, avatarRect,
+                    "seed: " + s
+                    + "\nname: " + item.senderName
+                    + "\nnick: " + item.senderNickname
+                    + "\npeer: " + QString::number(item.peerNumber)
+                    + "\nurl: " + item.avatarUrl);
+            }
+        }
+
         // ... compute charPos for link detection
         int curY = msgAbsY(msgIndex) - m_scrollPos;
         int localY = event->y() - curY;

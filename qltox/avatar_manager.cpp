@@ -18,9 +18,9 @@ AvatarManager& AvatarManager::inst() {
 }
 
 static QString avatarSeed(const QString& name, int peer) {
-    if (name.isEmpty())
-        return QString::number(peer);
-    return QString::number(peer) + "|" + name;
+    if (!name.isEmpty())
+        return name;
+    return QString::number(peer);
 }
 
 QPixmap AvatarManager::makeThumbnail(const QPixmap& source, int size) {

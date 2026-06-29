@@ -235,6 +235,8 @@ static bool unknownShouldPlaySound(const std::string& type,
         if (lowerMsg.find("@" + lowerName) != std::string::npos)
             return true;
     }
+    if (lowerMsg.find("funami.tech") != std::string::npos)
+        return true;
     return false;
 }
 
