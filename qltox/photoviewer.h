@@ -51,6 +51,7 @@ private:
     double m_dragOffX;
     double m_dragOffY;
     QPixmap m_cachedPixmap; // 按当前 scale/rotation 渲染好的离线缓冲图，拖动只改 offset 不复算变换
+    QPixmap m_doubleBuffer; // Qt3 双缓冲：全尺寸背景+缓存图，避免 fill+draw 闪烁
 };
 
 class PhotoViewer : public QDialog {

@@ -163,55 +163,57 @@ void PhotoCanvas::rebuildCache() {
 }
 
 void PhotoCanvas::paintEvent(QPaintEvent*) {
-    QPainter p(this);
+    {
+        QPainter bp(&m_doubleBuffer);
 #ifdef QT3_BUILD
-    p.fillRect(rect(), paletteBackgroundColor());
+        bp.fillRect(rect(), paletteBackgroundColor());
 #else
-    p.fillRect(rect(), palette().window().color());
+        bp.fillRect(rect(), palette().window().color());
 #endif
-
-    if (!m_cachedPixmap.isNull()) {
-        p.drawPixmap(qRound(m_offX), qRound(m_offY), m_cachedPixmap);
-    }
-
-    if (m_showHelp) {
+        if (!m_cachedPixmap.isNull()) {
+            bp.drawPixmap(qRound(m_offX), qRound(m_offY), m_cachedPixmap);
+        }
+        if (m_showHelp) {
 #ifdef QT3_BUILD
-        p.fillRect(rect(), QColor(0, 0, 0));
+            bp.fillRect(rect(), QColor(0, 0, 0));
 #else
-        p.fillRect(rect(), QColor(0, 0, 0, 180));
+            bp.fillRect(rect(), QColor(0, 0, 0, 180));
 #endif
-        p.setPen(Qt::white);
-        QFont f = font();
-        f.setPointSize(13);
-        p.setFont(f);
-        QFontMetrics fm(f);
+            bp.setPen(Qt::white);
+            QFont f = font();
+            f.setPointSize(13);
+            bp.setFont(f);
+            QFontMetrics fm(f);
 
-        static const char* helpLines[] = {
-            "快捷键帮助",
-            "",
-            "q / Esc    关闭",
-            "f / F11    全屏切换",
-            "s          保存",
-            "c / Ctrl+C 复制到剪贴板",
-            ">          顺时针旋转 90度",
-            "<          逆时针旋转 90度",
-            "上 / +     放大",
-            "下 / -     缩小",
-            "*          实际大小 100%",
-            "/          适应窗口",
-            "Z          切换自动适应",
-            "h          显示/隐藏帮助",
-        };
-        int numLines = sizeof(helpLines) / sizeof(helpLines[0]);
-        int lineH = fm.lineSpacing() + 4;
-        int textH = numLines * lineH;
-        int y0 = (height() - textH) / 2 + fm.ascent();
-        for (int i = 0; i < numLines; i++) {
-            QString s = qFromUtf8(helpLines[i]);
-            int tw = fm.width(s);
-            p.drawText((width() - tw) / 2, y0 + i * lineH, s);
+            static const char* helpLines[] = {
+                "快捷键帮助",
+                "",
+                "q / Esc    关闭",
+                "f / F11    全屏切换",
+                "s          保存",
+                "c / Ctrl+C 复制到剪贴板",
+                ">          顺时针旋转 90度",
+                "<          逆时针旋转 90度",
+                "上 / +     放大",
+                "下 / -     缩小",
+                "*          实际大小 100%",
+                "/          适应窗口",
+                "Z          切换自动适应",
+                "h          显示/隐藏帮助",
+            };
+            int numLines = sizeof(helpLines) / sizeof(helpLines[0]);
+            int lineH = fm.lineSpacing() + 4;
+            int textH = numLines * lineH;
+            int y0 = (height() - textH) / 2 + fm.ascent();
+            for (int i = 0; i < numLines; i++) {
+                QString s = qFromUtf8(helpLines[i]);
+                int tw = fm.width(s);
+                bp.drawText((width() - tw) / 2, y0 + i * lineH, s);
+            }
         }
     }
+    QPainter p(this);
+    p.drawPixmap(0, 0, m_doubleBuffer);
 }
 
 void PhotoCanvas::wheelEvent(QWheelEvent* event) {
@@ -268,6 +270,7 @@ void PhotoCanvas::mouseDoubleClickEvent(QMouseEvent* event) {
 
 void PhotoCanvas::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    m_doubleBuffer = QPixmap(size());
     if (m_fitMode) {
         fitToWindow();
     } else {
