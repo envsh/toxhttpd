@@ -327,7 +327,7 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
 
 static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
     ChatElement::ElementType etype,
-    const QPixmap& thumbnail, const QString& caption,
+    const QPixmap& fullImage, const QString& caption,
     int mediaWidth, int mediaHeight, int durationSec,
     QMovie* movie,
     const QFont& baseFont, const QFontMetrics& fm,
@@ -348,7 +348,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
             frame = movie->currentPixmap();
 #endif
     }
-    const QPixmap& src = !frame.isNull() ? frame : thumbnail;
+    const QPixmap& src = !frame.isNull() ? frame : fullImage;
     int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, state, downloadBtnOut, retryBtnOut, fileSize);
 
     // GIF badge
@@ -1195,7 +1195,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                                   bubbleRect.width() - 2*kBubbleHPad, bubbleRect.height() - 2*kBubbleVPad);
         }
         // WebP fallback: decode raw bytes to thumbnail
-        if (thumbnail.isNull() && !rawFileData.empty() && isWebP(rawFileData)) {
+        if (fullImage.isNull() && !rawFileData.empty() && isWebP(rawFileData)) {
             QPixmap wp = decodeWebP(rawFileData);
             if (!wp.isNull()) {
                 mediaWidth = wp.width();
@@ -1204,17 +1204,17 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 {
                     QImage tmpImg = wp.convertToImage();
                     QImage scaledImg = tmpImg.smoothScale(thumbnailRect.width(), thumbnailRect.height(), QImage::ScaleMax);
-                    thumbnail.convertFromImage(scaledImg);
+                    fullImage.convertFromImage(scaledImg);
                 }
 #else
-                thumbnail = wp.scaled(thumbnailRect.width(), thumbnailRect.height(),
+                fullImage = wp.scaled(thumbnailRect.width(), thumbnailRect.height(),
                                       Qt::KeepAspectRatio, Qt::SmoothTransformation);
 #endif
             }
         }
         // 预缩放缓存：避免每帧重新缩放全分辨率图片
-        QPixmap displayPixmap = thumbnail;
-        if (!thumbnail.isNull() && mediaWidth > 0 && mediaHeight > 0) {
+        QPixmap displayPixmap = fullImage;
+        if (!fullImage.isNull() && mediaWidth > 0 && mediaHeight > 0) {
             int maxW = thumbnailRect.width();
             // dw/dh 计算必须与 paintThumbnail() 一致，否则每帧 rescale
             int dw, dh;
@@ -1231,12 +1231,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             if (dw != scaledForDispW || dh != scaledForDispH) {
 #ifdef QT3_BUILD
                 {
-                    QImage img = thumbnail.convertToImage();
+                    QImage img = fullImage.convertToImage();
                     QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMin);
                     scaledDisplay.convertFromImage(scaledImg);
                 }
 #else
-                scaledDisplay = thumbnail.scaled(dw, dh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+                scaledDisplay = fullImage.scaled(dw, dh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 #endif
                 scaledForDispW = dw;
                 scaledForDispH = dh;
@@ -2647,9 +2647,9 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
             if ((m_items[msgIndex].etype == ChatElement::Image ||
                  m_items[msgIndex].etype == ChatElement::Video ||
                  m_items[msgIndex].etype == ChatElement::Gif) &&
-                (!m_items[msgIndex].thumbnail.isNull() || !m_items[msgIndex].rawFileData.empty()) &&
+                (!m_items[msgIndex].fullImage.isNull() || !m_items[msgIndex].rawFileData.empty()) &&
                 m_items[msgIndex].thumbnailRect.contains(event->pos())) {
-                QPixmap fullPix = m_items[msgIndex].thumbnail;
+                QPixmap fullPix = m_items[msgIndex].fullImage;
                 if (fullPix.isNull() && isWebP(m_items[msgIndex].rawFileData))
                     fullPix = decodeWebP(m_items[msgIndex].rawFileData);
                 if (fullPix.isNull()) return;
@@ -2813,7 +2813,7 @@ void ChatView::triggerVisibleDownloads() {
     for (int i = first; i <= last; i++) {
         ChatElement& el = m_items[i];
         if (!el.downloadRequested && el.downloadState == ChatElement::NotRequested
-            && el.thumbnail.isNull() && !el.mediaUrl.isEmpty()) {
+            && el.fullImage.isNull() && !el.mediaUrl.isEmpty()) {
             el.downloadRequested = true;
             qWarning("[VisibleTrigger] would download idx=%d type=%d url=%s",
                      i, (int)el.etype, qToUtf8(el.mediaUrl).data());

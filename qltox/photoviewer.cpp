@@ -164,6 +164,11 @@ void PhotoCanvas::rebuildCache() {
 
 void PhotoCanvas::paintEvent(QPaintEvent*) {
     QPainter p(this);
+#ifdef QT3_BUILD
+    p.fillRect(rect(), paletteBackgroundColor());
+#else
+    p.fillRect(rect(), palette().window().color());
+#endif
 
     if (!m_cachedPixmap.isNull()) {
         p.drawPixmap(qRound(m_offX), qRound(m_offY), m_cachedPixmap);

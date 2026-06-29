@@ -58,7 +58,7 @@ struct ChatElement {
     QRect sourceBtnRect;
 
     // Shared media fields (Image / Gif / Video)
-    QPixmap thumbnail;
+    QPixmap fullImage;
     QPixmap scaledDisplay;   // 预缩放到显示尺寸的缓存
     int     scaledForDispW;  // 缓存对应的绘制宽度
     int     scaledForDispH;  // 缓存对应的绘制高度

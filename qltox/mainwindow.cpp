@@ -480,7 +480,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
             if (e->success) {
                 if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
-                    el.thumbnail.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
+                    el.fullImage.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
                     el.rawFileData = e->rawData;
 
                     {
