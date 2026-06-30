@@ -321,9 +321,11 @@ bool Storage::openDb(const char *path) {
     execPragma("PRAGMA journal_mode=WAL");
     execPragma("PRAGMA synchronous=NORMAL");
     execPragma("PRAGMA page_size=4096");
-    execPragma("PRAGMA cache_size=-64000");
+    execPragma("PRAGMA cache_size=-8000");
     execPragma("PRAGMA temp_store=MEMORY");
-    execPragma("PRAGMA mmap_size=268435456");
+    execPragma("PRAGMA mmap_size=0");
+    execPragma("PRAGMA wal_autocheckpoint=200");
+    execPragma("PRAGMA journal_size_limit=16777216");
     execPragma("PRAGMA busy_timeout=5000");
     execPragma("PRAGMA foreign_keys=ON");
 
@@ -465,6 +467,7 @@ void WriteQueue::run() {
             m_queue.pop();
         }
         task();
+        sqlite3_release_memory(-1);
     }
 }
 
