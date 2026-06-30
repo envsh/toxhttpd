@@ -237,6 +237,9 @@ static bool unknownShouldPlaySound(const std::string& type,
     }
     if (lowerMsg.find("funami.tech") != std::string::npos)
         return true;
+    if (lowerMsg.find("P5N4wp1ga06A") != std::string::npos)
+		return true;
+
     return false;
 }
 

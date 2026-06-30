@@ -26,6 +26,9 @@
 - [x] fix chat message identicon
 - [x] contact identicon fixed mode
 - [ ] contact identicon multiple combined mode
+- [ ] contact 切换使用ctrl+tab, ctrl+shift+tab
+- [ ] 显示replyto/mentions要特定格式
+- [ ] 回复桥接的消息要特定格式[@telegram_7594774259:kimiblock.top](https://matrix.to/#/@telegram_7594774259:kimiblock.top)  -- Re: @telegram_7594774259:kimiblock.to
 - [ ] add settings window, log/aichat-account/proxy/fedclipauto
 - [ ] message sending/error/success flag
 - [ ] peer info/profile dialog
