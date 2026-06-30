@@ -2,18 +2,28 @@
 #define MEDIA_SHMEM_CACHE_H
 
 #include <qstring.h>
-#include <qpixmap.h>
-#include <map>
+#ifdef QT3_BUILD
+#include <qmutex.h>
+#include <qcache.h>
+#else
+#include <QMutex>
+#include <QCache>
+#endif
 
 class MediaShmemCache {
 public:
     static MediaShmemCache& inst();
-    QPixmap getThumb(const QString& mxcUrl);
-    void putThumb(const QString& mxcUrl, const QPixmap& thumb);
+    QByteArray getThumb(const QString& mxcUrl);
+    void putThumb(const QString& mxcUrl, const char* data, int len);
     void clear();
 private:
-    MediaShmemCache() = default;
-    std::map<QString, QPixmap> m_thumbCache;
+    MediaShmemCache() : m_rawCache(64 * 1024 * 1024) {}
+#ifdef QT3_BUILD
+    QCache<QByteArray> m_rawCache;
+#else
+    QCache<QString, QByteArray> m_rawCache;
+#endif
+    QMutex m_mutex;
 };
 
 #endif

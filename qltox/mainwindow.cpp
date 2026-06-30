@@ -38,6 +38,18 @@ static const int VIRTUAL_UNKNOWN_ID = -100;
 static const int VIRTUAL_SYSEVENT_ID = -101;
 static const int VIRTUAL_REDDIT_ID = -102;
 
+// ── media thumbnail 辅助函数（从原始字节解码 → 缩放到显示尺寸）──
+static QPixmap decodeRawToThumb(const char* data, int len, int mediaW, int mediaH, int maxW) {
+    QPixmap tmp;
+    tmp.loadFromData((const uchar*)data, len);
+    if (tmp.isNull()) {
+        std::string s(data, len);
+        tmp = decodeWebP(s);
+    }
+    if (tmp.isNull()) return QPixmap();
+    return makeScaledThumb(tmp, mediaW, mediaH, maxW);
+}
+
 // ── peer 持久化 helpers ──
 // key 格式: "friend_N", "group_N_M", "conference_N_M", "unknown_*"
 struct PeerKey {
@@ -491,17 +503,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
 
                     {
-                        // 生成缩略图，不进内存缓存全尺寸
-                        QPixmap tmp;
-                        tmp.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
-                        if (tmp.isNull() && isWebP(e->rawData))
-                            tmp = decodeWebP(e->rawData);
-                        if (!tmp.isNull()) {
-                            QPixmap thumb = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
-                                                            chatWidget->width() * 70 / 100);
-                            MediaShmemCache::inst().putThumb(qFromUtf8(e->mxcUrl), thumb);
-                            el.scaledDisplay = thumb;
-                        }
+                        // Cache raw bytes (JPEG/WebP), not QPixmap
+                        MediaShmemCache::inst().putThumb(qFromUtf8(e->mxcUrl), (const char*)e->rawData.data(), e->rawData.size());
+                        el.scaledDisplay = decodeRawToThumb((const char*)e->rawData.data(), e->rawData.size(),
+                            el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
                     }
 
                     {
@@ -1560,25 +1565,18 @@ void MainWindow::handleEvents(const EventList& events) {
                             QString mxc = qFromUtf8(hm.mediaUrl);
                             ChatElement& el = chatWidget->mutableMessageAt(newIdx);
 
-                            QPixmap memThumb = MediaShmemCache::inst().getThumb(mxc);
-                            if (!memThumb.isNull()) {
-                                el.scaledDisplay = memThumb;
+                            QByteArray rawBytes = MediaShmemCache::inst().getThumb(mxc);
+                            if (!rawBytes.isEmpty()) {
+                                el.scaledDisplay = decodeRawToThumb(rawBytes.data(), rawBytes.size(),
+                                    el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
                                 el.downloadState = ChatElement::Completed;
                             } else {
                                 auto dbData = Storage::instance().cacheDb()->loadMedia(
                                     mediaCacheKey("file", mxc).c_str());
                                 if (!dbData.empty()) {
-                                    std::string rawStr(dbData.begin(), dbData.end());
-                                    QPixmap tmp;
-                                    tmp.loadFromData((const uchar*)rawStr.data(), rawStr.size());
-                                    if (tmp.isNull() && isWebP(rawStr))
-                                        tmp = decodeWebP(rawStr);
-                                    if (!tmp.isNull()) {
-                                        QPixmap thumb = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
-                                                                        chatWidget->width() * 70 / 100);
-                                        MediaShmemCache::inst().putThumb(mxc, thumb);
-                                        el.scaledDisplay = thumb;
-                                    }
+                                    MediaShmemCache::inst().putThumb(mxc, (const char*)dbData.data(), dbData.size());
+                                    el.scaledDisplay = decodeRawToThumb((const char*)dbData.data(), dbData.size(),
+                                        el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
                                     el.downloadState = ChatElement::Completed;
                                 } else {
                                     el.downloadState = ChatElement::InProgress;
@@ -2274,9 +2272,10 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
     if (currentChatId < 0) { return; }
 
     ChatElement& el = chatWidget->mutableMessageAt(msgIndex);
-    QPixmap memThumb = MediaShmemCache::inst().getThumb(mediaUrl);
-    if (!memThumb.isNull()) {
-        el.scaledDisplay = memThumb;
+    QByteArray rawBytes = MediaShmemCache::inst().getThumb(mediaUrl);
+    if (!rawBytes.isEmpty()) {
+        el.scaledDisplay = decodeRawToThumb(rawBytes.data(), rawBytes.size(),
+            el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
         el.downloadState = ChatElement::Completed;
         chatWidget->triggerRelayout(msgIndex);
         return;
@@ -2284,17 +2283,9 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
     auto dbData = Storage::instance().cacheDb()->loadMedia(
         mediaCacheKey("file", mediaUrl).c_str());
     if (!dbData.empty()) {
-        std::string rawStr(dbData.begin(), dbData.end());
-        QPixmap tmp;
-        tmp.loadFromData((const uchar*)rawStr.data(), rawStr.size());
-        if (tmp.isNull() && isWebP(rawStr))
-            tmp = decodeWebP(rawStr);
-        if (!tmp.isNull()) {
-            QPixmap thumb = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
-                                            chatWidget->width() * 70 / 100);
-            MediaShmemCache::inst().putThumb(mediaUrl, thumb);
-            el.scaledDisplay = thumb;
-        }
+        MediaShmemCache::inst().putThumb(mediaUrl, (const char*)dbData.data(), dbData.size());
+        el.scaledDisplay = decodeRawToThumb((const char*)dbData.data(), dbData.size(),
+            el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
         el.downloadState = ChatElement::Completed;
         chatWidget->triggerRelayout(msgIndex);
         return;
