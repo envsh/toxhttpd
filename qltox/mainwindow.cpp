@@ -27,6 +27,7 @@
 #include "toastwidget.h"
 #include "sharedstatusbar.h"
 #include "photoviewer.h"
+#include "media_shmem_cache.h"
 #include <qlabel.h>
 #include "ConfigDialog.h"
 #include <qpushbutton.h>
@@ -496,8 +497,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
                         if (tmp.isNull() && isWebP(e->rawData))
                             tmp = decodeWebP(e->rawData);
                         if (!tmp.isNull()) {
-                            el.scaledDisplay = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
-                                                               chatWidget->width() * 70 / 100);
+                            QPixmap thumb = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
+                                                            chatWidget->width() * 70 / 100);
+                            MediaShmemCache::inst().putThumb(qFromUtf8(e->mxcUrl), thumb);
+                            el.scaledDisplay = thumb;
                         }
                     }
 
@@ -1556,21 +1559,32 @@ void MainWindow::handleEvents(const EventList& events) {
                         if (!hm.mediaUrl.empty() && hm.msgtype != "file") {
                             QString mxc = qFromUtf8(hm.mediaUrl);
                             ChatElement& el = chatWidget->mutableMessageAt(newIdx);
-                            bool memDone = (el.downloadState == ChatElement::Completed);
-                            auto dbData = Storage::instance().cacheDb()->loadMedia(
-                                mediaCacheKey("file", mxc).c_str());
-                            bool dbDone = !dbData.empty();
 
-                            if (dbDone && !memDone) {
-                                qWarning("File in DB but not completed in mem: %s", qToUtf8(mxc).data());
-                            } else if (!dbDone && memDone) {
-                                qWarning("File completed in mem but not in DB: %s", qToUtf8(mxc).data());
-                            } else if (dbDone && memDone) {
-                                ;  // consistent
+                            QPixmap memThumb = MediaShmemCache::inst().getThumb(mxc);
+                            if (!memThumb.isNull()) {
+                                el.scaledDisplay = memThumb;
+                                el.downloadState = ChatElement::Completed;
+                            } else {
+                                auto dbData = Storage::instance().cacheDb()->loadMedia(
+                                    mediaCacheKey("file", mxc).c_str());
+                                if (!dbData.empty()) {
+                                    std::string rawStr(dbData.begin(), dbData.end());
+                                    QPixmap tmp;
+                                    tmp.loadFromData((const uchar*)rawStr.data(), rawStr.size());
+                                    if (tmp.isNull() && isWebP(rawStr))
+                                        tmp = decodeWebP(rawStr);
+                                    if (!tmp.isNull()) {
+                                        QPixmap thumb = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
+                                                                        chatWidget->width() * 70 / 100);
+                                        MediaShmemCache::inst().putThumb(mxc, thumb);
+                                        el.scaledDisplay = thumb;
+                                    }
+                                    el.downloadState = ChatElement::Completed;
+                                } else {
+                                    el.downloadState = ChatElement::InProgress;
+                                    ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
+                                }
                             }
-
-                            el.downloadState = ChatElement::InProgress;
-                            ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
                         }
                     } else {
                         m_messageCache[{chatId, chatType}].push_back(msg);
@@ -2260,21 +2274,34 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
     if (currentChatId < 0) { return; }
 
     ChatElement& el = chatWidget->mutableMessageAt(msgIndex);
-    bool memDone = (el.downloadState == ChatElement::Completed);
+    QPixmap memThumb = MediaShmemCache::inst().getThumb(mediaUrl);
+    if (!memThumb.isNull()) {
+        el.scaledDisplay = memThumb;
+        el.downloadState = ChatElement::Completed;
+        chatWidget->triggerRelayout(msgIndex);
+        return;
+    }
     auto dbData = Storage::instance().cacheDb()->loadMedia(
         mediaCacheKey("file", mediaUrl).c_str());
-    bool dbDone = !dbData.empty();
-
-    if (dbDone && !memDone) {
-        qWarning("File in DB but not completed in mem: %s", qToUtf8(mediaUrl).data());
-    } else if (!dbDone && memDone) {
-        qWarning("File completed in mem but not in DB: %s", qToUtf8(mediaUrl).data());
-    } else if (dbDone && memDone) {
-        ;  // consistent
+    if (!dbData.empty()) {
+        std::string rawStr(dbData.begin(), dbData.end());
+        QPixmap tmp;
+        tmp.loadFromData((const uchar*)rawStr.data(), rawStr.size());
+        if (tmp.isNull() && isWebP(rawStr))
+            tmp = decodeWebP(rawStr);
+        if (!tmp.isNull()) {
+            QPixmap thumb = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
+                                            chatWidget->width() * 70 / 100);
+            MediaShmemCache::inst().putThumb(mediaUrl, thumb);
+            el.scaledDisplay = thumb;
+        }
+        el.downloadState = ChatElement::Completed;
+        chatWidget->triggerRelayout(msgIndex);
+        return;
     }
 
-    el.downloadState = ChatElement::InProgress;
     chatWidget->triggerRelayout(msgIndex);
+    el.downloadState = ChatElement::InProgress;
     ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
                           msgIndex, std::string(qToUtf8(mediaUrl).data()));
 }
