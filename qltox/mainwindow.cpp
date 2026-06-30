@@ -860,15 +860,10 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         return;
     }
     
-    // 保存当前联系人的消息到缓存
+    // 保存当前联系人的消息到缓存（move，不复制）
     if (currentChatId != -1 && !currentChatType.isEmpty()) {
         auto key = std::make_pair(currentChatId, std::string(qToUtf8(currentChatType).data()));
-        std::vector<ChatElement> msgs;
-        int n = chatWidget->messageCount();
-        for (int i = 0; i < n; ++i) {
-            msgs.push_back(chatWidget->messageAt(i));
-        }
-        m_messageCache[key] = std::move(msgs);
+        m_messageCache[key] = chatWidget->detachMessages();
     }
     
     qWarning("onContactSelected: id=%d, type=%s", id, qToUtf8(type).data());
@@ -926,7 +921,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     if (hasCache) {
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
-        chatWidget->restoreMessages(cacheIt->second);
+        chatWidget->attachMessages(std::move(cacheIt->second));
         chatWidget->triggerVisibleDownloads();
         if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
             && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
@@ -1553,7 +1548,6 @@ void MainWindow::handleEvents(const EventList& events) {
                 
                     qWarning("Cache PUSH to %s %d: sender=%s",
                              chatType.c_str(), chatId, qToUtf8(msg.senderName).data());
-                    m_messageCache[{chatId, chatType}].push_back(msg);
                     contactListWidget->updateContactLastMessage(
                         chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
@@ -1579,6 +1573,7 @@ void MainWindow::handleEvents(const EventList& events) {
                             ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
                         }
                     } else {
+                        m_messageCache[{chatId, chatType}].push_back(msg);
                         contactListWidget->incrementUnread(chatId, qFromUtf8(chatType));
                     }
 

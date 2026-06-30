@@ -31,7 +31,7 @@ QPixmap makeScaledThumb(const QPixmap& src, int mediaW, int mediaH, int maxConta
     }
 #ifdef QT3_BUILD
     QImage img = src.convertToImage();
-    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMin);
+    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMax);
     QPixmap out;
     out.convertFromImage(scaledImg);
     return out;
@@ -1866,6 +1866,25 @@ void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
     m_scrollDownPill.setCount(0);
     m_items = msgs;
     m_gifFrameUpdated.assign(msgs.size(), 0);
+    relayout();
+    scrollToBottom();
+}
+
+std::vector<ChatElement> ChatView::detachMessages() {
+    auto ret = std::move(m_items);
+    for (auto& el : ret) { el.stopAnimation(); }
+    m_items.clear();
+    m_gifFrameUpdated.clear();
+    m_blocks.clear();
+    m_totalHeight = 0;
+    m_scrollPos = 0;
+    m_vScrollBar->setRange(0, 0);
+    return ret;
+}
+
+void ChatView::attachMessages(std::vector<ChatElement> msgs) {
+    m_items = std::move(msgs);
+    m_gifFrameUpdated.assign(m_items.size(), 0);
     relayout();
     scrollToBottom();
 }

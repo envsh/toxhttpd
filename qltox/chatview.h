@@ -123,6 +123,8 @@ public:
 
     void appendMessage(const ChatElement& msg);
     void restoreMessages(const std::vector<ChatElement>& msgs);
+    std::vector<ChatElement> detachMessages();
+    void attachMessages(std::vector<ChatElement> msgs);
     void clearMessages();
     void scrollToBottom();
     ChatElement& messageAt(int index);

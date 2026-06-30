@@ -32,6 +32,8 @@ public:
     ChatElement& mutableMessageAt(int index);
     void appendMessage(const ChatElement& msg);
     void restoreMessages(const std::vector<ChatElement>& msgs);
+    std::vector<ChatElement> detachMessages();
+    void attachMessages(std::vector<ChatElement> msgs);
     void triggerRelayout(int msgIndex = -1);
     void triggerVisibleDownloads();
     void repaintMessages() { messageArea->update(); }

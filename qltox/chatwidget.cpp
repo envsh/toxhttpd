@@ -248,6 +248,15 @@ void ChatWidget::restoreMessages(const std::vector<ChatElement>& msgs) {
     updateHeaderCount();
 }
 
+std::vector<ChatElement> ChatWidget::detachMessages() {
+    return messageArea->detachMessages();
+}
+
+void ChatWidget::attachMessages(std::vector<ChatElement> msgs) {
+    messageArea->attachMessages(std::move(msgs));
+    updateHeaderCount();
+}
+
 void ChatWidget::onSendClicked() {
     if (inputEdit->placeholderText().length() > 0) {
 #ifdef QT3_BUILD
