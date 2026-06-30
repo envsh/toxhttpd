@@ -28,6 +28,7 @@ const EventType34 EventListReadyType = toEventType34(QEvent::User + 100);
 const EventType34 ApiResultReadyType = toEventType34(QEvent::User + 102);
 const EventType34 MediaDownloadReadyType = toEventType34(QEvent::User + 103);
 const EventType34 AvatarDownloadReadyType = toEventType34(QEvent::User + 104);
+const EventType34 DiskLoadReadyType       = toEventType34(QEvent::User + 105);
 
 // ── API 请求类型 ──
 enum ApiRequestType {
@@ -165,6 +166,16 @@ public:
     AvatarDownloadEvent() : CustomEventBase(AvatarDownloadReadyType) {}
     std::string mxcUrl;
     QPixmap pixmap;
+    bool success = false;
+    std::string errorInfo;
+};
+
+class DiskLoadEvent : public CustomEventBase {
+public:
+    DiskLoadEvent() : CustomEventBase(DiskLoadReadyType) {}
+    int msgIndex = 0;
+    std::string mediaUrl;
+    std::vector<uint8_t> rawData;
     bool success = false;
     std::string errorInfo;
 };

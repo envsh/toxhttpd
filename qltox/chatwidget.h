@@ -46,6 +46,7 @@ signals:
     void translateForSendRequested(const QString& text, const QString& targetLang);
     void sourceClicked(int msgIndex);
     void retryClicked(int msgIndex, const QString& mediaUrl);
+    void openFullSizeImage(int msgIndex, const QString& mediaUrl);
 
 private slots:
     void onSendClicked();

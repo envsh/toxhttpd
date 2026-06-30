@@ -26,6 +26,7 @@
 #include <qfile.h>
 #include "toastwidget.h"
 #include "sharedstatusbar.h"
+#include "photoviewer.h"
 #include <qlabel.h>
 #include "ConfigDialog.h"
 #include <qpushbutton.h>
@@ -397,6 +398,8 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onTranslateForSendRequested(const QString&, const QString&)));
     connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
     connect(chatWidget, SIGNAL(retryClicked(int, const QString&)), this, SLOT(onRetryClicked(int, const QString&)));
+    connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
+            this, SLOT(onOpenFullSizeImage(int, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 启动事件轮询引擎
@@ -485,8 +488,18 @@ void MainWindow::customEvent(CustomEventBase* event) {
             if (e->success) {
                 if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
-                    el.fullImage.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
-                    el.rawFileData = e->rawData;
+
+                    {
+                        // 生成缩略图，不进内存缓存全尺寸
+                        QPixmap tmp;
+                        tmp.loadFromData((const uchar*)e->rawData.data(), e->rawData.size());
+                        if (tmp.isNull() && isWebP(e->rawData))
+                            tmp = decodeWebP(e->rawData);
+                        if (!tmp.isNull()) {
+                            el.scaledDisplay = makeScaledThumb(tmp, el.mediaWidth, el.mediaHeight,
+                                                               chatWidget->width() * 70 / 100);
+                        }
+                    }
 
                     {
                         std::string key = mediaCacheKey("file", qFromUtf8(e->mxcUrl));
@@ -532,7 +545,30 @@ void MainWindow::customEvent(CustomEventBase* event) {
         }
         return;
     }
-    
+
+    // 磁盘缓存加载完成（双击查看原图）
+    if (event->type() == DiskLoadReadyType) {
+        DiskLoadEvent* e = static_cast<DiskLoadEvent*>(event);
+        if (!e->success) {
+            qWarning("DiskLoad: cache miss for msg %d url=%s",
+                     e->msgIndex, e->mediaUrl.c_str());
+            return;
+        }
+        QPixmap pix;
+        {
+            const auto& rd = e->rawData;
+            std::string rawStr(rd.begin(), rd.end());
+            if (!pix.loadFromData((const uchar*)rawStr.data(), rawStr.size())) {
+                if (isWebP(rawStr))
+                    pix = decodeWebP(rawStr);
+            }
+        }
+        if (pix.isNull()) { return; }
+        PhotoViewer* pv = new PhotoViewer(this, pix);
+        pv->show();
+        return;
+    }
+
     // 数据加载完成
     if (event->type() == ApiResultReadyType) {
         ApiResultEvent* e = static_cast<ApiResultEvent*>(event);
@@ -2246,6 +2282,26 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
     chatWidget->triggerRelayout(msgIndex);
     ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
                           msgIndex, std::string(qToUtf8(mediaUrl).data()));
+}
+
+void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    std::string key = mediaCacheKey("file", mediaUrl);
+    Storage::instance().cacheDbAsync()->loadMedia(
+        key,
+        [this, msgIndex, mediaUrl](std::vector<uint8_t> data, std::string) {
+            auto* ev = new DiskLoadEvent();
+            ev->msgIndex = msgIndex;
+            ev->mediaUrl = std::string(qToUtf8(mediaUrl).data());
+            if (data.empty()) {
+                ev->success = false;
+                ev->errorInfo = "cache miss";
+            } else {
+                ev->success = true;
+                ev->rawData = std::move(data);
+            }
+            QApplication::postEvent(this, ev);
+        });
 }
 
 void MainWindow::onSourceClicked(int msgIndex) {

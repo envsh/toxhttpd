@@ -47,6 +47,7 @@ public:
     void onTranslateForSendRequested(const QString& text, const QString& targetLang);
     void onSourceClicked(int msgIndex);
     void onRetryClicked(int msgIndex, const QString& mediaUrl);
+    void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
     void onMenu1Stub();

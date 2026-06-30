@@ -58,10 +58,7 @@ struct ChatElement {
     QRect sourceBtnRect;
 
     // Shared media fields (Image / Gif / Video)
-    QPixmap fullImage;
     QPixmap scaledDisplay;   // 预缩放到显示尺寸的缓存
-    int     scaledForDispW;  // 缓存对应的绘制宽度
-    int     scaledForDispH;  // 缓存对应的绘制高度
     QString caption;
     QString mediaUrl;
     enum DownloadState { NotRequested, InProgress, Completed, Failed };
@@ -90,15 +87,12 @@ struct ChatElement {
     short cachedWidth;
     short height;
 
-    // Raw downloaded bytes (WebP fallback decode)
-    std::string rawFileData;
-
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
         , translationInProgress(false), downloadState(NotRequested), downloadRequested(false)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
-        , scaledForDispW(-1), scaledForDispH(-1), cachedWidth(-1), height(0) {}
+        , cachedWidth(-1), height(0) {}
 
     int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont);
     void paint(QPainter& p, int y, int viewWidth, bool isSelected,
@@ -108,6 +102,10 @@ struct ChatElement {
     void startAnimation(QWidget* parent, int msgIndex);
     void stopAnimation();
 };
+
+QPixmap makeScaledThumb(const QPixmap& src, int mediaW, int mediaH, int maxContainW);
+bool isWebP(const std::string& d);
+QPixmap decodeWebP(const std::string& data);
 
 struct LinkSpan {
     int start;
@@ -157,6 +155,7 @@ signals:
     void mentionClicked(const QString& username);
     void retryClicked(int msgIndex, const QString& mediaUrl);
     void downloadNeeded(int msgIndex, const QString& mediaUrl);
+    void openFullSizeImage(int msgIndex, const QString& mediaUrl);
 
 private slots:
     void onScrollChanged(int value);

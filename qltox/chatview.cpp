@@ -9,15 +9,39 @@
 #endif
 #include <algorithm>
 #include <cstdlib>
+#include <qimage.h>
 #include "translator.h"
 
 // ── Media display sizing ──
 static const int kMaxMediaDim = 260;
 static const int kMinMediaH = 50;
 
+QPixmap makeScaledThumb(const QPixmap& src, int mediaW, int mediaH, int maxContainW) {
+    if (src.isNull()) return QPixmap();
+    int dw, dh;
+    if (mediaW > 0 && mediaH > 0) {
+        double ratio = (double)mediaH / mediaW;
+        dw = std::min(maxContainW, kMaxMediaDim);
+        dh = (int)(dw * ratio);
+        if (dh > kMaxMediaDim) { dh = kMaxMediaDim; dw = (int)(kMaxMediaDim / ratio); }
+        if (dh < kMinMediaH)   { dh = kMinMediaH;   dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
+    } else {
+        dw = std::min(maxContainW, kMaxMediaDim);
+        dh = 200;
+    }
+#ifdef QT3_BUILD
+    QImage img = src.convertToImage();
+    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMin);
+    QPixmap out;
+    out.convertFromImage(scaledImg);
+    return out;
+#else
+    return src.scaled(dw, dh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+#endif
+}
+
 #ifdef QT3_BUILD
 #include <qpainter.h>
-#include <qimage.h>
 #include <qprocess.h>
 #include <qregexp.h>
 #include <qstringlist.h>
@@ -42,13 +66,13 @@ static const int kMinMediaH = 50;
 #include <dlfcn.h>
 #include <cstdint>
 
-static bool isWebP(const std::string& d) {
+bool isWebP(const std::string& d) {
     return d.size() >= 12 &&
            d[0]=='R'&&d[1]=='I'&&d[2]=='F'&&d[3]=='F' &&
            d[8]=='W'&&d[9]=='E'&&d[10]=='B'&&d[11]=='P';
 }
 
-static QPixmap decodeWebP(const std::string& data) {
+QPixmap decodeWebP(const std::string& data) {
     if (!isWebP(data) || data.size() < 12) return QPixmap();
     void* lib = dlopen("libwebp.so", RTLD_LAZY);
     if (!lib) { qWarning("dlopen libwebp: %s", dlerror()); return QPixmap(); }
@@ -1194,56 +1218,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             thumbnailRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                                   bubbleRect.width() - 2*kBubbleHPad, bubbleRect.height() - 2*kBubbleVPad);
         }
-        // WebP fallback: decode raw bytes to thumbnail
-        if (fullImage.isNull() && !rawFileData.empty() && isWebP(rawFileData)) {
-            QPixmap wp = decodeWebP(rawFileData);
-            if (!wp.isNull()) {
-                mediaWidth = wp.width();
-                mediaHeight = wp.height();
-#ifdef QT3_BUILD
-                {
-                    QImage tmpImg = wp.convertToImage();
-                    QImage scaledImg = tmpImg.smoothScale(thumbnailRect.width(), thumbnailRect.height(), QImage::ScaleMax);
-                    fullImage.convertFromImage(scaledImg);
-                }
-#else
-                fullImage = wp.scaled(thumbnailRect.width(), thumbnailRect.height(),
-                                      Qt::KeepAspectRatio, Qt::SmoothTransformation);
-#endif
-            }
-        }
-        // 预缩放缓存：避免每帧重新缩放全分辨率图片
-        QPixmap displayPixmap = fullImage;
-        if (!fullImage.isNull() && mediaWidth > 0 && mediaHeight > 0) {
-            int maxW = thumbnailRect.width();
-            // dw/dh 计算必须与 paintThumbnail() 一致，否则每帧 rescale
-            int dw, dh;
-            if (mediaWidth > 0 && mediaHeight > 0) {
-                double ratio = (double)mediaHeight / mediaWidth;
-                dw = std::min(maxW, kMaxMediaDim);
-                dh = (int)(dw * ratio);
-                if (dh > kMaxMediaDim) { dh = kMaxMediaDim; dw = (int)(kMaxMediaDim / ratio); }
-                if (dh < kMinMediaH)   { dh = kMinMediaH;   dw = std::min((int)(kMinMediaH / ratio), kMaxMediaDim); }
-            } else {
-                dw = std::min(maxW, kMaxMediaDim);
-                dh = 200;
-            }
-            if (dw != scaledForDispW || dh != scaledForDispH) {
-#ifdef QT3_BUILD
-                {
-                    QImage img = fullImage.convertToImage();
-                    QImage scaledImg = img.smoothScale(dw, dh, QImage::ScaleMin);
-                    scaledDisplay.convertFromImage(scaledImg);
-                }
-#else
-                scaledDisplay = fullImage.scaled(dw, dh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-#endif
-                scaledForDispW = dw;
-                scaledForDispH = dh;
-            }
-            displayPixmap = scaledDisplay;
-        }
-        paintMediaContent(p, bubbleRect, etype, displayPixmap, caption,
+        paintMediaContent(p, bubbleRect, etype, scaledDisplay, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
                           baseFont, fm, emojiW, pal, downloadState,
                           &downloadBtnRect, &retryBtnRect, fileSize);
@@ -2002,7 +1977,6 @@ void ChatView::relayout() {
         if (m_items[i].cachedWidth != w) {
             m_items[i].height = m_items[i].calcHeight(w, m_fm, m_emojiW, font());
             m_items[i].cachedWidth = (short)w;
-            m_items[i].scaledForDispW = -1;
         }
         m_totalHeight += m_items[i].height;
     }
@@ -2643,18 +2617,13 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
                 m_items[msgIndex].retryBtnRect.contains(event->pos())) {
                 return;
             }
-            // 双击媒体缩略图 → 打开 PhotoViewer
+            // 双击媒体缩略图 → 异步从磁盘加载原图
             if ((m_items[msgIndex].etype == ChatElement::Image ||
                  m_items[msgIndex].etype == ChatElement::Video ||
                  m_items[msgIndex].etype == ChatElement::Gif) &&
-                (!m_items[msgIndex].fullImage.isNull() || !m_items[msgIndex].rawFileData.empty()) &&
+                !m_items[msgIndex].scaledDisplay.isNull() &&
                 m_items[msgIndex].thumbnailRect.contains(event->pos())) {
-                QPixmap fullPix = m_items[msgIndex].fullImage;
-                if (fullPix.isNull() && isWebP(m_items[msgIndex].rawFileData))
-                    fullPix = decodeWebP(m_items[msgIndex].rawFileData);
-                if (fullPix.isNull()) return;
-                PhotoViewer* pv = new PhotoViewer(this, fullPix);
-                pv->show();
+                emit openFullSizeImage(msgIndex, m_items[msgIndex].mediaUrl);
                 return;
             }
         }
@@ -2813,7 +2782,7 @@ void ChatView::triggerVisibleDownloads() {
     for (int i = first; i <= last; i++) {
         ChatElement& el = m_items[i];
         if (!el.downloadRequested && el.downloadState == ChatElement::NotRequested
-            && el.fullImage.isNull() && !el.mediaUrl.isEmpty()) {
+            && el.scaledDisplay.isNull() && !el.mediaUrl.isEmpty()) {
             el.downloadRequested = true;
             qWarning("[VisibleTrigger] would download idx=%d type=%d url=%s",
                      i, (int)el.etype, qToUtf8(el.mediaUrl).data());
