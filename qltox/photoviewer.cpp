@@ -284,7 +284,11 @@ void PhotoCanvas::resizeEvent(QResizeEvent* event) {
 // ============================================================
 
 PhotoViewer::PhotoViewer(QWidget* parent, const QPixmap& pixmap)
-    : QDialog(parent)
+    : QDialog(parent
+#ifdef QT3_BUILD
+      , nullptr, false, WDestructiveClose
+#endif
+      )
     , m_canvas(0)
     , m_toolbar(0)
     , m_statusBar(0)
@@ -296,6 +300,9 @@ PhotoViewer::PhotoViewer(QWidget* parent, const QPixmap& pixmap)
     , m_savedH(600)
     , m_origPixmap(pixmap)
 {
+#ifndef QT3_BUILD
+    setAttribute(Qt::WA_DeleteOnClose);
+#endif
     m_canvas = new PhotoCanvas(this, pixmap);
 
     QVBoxLayout* lay = new QVBoxLayout(this);
@@ -457,6 +464,11 @@ void PhotoViewer::keyPressEvent(QKeyEvent* e) {
         break;
     }
     QDialog::keyPressEvent(e);
+}
+
+PhotoViewer::~PhotoViewer() {
+    qDebug("PhotoViewer destroyed, origPixmap=%dx%d",
+           m_origPixmap.width(), m_origPixmap.height());
 }
 
 void PhotoViewer::closeEvent(QCloseEvent* event) {

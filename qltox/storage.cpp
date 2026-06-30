@@ -241,8 +241,17 @@ static std::string pathFor(const char *dir, const char *name) {
     return s;
 }
 
+static bool gPageCacheConfigured = false;
+
 bool Storage::init(const char *dataDir) {
     auto totalStart = std::chrono::steady_clock::now();
+
+    if (!gPageCacheConfigured) {
+        int hdrSize;
+        sqlite3_config(SQLITE_CONFIG_PCACHE_HDRSZ, &hdrSize);
+        sqlite3_config(SQLITE_CONFIG_SMALL_MALLOC, 1);
+        gPageCacheConfigured = true;
+    }
 
     m_dataDir = dataDir;
     mkdirRecursive(dataDir);
@@ -263,6 +272,9 @@ bool Storage::init(const char *dataDir) {
     if (!initAsyncDomains()) { return false; }
 
     checkFeatures();
+
+    // SQLite 堆软限额 — 超额时自动 release_memory
+    sqlite3_soft_heap_limit64(32LL * 1024 * 1024);
 
     qDebug("Storage init complete in %lldms", elapsedMs(totalStart));
     return true;
@@ -321,7 +333,7 @@ bool Storage::openDb(const char *path) {
     execPragma("PRAGMA journal_mode=WAL");
     execPragma("PRAGMA synchronous=NORMAL");
     execPragma("PRAGMA page_size=4096");
-    execPragma("PRAGMA cache_size=-8000");
+    execPragma("PRAGMA cache_size=-2000");
     execPragma("PRAGMA temp_store=MEMORY");
     execPragma("PRAGMA mmap_size=0");
     execPragma("PRAGMA wal_autocheckpoint=200");

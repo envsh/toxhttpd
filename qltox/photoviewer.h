@@ -58,6 +58,7 @@ class PhotoViewer : public QDialog {
     Q_OBJECT
 public:
     PhotoViewer(QWidget* parent, const QPixmap& pixmap);
+    ~PhotoViewer();
 
 protected:
     void keyPressEvent(QKeyEvent* event);
