@@ -1859,6 +1859,8 @@ ChatView::ChatView(QWidget* parent)
 }
 
 ChatView::~ChatView() {
+    m_animTimer->stop();
+    clearMessages();
     delete[] m_bmpW;
 }
 

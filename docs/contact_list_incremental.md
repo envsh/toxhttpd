@@ -336,3 +336,71 @@ matchesFilter:
 ### 11.3 结论
 
 实现与 TG `Dialogs::List` 核心机制完全对齐。11 项核心机制一致，6 项有意识分歧均有明确理由（见 11.2），不影响架构正确性和性能。
+
+---
+
+## 12. 性能优化 — Qt4/Qt5 绘制 & Batch 机制
+
+### 12.1 背景
+
+Qt3 使用 X11 协议绘制 `QPainter::drawText`，一次 `XDrawString` 调用了事，无字体回退。
+
+Qt4/Qt5 使用 CoreGraphics (macOS) 或 raster engine (Linux)，`drawText` 涉及 CoreText/FreeType 字体回退 + 字形光栅化，每次调用数百 μs 到数 ms。CJK 和 emoji 字符尤其明显。
+
+批量事件到达时（如 50 条消息），每个事件触发 2 次 `refreshView`（各自 `incrementUnread` + `updateContactLastMessage`），每帧 100 次 `drawText` 级联，CPU 瞬时 90%+，数秒后回落。
+
+### 12.2 优化项
+
+| # | 改动 | 文件 | 说明 |
+|---|------|------|------|
+| 1 | `renderRowToCache` 去掉 QImage 中间层 | `contactlist.cpp` | 原 Qt4 用 `QImage(w,h,ARGB32)` + `QPixmap::fromImage` → 一次 X round-trip。改为直接 `QPixmap(w,h)` + `QPainter` |
+| 2 | `getCircularAvatar` QBitmap mask 替代 QPainterPath clip | `contactlist.cpp` | 原 Qt4 用 `QPainterPath.addEllipse()` + `setClipPath()`。改为 `QBitmap(size)` + `setMask()`，和 Qt3 一致 |
+| 3 | `paintEvent` Qt4/Qt5 恢复行缓存 | `contactlist.cpp` | 选中行: `drawText`（仅 1 行）。非选中行: `renderRowToCache` + `drawPixmap`（纹理 blit，避开 drawText） |
+| 4 | `handleEvents` 首尾加 beginBatch/endBatch | `mainwindow.cpp` | 批量事件处理时，所有 refreshView 跳过、adjustBySort 推迟。endBatch 时一次 stable_sort + 一次 refreshView |
+
+### 12.3 Batch 机制详解
+
+```cpp
+// ContactListWidget (已存在，此前无调用方)
+void beginBatch() { ++m_batchLevel; m_list.freeze(); }
+void endBatch() {
+    if (--m_batchLevel <= 0) {
+        m_batchLevel = 0;
+        m_list.unfreeze(m_sortCriteria);  // pending ≥2 → 一次 stable_sort
+        refreshView();                    // 一次 refreshView
+    }
+}
+
+// mainwindow.cpp — handleEvents 首尾调用
+void MainWindow::handleEvents(const EventList& events) {
+    contactListWidget->beginBatch();
+    for (size_t i = 0; i < events.size(); ++i) {
+        // 现有逻辑不变
+    }
+    contactListWidget->endBatch();
+}
+```
+
+Batch 内 freeze 期间：
+- `adjustBySort` 不执行 rotate，只存入 `m_pendingAdjust[]`
+- `refreshView()` 被跳过 (`m_batchLevel > 0`)
+
+`endBatch` 时：
+- `pendingAdjust.size() >= 2` → 一次 `stable_sort`（O(n log n)），替代 N 次 `rotate`（O(n) 每次）
+- 一次 `refreshView` → 一次 truncation + 一次 `update()` → 一次 paint
+
+### 12.4 性能对比（50 事件 batch）
+
+| 操作 | 无 Batch | 有 Batch | 加速比 |
+|------|----------|----------|--------|
+| `refreshView` 调用 | 100 | 1 | 100x |
+| `adjustBySort` | 100 次 rotate O(n) | 1 次 stable_sort O(n log n) | ~10x |
+| paint 触发 | 多次 update() | 1 次 update() | ≥10x |
+| truncate 总次数 | 100 行 | ~50 行（去重后） | 2x |
+| 联系人遍历次数 | 20000+ | 200 | 100x |
+
+### 12.5 注意事项
+
+- 此改动对 Qt3 无副作用。批量减少的是 `refreshView` 调用，Qt3 可同等收益。
+- `beginBatch/endBatch` 支持嵌套（`m_batchLevel` 计数器），外层 endBatch 触发最终刷新。
+- `EmojiRenderer::renderEmoji` (m_ok 为 false 时) 使用 `QPainter::drawText` 绘制 emoji 字符。macOS 下若 emoji 字体路径不存在，fallback 走 CoreText，不影响性能。

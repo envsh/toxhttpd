@@ -186,21 +186,26 @@ QPixmap ContactListView::getCircularAvatar(uint32_t cp, int size) {
     m_circularAvatarCache[cp] = masked;
     return masked;
 #else
-    QPixmap result(size, size);
+    QPixmap result(raw.width(), raw.height());
     result.fill(Qt::transparent);
-    QPainter rp(&result);
-    rp.setBrush(QColor(224, 224, 224));
-    rp.setPen(Qt::NoPen);
-    rp.drawEllipse(0, 0, size, size);
     {
-        QPainterPath clipPath;
-        clipPath.addEllipse(0, 0, size, size);
-        rp.setClipPath(clipPath);
-        int pmx = (size - raw.width()) / 2;
-        int pmy = (size - raw.height()) / 2;
-        rp.drawPixmap(pmx, pmy, raw);
+#ifdef QT3_BUILD
+        QBitmap mask(raw.width(), raw.height(), true);
+#else
+        QBitmap mask(raw.width(), raw.height());
+        mask.fill(Qt::color1);
+#endif
+        QPainter mp(&mask);
+        mp.setBrush(Qt::color1);
+        mp.setPen(Qt::NoPen);
+        mp.drawEllipse(0, 0, raw.width(), raw.height());
+        mp.end();
+        QPixmap masked = raw;
+        masked.setMask(mask);
+        QPainter rp(&result);
+        rp.drawPixmap(0, 0, masked);
+        rp.end();
     }
-    rp.end();
     m_circularAvatarCache[cp] = result;
     return result;
 #endif
@@ -528,13 +533,11 @@ void ContactListView::renderRowToCache(int i, int w) {
 
 #ifdef QT3_BUILD
     QPixmap pm(w, h, 32);
+#else
+    QPixmap pm(w, h);
+#endif
     pm.fill(currentPalette().windowBg);
     QPainter cp(&pm);
-#else
-    QImage img(w, h, QImage::Format_ARGB32);
-    img.fill(qRgba(0, 0, 0, 0));
-    QPainter cp(&img);
-#endif
     uint32_t cp_emoji = typeToEmojiCp(rd->type);
     QPixmap av = getCircularAvatar(cp_emoji, kAvatarSz - 4);
     paintContactRow(cp, 0, 0, w, h,
@@ -542,11 +545,7 @@ void ContactListView::renderRowToCache(int i, int w) {
                     rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr,
                     rd->pinnedIndex, rd->truncatedName, rd->truncatedMsg, av);
     cp.end();
-#ifdef QT3_BUILD
     rc.pix = pm;
-#else
-    rc.pix = QPixmap::fromImage(img);
-#endif
     rc.width = w;
 }
 

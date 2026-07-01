@@ -1022,6 +1022,7 @@ void MainWindow::onMessageSending(const QString& message) {
 }
 
 void MainWindow::handleEvents(const EventList& events) {
+    contactListWidget->beginBatch();
     for (size_t i = 0; i < events.size(); ++i) {
         const Event& e = events[i];
         qWarning("Event: %s", e.type.c_str());
@@ -1641,6 +1642,7 @@ void MainWindow::handleEvents(const EventList& events) {
             }
         }
     }
+    contactListWidget->endBatch();
 }
 
 void MainWindow::onLanguageChanged(const QString& langCode) {
