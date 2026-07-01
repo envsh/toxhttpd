@@ -33,6 +33,7 @@ struct MsgBlock {
 };
 
 struct ChatElement {
+    enum SendState { SendSending, SendSent, SendFailed };
     enum ElementType { Text, Image, File, Video, Gif, Audio };
 
     ElementType etype;
@@ -85,13 +86,16 @@ struct ChatElement {
     // Layout cache (TG-style per-element)
     short cachedWidth;
     short height;
+    SendState sendState;
+    QString sendErrorMsg;
+    QRect resendIconRect;
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
         , translationInProgress(false), downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
-        , cachedWidth(-1), height(0) {}
+        , cachedWidth(-1), height(0), sendState(SendSending) {}
 
     int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont);
     void paint(QPainter& p, int y, int viewWidth, bool isSelected,
@@ -156,6 +160,7 @@ signals:
     void retryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void downloadNeeded(int msgIndex, const QString& mediaUrl);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
+    void resendMessage(int msgIndex);
 
 private slots:
     void onScrollChanged(int value);

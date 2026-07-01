@@ -48,6 +48,7 @@ signals:
     void sourceClicked(int msgIndex);
     void retryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
+    void resendMessage(int msgIndex);
 
 private slots:
     void onSendClicked();

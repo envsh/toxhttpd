@@ -412,6 +412,7 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onTranslateForSendRequested(const QString&, const QString&)));
     connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
     connect(chatWidget, SIGNAL(retryClicked(int, const QString&, const QString&)), this, SLOT(onRetryClicked(int, const QString&, const QString&)));
+    connect(chatWidget, SIGNAL(resendMessage(int)), this, SLOT(onResendMessage(int)));
     connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
@@ -763,11 +764,26 @@ void MainWindow::customEvent(CustomEventBase* event) {
             }
             if (targetName.isEmpty())
                 targetName = qFromUtf8(evt->chatType) + " " + QString::number(evt->chatId);
+            {
+                for (int i = chatWidget->messageCount() - 1; i >= 0; i--) {
+                    ChatElement& el = chatWidget->mutableMessageAt(i);
+                    if (el.category == "self" && el.sendState == ChatElement::SendSending) {
+                        if (evt->success) {
+                            el.sendState = ChatElement::SendSent;
+                        } else {
+                            el.sendState = ChatElement::SendFailed;
+                            el.sendErrorMsg = qFromUtf8(evt->errorMessage);
+                        }
+                        break;
+                    }
+                }
+            }
             if (!evt->success) {
                 ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
             }
             else
                 ToastWidget::show(chatWidget, _("send_success").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 2000);
+            chatWidget->repaintMessages();
             return;
         }
         
@@ -1044,6 +1060,13 @@ void MainWindow::onMessageSending(const QString& message) {
 
     // 乐观更新：先显示在界面
     chatWidget->appendMessage(message, "self", "Me", QString(), -1, getCurrentTime());
+    {
+        int lastIdx = chatWidget->messageCount() - 1;
+        if (lastIdx >= 0) {
+            ChatElement& el = chatWidget->mutableMessageAt(lastIdx);
+            el.sendState = ChatElement::SendSending;
+        }
+    }
     contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message, timenowhm());
 }
 
@@ -2343,6 +2366,28 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl, const QSt
     el.downloadState = ChatElement::InProgress;
     ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
                           msgIndex, std::string(qToUtf8(mediaUrl).data()));
+}
+
+void MainWindow::onResendMessage(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    if (currentChatId == -1 || currentChatType.isEmpty()) { return; }
+    QString msgText = chatWidget->messageAt(msgIndex).messageText;
+    if (msgText.isEmpty()) { return; }
+#ifdef USE_UNIFIED_SEND_API
+    std::string type = std::string(qToUtf8(currentChatType).data());
+    std::string idOverride;
+    if (type == kGomuksRoomType || type == kUnktoxConferenceType
+        || type == kUnktoxFriendType || type == kUnktoxGroupType) {
+        for (const auto& cd : m_accumulatedContactData) {
+            if (cd.id == currentChatId && cd.type == type) {
+                idOverride = cd.chatId; break;
+            }
+        }
+    }
+    ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(msgText)), idOverride);
+#else
+    ToxAPI::sendMessage(currentChatId, "friend", std::string(qToUtf8(msgText)));
+#endif
 }
 
 void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {

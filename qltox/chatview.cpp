@@ -839,6 +839,20 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2, y + kPad,
                        fm.width(time), headerH, Qt::AlignRight | Qt::AlignVCenter, time);
 
+            // send status
+            if (category == "self") {
+                int statusX = hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20;
+                resendIconRect = QRect(statusX, y + kPad + (headerH - hdrBtnSize) / 2,
+                                       hdrBtnSize, hdrBtnSize);
+                if (sendState == SendSending) {
+                    drawEmojiIcon(p, resendIconRect, 0x23F3, "⏳");
+                } else if (sendState == SendSent) {
+                    drawEmojiIcon(p, resendIconRect, 0x2713, "✓");
+                } else if (sendState == SendFailed) {
+                    drawEmojiIcon(p, resendIconRect, 0x2757, "❗");
+                }
+            }
+
             p.setFont(baseFont);
 
             if (etype != ChatElement::File) {
@@ -868,6 +882,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #else
             p.drawRoundedRect(bubbleRect, kBubbleRadius, kBubbleRadius);
 #endif
+            // send failed retry — use header ❗ instead
         } else {
             int ax = kPad;
             QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
@@ -1442,6 +1457,17 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
                        y + kPad, fm.width(time), headerH,
                        Qt::AlignRight | Qt::AlignVCenter, time);
+             // send status
+            resendIconRect = QRect(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20,
+                                   y + kPad + (headerH - hdrBtnSize) / 2,
+                                   hdrBtnSize, hdrBtnSize);
+            if (sendState == SendSending) {
+                drawEmojiIcon(p, resendIconRect, 0x23F3, "⏳");
+            } else if (sendState == SendSent) {
+                drawEmojiIcon(p, resendIconRect, 0x2713, "✓");
+            } else if (sendState == SendFailed) {
+                drawEmojiIcon(p, resendIconRect, 0x2757, "❗");
+            }
             p.setFont(baseFont);
 
             // header buttons
@@ -2428,6 +2454,12 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 m_items[msgIndex].retryBtnRect.contains(event->pos())) {
                 return;
             }
+            // Check resend via status icon
+            if (m_items[msgIndex].category == "self"
+                && m_items[msgIndex].sendState == ChatElement::SendFailed
+                && m_items[msgIndex].resendIconRect.contains(event->pos())) {
+                return;
+            }
 
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
@@ -2560,6 +2592,28 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
             }
         }
 
+        // Send error tooltip
+        {
+            const auto& item = m_items[msgIndex];
+            if (item.sendState == ChatElement::SendFailed
+                && !item.sendErrorMsg.isEmpty()
+                && item.resendIconRect.contains(event->pos())) {
+                    QString tip = qFromUtf8("错误：") + item.sendErrorMsg + qFromUtf8("。（点击重新发送）");
+                    showTempTooltip(this, item.resendIconRect, tip);
+            }
+        }
+
+            // Resend icon cursor
+            {
+                const auto& item = m_items[msgIndex];
+                if (item.sendState == ChatElement::SendFailed
+                    && item.category == "self"
+                    && item.resendIconRect.contains(event->pos())) {
+                    setCursor(QCursor(Qt::PointingHandCursor));
+                    QWidget::mouseMoveEvent(event);
+                    return;
+                }
+            }
         // ... compute charPos for link detection
         int curY = msgAbsY(msgIndex) - m_scrollPos;
         int localY = event->y() - curY;
@@ -2597,6 +2651,23 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
             ChatElement& el = m_items[msgIndex];
+            // Send failed retry
+            if (el.sendState == ChatElement::SendFailed && el.category == "self"
+                && !el.retryBtnRect.isNull() && el.retryBtnRect.contains(event->pos())) {
+                el.sendState = ChatElement::SendSending;
+                updateRect(el.resendIconRect);
+                emit resendMessage(msgIndex);
+                return;
+            }
+            // Resend via status icon
+            if (el.category == "self"
+                && el.sendState == ChatElement::SendFailed
+                && el.resendIconRect.contains(event->pos())) {
+                el.sendState = ChatElement::SendSending;
+                updateRect(el.resendIconRect);
+                emit resendMessage(msgIndex);
+                return;
+            }
             // Download button (always)
             if (!el.downloadBtnRect.isNull() &&
                 el.downloadBtnRect.contains(event->pos())) {
@@ -2687,9 +2758,13 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
 #else
     QMenu menu(this);
 #endif
+    bool canRetry = (msgIndex >= 0 && msgIndex < (int)m_items.size()
+                     && m_items[msgIndex].sendState == ChatElement::SendFailed
+                     && m_items[msgIndex].category == "self");
     // Copy full message
 #ifdef QT3_BUILD
     int copyMsgId = menu.insertItem(_("context.copy_message"));
+    int retryMsgId = canRetry ? menu.insertItem("重发") : -1;
     int selectAllId = menu.insertItem(_("context.select_all"));
     int copyNickId = -1, mentionId = -1;
     if (onName) {
@@ -2698,6 +2773,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     }
 #else
     QAction* copyMsgAction = menu.addAction(_("context.copy_message"));
+    QAction* retryMsgAction = canRetry ? menu.addAction("重发") : nullptr;
     QAction* selectAllAction = menu.addAction(_("context.select_all"));
     QAction* copyNickAction = nullptr;
     QAction* mentionAction = nullptr;
@@ -2710,6 +2786,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     int choice = menu.exec(event->globalPos());
     if (choice == copyMsgId) {
         copyFullMessage(msgIndex);
+    } else if (canRetry && choice == retryMsgId) {
+        m_items[msgIndex].sendState = ChatElement::SendSending;
+        updateRect(m_items[msgIndex].resendIconRect);
+        emit resendMessage(msgIndex);
     } else if (choice == selectAllId) {
         // Select all text in all messages
         m_selMsgIndex = 0;
@@ -2725,6 +2805,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     QAction* chosen = menu.exec(event->globalPos());
     if (chosen == copyMsgAction) {
         copyFullMessage(msgIndex);
+    } else if (canRetry && chosen == retryMsgAction) {
+        m_items[msgIndex].sendState = ChatElement::SendSending;
+        updateRect(m_items[msgIndex].resendIconRect);
+        emit resendMessage(msgIndex);
     } else if (chosen == selectAllAction) {
         m_selMsgIndex = 0;
         m_selStart = 0;

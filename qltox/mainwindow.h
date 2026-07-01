@@ -52,6 +52,7 @@ protected slots:
     void onTranslateForSendRequested(const QString& text, const QString& targetLang);
     void onSourceClicked(int msgIndex);
     void onRetryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
+    void onResendMessage(int msgIndex);
     void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();

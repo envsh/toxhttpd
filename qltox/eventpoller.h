@@ -200,6 +200,7 @@ public:
     std::string message;
     int chatId;
     std::string chatType;
+    std::string errorMessage;
 };
 
 class MembersLoadedEvent : public ApiResultEvent {

@@ -847,6 +847,14 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         auto* ev = new MessageSentResultEvent((ApiRequestType)type);
         ev->elapsedMs = resp.elapsedMs;
         ev->success = (resp.httpCode == 200 && !resp.body.empty());
+        if (!ev->success) {
+            if (!resp.curlErrStr.empty())
+                ev->errorMessage = resp.curlErrStr;
+            else if (resp.httpCode != 200)
+                ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
+            else
+                ev->errorMessage = "unknown error";
+        }
         ev->chatId = ctx->id;
         ev->message = ctx->str1;
         switch (ctx->type) {
