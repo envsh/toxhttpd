@@ -28,6 +28,7 @@
 #include "sharedstatusbar.h"
 #include "photoviewer.h"
 #include "media_shmem_cache.h"
+#include <qtimer.h>
 #include <qlabel.h>
 #include "ConfigDialog.h"
 #include <qpushbutton.h>
@@ -410,7 +411,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(translateForSendRequested(const QString&, const QString&)),
             this, SLOT(onTranslateForSendRequested(const QString&, const QString&)));
     connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
-    connect(chatWidget, SIGNAL(retryClicked(int, const QString&)), this, SLOT(onRetryClicked(int, const QString&)));
+    connect(chatWidget, SIGNAL(retryClicked(int, const QString&, const QString&)), this, SLOT(onRetryClicked(int, const QString&, const QString&)));
     connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
@@ -850,6 +851,32 @@ void MainWindow::customEvent(CustomEventBase* event) {
             return;
         }
     }
+}
+
+bool MainWindow::event(QEvent* event) {
+    bool ret = QMainWindow::event(event);
+    if (!m_firstPaintLogged && event->type() == QEvent::Paint) {
+        m_paintCounter++;		
+	}
+    if (!m_firstPaintLogged) {
+		if (event->type() == QEvent::Paint) {
+			if (!qApp->hasPendingEvents() || m_paintCounter > 5) {
+				m_firstPaintLogged = true;
+				QTimer::singleShot(0, this, SLOT(onFirstPaintComplete()));
+			}
+		} else {
+			if (!qApp->hasPendingEvents() && m_paintCounter > 0) {
+				m_firstPaintLogged = true;
+				QTimer::singleShot(0, this, SLOT(onFirstPaintComplete()));
+			}			
+		}
+    }
+    return ret;
+}
+
+void MainWindow::onFirstPaintComplete() {
+    qWarning("=== UI 首次绘制完成 === pending=%s",
+             qApp->hasPendingEvents() ? "true" : "false");
 }
 
 void MainWindow::onContactSelected(int id, const QString& type, const QString& name) {
@@ -2164,7 +2191,7 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
     if (currentChatId == -1 || currentChatType.isEmpty()) return;
     
     for (const auto& msg : messages) {
-        bool isSelf = (msg.sender_pubkey == selfPubkey);
+        bool isSelf  = (msg.sender_pubkey == selfPubkey);
         QString senderLabel;
         QString senderNickname;
         QString ipAddress;
@@ -2239,16 +2266,36 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
         
         QString timeStr = qFormatTime(qFromUtf8(msg.created_at));
         
-        chatWidget->appendMessage(
-            qFromUtf8(msg.message),
-            isSelf ? "self" : "other",
-            senderLabel,
-            senderNickname,
-            isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number),
-            timeStr,
-            avatarUrl,
-            ipAddress
-        );
+        ChatElement el;
+        el.messageText    = qFromUtf8(msg.message);
+        el.category       = isSelf ? "self" : "other";
+        el.senderName     = senderLabel;
+        el.senderNickname = senderNickname;
+        el.peerNumber     = isSelf ? -1 : (currentChatType == "friend" ? currentChatId : (int)msg.sender_number);
+        el.time           = timeStr;
+        el.avatarUrl      = avatarUrl;
+        el.ipAddress      = ipAddress;
+
+        if (!msg.mediaUrl.empty()) {
+            el.mediaUrl    = qFromUtf8(msg.mediaUrl);
+            el.mediaWidth  = msg.mediaWidth;
+            el.mediaHeight = msg.mediaHeight;
+            el.fileSize    = msg.fileSize;
+        }
+
+        if (msg.msgtype == "image") {
+            el.etype = ChatElement::Image;
+        } else if (msg.msgtype == "video") {
+            el.etype       = ChatElement::Video;
+            el.durationSec = msg.duration / 1000;
+        } else if (msg.msgtype == "audio") {
+            el.etype       = ChatElement::Audio;
+            el.durationSec = msg.duration / 1000;
+        } else if (msg.msgtype == "file") {
+            el.etype = ChatElement::File;
+        }
+
+        chatWidget->appendMessage(el);
     }
 }
 
@@ -2269,7 +2316,7 @@ void MainWindow::onTranslateForSendRequested(const QString& text, const QString&
     ToxAPI::translateForSend(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)));
 }
 
-void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl) {
+void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl, const QString& /*source*/) {
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
     if (currentChatId < 0) { return; }
 

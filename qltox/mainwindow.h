@@ -26,6 +26,11 @@ public:
     
     void customEvent(CustomEventBase* event);
     
+protected:
+    bool event(QEvent* event) override;
+protected slots:
+    void onFirstPaintComplete();
+    
     public slots:
     void onContactSelected(int id, const QString& type, const QString& name);
     void onMessageSending(const QString& message);
@@ -46,7 +51,7 @@ public:
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
     void onTranslateForSendRequested(const QString& text, const QString& targetLang);
     void onSourceClicked(int msgIndex);
-    void onRetryClicked(int msgIndex, const QString& mediaUrl);
+    void onRetryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
@@ -75,6 +80,9 @@ private:
     static const int kLoadMessages = 3;
     static const int kLoadMembers = 4;
     static const int kLoadSendMsg = 5;
+
+    bool m_firstPaintLogged = false;
+    int m_paintCounter = 0;
 
     // 增量累积的 contacts（值类型，避免指针所有权混乱）
     std::vector<ContactData> m_accumulatedContactData;

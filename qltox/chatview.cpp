@@ -2601,13 +2601,13 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
             // Download button (always)
             if (!el.downloadBtnRect.isNull() &&
                 el.downloadBtnRect.contains(event->pos())) {
-                emit retryClicked(msgIndex, el.mediaUrl);
+                emit retryClicked(msgIndex, el.mediaUrl, qFromUtf8("manual_always"));
                 return;
             }
             // Retry button (only when failed)
             if (!el.retryBtnRect.isNull() &&
                 el.retryBtnRect.contains(event->pos())) {
-                emit retryClicked(msgIndex, el.mediaUrl);
+                emit retryClicked(msgIndex, el.mediaUrl, qFromUtf8("manual_error"));
                 return;
             }
         }
@@ -2792,6 +2792,8 @@ std::pair<int,int> ChatView::visibleMessageRange() const {
 }
 
 void ChatView::triggerVisibleDownloads() {
+    return; // 废弃：由 paintEvent 统一检测和触发
+    // 已废弃：统一在 paintEvent 中逐项检测，直接发射 retryClicked
     if (m_items.empty()) {
         qWarning("[VisibleTrigger] empty items, skipping");
         return;
@@ -2802,9 +2804,8 @@ void ChatView::triggerVisibleDownloads() {
     qWarning("[VisibleTrigger] visible range: %d ~ %d", first, last);
     for (int i = first; i <= last; i++) {
         ChatElement& el = m_items[i];
-        if (!el.downloadRequested && el.downloadState == ChatElement::NotRequested
+        if (el.downloadState == ChatElement::NotRequested
             && el.scaledDisplay.isNull() && !el.mediaUrl.isEmpty()) {
-            el.downloadRequested = true;
             qWarning("[VisibleTrigger] would download idx=%d type=%d url=%s",
                      i, (int)el.etype, qToUtf8(el.mediaUrl).data());
         }
@@ -2836,6 +2837,15 @@ void ChatView::paintEvent(QPaintEvent* event) {
         if (y + h >= 0 && y <= vpH) {
             m_items[i].paint(bp, y, viewW, ((int)i == m_selMsgIndex), selRects,
                              m_fm, m_emojiW, font(), currentPalette());
+            ChatElement& el = m_items[i];
+            if (el.downloadState == ChatElement::NotRequested
+                && el.scaledDisplay.isNull()
+                && !el.mediaUrl.isEmpty()
+                && (el.etype == ChatElement::Image || el.etype == ChatElement::Gif)
+                && el.fileSize > 0 && el.fileSize < 1048576)
+            {
+                emit retryClicked((int)i, el.mediaUrl, qFromUtf8("autopaint"));
+            }
         }
         if (y > vpH) { break; }
         y += h;

@@ -63,7 +63,6 @@ struct ChatElement {
     QString mediaUrl;
     enum DownloadState { NotRequested, InProgress, Completed, Failed };
     DownloadState downloadState;
-    bool downloadRequested;
     QRect thumbnailRect;
     int mediaWidth;
     QRect downloadBtnRect;
@@ -89,7 +88,7 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , translationInProgress(false), downloadState(NotRequested), downloadRequested(false)
+        , translationInProgress(false), downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , cachedWidth(-1), height(0) {}
@@ -155,7 +154,7 @@ signals:
     void translateClicked(int msgIndex);
     void sourceClicked(int msgIndex);
     void mentionClicked(const QString& username);
-    void retryClicked(int msgIndex, const QString& mediaUrl);
+    void retryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void downloadNeeded(int msgIndex, const QString& mediaUrl);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
 
