@@ -957,7 +957,6 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         // 缓存命中：恢复缓存消息，同时后台拉取刷新
         qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
         chatWidget->attachMessages(std::move(cacheIt->second));
-        chatWidget->triggerVisibleDownloads();
         if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
             && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
             && type != kFilesyncType && type != kClipboardType) {

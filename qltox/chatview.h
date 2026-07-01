@@ -129,7 +129,6 @@ public:
     ChatElement& messageAt(int index);
     int messageCount() const;
     void triggerRelayout(int msgIndex = -1);
-    void triggerVisibleDownloads();
     void onGifFrameUpdated(int msgIndex);
 
     static const int kAvatarSize   = 42;

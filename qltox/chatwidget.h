@@ -35,7 +35,6 @@ public:
     std::vector<ChatElement> detachMessages();
     void attachMessages(std::vector<ChatElement> msgs);
     void triggerRelayout(int msgIndex = -1);
-    void triggerVisibleDownloads();
     void repaintMessages() { messageArea->update(); }
     void retranslateUi();
     void showUnreadBanner(int count);

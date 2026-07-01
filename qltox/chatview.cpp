@@ -1931,7 +1931,6 @@ void ChatView::appendMessage(const ChatElement& msg) {
         m_vScrollBar->setValue(maxScroll);
         m_vScrollBar->blockSignals(false);
         m_vScrollBar->showTemporarily();
-        triggerVisibleDownloads();
         updateFull();
     } else {
         m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
@@ -2791,27 +2790,6 @@ std::pair<int,int> ChatView::visibleMessageRange() const {
     return {first, last};
 }
 
-void ChatView::triggerVisibleDownloads() {
-    return; // 废弃：由 paintEvent 统一检测和触发
-    // 已废弃：统一在 paintEvent 中逐项检测，直接发射 retryClicked
-    if (m_items.empty()) {
-        qWarning("[VisibleTrigger] empty items, skipping");
-        return;
-    }
-    auto range = visibleMessageRange();
-    int first = range.first, last = range.second;
-    if (first < 0) { return; }
-    qWarning("[VisibleTrigger] visible range: %d ~ %d", first, last);
-    for (int i = first; i <= last; i++) {
-        ChatElement& el = m_items[i];
-        if (el.downloadState == ChatElement::NotRequested
-            && el.scaledDisplay.isNull() && !el.mediaUrl.isEmpty()) {
-            qWarning("[VisibleTrigger] would download idx=%d type=%d url=%s",
-                     i, (int)el.etype, qToUtf8(el.mediaUrl).data());
-        }
-    }
-}
-
 void ChatView::paintEvent(QPaintEvent* event) {
     if (m_backBuffer.size() != size()) {
         m_backBuffer = QPixmap(size());
@@ -2864,7 +2842,6 @@ void ChatView::resizeEvent(QResizeEvent* event) {
     int sbw = m_vScrollBar->sizeHint().width();
     m_vScrollBar->setGeometry(width() - sbw, 0, sbw, height());
     relayout();
-    triggerVisibleDownloads();
 }
 
 void ChatView::onScrollChanged(int value) {
@@ -2880,5 +2857,4 @@ void ChatView::onScrollChanged(int value) {
         updateRect(m_scrollDownPill.rect());
     }
     m_vScrollBar->showTemporarily();
-    triggerVisibleDownloads();
 }
