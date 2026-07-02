@@ -147,6 +147,21 @@ static bool addPeerToDb(const std::string& key, const PeerInfo& pi) {
     return true;
 }
 
+static void updateContactDb(const std::string& chanid, const std::string& name,
+                            const std::string& status, int is_connected) {
+    qDebug("updateContactDb: chanid=%s name=%s status=%s is_connected=%d",
+           chanid.c_str(), name.c_str(), status.c_str(), is_connected);
+    auto* async = Storage::instance().channelDbAsync();
+    if (!async) return;
+    ChannelRow row;
+    row.chanid       = chanid;
+    row.proto_type   = "tox";
+    row.name         = name;
+    row.status       = status;
+    row.is_connected = is_connected;
+    async->update_contact_channel(std::move(row), nullptr);
+}
+
 static void updatePeerInDb(const std::string& key, const PeerInfo& pi) {
     PeerKey pk = parsePeerKey(key);
     if (!pk.valid) { return; }
@@ -639,6 +654,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                             entry.statusStr = "none";
                         }
                         addPeerToDb(key, entry);
+                        updateContactDb(cd.type + "_" + std::to_string(cd.id),
+                                        cd.name, cd.status, cd.isConnected ? 1 : 0);
                     }
                 }
                 ContactList cl;
@@ -662,6 +679,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->chat_id = "";
                     c->is_connected = false;
                     cl.append(c);
+                    updateContactDb(std::string(kUnknownType) + "_" + std::to_string(VIRTUAL_UNKNOWN_ID),
+                                    "Unknown", "online", -1);
                 }
                 {
                     Contact* c = new Contact();
@@ -672,6 +691,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->chat_id = "";
                     c->is_connected = false;
                     cl.append(c);
+                    updateContactDb(std::string(kSyseventType) + "_" + std::to_string(VIRTUAL_SYSEVENT_ID),
+                                    "Sysevent", "online", -1);
                 }
                 // 追加固定虚拟联系人
                 {
@@ -683,6 +704,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->chat_id = "";
                     c->is_connected = false;
                     cl.append(c);
+                    updateContactDb(std::string(kTopicType) + "_" + std::to_string(VIRTUAL_REDDIT_ID),
+                                    "Reddit", "online", -1);
                 }
                 contactListWidget->setContacts(cl);
             }
@@ -1367,6 +1390,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         updatePeerInDb(key, it->second);
                     }
                     contactListWidget->updateFriendName(friendId, qFromUtf8(newName));
+                    updateContactDb("friend_" + std::to_string(friendId), newName, "", -1);
                 }
                 cJSON_Delete(root);
             }
@@ -1403,6 +1427,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         updatePeerInDb(key, it->second);
                     }
                     contactListWidget->updateFriendConnectionStatus(friendId, qFromUtf8(statusStr));
+                    updateContactDb("friend_" + std::to_string(friendId), "", "",
+                                    (statusStr == "udp" || statusStr == "tcp") ? 1 : 0);
                 }
                 cJSON_Delete(root);
             }
@@ -1492,6 +1518,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         contactListWidget->updateContact(cd.id, qFromUtf8(cd.type),
                             qFromUtf8(cd.name), qFromUtf8(cd.chatId), qFromUtf8(cd.status));
                     }
+                    updateContactDb(cd.type + "_" + std::to_string(cd.id),
+                                    cd.name, cd.status, cd.isConnected ? 1 : 0);
                 }
             }
 

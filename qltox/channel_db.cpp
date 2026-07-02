@@ -35,7 +35,8 @@ public:
     std::unique_ptr<ChannelRow> get_channel(const char* chanid) override {
         auto stmt = db().prepare(
             "SELECT chanid,proto_type,last_message_rowid,last_read_rowid,"
-            "       unread_count,pinned_order,draft_text,muted "
+            "       unread_count,pinned_order,draft_text,muted,"
+            "       name,status,is_connected,last_message_text,last_message_time,last_active,auto_translate "
             "FROM channels WHERE chanid=?1");
         if (!stmt.isPrepared()) { return nullptr; }
         if (!stmt.bind(1, chanid)) { return nullptr; }
@@ -49,6 +50,13 @@ public:
         row->pinned_order = stmt.columnInt(5);
         row->draft_text = stmt.columnText(6);
         row->muted = stmt.columnInt(7);
+        row->name = stmt.columnText(8);
+        row->status = stmt.columnText(9);
+        row->is_connected = stmt.columnInt(10);
+        row->last_message_text = stmt.columnText(11);
+        row->last_message_time = stmt.columnText(12);
+        row->last_active = stmt.columnInt64(13);
+        row->auto_translate = stmt.columnInt(14);
         return row;
     }
 
@@ -94,7 +102,8 @@ public:
         std::vector<ChannelRow> rows;
         auto stmt = db().prepare(
             "SELECT chanid,proto_type,last_message_rowid,last_read_rowid,"
-            "       unread_count,pinned_order,draft_text,muted "
+            "       unread_count,pinned_order,draft_text,muted,"
+            "       name,status,is_connected,last_message_text,last_message_time,last_active,auto_translate "
             "FROM channels WHERE pinned_order>0 ORDER BY pinned_order ASC");
         if (!stmt.isPrepared()) { return rows; }
         while (stmt.stepRow()) {
@@ -107,6 +116,13 @@ public:
             row.pinned_order = stmt.columnInt(5);
             row.draft_text = stmt.columnText(6);
             row.muted = stmt.columnInt(7);
+            row.name = stmt.columnText(8);
+            row.status = stmt.columnText(9);
+            row.is_connected = stmt.columnInt(10);
+            row.last_message_text = stmt.columnText(11);
+            row.last_message_time = stmt.columnText(12);
+            row.last_active = stmt.columnInt64(13);
+            row.auto_translate = stmt.columnInt(14);
             rows.push_back(std::move(row));
         }
         return rows;
@@ -248,6 +264,59 @@ public:
         return stmt.step();
     }
 
+    bool add_contact_channel(const ChannelRow& row) override {
+        auto stmt = db().prepare(
+            "INSERT OR REPLACE INTO channels "
+            "(chanid,proto_type,name,status,is_connected,"
+            " last_message_text,last_message_time,last_active,"
+            " unread_count,pinned_order,muted,auto_translate) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, row.chanid.c_str()))          { return false; }
+        if (!stmt.bind(2, row.proto_type.c_str()))       { return false; }
+        if (!stmt.bind(3, row.name.c_str()))             { return false; }
+        if (!stmt.bind(4, row.status.c_str()))           { return false; }
+        if (!stmt.bind(5, row.is_connected))             { return false; }
+        if (!stmt.bind(6, row.last_message_text.c_str())) { return false; }
+        if (!stmt.bind(7, row.last_message_time.c_str())) { return false; }
+        if (!stmt.bind(8, row.last_active))              { return false; }
+        if (!stmt.bind(9, row.unread_count))             { return false; }
+        if (!stmt.bind(10, row.pinned_order))            { return false; }
+        if (!stmt.bind(11, row.muted))                   { return false; }
+        if (!stmt.bind(12, row.auto_translate))          { return false; }
+        return stmt.step();
+    }
+
+    bool update_contact_channel(const ChannelRow& row) override {
+        auto stmt = db().prepare(
+            "INSERT INTO channels "
+            "(chanid,proto_type,name,status,is_connected,"
+            " last_message_text,last_message_time,last_active,"
+            " unread_count,pinned_order,muted,auto_translate) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12) "
+            "ON CONFLICT(chanid) DO UPDATE SET "
+            "name=CASE WHEN excluded.name!='' THEN excluded.name ELSE channels.name END,"
+            "status=CASE WHEN excluded.status!='' THEN excluded.status ELSE channels.status END,"
+            "is_connected=CASE WHEN excluded.is_connected!=-1 THEN excluded.is_connected ELSE channels.is_connected END");
+        if (!stmt.isPrepared()) {
+            qWarning("ChannelDb::update_contact_channel prepare failed for %s", row.chanid.c_str());
+            return false;
+        }
+        if (!stmt.bind(1, row.chanid.c_str()))          { return false; }
+        if (!stmt.bind(2, row.proto_type.c_str()))       { return false; }
+        if (!stmt.bind(3, row.name.c_str()))             { return false; }
+        if (!stmt.bind(4, row.status.c_str()))           { return false; }
+        if (!stmt.bind(5, row.is_connected))             { return false; }
+        if (!stmt.bind(6, row.last_message_text.c_str())) { return false; }
+        if (!stmt.bind(7, row.last_message_time.c_str())) { return false; }
+        if (!stmt.bind(8, row.last_active))              { return false; }
+        if (!stmt.bind(9, row.unread_count))             { return false; }
+        if (!stmt.bind(10, row.pinned_order))            { return false; }
+        if (!stmt.bind(11, row.muted))                   { return false; }
+        if (!stmt.bind(12, row.auto_translate))          { return false; }
+        return stmt.step();
+    }
+
     bool begin_write_transaction() override { return db().beginTransaction(); }
     bool commit_transaction() override { return db().commitTransaction(); }
 };
@@ -357,6 +426,22 @@ public:
         });
     }
 
+    void add_contact_channel(ChannelRow row, std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, row, done]() {
+            bool ok = sync->get().add_contact_channel(row);
+            if (done) { done(ok); }
+        });
+    }
+
+    void update_contact_channel(ChannelRow row, std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, row, done]() {
+            bool ok = sync->get().update_contact_channel(row);
+            if (done) { done(ok); }
+        });
+    }
+
     void close(std::function<void()> done) override {
         auto sync = m_sync;
         post([sync, done]() {
@@ -379,6 +464,7 @@ std::shared_ptr<ChannelDbAsyncInterface> create_channel_db_async(
 }
 
 bool init_channel_db(SqliteDb& db) {
+    // db.exec("DROP TABLE IF EXISTS channels"); // 清表重建 — 注释此行保留数据
     bool ok = db.exec(
         "CREATE TABLE IF NOT EXISTS channels ("
         "  chanid             TEXT PRIMARY KEY,"
@@ -389,6 +475,13 @@ bool init_channel_db(SqliteDb& db) {
         "  pinned_order       INTEGER DEFAULT 0,"
         "  draft_text         TEXT DEFAULT '',"
         "  muted              INTEGER DEFAULT 0,"
+        "  name               TEXT DEFAULT '',"
+        "  status             TEXT DEFAULT '',"
+        "  is_connected       INTEGER DEFAULT 0,"
+        "  last_message_text  TEXT DEFAULT '',"
+        "  last_message_time  TEXT DEFAULT '',"
+        "  last_active        INTEGER DEFAULT 0,"
+        "  auto_translate     INTEGER DEFAULT 0,"
         "  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")");
     // peers v2: drop old single-key table, recreate with composite PK
