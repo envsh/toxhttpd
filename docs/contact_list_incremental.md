@@ -404,3 +404,34 @@ Batch 内 freeze 期间：
 - 此改动对 Qt3 无副作用。批量减少的是 `refreshView` 调用，Qt3 可同等收益。
 - `beginBatch/endBatch` 支持嵌套（`m_batchLevel` 计数器），外层 endBatch 触发最终刷新。
 - `EmojiRenderer::renderEmoji` (m_ok 为 false 时) 使用 `QPainter::drawText` 绘制 emoji 字符。macOS 下若 emoji 字体路径不存在，fallback 走 CoreText，不影响性能。
+
+## Debug Diary
+
+### 联系人排序：`last_active` 不生效（已修复 2026-07）
+
+**表象**：没有收到消息的虚拟联系人（Unknown/Sysevent/Reddit）始终排在列表最顶部，有消息的真实联系人反而在下面。
+
+**根因**（两层）：
+
+1. **`setContacts` 中 `m_list.clear()` 销毁所有 RowData，`lastActive` 丢失**
+   - 构造期种子列表先加入虚拟联系人
+   - 事件到达 → `updateContactLastMessage` 正确更新了 `rd->lastActive = now()`
+   - 但紧接着 `PartialDataEvent` 再次调用 `setContacts`，内部 `m_list.clear()` 销毁所有 RowData
+   - 全量重建时用 `c->lastActive.toTime_t()`（`QDateTime()` 默认值 → `0`），之前设好的 `lastActive` 归零
+   - 消息文本有 `m_lastMessages` 缓存可恢复，但 `lastActive` 无对应缓存
+
+2. **全量重建后所有联系人 `lastActive == 0`，排序降级到 `online_first`**
+   - `pinned_first: unpinned` → 继续
+   - `last_active: 全部 0` → 继续
+   - `online_first: 虚拟联系人 status="online"` → **虚拟联系人排最前面**
+   - 真实联系人即使有新消息，`lastActive` 也是 0（被前一次 clear 清掉了）
+
+**修复**：
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| `setContacts` clear 前备份 lastActive，重建后恢复 | `contactlist.cpp:637-643` | 核心修复：防止 clear 丢失已有 lastActive |
+| 初始化 `= 0` 替代 `c->lastActive.toTime_t()` | `contactlist.cpp:656,740` | 不依赖 QDateTime 转换，语义更清晰 |
+| `updateContactLastMessage` 用 `QDateTime::currentDateTime().toTime_t()` | `contactlist.cpp:792` | Qt3/Qt4 兼容，不引入 `int64_t` |
+| `#include <time.h>` 移除 | `contactlist.cpp:1` | 不再需要 `::time(0)` |
+| 类型保持 `uint`，不上 `int64_t` | `contactlist.h:58` | Qt3 `toTime_t()` 返回 `time_t`，Qt4 返回 `uint`，`uint` 兼容两者 |

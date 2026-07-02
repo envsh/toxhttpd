@@ -587,8 +587,8 @@ ContactListWidget::ContactListWidget(QWidget* parent)
     searchRow->addWidget(sortBtn);
     layout->addLayout(searchRow);
 
-    m_sortCriteria.push_back("last_active");
     m_sortCriteria.push_back("online_first");
+    m_sortCriteria.push_back("last_active");
     m_sortCriteria.push_back("pinned_first");
 
     m_itemHeight = calcItemHeight(font());
@@ -634,6 +634,14 @@ ContactListWidget::ContactListWidget(QWidget* parent)
 }
 
 void ContactListWidget::setContacts(ContactList& contacts) {
+    std::map<std::pair<int, QString>, uint> activeBackup;
+    for (int i = 0; i < m_list.size(); ++i) {
+        RowData* rd = m_list.at(i);
+        if (rd->lastActive > 0) {
+            activeBackup[{rd->id, rd->type}] = rd->lastActive;
+        }
+    }
+
     m_list.clear();
     for (uint i = 0; i < contacts.count(); ++i) {
         Contact* c = contacts.at(i);
@@ -645,7 +653,11 @@ void ContactListWidget::setContacts(ContactList& contacts) {
         rd->status = c->status;
         rd->chatId = c->chat_id;
         rd->isConnected = c->is_connected;
-        rd->lastActive = c->lastActive.toTime_t();
+        rd->lastActive = 0;
+        auto bk = activeBackup.find({c->id, c->type});
+        if (bk != activeBackup.end()) {
+            rd->lastActive = bk->second;
+        }
         auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
         auto uit = m_unreadCounts.find(key);
         rd->unread = (uit != m_unreadCounts.end()) ? uit->second : 0;
@@ -725,7 +737,7 @@ void ContactListWidget::addContact(Contact* c) {
     rd->status = c->status;
     rd->chatId = c->chat_id;
     rd->isConnected = c->is_connected;
-    rd->lastActive = c->lastActive.toTime_t();
+    rd->lastActive = 0;
     rd->unread = unread;
     rd->lastMessage = lastMsg;
     rd->timeStr = lastTime;
