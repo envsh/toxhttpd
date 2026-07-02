@@ -359,16 +359,31 @@ void Storage::flushWriteBatch() {
 ```sql
 -- 会话元数据（联系人/群聊/会议）
 CREATE TABLE IF NOT EXISTS channels (
-    chanid             TEXT PRIMARY KEY,   -- "friend:0", "group:1", "conference:2"
-    proto_type         TEXT DEFAULT 'tox', -- "tox", "matrix"
+    chanid             TEXT PRIMARY KEY,
+    proto_type         TEXT DEFAULT 'tox',
     last_message_rowid INTEGER NOT NULL DEFAULT 0,
     last_read_rowid    INTEGER NOT NULL DEFAULT 0,
     unread_count       INTEGER DEFAULT 0,
     pinned_order       INTEGER DEFAULT 0,  -- 0=未置顶, >0=置顶排序
     draft_text         TEXT DEFAULT '',
     muted              INTEGER DEFAULT 0,
+    name               TEXT DEFAULT '',
+    status             TEXT DEFAULT '',
+    is_connected       INTEGER DEFAULT 0,
+    last_message_text  TEXT DEFAULT '',
+    last_message_time  TEXT DEFAULT '',
+    last_active        INTEGER DEFAULT 0,
+    auto_translate     INTEGER DEFAULT 0,
+    icon_url           TEXT DEFAULT '',
+    pubkey             TEXT DEFAULT '',
     created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- channels 表写入点
+--   updateContactDb()           — chanid, proto_type, name, status, is_connected
+--   db_writeUnreadReset()       — unread_count = 0
+--   db_writeUnreadIncrement()   — unread_count += 1 (increment_unread)
+--   db_writeLastMessage()       — last_message_text, last_message_time, last_active
 
 -- 消息表
 CREATE TABLE IF NOT EXISTS messages (

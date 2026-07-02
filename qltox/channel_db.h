@@ -21,6 +21,8 @@ struct ChannelRow {
     std::string last_message_time;
     int64_t last_active = 0;
     int auto_translate = 0;
+    std::string icon_url;
+    std::string pubkey;
 };
 
 struct ChannelUpdate {
@@ -31,6 +33,9 @@ struct ChannelUpdate {
     bool hasPinnedOrder = false;        int pinned_order;
     bool hasDraftText = false;          std::string draft_text;
     bool hasMuted = false;              int muted;
+    bool hasLastMessageText = false;    std::string last_message_text;
+    bool hasLastMessageTime = false;    std::string last_message_time;
+    bool hasLastActive = false;         int64_t last_active;
 };
 
 struct PeerRow {
@@ -63,6 +68,7 @@ public:
 
     virtual bool add_contact_channel(const ChannelRow& row) = 0;
     virtual bool update_contact_channel(const ChannelRow& row) = 0;
+    virtual bool increment_unread(const char* chanid, int delta) = 0;
 
     virtual bool add_peer(const PeerRow& row) = 0;
     virtual bool update_peer(const PeerRow& row) = 0;
@@ -94,6 +100,8 @@ public:
     virtual void load_pinned(std::function<void(std::vector<ChannelRow>)> done) = 0;
     virtual void add_contact_channel(ChannelRow row, std::function<void(bool)> done) = 0;
     virtual void update_contact_channel(ChannelRow row, std::function<void(bool)> done) = 0;
+    virtual void increment_unread(std::string chanid, int delta,
+                                  std::function<void(bool)> done) = 0;
     virtual void add_peer(PeerRow row, std::function<void(bool)> done) = 0;
     virtual void update_peer(PeerRow row, std::function<void(bool)> done) = 0;
     virtual void get_chan_peer(std::string chanid, int peer_number,

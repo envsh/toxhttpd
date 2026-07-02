@@ -148,18 +148,56 @@ static bool addPeerToDb(const std::string& key, const PeerInfo& pi) {
 }
 
 static void updateContactDb(const std::string& chanid, const std::string& name,
-                            const std::string& status, int is_connected) {
+                            const std::string& status, int is_connected,
+                            const std::string& iconUrl = "",
+                            const std::string& pubkey = "",
+                            const std::string& protoType = "tox") {
     qDebug("updateContactDb: chanid=%s name=%s status=%s is_connected=%d",
            chanid.c_str(), name.c_str(), status.c_str(), is_connected);
     auto* async = Storage::instance().channelDbAsync();
     if (!async) return;
     ChannelRow row;
     row.chanid       = chanid;
-    row.proto_type   = "tox";
+    row.proto_type   = protoType;
     row.name         = name;
     row.status       = status;
     row.is_connected = is_connected;
+    row.icon_url     = iconUrl;
+    row.pubkey       = pubkey;
     async->update_contact_channel(std::move(row), nullptr);
+}
+
+static std::string chanidStr(int id, const QString& type) {
+    return std::string(qToUtf8(type).data()) + "_" + std::to_string(id);
+}
+
+static void db_writeUnreadReset(int id, const QString& type) {
+    auto* async = Storage::instance().channelDbAsync();
+    if (!async) return;
+    ChannelUpdate upd;
+    upd.hasUnreadCount = true;
+    upd.unread_count = 0;
+    async->update_channel(chanidStr(id, type), std::move(upd), nullptr);
+}
+
+static void db_writeUnreadIncrement(int id, const QString& type) {
+    auto* async = Storage::instance().channelDbAsync();
+    if (!async) return;
+    async->increment_unread(chanidStr(id, type), 1, nullptr);
+}
+
+static void db_writeLastMessage(int id, const QString& type,
+                                const QString& msg, const QString& timeStr) {
+    auto* async = Storage::instance().channelDbAsync();
+    if (!async) return;
+    ChannelUpdate upd;
+    upd.hasLastMessageText = true;
+    upd.last_message_text = std::string(qToUtf8(msg).data());
+    upd.hasLastMessageTime = true;
+    upd.last_message_time = std::string(qToUtf8(timeStr).data());
+    upd.hasLastActive = true;
+    upd.last_active = (int64_t)::time(0);
+    async->update_channel(chanidStr(id, type), std::move(upd), nullptr);
 }
 
 static void updatePeerInDb(const std::string& key, const PeerInfo& pi) {
@@ -655,7 +693,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                         }
                         addPeerToDb(key, entry);
                         updateContactDb(cd.type + "_" + std::to_string(cd.id),
-                                        cd.name, cd.status, cd.isConnected ? 1 : 0);
+                                        cd.name, cd.status, cd.isConnected ? 1 : 0,
+                                        cd.iconUrl, cd.chatId, cd.type);
                     }
                 }
                 ContactList cl;
@@ -680,7 +719,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->is_connected = false;
                     cl.append(c);
                     updateContactDb(std::string(kUnknownType) + "_" + std::to_string(VIRTUAL_UNKNOWN_ID),
-                                    "Unknown", "online", -1);
+                                    "Unknown", "online", -1, "", "", kUnknownType);
                 }
                 {
                     Contact* c = new Contact();
@@ -692,7 +731,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->is_connected = false;
                     cl.append(c);
                     updateContactDb(std::string(kSyseventType) + "_" + std::to_string(VIRTUAL_SYSEVENT_ID),
-                                    "Sysevent", "online", -1);
+                                    "Sysevent", "online", -1, "", "", kSyseventType);
                 }
                 // 追加固定虚拟联系人
                 {
@@ -705,7 +744,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     c->is_connected = false;
                     cl.append(c);
                     updateContactDb(std::string(kTopicType) + "_" + std::to_string(VIRTUAL_REDDIT_ID),
-                                    "Reddit", "online", -1);
+                                    "Reddit", "online", -1, "", "", kTopicType);
                 }
                 contactListWidget->setContacts(cl);
             }
@@ -945,6 +984,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     currentChatType = type;
     int prevUnread = contactListWidget->unreadCount(id, type);
     contactListWidget->resetUnread(id, type);
+    db_writeUnreadReset(id, type);
     
     QString headerText;
     QString emoji;
@@ -1091,6 +1131,7 @@ void MainWindow::onMessageSending(const QString& message) {
         }
     }
     contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message, timenowhm());
+    db_writeLastMessage(currentChatId, currentChatType, message, timenowhm());
 }
 
 void MainWindow::handleEvents(const EventList& events) {
@@ -1112,8 +1153,10 @@ void MainWindow::handleEvents(const EventList& events) {
                                          friendId, getCurrentTime());
                     } else {
                         contactListWidget->incrementUnread(friendId, "friend");
+                        db_writeUnreadIncrement(friendId, "friend");
                     }
                     contactListWidget->updateContactLastMessage(friendId, "friend", message, timenowhm());
+                    db_writeLastMessage(friendId, "friend", message, timenowhm());
                     if (!qIsAppActive())
                         playNotificationSound();
                 }
@@ -1216,8 +1259,10 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime());
                     } else {
                         contactListWidget->incrementUnread(confNumber, "conference");
+                        db_writeUnreadIncrement(confNumber, "conference");
                     }
                     contactListWidget->updateContactLastMessage(confNumber, "conference", message, timenowhm());
+                    db_writeLastMessage(confNumber, "conference", message, timenowhm());
                     if (!qIsAppActive())
                         playNotificationSound();
                 } else {
@@ -1318,8 +1363,10 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime(), "", ipAddress);
                     } else {
                         contactListWidget->incrementUnread(groupNumber, "group");
+                        db_writeUnreadIncrement(groupNumber, "group");
                     }
                     contactListWidget->updateContactLastMessage(groupNumber, "group", message, timenowhm());
+                    db_writeLastMessage(groupNumber, "group", message, timenowhm());
                     if (!qIsAppActive())
                         playNotificationSound();
                 }
@@ -1447,6 +1494,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     chatWidget->appendMessage(msg);
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
+                    db_writeUnreadIncrement(VIRTUAL_SYSEVENT_ID, kSyseventType);
                 }
             }
         } else if (!e.type.empty() && e.type[0] == '_') {
@@ -1468,6 +1516,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     chatWidget->appendMessage(msg);
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
+                    db_writeUnreadIncrement(VIRTUAL_SYSEVENT_ID, kSyseventType);
                 }
             }
         } else {
@@ -1519,7 +1568,8 @@ void MainWindow::handleEvents(const EventList& events) {
                             qFromUtf8(cd.name), qFromUtf8(cd.chatId), qFromUtf8(cd.status));
                     }
                     updateContactDb(cd.type + "_" + std::to_string(cd.id),
-                                    cd.name, cd.status, cd.isConnected ? 1 : 0);
+                                    cd.name, cd.status, cd.isConnected ? 1 : 0,
+                                    cd.iconUrl, cd.chatId, cd.type);
                 }
             }
 
@@ -1636,6 +1686,7 @@ void MainWindow::handleEvents(const EventList& events) {
                              chatType.c_str(), chatId, qToUtf8(msg.senderName).data());
                     contactListWidget->updateContactLastMessage(
                         chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
+                    db_writeLastMessage(chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
                         chatWidget->appendMessage(msg);
                         int newIdx = chatWidget->messageCount() - 1;
@@ -1665,6 +1716,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     } else {
                         m_messageCache[{chatId, chatType}].push_back(msg);
                         contactListWidget->incrementUnread(chatId, qFromUtf8(chatType));
+                        db_writeUnreadIncrement(chatId, qFromUtf8(chatType));
                     }
 
                     // 声音通知
@@ -1689,10 +1741,12 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_messageCache[{VIRTUAL_REDDIT_ID, kTopicType}].push_back(msg);
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
+                db_writeLastMessage(VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
                 if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType) {
                     chatWidget->appendMessage(msg);
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
+                    db_writeUnreadIncrement(VIRTUAL_REDDIT_ID, kTopicType);
                 }
             } else {
                 ChatElement msg;
@@ -1711,10 +1765,12 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_messageCache[{VIRTUAL_UNKNOWN_ID, kUnknownType}].push_back(msg);
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
+                db_writeLastMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
                 if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType) {
                     chatWidget->appendMessage(msg);
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, kUnknownType);
+                    db_writeUnreadIncrement(VIRTUAL_UNKNOWN_ID, kUnknownType);
                 }
             }
         }

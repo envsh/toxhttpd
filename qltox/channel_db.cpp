@@ -75,6 +75,9 @@ public:
         if (upd.hasPinnedOrder)      addField("pinned_order");
         if (upd.hasDraftText)        addField("draft_text");
         if (upd.hasMuted)            addField("muted");
+        if (upd.hasLastMessageText)  addField("last_message_text");
+        if (upd.hasLastMessageTime)  addField("last_message_time");
+        if (upd.hasLastActive)       addField("last_active");
         if (n == 0) { return true; }
         sql += " WHERE chanid=?1";
         auto stmt = db().prepare(sql.c_str());
@@ -88,6 +91,9 @@ public:
         if (upd.hasPinnedOrder)      { stmt.bind(idx++, upd.pinned_order); }
         if (upd.hasDraftText)        { stmt.bind(idx++, upd.draft_text.c_str()); }
         if (upd.hasMuted)            { stmt.bind(idx++, upd.muted); }
+        if (upd.hasLastMessageText)  { stmt.bind(idx++, upd.last_message_text.c_str()); }
+        if (upd.hasLastMessageTime)  { stmt.bind(idx++, upd.last_message_time.c_str()); }
+        if (upd.hasLastActive)       { stmt.bind(idx++, upd.last_active); }
         return stmt.step();
     }
 
@@ -290,14 +296,16 @@ public:
     bool update_contact_channel(const ChannelRow& row) override {
         auto stmt = db().prepare(
             "INSERT INTO channels "
-            "(chanid,proto_type,name,status,is_connected,"
+            "(chanid,proto_type,name,status,is_connected,icon_url,pubkey,"
             " last_message_text,last_message_time,last_active,"
             " unread_count,pinned_order,muted,auto_translate) "
-            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14) "
             "ON CONFLICT(chanid) DO UPDATE SET "
             "name=CASE WHEN excluded.name!='' THEN excluded.name ELSE channels.name END,"
             "status=CASE WHEN excluded.status!='' THEN excluded.status ELSE channels.status END,"
-            "is_connected=CASE WHEN excluded.is_connected!=-1 THEN excluded.is_connected ELSE channels.is_connected END");
+            "is_connected=CASE WHEN excluded.is_connected!=-1 THEN excluded.is_connected ELSE channels.is_connected END,"
+            "icon_url=CASE WHEN excluded.icon_url!='' THEN excluded.icon_url ELSE channels.icon_url END,"
+            "pubkey=CASE WHEN excluded.pubkey!='' THEN excluded.pubkey ELSE channels.pubkey END");
         if (!stmt.isPrepared()) {
             qWarning("ChannelDb::update_contact_channel prepare failed for %s", row.chanid.c_str());
             return false;
@@ -307,13 +315,24 @@ public:
         if (!stmt.bind(3, row.name.c_str()))             { return false; }
         if (!stmt.bind(4, row.status.c_str()))           { return false; }
         if (!stmt.bind(5, row.is_connected))             { return false; }
-        if (!stmt.bind(6, row.last_message_text.c_str())) { return false; }
-        if (!stmt.bind(7, row.last_message_time.c_str())) { return false; }
-        if (!stmt.bind(8, row.last_active))              { return false; }
-        if (!stmt.bind(9, row.unread_count))             { return false; }
-        if (!stmt.bind(10, row.pinned_order))            { return false; }
-        if (!stmt.bind(11, row.muted))                   { return false; }
-        if (!stmt.bind(12, row.auto_translate))          { return false; }
+        if (!stmt.bind(6, row.icon_url.c_str()))         { return false; }
+        if (!stmt.bind(7, row.pubkey.c_str()))           { return false; }
+        if (!stmt.bind(8, row.last_message_text.c_str())) { return false; }
+        if (!stmt.bind(9, row.last_message_time.c_str())) { return false; }
+        if (!stmt.bind(10, row.last_active))             { return false; }
+        if (!stmt.bind(11, row.unread_count))            { return false; }
+        if (!stmt.bind(12, row.pinned_order))            { return false; }
+        if (!stmt.bind(13, row.muted))                   { return false; }
+        if (!stmt.bind(14, row.auto_translate))          { return false; }
+        return stmt.step();
+    }
+
+    bool increment_unread(const char* chanid, int delta) override {
+        auto stmt = db().prepare(
+            "UPDATE channels SET unread_count = unread_count + ?1 WHERE chanid=?2");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, delta)) { return false; }
+        if (!stmt.bind(2, chanid)) { return false; }
         return stmt.step();
     }
 
@@ -442,6 +461,15 @@ public:
         });
     }
 
+    void increment_unread(std::string chanid, int delta,
+                          std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, delta, done]() {
+            bool ok = sync->get().increment_unread(chanid.c_str(), delta);
+            if (done) { done(ok); }
+        });
+    }
+
     void close(std::function<void()> done) override {
         auto sync = m_sync;
         post([sync, done]() {
@@ -482,6 +510,8 @@ bool init_channel_db(SqliteDb& db) {
         "  last_message_time  TEXT DEFAULT '',"
         "  last_active        INTEGER DEFAULT 0,"
         "  auto_translate     INTEGER DEFAULT 0,"
+        "  icon_url           TEXT DEFAULT '',"
+        "  pubkey             TEXT DEFAULT '',"
         "  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")");
     // peers v2: drop old single-key table, recreate with composite PK
