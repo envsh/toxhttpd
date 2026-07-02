@@ -11,6 +11,10 @@ const char* const kTopicType          = "topic";
 const char* const kFilesyncType       = "filesync";
 const char* const kClipboardType      = "clipboard";
 const char* const kUnknownType        = "unknown";
+const char* const kBookmarkType       = "bookmark";
+const char* const kAichatType         = "aichat";
+const char* const kPastebinType       = "pastebin";
+const char* const kTranslateType      = "translate";
 #include <unistd.h>
 
 EventPoller* EventPoller::s_instance = nullptr;

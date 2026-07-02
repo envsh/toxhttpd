@@ -38,6 +38,10 @@
 static const int VIRTUAL_UNKNOWN_ID = -100;
 static const int VIRTUAL_SYSEVENT_ID = -101;
 static const int VIRTUAL_REDDIT_ID = -102;
+static const int VIRTUAL_BOOKMARK_ID  = -103;
+static const int VIRTUAL_AICHAT_ID    = -104;
+static const int VIRTUAL_PASTEBIN_ID  = -105;
+static const int VIRTUAL_TRANSLATE_ID = -106;
 
 // ── media thumbnail 辅助函数（从原始字节解码 → 缩放到显示尺寸）──
 static QPixmap decodeRawToThumb(const char* data, int len, int mediaW, int mediaH, int maxW) {
@@ -493,6 +497,26 @@ MainWindow::MainWindow(QWidget* parent)
         c->type = kTopicType; c->status = "online";
         c->chat_id = ""; c->is_connected = false;
         seedList.append(c);
+        c = new Contact();
+        c->id = VIRTUAL_BOOKMARK_ID; c->name = "Bookmark";
+        c->type = kBookmarkType; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
+        c = new Contact();
+        c->id = VIRTUAL_AICHAT_ID; c->name = "AI Chat";
+        c->type = kAichatType; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
+        c = new Contact();
+        c->id = VIRTUAL_PASTEBIN_ID; c->name = "Paste Bin";
+        c->type = kPastebinType; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
+        c = new Contact();
+        c->id = VIRTUAL_TRANSLATE_ID; c->name = "Translate";
+        c->type = kTranslateType; c->status = "online";
+        c->chat_id = ""; c->is_connected = false;
+        seedList.append(c);
         contactListWidget->setContacts(seedList);
     }
     
@@ -745,6 +769,54 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     cl.append(c);
                     updateContactDb(std::string(kTopicType) + "_" + std::to_string(VIRTUAL_REDDIT_ID),
                                     "Reddit", "online", -1, "", "", kTopicType);
+                }
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_BOOKMARK_ID;
+                    c->name = "Bookmark";
+                    c->type = kBookmarkType;
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
+                    cl.append(c);
+                    updateContactDb(std::string(kBookmarkType) + "_" + std::to_string(VIRTUAL_BOOKMARK_ID),
+                                    "Bookmark", "online", -1, "", "", kBookmarkType);
+                }
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_AICHAT_ID;
+                    c->name = "AI Chat";
+                    c->type = kAichatType;
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
+                    cl.append(c);
+                    updateContactDb(std::string(kAichatType) + "_" + std::to_string(VIRTUAL_AICHAT_ID),
+                                    "AI Chat", "online", -1, "", "", kAichatType);
+                }
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_PASTEBIN_ID;
+                    c->name = "Paste Bin";
+                    c->type = kPastebinType;
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
+                    cl.append(c);
+                    updateContactDb(std::string(kPastebinType) + "_" + std::to_string(VIRTUAL_PASTEBIN_ID),
+                                    "Paste Bin", "online", -1, "", "", kPastebinType);
+                }
+                {
+                    Contact* c = new Contact();
+                    c->id = VIRTUAL_TRANSLATE_ID;
+                    c->name = "Translate";
+                    c->type = kTranslateType;
+                    c->status = "online";
+                    c->chat_id = "";
+                    c->is_connected = false;
+                    cl.append(c);
+                    updateContactDb(std::string(kTranslateType) + "_" + std::to_string(VIRTUAL_TRANSLATE_ID),
+                                    "Translate", "online", -1, "", "", kTranslateType);
                 }
                 contactListWidget->setContacts(cl);
             }
@@ -1006,6 +1078,18 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     } else if (type == kTopicType) {
         emoji = EMOJI_TOPIC;
         headerText = emoji + " " + name;
+    } else if (type == kBookmarkType) {
+        emoji = EMOJI_BOOKMARK;
+        headerText = emoji + " " + name;
+    } else if (type == kAichatType) {
+        emoji = EMOJI_AICHAT;
+        headerText = emoji + " " + name;
+    } else if (type == kPastebinType) {
+        emoji = EMOJI_PASTEBIN;
+        headerText = emoji + " " + name;
+    } else if (type == kTranslateType) {
+        emoji = EMOJI_TRANSLATE;
+        headerText = emoji + " " + name;
     } else if (type == kGomuksRoomType) {
         emoji = EMOJI_MATRIX;
         headerText = emoji + " " + name;
@@ -1038,7 +1122,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         chatWidget->attachMessages(std::move(cacheIt->second));
         if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
             && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
-            && type != kFilesyncType && type != kClipboardType) {
+            && type != kFilesyncType && type != kClipboardType
+            && type != kBookmarkType && type != kAichatType
+            && type != kPastebinType && type != kTranslateType) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -1048,7 +1134,9 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         chatWidget->clearMessages();
         if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
             && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
-            && type != kFilesyncType && type != kClipboardType) {
+            && type != kFilesyncType && type != kClipboardType
+            && type != kBookmarkType && type != kAichatType
+            && type != kPastebinType && type != kTranslateType) {
             chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
             ToxAPI::getMessagesHistory(id, typeStr);
         }
@@ -1064,6 +1152,12 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         ToxAPI::getConferenceMembers(id);
     }
 }
+
+// ── 虚拟联系人消息截留 stub ──
+static void handleBookmarkMessage(const QString&) {}
+static void handleAichatMessage(const QString&) {}
+static void handlePastebinMessage(const QString&) {}
+static void handleTranslateMessage(const QString&) {}
 
 void MainWindow::onMessageSending(const QString& message) {
     // ── 统一发送 API ──
@@ -1095,8 +1189,18 @@ void MainWindow::onMessageSending(const QString& message) {
         }
     }
 
-    chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
-    ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
+    if (type == kBookmarkType) {
+        handleBookmarkMessage(message);
+    } else if (type == kAichatType) {
+        handleAichatMessage(message);
+    } else if (type == kPastebinType) {
+        handlePastebinMessage(message);
+    } else if (type == kTranslateType) {
+        handleTranslateMessage(message);
+    } else {
+        chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
+        ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
+    }
 #else
     // ✅ 改为异步请求
     ApiRequestType reqType;
@@ -1128,6 +1232,10 @@ void MainWindow::onMessageSending(const QString& message) {
         if (lastIdx >= 0) {
             ChatElement& el = chatWidget->mutableMessageAt(lastIdx);
             el.sendState = ChatElement::SendSending;
+            if (type == kBookmarkType || type == kAichatType
+                || type == kPastebinType || type == kTranslateType) {
+                el.sendState = ChatElement::SendSent;
+            }
         }
     }
     contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message, timenowhm());
@@ -1806,6 +1914,14 @@ void MainWindow::retranslateUi() {
             headerText = QString(_("unknown")) + " " + QString::number(currentChatId);
         } else if (currentChatType == kSyseventType) {
             headerText = QString("System Events") + " " + QString::number(currentChatId);
+        } else if (currentChatType == kBookmarkType) {
+            headerText = QString("Bookmark") + " " + QString::number(currentChatId);
+        } else if (currentChatType == kAichatType) {
+            headerText = QString("AI Chat") + " " + QString::number(currentChatId);
+        } else if (currentChatType == kPastebinType) {
+            headerText = QString("Paste Bin") + " " + QString::number(currentChatId);
+        } else if (currentChatType == kTranslateType) {
+            headerText = QString("Translate") + " " + QString::number(currentChatId);
         }
         chatWidget->setHeaderText(headerText);
     }
@@ -2468,7 +2584,17 @@ void MainWindow::onResendMessage(int msgIndex) {
             }
         }
     }
-    ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(msgText)), idOverride);
+    if (type == kBookmarkType) {
+        handleBookmarkMessage(msgText);
+    } else if (type == kAichatType) {
+        handleAichatMessage(msgText);
+    } else if (type == kPastebinType) {
+        handlePastebinMessage(msgText);
+    } else if (type == kTranslateType) {
+        handleTranslateMessage(msgText);
+    } else {
+        ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(msgText)), idOverride);
+    }
 #else
     ToxAPI::sendMessage(currentChatId, "friend", std::string(qToUtf8(msgText)));
 #endif

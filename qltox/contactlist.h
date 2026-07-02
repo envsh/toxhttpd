@@ -25,6 +25,10 @@ extern const char* EMOJI_SYSEVENT;
 extern const char* EMOJI_UNKNOWN;
 extern const char* EMOJI_TOPIC;
 extern const char* EMOJI_MATRIX;
+extern const char* EMOJI_BOOKMARK;
+extern const char* EMOJI_AICHAT;
+extern const char* EMOJI_PASTEBIN;
+extern const char* EMOJI_TRANSLATE;
 
 struct Contact {
     int id;

@@ -22,6 +22,10 @@ extern const char* const kTopicType;
 extern const char* const kFilesyncType;
 extern const char* const kClipboardType;
 extern const char* const kUnknownType;
+extern const char* const kBookmarkType;
+extern const char* const kAichatType;
+extern const char* const kPastebinType;
+extern const char* const kTranslateType;
 
 // ── 事件类型常量 ──
 const EventType34 EventListReadyType = toEventType34(QEvent::User + 100);

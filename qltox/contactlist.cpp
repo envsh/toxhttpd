@@ -26,6 +26,10 @@ const char* EMOJI_SYSEVENT = "⚙";
 const char* EMOJI_UNKNOWN = "❓";
 const char* EMOJI_TOPIC = "📌";
 const char* EMOJI_MATRIX = "🧮";
+const char* EMOJI_BOOKMARK  = "🔖";
+const char* EMOJI_AICHAT    = "🤖";
+const char* EMOJI_PASTEBIN  = "📦";
+const char* EMOJI_TRANSLATE = "🔤";
 const char* STATUS_ONLINE = "●";
 const char* STATUS_OFFLINE = "○";
 
@@ -46,6 +50,10 @@ static uint32_t typeToEmojiCp(const QString& type) {
     if (type == kClipboardType) return 0x1F4CB;
     if (type == kGomuksRoomType) return 0x1F9EE;
     if (type == kImapMailType)  return 0x2709;
+    if (type == kBookmarkType)  return 0x1F516;
+    if (type == kAichatType)    return 0x1F916;
+    if (type == kPastebinType)  return 0x1F4E6;
+    if (type == kTranslateType) return 0x1F524;
     return 0x1F464;
 }
 
