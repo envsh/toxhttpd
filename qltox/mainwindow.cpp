@@ -1758,6 +1758,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         }
                         msg.caption = (slashPos >= 0)
                             ? msg.fileName.mid(slashPos + 1) : msg.fileName;
+                        msg.fileSize = hm.fileSize;
                     } else if (hm.msgtype == "image") {
                         msg.etype       = ChatElement::Image;
                         msg.caption     = qFromUtf8(hm.message);

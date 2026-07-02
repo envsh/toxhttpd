@@ -753,8 +753,10 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         if (nameLines < 1) { nameLines = 1; }
 
         int subLines = messageText.isEmpty() ? 0 : 1;
+        int sizeLines = 1;
         int textHeight = nameLines * fm.lineSpacing()
-                       + (subLines > 0 ? kPad/2 + subLines * fm.lineSpacing() : 0);
+                       + (subLines > 0 ? kPad/2 + subLines * fm.lineSpacing() : 0)
+                       + (sizeLines > 0 ? kPad/2 + sizeLines * fm.lineSpacing() : 0);
 
         int kDLBtnH = 30;
         int bubbleHeight = 2 * kBubbleVPad
@@ -1560,6 +1562,18 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                            Qt::AlignLeft | Qt::AlignVCenter, messageText);
                 p.setFont(baseFont);
             }
+            {
+                QString sz = formatFileSize(fileSize);
+                if (sz.isEmpty()) { sz = qFromUtf8("0 B"); }
+                int baseY = iconY + fm.lineSpacing() + kPad/2;
+                if (!messageText.isEmpty() && messageText != displayName)
+                    baseY += fm.lineSpacing() + kPad/2;
+                p.setPen(pal.textMuted);
+                f.setPointSize(10); p.setFont(f);
+                p.drawText(textX, baseY, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter, sz);
+                p.setFont(baseFont);
+            }
         } else {
             int ax = kPad;
             QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
@@ -1693,6 +1707,18 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 p.setFont(f);
                 p.drawText(textX, iconY + fm.lineSpacing() + kPad/2, textW, fm.lineSpacing(),
                            Qt::AlignLeft | Qt::AlignVCenter, messageText);
+                p.setFont(baseFont);
+            }
+            {
+                QString sz = formatFileSize(fileSize);
+                if (sz.isEmpty()) { sz = qFromUtf8("0 B"); }
+                int baseY = iconY + fm.lineSpacing() + kPad/2;
+                if (!messageText.isEmpty() && messageText != displayName)
+                    baseY += fm.lineSpacing() + kPad/2;
+                p.setPen(pal.textMuted);
+                f.setPointSize(10); p.setFont(f);
+                p.drawText(textX, baseY, textW, fm.lineSpacing(),
+                           Qt::AlignLeft | Qt::AlignVCenter, sz);
                 p.setFont(baseFont);
             }
         }

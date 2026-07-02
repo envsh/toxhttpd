@@ -444,6 +444,10 @@ static bool tryParseFilesyncEvent(const std::string& rawStr, ParseResult& ret) {
     std::string type   = jsonGetString(root, "type");
     std::string event  = jsonGetString(root, "event");
     std::string path   = jsonGetString(root, "path");
+    int64_t     size   = jsonGetInt64(root, "size");
+    std::string mime   = jsonGetString(root, "mime");
+    std::string sha256 = jsonGetString(root, "sha256");
+    std::string chunk0 = jsonGetString(root, "chunk0");
     cJSON_Delete(root);
 
     if (type != "filesync") return false;
@@ -461,9 +465,11 @@ static bool tryParseFilesyncEvent(const std::string& rawStr, ParseResult& ret) {
     ret.contacts.push_back(cd);
 
     HistoryMessage hm;
-    hm.message    = event + ": " + path;
+    hm.message    = event + ": " + path + " chunk0=" + std::to_string(chunk0.length());
     hm.direction  = "received";
     hm.roomId     = topic;
+    hm.fileSize   = size;
+    hm.mediaMime  = mime;
     ret.messages.push_back(hm);
 
     ret.handled = true;
