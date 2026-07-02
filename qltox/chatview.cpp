@@ -2565,7 +2565,13 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
                 nf.setPointSize(11);
                 QFontMetrics nfm(nf);
                 int headerH = nfm.lineSpacing();
-                QRect nameRect(kPad, msgY + kPad, width() - 2*kPad, headerH);
+                int halfW = (width() - 2*kPad) / 3;
+                QRect nameRect;
+                if (item.category == "self") {
+                    nameRect = QRect(width() - kPad - halfW, msgY + kPad, halfW, headerH);
+                } else {
+                    nameRect = QRect(kPad, msgY + kPad, halfW, headerH);
+                }
                 if (nameRect.contains(event->pos())) {
                     showTempTooltip(this, nameRect, item.senderName);
                 }

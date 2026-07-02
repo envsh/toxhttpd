@@ -1816,8 +1816,10 @@ void MainWindow::handleEvents(const EventList& events) {
                                         el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
                                     el.downloadState = ChatElement::Completed;
                                 } else {
-                                    el.downloadState = ChatElement::InProgress;
-                                    ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
+                                    if (hm.fileSize > 0 && hm.fileSize < 1048576) {
+                                        el.downloadState = ChatElement::InProgress;
+                                        ToxAPI::downloadMedia(chatId, chatType, newIdx, hm.mediaUrl);
+                                    }
                                 }
                             }
                         }
