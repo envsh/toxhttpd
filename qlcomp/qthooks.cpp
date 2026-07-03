@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <cxxabi.h>
 #include <execinfo.h>
+#include <unistd.h>
 
 #ifdef QT3_BUILD
 
@@ -72,7 +73,22 @@ static void __attribute__((noinline)) logWithCaller(const char* label, const cha
     const char* caller = callerBacktrace();
 #endif
 
-    fprintf(stderr, "[%s] [%s] %s [from %s]\n", tbuf, label, buf, caller);
+    static bool s_tty = isatty(fileno(stderr)) != 0;
+
+    const char* labelColor = "";
+    const char* dimOn  = "";
+    const char* dimOff = "";
+    if (s_tty) {
+        if (strcmp(label, "DEBUG") == 0) labelColor = "\033[2m";
+        else if (strcmp(label, "INFO") == 0) labelColor = "\033[1;32m";
+        else if (strcmp(label, "WARN") == 0) labelColor = "\033[1;33m";
+        else if (strcmp(label, "FATAL") == 0) labelColor = "\033[1;31m";
+        dimOn  = "\033[2m";
+        dimOff = "\033[0m";
+    }
+
+    fprintf(stderr, "%s[%s]%s %s[%s]\033[0m %s %s[from %s]%s\n",
+            dimOn, tbuf, dimOff, labelColor, label, buf, dimOn, caller, dimOff);
 }
 
 void qDebug(const char* fmt, ...) {
