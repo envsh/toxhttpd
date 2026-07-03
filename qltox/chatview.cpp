@@ -2539,7 +2539,8 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
             // Check translate button click
-            if (m_items[msgIndex].translateBtnRect.contains(event->pos())) {
+            if (m_items[msgIndex].etype != ChatElement::File
+                && m_items[msgIndex].translateBtnRect.contains(event->pos())) {
                 if (!m_items[msgIndex].translationInProgress) {
                     emit translateClicked(msgIndex);
                 }
@@ -2547,7 +2548,8 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
             }
 
             // Check source button click
-            if (m_items[msgIndex].sourceBtnRect.contains(event->pos())) {
+            if (m_items[msgIndex].etype != ChatElement::File
+                && m_items[msgIndex].sourceBtnRect.contains(event->pos())) {
                 emit sourceClicked(msgIndex);
                 return;
             }
@@ -2865,7 +2867,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         QFontMetrics nfm(nf);
         int headerH = nfm.lineSpacing();
         QRect nameRect(kPad, msgY + kPad, width() - 2*kPad, headerH);
-        onName = nameRect.contains(event->pos());
+        onName = item.firstInGroup && nameRect.contains(event->pos());
     }
 #ifdef QT3_BUILD
     QPopupMenu menu(this);
@@ -2878,8 +2880,13 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     // Copy full message
 #ifdef QT3_BUILD
     int copyMsgId = menu.insertItem(_("context.copy_message"));
-    int retryMsgId = canRetry ? menu.insertItem("重发") : -1;
+    int retryMsgId = canRetry ? menu.insertItem(qFromUtf8("重发")) : -1;
     int selectAllId = menu.insertItem(_("context.select_all"));
+    int sourceMsgId = -1, translateMsgId = -1;
+    if (msgIndex >= 0 && m_items[msgIndex].etype != ChatElement::File) {
+        sourceMsgId = menu.insertItem(qFromUtf8("查看原文"));
+        translateMsgId = menu.insertItem(qFromUtf8("翻译"));
+    }
     int copyNickId = -1, mentionId = -1;
     if (onName) {
         copyNickId = menu.insertItem(qFromUtf8("复制昵称"));
@@ -2889,6 +2896,12 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     QAction* copyMsgAction = menu.addAction(_("context.copy_message"));
     QAction* retryMsgAction = canRetry ? menu.addAction("重发") : nullptr;
     QAction* selectAllAction = menu.addAction(_("context.select_all"));
+    QAction* sourceMsgAction = nullptr;
+    QAction* translateMsgAction = nullptr;
+    if (msgIndex >= 0 && m_items[msgIndex].etype != ChatElement::File) {
+        sourceMsgAction = menu.addAction("查看原文");
+        translateMsgAction = menu.addAction("翻译");
+    }
     QAction* copyNickAction = nullptr;
     QAction* mentionAction = nullptr;
     if (onName) {
@@ -2910,6 +2923,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selStart = 0;
         m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
         updateFull();
+    } else if (sourceMsgId >= 0 && choice == sourceMsgId) {
+        emit sourceClicked(msgIndex);
+    } else if (translateMsgId >= 0 && choice == translateMsgId) {
+        emit translateClicked(msgIndex);
     } else if (choice == copyNickId) {
         QApplication::clipboard()->setText(displayName);
     } else if (choice == mentionId) {
@@ -2928,6 +2945,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selStart = 0;
         m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
         updateFull();
+    } else if (sourceMsgAction && chosen == sourceMsgAction) {
+        emit sourceClicked(msgIndex);
+    } else if (translateMsgAction && chosen == translateMsgAction) {
+        emit translateClicked(msgIndex);
     } else if (chosen == copyNickAction) {
         QApplication::clipboard()->setText(displayName);
     } else if (chosen == mentionAction) {
