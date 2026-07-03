@@ -86,6 +86,7 @@ struct ChatElement {
     // Layout cache (TG-style per-element)
     short cachedWidth;
     short height;
+    uchar firstInGroup : 1;
     SendState sendState;
     QString sendErrorMsg;
     QRect resendIconRect;
@@ -95,7 +96,7 @@ struct ChatElement {
         , translationInProgress(false), downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
-        , cachedWidth(-1), height(0), sendState(SendSending) {}
+        , cachedWidth(-1), height(0), firstInGroup(1), sendState(SendSending) {}
 
     int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont);
     void paint(QPainter& p, int y, int viewWidth, bool isSelected,

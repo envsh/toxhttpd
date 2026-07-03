@@ -16,6 +16,11 @@
 static const int kMaxMediaDim = 260;
 static const int kMinMediaH = 50;
 
+static bool isSameSender(const ChatElement& a, const ChatElement& b) {
+    return a.category == b.category
+        && a.senderName == b.senderName;
+}
+
 QPixmap makeScaledThumb(const QPixmap& src, int mediaW, int mediaH, int maxContainW) {
     if (src.isNull()) return QPixmap();
     int dw, dh;
@@ -515,6 +520,30 @@ static void paintAudioContent(QPainter& p, const QRect& bubbleRect,
         p.setFont(baseFont);
     }
 }
+
+// 连续同发送者消息：在气泡右下角绘制时间戳。
+//           ┌──────────────────────┐
+//           │ 连续消息不显示头像     │
+//           │ 和姓名，但时间仍可见。  │
+//           │                10:30 │
+//           └──────────────────────┘
+// 文本消息：时间覆盖最后一行文末（Telegram 旧版风格）
+// 媒体消息：时间放在气泡右下空白处，不重叠主要内容。
+static void drawGroupedTime(QPainter& p, const QFont& baseFont,
+                            const QFontMetrics& fm, const QRect& bubbleRect,
+                            const QString& time, const StyleParams::Palette& pal)
+{
+    QFont f = baseFont;
+    f.setPointSize(10);
+    p.setFont(f);
+    p.setPen(pal.textMuted);
+    int tw = fm.width(time);
+    p.drawText(bubbleRect.right() - tw - ChatView::kBubbleHPad,
+               bubbleRect.bottom() - ChatView::kBubbleVPad - fm.lineSpacing(),
+               tw, fm.lineSpacing(),
+               Qt::AlignRight | Qt::AlignVCenter, time);
+    p.setFont(baseFont);
+}
 #endif
 
 // ───── ChatElement methods ─────
@@ -624,6 +653,9 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
             bubbleHeight += kBubbleVPad / 2 + transLineCount * sfm.lineSpacing() + kBubbleVPad + 7;
         }
 
+        if (!firstInGroup) {
+            return bubbleHeight + kPad / 2 + kMsgSpacing;
+        }
         int headerHeight = fm.lineSpacing() + kPad;
         int contentHeight = kPad + headerHeight + bubbleHeight;
         int avatarTotal = kPad + kAvatarSize;
@@ -661,6 +693,9 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         int captionH = caption.isEmpty() ? 0 : fm.lineSpacing() + kPad/2;
         int kDLBtnH = 30;
         int bubbleH = 2 * kBubbleVPad + imgDispH + captionH + kDLBtnH;
+        if (!firstInGroup) {
+            return bubbleH + kPad / 2 + 8;
+        }
         int headerHeight = fm.lineSpacing() + kPad;
         int contentHeight = kPad + headerHeight + bubbleH;
         int avatarTotal = kPad + kAvatarSize;
@@ -702,6 +737,9 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
         int kDLBtnH = 30;
         int bubbleH = 2 * kBubbleVPad + std::max(textH + kPad, iconSize) + kDLBtnH;
         if (bubbleH < 2 * kBubbleVPad + iconSize + kDLBtnH) { bubbleH = 2 * kBubbleVPad + iconSize + kDLBtnH; }
+        if (!firstInGroup) {
+            return bubbleH + kPad / 2 + 8;
+        }
         int headerHeight = fm.lineSpacing() + kPad;
         int contentHeight = kPad + headerHeight + bubbleH;
         int avatarTotal = kPad + kAvatarSize;
@@ -765,6 +803,9 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
             bubbleHeight = 2 * kBubbleVPad + iconSize + kDLBtnH;
         }
 
+        if (!firstInGroup) {
+            return bubbleHeight + kPad / 2 + kMsgSpacing;
+        }
         int headerHeight = fm.lineSpacing() + kPad;
         int contentHeight = kPad + headerHeight + bubbleHeight;
         int avatarTotal = kPad + kAvatarSize;
@@ -798,81 +839,84 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
-            int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
-
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
             int bubbleMaxW = contentRight - contentLeft;
             int bubbleW = std::min(bubbleMaxW, (bubbleMaxW * 80) / 100);
 
-            int hdrTextRight = contentRight - hdrBtnAreaW - kPad / 2;
+            if (firstInGroup) {
+                int ax = viewWidth - kPad - kAvatarSize;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
 
-            f.setPointSize(11);
-            p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString displayName;
-            if (!senderNickname.isEmpty())
-                displayName = senderNickname;
-            else if (!senderName.isEmpty())
-                displayName = senderName;
-            else if (peerNumber >= 0)
-                displayName = QString("Peer %1").arg(peerNumber);
-            else
-                displayName = "?";
-            displayName = qElideChars(displayName, 23, ElideMiddle);
-            int nameW = fm.width(displayName) + fm.width("  ");
-            p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
+                int hdrTextRight = contentRight - hdrBtnAreaW - kPad / 2;
 
-            int ipW = 0;
-            if (!ipAddress.isEmpty()) {
+                f.setPointSize(11);
+                p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString displayName;
+                if (!senderNickname.isEmpty())
+                    displayName = senderNickname;
+                else if (!senderName.isEmpty())
+                    displayName = senderName;
+                else if (peerNumber >= 0)
+                    displayName = QString("Peer %1").arg(peerNumber);
+                else
+                    displayName = "?";
+                displayName = qElideChars(displayName, 23, ElideMiddle);
+                int nameW = fm.width(displayName) + fm.width("  ");
+                p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH, Qt::AlignRight | Qt::AlignVCenter, displayName);
+
+                int ipW = 0;
+                if (!ipAddress.isEmpty()) {
+                    f.setPointSize(10);
+                    p.setFont(f);
+                    p.setPen(QColor(130, 140, 150));
+                    ipW = fm.width(ipAddress);
+                    p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
+                               ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                }
+
                 f.setPointSize(10);
                 p.setFont(f);
-                p.setPen(QColor(130, 140, 150));
-                ipW = fm.width(ipAddress);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
-                           ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
-            }
+                p.setPen(pal.textMuted);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2, y + kPad,
+                           fm.width(time), headerH, Qt::AlignRight | Qt::AlignVCenter, time);
 
-            f.setPointSize(10);
-            p.setFont(f);
-            p.setPen(pal.textMuted);
-            p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2, y + kPad,
-                       fm.width(time), headerH, Qt::AlignRight | Qt::AlignVCenter, time);
+                // send status
+                if (category == "self") {
+                    int statusX = hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20;
+                    resendIconRect = QRect(statusX, y + kPad + (headerH - hdrBtnSize) / 2,
+                                            hdrBtnSize, hdrBtnSize);
+                    if (sendState == SendSending) {
+                        drawEmojiIcon(p, resendIconRect, 0x23F3, "⏳");
+                    } else if (sendState == SendSent) {
+                        drawEmojiIcon(p, resendIconRect, 0x2713, "✓");
+                    } else if (sendState == SendFailed) {
+                        drawEmojiIcon(p, resendIconRect, 0x2757, "❗");
+                    }
+                }
 
-            // send status
-            if (category == "self") {
-                int statusX = hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20;
-                resendIconRect = QRect(statusX, y + kPad + (headerH - hdrBtnSize) / 2,
-                                       hdrBtnSize, hdrBtnSize);
-                if (sendState == SendSending) {
-                    drawEmojiIcon(p, resendIconRect, 0x23F3, "⏳");
-                } else if (sendState == SendSent) {
-                    drawEmojiIcon(p, resendIconRect, 0x2713, "✓");
-                } else if (sendState == SendFailed) {
-                    drawEmojiIcon(p, resendIconRect, 0x2757, "❗");
+                p.setFont(baseFont);
+
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = contentRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted);
+                    p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
                 }
             }
 
-            p.setFont(baseFont);
-
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = contentRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted);
-                p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
-            }
-
             int bubbleX = contentRight - bubbleW;
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             bubbleRect = QRect(bubbleX, bubbleY, bubbleW, bubbleH);
             textRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                              bubbleRect.width() - 2 * kBubbleHPad, bubbleRect.height() - 2 * kBubbleVPad);
@@ -886,74 +930,77 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 #endif
             // send failed retry — use header ❗ instead
         } else {
-            int ax = kPad;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
-
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
             int bubbleW = (contentW * 80) / 100;
             if (bubbleW < 100) { bubbleW = contentW; }
             int bubbleRight = contentX + bubbleW;
 
-            int hdrTextRight = bubbleRight - hdrBtnAreaW - kPad / 2;
+            if (firstInGroup) {
+                int ax = kPad;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
 
-            f.setPointSize(11);
-            p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString displayName;
-            if (!senderNickname.isEmpty())
-                displayName = senderNickname;
-            else if (!senderName.isEmpty())
-                displayName = senderName;
-            else if (peerNumber >= 0)
-                displayName = QString("Peer %1").arg(peerNumber);
-            else
-                displayName = "?";
-            displayName = qElideChars(displayName, 23, ElideMiddle);
-            int maxNameW = hdrTextRight - contentX;
-            if (maxNameW < 20) { maxNameW = 20; }
-            p.drawText(contentX, y + kPad, maxNameW, headerH, Qt::AlignLeft | Qt::AlignVCenter, displayName);
+                int hdrTextRight = bubbleRight - hdrBtnAreaW - kPad / 2;
 
-            f.setPointSize(10);
-            p.setFont(f);
-            int ipEnd = contentX + fm.width(displayName) + kPad;
-            if (!ipAddress.isEmpty()) {
-                p.setPen(QColor(130, 140, 150));
-                int ipW = fm.width(ipAddress);
-                int ipMax = hdrTextRight - ipEnd;
-                if (ipMax > ipW) { ipMax = ipW; }
-                if (ipMax > 0) {
-                    p.drawText(ipEnd, y + kPad, ipMax, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
-                }
-                ipEnd += fm.width(ipAddress) + kPad/2;
-            }
-
-            p.setPen(pal.textMuted);
-            int timeX = ipEnd;
-            int timeMaxW = hdrTextRight - timeX;
-            if (timeMaxW > 0) {
-                p.drawText(timeX, y + kPad, timeMaxW, headerH, Qt::AlignLeft | Qt::AlignVCenter, time);
-            }
-
-            p.setFont(baseFont);
-
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = bubbleRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                f.setPointSize(11);
+                p.setFont(f);
                 p.setPen(pal.textMuted);
-                p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                QString displayName;
+                if (!senderNickname.isEmpty())
+                    displayName = senderNickname;
+                else if (!senderName.isEmpty())
+                    displayName = senderName;
+                else if (peerNumber >= 0)
+                    displayName = QString("Peer %1").arg(peerNumber);
+                else
+                    displayName = "?";
+                displayName = qElideChars(displayName, 23, ElideMiddle);
+                int maxNameW = hdrTextRight - contentX;
+                if (maxNameW < 20) { maxNameW = 20; }
+                p.drawText(contentX, y + kPad, maxNameW, headerH, Qt::AlignLeft | Qt::AlignVCenter, displayName);
+
+                f.setPointSize(10);
+                p.setFont(f);
+                int ipEnd = contentX + fm.width(displayName) + kPad;
+                if (!ipAddress.isEmpty()) {
+                    p.setPen(QColor(130, 140, 150));
+                    int ipW = fm.width(ipAddress);
+                    int ipMax = hdrTextRight - ipEnd;
+                    if (ipMax > ipW) { ipMax = ipW; }
+                    if (ipMax > 0) {
+                        p.drawText(ipEnd, y + kPad, ipMax, headerH,
+                                   Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                    }
+                    ipEnd += fm.width(ipAddress) + kPad/2;
+                }
+
+                p.setPen(pal.textMuted);
+                int timeX = ipEnd;
+                int timeMaxW = hdrTextRight - timeX;
+                if (timeMaxW > 0) {
+                    p.drawText(timeX, y + kPad, timeMaxW, headerH, Qt::AlignLeft | Qt::AlignVCenter, time);
+                }
+
+                p.setFont(baseFont);
+
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = bubbleRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted);
+                    p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
             textRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
@@ -1070,6 +1117,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 p.setFont(baseFont);
             }
         }
+        if (!firstInGroup) { drawGroupedTime(p, baseFont, fm, bubbleRect, time, pal); }
         break;
     }
     case Image:
@@ -1090,54 +1138,58 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
-            int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
             int bubbleMaxW = contentRight - contentLeft;
             int bubbleW = std::min(bubbleMaxW, (bubbleMaxW * 80) / 100);
-            int hdrTextRight = contentRight - kPad / 2;
 
-            f.setPointSize(11); p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString dname = !senderNickname.isEmpty() ? senderNickname
-                          : !senderName.isEmpty() ? senderName
-                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
-            dname = qElideChars(dname, 23, ElideMiddle);
-            int nameW = fm.width(dname);
-            p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
-                       Qt::AlignRight | Qt::AlignVCenter, dname);
-            int ipW = 0;
-            if (!ipAddress.isEmpty()) {
+            if (firstInGroup) {
+                int ax = viewWidth - kPad - kAvatarSize;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
+                int hdrTextRight = contentRight - kPad / 2;
+
+                f.setPointSize(11); p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString dname = !senderNickname.isEmpty() ? senderNickname
+                              : !senderName.isEmpty() ? senderName
+                              : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+                dname = qElideChars(dname, 23, ElideMiddle);
+                int nameW = fm.width(dname);
+                p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, dname);
+                int ipW = 0;
+                if (!ipAddress.isEmpty()) {
+                    f.setPointSize(10); p.setFont(f);
+                    p.setPen(QColor(130, 140, 150));
+                    ipW = fm.width(ipAddress);
+                    p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
+                               ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                }
                 f.setPointSize(10); p.setFont(f);
-                p.setPen(QColor(130, 140, 150));
-                ipW = fm.width(ipAddress);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
-                           ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
-            }
-            f.setPointSize(10); p.setFont(f);
-            p.setPen(pal.textMuted);
-            p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
-                       y + kPad, fm.width(time), headerH,
-                       Qt::AlignRight | Qt::AlignVCenter, time);
-            p.setFont(baseFont);
+                p.setPen(pal.textMuted);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
+                           y + kPad, fm.width(time), headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, time);
+                p.setFont(baseFont);
 
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = contentRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = contentRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
             int bubbleX = contentRight - bubbleW;
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(bubbleX, bubbleY, bubbleW, bubbleH);
             p.setBrush(pal.baseBg);
@@ -1148,61 +1200,65 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.drawRoundedRect(bubbleRect, kBubbleRadius, kBubbleRadius);
 #endif
         } else {
-            int ax = kPad;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
             int bubbleW = (contentW * 80) / 100;
             if (bubbleW < 100) { bubbleW = contentW; }
             int bubbleRight = contentX + bubbleW;
-            int hdrTextRight = bubbleRight - kPad / 2;
 
-            f.setPointSize(11); p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString dname = !senderNickname.isEmpty() ? senderNickname
-                          : !senderName.isEmpty() ? senderName
-                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
-            dname = qElideChars(dname, 23, ElideMiddle);
-            int maxNameW = hdrTextRight - contentX;
-            if (maxNameW < 20) { maxNameW = 20; }
-            p.drawText(contentX, y + kPad, maxNameW, headerH,
-                       Qt::AlignLeft | Qt::AlignVCenter, dname);
-            f.setPointSize(10); p.setFont(f);
-            int ipEnd = contentX + fm.width(dname) + kPad;
-            if (!ipAddress.isEmpty()) {
-                p.setPen(QColor(130, 140, 150));
-                int ipW = fm.width(ipAddress);
-                int ipMax = hdrTextRight - ipEnd;
-                if (ipMax > ipW) { ipMax = ipW; }
-                if (ipMax > 0) {
-                    p.drawText(ipEnd, y + kPad, ipMax, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+            if (firstInGroup) {
+                int ax = kPad;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
+                int hdrTextRight = bubbleRight - kPad / 2;
+
+                f.setPointSize(11); p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString dname = !senderNickname.isEmpty() ? senderNickname
+                              : !senderName.isEmpty() ? senderName
+                              : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+                dname = qElideChars(dname, 23, ElideMiddle);
+                int maxNameW = hdrTextRight - contentX;
+                if (maxNameW < 20) { maxNameW = 20; }
+                p.drawText(contentX, y + kPad, maxNameW, headerH,
+                           Qt::AlignLeft | Qt::AlignVCenter, dname);
+                f.setPointSize(10); p.setFont(f);
+                int ipEnd = contentX + fm.width(dname) + kPad;
+                if (!ipAddress.isEmpty()) {
+                    p.setPen(QColor(130, 140, 150));
+                    int ipW = fm.width(ipAddress);
+                    int ipMax = hdrTextRight - ipEnd;
+                    if (ipMax > ipW) { ipMax = ipW; }
+                    if (ipMax > 0) {
+                        p.drawText(ipEnd, y + kPad, ipMax, headerH,
+                                   Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                    }
+                    ipEnd += fm.width(ipAddress) + kPad/2;
                 }
-                ipEnd += fm.width(ipAddress) + kPad/2;
-            }
-            p.setPen(pal.textMuted);
-            int timeMaxW = hdrTextRight - ipEnd;
-            if (timeMaxW > 0) {
-                p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
-                           Qt::AlignLeft | Qt::AlignVCenter, time);
-            }
-            p.setFont(baseFont);
+                p.setPen(pal.textMuted);
+                int timeMaxW = hdrTextRight - ipEnd;
+                if (timeMaxW > 0) {
+                    p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
+                               Qt::AlignLeft | Qt::AlignVCenter, time);
+                }
+                p.setFont(baseFont);
 
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = bubbleRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = bubbleRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
             p.setBrush(pal.baseBg);
@@ -1238,7 +1294,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         paintMediaContent(p, bubbleRect, etype, scaledDisplay, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
                           baseFont, fm, emojiW, pal, downloadState,
-                          &downloadBtnRect, &retryBtnRect, fileSize);
+                           &downloadBtnRect, &retryBtnRect, fileSize);
+        if (!firstInGroup) { drawGroupedTime(p, baseFont, fm, bubbleRect, time, pal); }
         break;
     }
     case Audio: {
@@ -1257,54 +1314,58 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
-            int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
             int bubbleMaxW = contentRight - contentLeft;
             int bubbleW = std::min(bubbleMaxW, (bubbleMaxW * 80) / 100);
-            int hdrTextRight = contentRight - kPad / 2;
 
-            f.setPointSize(11); p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString dname = !senderNickname.isEmpty() ? senderNickname
-                          : !senderName.isEmpty() ? senderName
-                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
-            dname = qElideChars(dname, 23, ElideMiddle);
-            int nameW = fm.width(dname);
-            p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
-                       Qt::AlignRight | Qt::AlignVCenter, dname);
-            int ipW = 0;
-            if (!ipAddress.isEmpty()) {
+            if (firstInGroup) {
+                int ax = viewWidth - kPad - kAvatarSize;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
+                int hdrTextRight = contentRight - kPad / 2;
+
+                f.setPointSize(11); p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString dname = !senderNickname.isEmpty() ? senderNickname
+                              : !senderName.isEmpty() ? senderName
+                              : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+                dname = qElideChars(dname, 23, ElideMiddle);
+                int nameW = fm.width(dname);
+                p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, dname);
+                int ipW = 0;
+                if (!ipAddress.isEmpty()) {
+                    f.setPointSize(10); p.setFont(f);
+                    p.setPen(QColor(130, 140, 150));
+                    ipW = fm.width(ipAddress);
+                    p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
+                               ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                }
                 f.setPointSize(10); p.setFont(f);
-                p.setPen(QColor(130, 140, 150));
-                ipW = fm.width(ipAddress);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
-                           ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
-            }
-            f.setPointSize(10); p.setFont(f);
-            p.setPen(pal.textMuted);
-            p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
-                       y + kPad, fm.width(time), headerH,
-                       Qt::AlignRight | Qt::AlignVCenter, time);
-            p.setFont(baseFont);
+                p.setPen(pal.textMuted);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
+                           y + kPad, fm.width(time), headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, time);
+                p.setFont(baseFont);
 
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = contentRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = contentRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
             int bubbleX = contentRight - bubbleW;
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(bubbleX, bubbleY, bubbleW, bubbleH);
             p.setBrush(pal.baseBg);
@@ -1315,61 +1376,65 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             p.drawRoundedRect(bubbleRect, kBubbleRadius, kBubbleRadius);
 #endif
         } else {
-            int ax = kPad;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
             int bubbleW = (contentW * 80) / 100;
             if (bubbleW < 100) { bubbleW = contentW; }
             int bubbleRight = contentX + bubbleW;
-            int hdrTextRight = bubbleRight - kPad / 2;
 
-            f.setPointSize(11); p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString dname = !senderNickname.isEmpty() ? senderNickname
-                          : !senderName.isEmpty() ? senderName
-                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
-            dname = qElideChars(dname, 23, ElideMiddle);
-            int maxNameW = hdrTextRight - contentX;
-            if (maxNameW < 20) { maxNameW = 20; }
-            p.drawText(contentX, y + kPad, maxNameW, headerH,
-                       Qt::AlignLeft | Qt::AlignVCenter, dname);
-            f.setPointSize(10); p.setFont(f);
-            int ipEnd = contentX + fm.width(dname) + kPad;
-            if (!ipAddress.isEmpty()) {
-                p.setPen(QColor(130, 140, 150));
-                int ipW = fm.width(ipAddress);
-                int ipMax = hdrTextRight - ipEnd;
-                if (ipMax > ipW) { ipMax = ipW; }
-                if (ipMax > 0) {
-                    p.drawText(ipEnd, y + kPad, ipMax, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+            if (firstInGroup) {
+                int ax = kPad;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
+                int hdrTextRight = bubbleRight - kPad / 2;
+
+                f.setPointSize(11); p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString dname = !senderNickname.isEmpty() ? senderNickname
+                              : !senderName.isEmpty() ? senderName
+                              : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+                dname = qElideChars(dname, 23, ElideMiddle);
+                int maxNameW = hdrTextRight - contentX;
+                if (maxNameW < 20) { maxNameW = 20; }
+                p.drawText(contentX, y + kPad, maxNameW, headerH,
+                           Qt::AlignLeft | Qt::AlignVCenter, dname);
+                f.setPointSize(10); p.setFont(f);
+                int ipEnd = contentX + fm.width(dname) + kPad;
+                if (!ipAddress.isEmpty()) {
+                    p.setPen(QColor(130, 140, 150));
+                    int ipW = fm.width(ipAddress);
+                    int ipMax = hdrTextRight - ipEnd;
+                    if (ipMax > ipW) { ipMax = ipW; }
+                    if (ipMax > 0) {
+                        p.drawText(ipEnd, y + kPad, ipMax, headerH,
+                                   Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                    }
+                    ipEnd += fm.width(ipAddress) + kPad/2;
                 }
-                ipEnd += fm.width(ipAddress) + kPad/2;
-            }
-            p.setPen(pal.textMuted);
-            int timeMaxW = hdrTextRight - ipEnd;
-            if (timeMaxW > 0) {
-                p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
-                           Qt::AlignLeft | Qt::AlignVCenter, time);
-            }
-            p.setFont(baseFont);
+                p.setPen(pal.textMuted);
+                int timeMaxW = hdrTextRight - ipEnd;
+                if (timeMaxW > 0) {
+                    p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
+                               Qt::AlignLeft | Qt::AlignVCenter, time);
+                }
+                p.setFont(baseFont);
 
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = bubbleRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = bubbleRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
             p.setBrush(pal.baseBg);
@@ -1403,6 +1468,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             downloadBtnRect = bi.downloadBtn;
             retryBtnRect    = bi.retryBtn;
         }
+        if (!firstInGroup) { drawGroupedTime(p, baseFont, fm, bubbleRect, time, pal); }
         break;
     }
     case File: {
@@ -1422,73 +1488,76 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         int kMsgSpacing = ChatView::kMsgSpacing;
 
         if (category == "self") {
-            int ax = viewWidth - kPad - kAvatarSize;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
-
             int contentRight = viewWidth - 2 * kPad - kAvatarSize;
             int contentLeft = kPad;
             int bubbleMaxW = contentRight - contentLeft;
             int bubbleW = std::min(bubbleMaxW, (bubbleMaxW * 80) / 100);
-            int hdrTextRight = contentRight - kPad / 2;
 
-            // sender name
-            f.setPointSize(11);
-            p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString dname = !senderNickname.isEmpty() ? senderNickname
-                          : !senderName.isEmpty() ? senderName
-                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
-            dname = qElideChars(dname, 23, ElideMiddle);
-            int nameW = fm.width(dname);
-            p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
-                       Qt::AlignRight | Qt::AlignVCenter, dname);
+            if (firstInGroup) {
+                int ax = viewWidth - kPad - kAvatarSize;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
+                int hdrTextRight = contentRight - kPad / 2;
 
-            // IP
-            int ipW = 0;
-            if (!ipAddress.isEmpty()) {
+                // sender name
+                f.setPointSize(11);
+                p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString dname = !senderNickname.isEmpty() ? senderNickname
+                              : !senderName.isEmpty() ? senderName
+                              : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+                dname = qElideChars(dname, 23, ElideMiddle);
+                int nameW = fm.width(dname);
+                p.drawText(hdrTextRight - nameW, y + kPad, nameW, headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, dname);
+
+                // IP
+                int ipW = 0;
+                if (!ipAddress.isEmpty()) {
+                    f.setPointSize(10); p.setFont(f);
+                    p.setPen(QColor(130, 140, 150));
+                    ipW = fm.width(ipAddress);
+                    p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
+                               ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                }
+                // time
                 f.setPointSize(10); p.setFont(f);
-                p.setPen(QColor(130, 140, 150));
-                ipW = fm.width(ipAddress);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
-                           ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
-            }
-            // time
-            f.setPointSize(10); p.setFont(f);
-            p.setPen(pal.textMuted);
-            p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
-                       y + kPad, fm.width(time), headerH,
-                       Qt::AlignRight | Qt::AlignVCenter, time);
-             // send status
-            resendIconRect = QRect(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20,
-                                   y + kPad + (headerH - hdrBtnSize) / 2,
-                                   hdrBtnSize, hdrBtnSize);
-            if (sendState == SendSending) {
-                drawEmojiIcon(p, resendIconRect, 0x23F3, "⏳");
-            } else if (sendState == SendSent) {
-                drawEmojiIcon(p, resendIconRect, 0x2713, "✓");
-            } else if (sendState == SendFailed) {
-                drawEmojiIcon(p, resendIconRect, 0x2757, "❗");
-            }
-            p.setFont(baseFont);
+                p.setPen(pal.textMuted);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
+                           y + kPad, fm.width(time), headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, time);
+                 // send status
+                resendIconRect = QRect(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20,
+                                       y + kPad + (headerH - hdrBtnSize) / 2,
+                                       hdrBtnSize, hdrBtnSize);
+                if (sendState == SendSending) {
+                    drawEmojiIcon(p, resendIconRect, 0x23F3, "⏳");
+                } else if (sendState == SendSent) {
+                    drawEmojiIcon(p, resendIconRect, 0x2713, "✓");
+                } else if (sendState == SendFailed) {
+                    drawEmojiIcon(p, resendIconRect, 0x2757, "❗");
+                }
+                p.setFont(baseFont);
 
-            // header buttons
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = contentRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                // header buttons
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = contentRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
             // bubble background
             int bubbleX = contentRight - bubbleW;
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(bubbleX, bubbleY, bubbleW, bubbleH);
             p.setBrush(pal.baseBg);
@@ -1575,68 +1644,71 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 p.setFont(baseFont);
             }
         } else {
-            int ax = kPad;
-            QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
-            p.drawPixmap(ax, y + kPad, av);
-
             int contentX = 2 * kPad + kAvatarSize;
             int contentW = viewWidth - kPad - contentX;
             int bubbleW = (contentW * 80) / 100;
             if (bubbleW < 100) { bubbleW = contentW; }
             int bubbleRight = contentX + bubbleW;
-            int hdrTextRight = bubbleRight - kPad / 2;
 
-            // sender name
-            f.setPointSize(11); p.setFont(f);
-            p.setPen(pal.textMuted);
-            QString dname = !senderNickname.isEmpty() ? senderNickname
-                          : !senderName.isEmpty() ? senderName
-                          : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
-            dname = qElideChars(dname, 23, ElideMiddle);
-            int maxNameW = hdrTextRight - contentX;
-            if (maxNameW < 20) { maxNameW = 20; }
-            p.drawText(contentX, y + kPad, maxNameW, headerH,
-                       Qt::AlignLeft | Qt::AlignVCenter, dname);
+            if (firstInGroup) {
+                int ax = kPad;
+                QPixmap av = AvatarManager::inst().get(avatarUrl, senderName, peerNumber, kAvatarSize);
+                p.drawPixmap(ax, y + kPad, av);
+                int hdrTextRight = bubbleRight - kPad / 2;
 
-            // IP
-            f.setPointSize(10); p.setFont(f);
-            int ipEnd = contentX + fm.width(dname) + kPad;
-            if (!ipAddress.isEmpty()) {
-                p.setPen(QColor(130, 140, 150));
-                int ipW = fm.width(ipAddress);
-                int ipMax = hdrTextRight - ipEnd;
-                if (ipMax > ipW) { ipMax = ipW; }
-                if (ipMax > 0) {
-                    p.drawText(ipEnd, y + kPad, ipMax, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                // sender name
+                f.setPointSize(11); p.setFont(f);
+                p.setPen(pal.textMuted);
+                QString dname = !senderNickname.isEmpty() ? senderNickname
+                              : !senderName.isEmpty() ? senderName
+                              : (peerNumber >= 0 ? QString("Peer %1").arg(peerNumber) : "?");
+                dname = qElideChars(dname, 23, ElideMiddle);
+                int maxNameW = hdrTextRight - contentX;
+                if (maxNameW < 20) { maxNameW = 20; }
+                p.drawText(contentX, y + kPad, maxNameW, headerH,
+                           Qt::AlignLeft | Qt::AlignVCenter, dname);
+
+                // IP
+                f.setPointSize(10); p.setFont(f);
+                int ipEnd = contentX + fm.width(dname) + kPad;
+                if (!ipAddress.isEmpty()) {
+                    p.setPen(QColor(130, 140, 150));
+                    int ipW = fm.width(ipAddress);
+                    int ipMax = hdrTextRight - ipEnd;
+                    if (ipMax > ipW) { ipMax = ipW; }
+                    if (ipMax > 0) {
+                        p.drawText(ipEnd, y + kPad, ipMax, headerH,
+                                   Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
+                    }
+                    ipEnd += fm.width(ipAddress) + kPad/2;
                 }
-                ipEnd += fm.width(ipAddress) + kPad/2;
-            }
-            // time
-            p.setPen(pal.textMuted);
-            int timeMaxW = hdrTextRight - ipEnd;
-            if (timeMaxW > 0) {
-                p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
-                           Qt::AlignLeft | Qt::AlignVCenter, time);
-            }
-            p.setFont(baseFont);
+                // time
+                p.setPen(pal.textMuted);
+                int timeMaxW = hdrTextRight - ipEnd;
+                if (timeMaxW > 0) {
+                    p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
+                               Qt::AlignLeft | Qt::AlignVCenter, time);
+                }
+                p.setFont(baseFont);
 
-            // header buttons
-            if (etype != ChatElement::File) {
-                int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
-                int btnX0 = bubbleRight - hdrBtnAreaW;
-                sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
-                translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
-                p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
-                p.drawEllipse(sourceBtnRect);
-                drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
-                p.drawEllipse(translateBtnRect);
-                drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                // header buttons
+                if (etype != ChatElement::File) {
+                    int btnY = y + kPad + (headerH - hdrBtnSize) / 2;
+                    int btnX0 = bubbleRight - hdrBtnAreaW;
+                    sourceBtnRect = QRect(btnX0, btnY, hdrBtnSize, hdrBtnSize);
+                    translateBtnRect = QRect(btnX0 + hdrBtnSize + hdrBtnGap, btnY, hdrBtnSize, hdrBtnSize);
+                    p.setPen(pal.textMuted); p.setBrush(Qt::NoBrush);
+                    p.drawEllipse(sourceBtnRect);
+                    drawEmojiIcon(p, sourceBtnRect, 0x1F4CB, "📋");
+                    p.drawEllipse(translateBtnRect);
+                    drawEmojiIcon(p, translateBtnRect, 0x1F310, "🌐");
+                }
             }
 
             // bubble background
-            int bubbleY = y + kPad + headerH + kPad;
-            int bubbleH = height - (kPad + headerH + kPad) - kMsgSpacing;
+            int bubbleY = firstInGroup ? (y + kPad + headerH + kPad) : (y + kPad / 2);
+            int bubbleH = firstInGroup ? (height - (kPad + headerH + kPad) - kMsgSpacing)
+                                       : (height - kPad / 2 - kMsgSpacing);
             if (bubbleH < 30) { bubbleH = 30; }
             bubbleRect = QRect(contentX, bubbleY, bubbleW, bubbleH);
             p.setBrush(pal.baseBg);
@@ -1745,6 +1817,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             downloadBtnRect = bi.downloadBtn;
             retryBtnRect    = bi.retryBtn;
         }
+        if (!firstInGroup) { drawGroupedTime(p, baseFont, fm, bubbleRect, time, pal); }
         break;
     }
     }
@@ -1919,6 +1992,9 @@ ChatView::~ChatView() {
 void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
     m_scrollDownPill.setCount(0);
     m_items = msgs;
+    for (size_t i = 1; i < m_items.size(); ++i) {
+        m_items[i].firstInGroup = !isSameSender(m_items[i - 1], m_items[i]);
+    }
     m_gifFrameUpdated.assign(msgs.size(), 0);
     relayout();
     scrollToBottom();
@@ -1938,6 +2014,9 @@ std::vector<ChatElement> ChatView::detachMessages() {
 
 void ChatView::attachMessages(std::vector<ChatElement> msgs) {
     m_items = std::move(msgs);
+    for (size_t i = 1; i < m_items.size(); ++i) {
+        m_items[i].firstInGroup = !isSameSender(m_items[i - 1], m_items[i]);
+    }
     m_gifFrameUpdated.assign(m_items.size(), 0);
     relayout();
     scrollToBottom();
@@ -1968,6 +2047,9 @@ void ChatView::appendMessage(const ChatElement& msg) {
     m_items.push_back(msg);
     m_gifFrameUpdated.push_back(0);
     ChatElement& el = m_items.back();
+    if (m_items.size() >= 2) {
+        el.firstInGroup = !isSameSender(m_items[m_items.size() - 2], el);
+    }
     el.height = el.calcHeight(w, m_fm, m_emojiW, font());
     el.cachedWidth = (short)w;
     m_totalHeight += el.height;
