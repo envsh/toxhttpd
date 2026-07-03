@@ -87,6 +87,10 @@ private:
     QLabel* m_statusLabel;
     bool m_fullscreen;
     int m_savedX;
+#ifndef QT3_BUILD
+    Qt::WindowFlags m_savedFlags;
+    QByteArray m_savedGeo;
+#endif
     int m_savedY;
     int m_savedW;
     int m_savedH;

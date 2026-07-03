@@ -18,6 +18,12 @@ void QtappSetup::setup(QApplication& app) {
 #else
     QObject::connect(&app, SIGNAL(aboutToQuit()), &s, SLOT(onAppQuit()));
 #endif
+
+#ifndef QT3_BUILD
+    QFont f = app.font();
+    f.setPointSize(f.pointSize() + 1);
+    app.setFont(f);
+#endif
 }
 
 int QtappSetup::addTimer(unsigned int intervalMs, std::function<void()> callback) {

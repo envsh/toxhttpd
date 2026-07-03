@@ -143,7 +143,14 @@ static void qt4MsgHandler(QtMsgType type, const char* msg) {
 }
 
 struct Qt4MsgInit {
-    Qt4MsgInit() { qInstallMsgHandler(qt4MsgHandler); }
+    Qt4MsgInit() {
+		#if QT_VERSION < 0x050000
+			qInstallMsgHandler(qt4MsgHandler);
+		#elif QT_VERSION < 0x060000
+			// TODO
+			// qInstallMessageHandler(qt4MsgHandler);
+		#endif
+	}
 };
 static Qt4MsgInit g_qt4MsgInit;
 

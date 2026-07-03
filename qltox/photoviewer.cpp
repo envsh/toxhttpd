@@ -545,13 +545,28 @@ void PhotoViewer::onFullscreen() {
         setGeometry(QApplication::desktop()->screenGeometry(
             QApplication::desktop()->screenNumber(this)));
 #else
+        m_savedFlags = windowFlags();
+        m_savedGeo = saveGeometry();
+        // QDialog::showFullScreen() ignored by some X11 WMs for Qt::Dialog type.
+        // Fix: temporarily change type to Qt::Window, per:
+        //   stackoverflow.com/questions/12645880  (2012, 76+ votes)
+        //   doc.qt.io/archives/qt-4.8/qwidget.html#saveGeometry
+        setWindowFlags(Qt::Window);
         showFullScreen();
 #endif
         m_fullscreen = true;
     } else {
         m_toolbar->show();
         m_statusBar->show();
+#ifdef QT3_BUILD
         setGeometry(m_savedX, m_savedY, m_savedW, m_savedH);
+#else
+        // Restore flags + geometry. restoreGeometry() handles frame offset.
+        // show() on a hidden window with restored flags re-maps normally.
+        setWindowFlags(m_savedFlags);
+        restoreGeometry(m_savedGeo);
+        show();
+#endif
         m_fullscreen = false;
     }
     updateTitle();
