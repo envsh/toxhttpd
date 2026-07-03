@@ -1025,8 +1025,13 @@ bool MainWindow::event(QEvent* event) {
 }
 
 void MainWindow::onFirstPaintComplete() {
-    qWarning("=== UI 首次绘制完成 === pending=%s",
-             qApp->hasPendingEvents() ? "true" : "false");
+    QString status = qApp->hasPendingEvents() ? QString::fromUtf8("true") : QString::fromUtf8("false");
+    QString msg = QString::fromUtf8("=== UI 首次绘制完成 === pending=") + status;
+#ifdef QT3_BUILD
+    qWarning("%s", msg.utf8().data());
+#else
+    qWarning("%s", msg.toUtf8().constData());
+#endif
 }
 
 void MainWindow::onContactSelected(int id, const QString& type, const QString& name) {

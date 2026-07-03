@@ -120,4 +120,31 @@ void qInfo(const char* fmt, ...) {
     va_end(ap);
 }
 
+#else  // ===== Qt4: 消息处理器 =====
+#include <QApplication>
+#include <cstdio>
+#include <ctime>
+
+static void qt4MsgHandler(QtMsgType type, const char* msg) {
+    const char* level = "";
+    switch (type) {
+        case QtDebugMsg:    level = "DEBUG"; break;
+        case QtWarningMsg:  level = "WARN";  break;
+        case QtCriticalMsg: level = "ERROR"; break;
+        case QtFatalMsg:    level = "FATAL"; break;
+    }
+    time_t now = time(nullptr);
+    struct tm* t = localtime(&now);
+    char tbuf[32];
+    strftime(tbuf, sizeof(tbuf), "%H:%M:%S", t);
+    fprintf(stderr, "[%s] [%s] %s\n", tbuf, level, msg);
+    fflush(stderr);
+    if (type == QtFatalMsg) abort();
+}
+
+struct Qt4MsgInit {
+    Qt4MsgInit() { qInstallMsgHandler(qt4MsgHandler); }
+};
+static Qt4MsgInit g_qt4MsgInit;
+
 #endif
