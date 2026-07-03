@@ -546,6 +546,54 @@ static void drawGroupedTime(QPainter& p, const QFont& baseFont,
 }
 #endif
 
+// 根据与当前时间差格式化时间字符串。
+// "hh:mm" 格式保持原样，完整日期格式做相对格式化。
+static QString formatAdaptiveMessageTime(const QString& timeStr) {
+    if (timeStr.length() == 5 && timeStr[2] == ':') {
+        return timeStr;
+    }
+#ifdef QT3_BUILD
+    int y  = timeStr.mid(0, 4).toInt();
+    int mo = timeStr.mid(5, 2).toInt();
+    int d  = timeStr.mid(8, 2).toInt();
+    int h  = timeStr.mid(11, 2).toInt();
+    int mi = timeStr.mid(14, 2).toInt();
+    int s  = timeStr.mid(17, 2).toInt();
+    QDate dtDate(y, mo, d);
+    QTime dtTime(h, mi, s);
+    if (!dtDate.isValid() || !dtTime.isValid()) { return timeStr; }
+    QDateTime dt(dtDate, dtTime);
+    QDateTime now = QDateTime::currentDateTime();
+    int secs = dt.secsTo(now);
+#else
+    QDateTime dt = QDateTime::fromString(timeStr, "yyyy-MM-dd hh:mm:ss");
+    if (!dt.isValid()) { return timeStr; }
+    QDateTime now = QDateTime::currentDateTime();
+    qint64 secs = dt.secsTo(now);
+#endif
+    
+    // h:m:s or m-d h:m:s or y-m-d h:m:s
+    int sublen = timeStr.length();
+    if (dt.date() == now.date()) { sublen = 8; }
+    else if (dt.date().year() == now.date().year()) { sublen = 14; }
+    else {}
+    if (1) { return timeStr.right(sublen); }
+    
+    if (secs < 0) { secs = 0; }
+    if (secs < 60) { return qFromUtf8("刚刚"); }
+    if (secs < 3600) { return QString::number(secs / 60) + qFromUtf8(" 分钟前"); }
+    QDate today = now.date();
+    QDate msgDate = dt.date();
+    if (msgDate == today) { return dt.toString("HH:mm"); }
+    if (msgDate == today.addDays(-1)) { return qFromUtf8("昨天"); }
+    if (msgDate.daysTo(today) < 7) {
+        static const char* wd[] = { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
+        return qFromUtf8(wd[msgDate.dayOfWeek() - 1]);
+    }
+    if (msgDate.year() == today.year()) { return dt.toString("M月d日"); }
+    return dt.toString("yyyy年M月d日");
+}
+
 // ───── ChatElement methods ─────
 
 int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont) {
