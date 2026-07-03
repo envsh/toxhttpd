@@ -525,6 +525,8 @@ static void paintAudioContent(QPainter& p, const QRect& bubbleRect,
 //           ┌──────────────────────┐
 //           │ 连续消息不显示头像     │
 //           │ 和姓名，但时间仍可见。  │
+static QString formatAdaptiveMessageTime(const QString& timeStr);
+
 //           │                10:30 │
 //           └──────────────────────┘
 // 文本消息：时间覆盖最后一行文末（Telegram 旧版风格）
@@ -533,15 +535,16 @@ static void drawGroupedTime(QPainter& p, const QFont& baseFont,
                             const QFontMetrics& fm, const QRect& bubbleRect,
                             const QString& time, const StyleParams::Palette& pal)
 {
+    QString at = formatAdaptiveMessageTime(time);
     QFont f = baseFont;
     f.setPointSize(10);
     p.setFont(f);
     p.setPen(pal.textMuted);
-    int tw = fm.width(time);
+    int tw = fm.width(at);
     p.drawText(bubbleRect.right() - tw - ChatView::kBubbleHPad,
                bubbleRect.bottom() - ChatView::kBubbleVPad - fm.lineSpacing(),
                tw, fm.lineSpacing(),
-               Qt::AlignRight | Qt::AlignVCenter, time);
+               Qt::AlignRight | Qt::AlignVCenter, at);
     p.setFont(baseFont);
 }
 #endif
@@ -928,12 +931,13 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 f.setPointSize(10);
                 p.setFont(f);
                 p.setPen(pal.textMuted);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2, y + kPad,
-                           fm.width(time), headerH, Qt::AlignRight | Qt::AlignVCenter, time);
+                QString at = formatAdaptiveMessageTime(time);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(at) - kPad/2, y + kPad,
+                           fm.width(at), headerH, Qt::AlignRight | Qt::AlignVCenter, at);
 
                 // send status
                 if (category == "self") {
-                    int statusX = hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20;
+                    int statusX = hdrTextRight - nameW - ipW - kPad/2 - fm.width(at) - kPad/2 - 20;
                     resendIconRect = QRect(statusX, y + kPad + (headerH - hdrBtnSize) / 2,
                                             hdrBtnSize, hdrBtnSize);
                     if (sendState == SendSending) {
@@ -1027,7 +1031,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 int timeX = ipEnd;
                 int timeMaxW = hdrTextRight - timeX;
                 if (timeMaxW > 0) {
-                    p.drawText(timeX, y + kPad, timeMaxW, headerH, Qt::AlignLeft | Qt::AlignVCenter, time);
+                    p.drawText(timeX, y + kPad, timeMaxW, headerH, Qt::AlignLeft | Qt::AlignVCenter, formatAdaptiveMessageTime(time));
                 }
 
                 p.setFont(baseFont);
@@ -1214,11 +1218,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                     p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
                                ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
                 }
+                QString at = formatAdaptiveMessageTime(time);
                 f.setPointSize(10); p.setFont(f);
                 p.setPen(pal.textMuted);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
-                           y + kPad, fm.width(time), headerH,
-                           Qt::AlignRight | Qt::AlignVCenter, time);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(at) - kPad/2,
+                           y + kPad, fm.width(at), headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, at);
                 p.setFont(baseFont);
 
                 if (etype != ChatElement::File) {
@@ -1287,7 +1292,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 int timeMaxW = hdrTextRight - ipEnd;
                 if (timeMaxW > 0) {
                     p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, time);
+                               Qt::AlignLeft | Qt::AlignVCenter, formatAdaptiveMessageTime(time));
                 }
                 p.setFont(baseFont);
 
@@ -1390,11 +1395,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                     p.drawText(hdrTextRight - nameW - ipW - kPad/2, y + kPad,
                                ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
                 }
+                QString at = formatAdaptiveMessageTime(time);
                 f.setPointSize(10); p.setFont(f);
                 p.setPen(pal.textMuted);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
-                           y + kPad, fm.width(time), headerH,
-                           Qt::AlignRight | Qt::AlignVCenter, time);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(at) - kPad/2,
+                           y + kPad, fm.width(at), headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, at);
                 p.setFont(baseFont);
 
                 if (etype != ChatElement::File) {
@@ -1463,7 +1469,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 int timeMaxW = hdrTextRight - ipEnd;
                 if (timeMaxW > 0) {
                     p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, time);
+                               Qt::AlignLeft | Qt::AlignVCenter, formatAdaptiveMessageTime(time));
                 }
                 p.setFont(baseFont);
 
@@ -1569,13 +1575,14 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                                ipW, headerH, Qt::AlignLeft | Qt::AlignVCenter, ipAddress);
                 }
                 // time
+                QString at = formatAdaptiveMessageTime(time);
                 f.setPointSize(10); p.setFont(f);
                 p.setPen(pal.textMuted);
-                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2,
-                           y + kPad, fm.width(time), headerH,
-                           Qt::AlignRight | Qt::AlignVCenter, time);
+                p.drawText(hdrTextRight - nameW - ipW - kPad/2 - fm.width(at) - kPad/2,
+                           y + kPad, fm.width(at), headerH,
+                           Qt::AlignRight | Qt::AlignVCenter, at);
                  // send status
-                resendIconRect = QRect(hdrTextRight - nameW - ipW - kPad/2 - fm.width(time) - kPad/2 - 20,
+                resendIconRect = QRect(hdrTextRight - nameW - ipW - kPad/2 - fm.width(at) - kPad/2 - 20,
                                        y + kPad + (headerH - hdrBtnSize) / 2,
                                        hdrBtnSize, hdrBtnSize);
                 if (sendState == SendSending) {
@@ -1735,7 +1742,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                 int timeMaxW = hdrTextRight - ipEnd;
                 if (timeMaxW > 0) {
                     p.drawText(ipEnd, y + kPad, timeMaxW, headerH,
-                               Qt::AlignLeft | Qt::AlignVCenter, time);
+                               Qt::AlignLeft | Qt::AlignVCenter, formatAdaptiveMessageTime(time));
                 }
                 p.setFont(baseFont);
 
