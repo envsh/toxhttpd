@@ -521,12 +521,14 @@ static void paintAudioContent(QPainter& p, const QRect& bubbleRect,
     }
 }
 
+#endif
+
+static QString formatAdaptiveMessageTime(const QString& timeStr);
+
 // 连续同发送者消息：在气泡右下角绘制时间戳。
 //           ┌──────────────────────┐
 //           │ 连续消息不显示头像     │
 //           │ 和姓名，但时间仍可见。  │
-static QString formatAdaptiveMessageTime(const QString& timeStr);
-
 //           │                10:30 │
 //           └──────────────────────┘
 // 文本消息：时间覆盖最后一行文末（Telegram 旧版风格）
@@ -547,7 +549,7 @@ static void drawGroupedTime(QPainter& p, const QFont& baseFont,
                Qt::AlignRight | Qt::AlignVCenter, at);
     p.setFont(baseFont);
 }
-#endif
+
 
 // 根据与当前时间差格式化时间字符串。
 // "hh:mm" 格式保持原样，完整日期格式做相对格式化。
