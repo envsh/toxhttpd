@@ -68,6 +68,8 @@ class ContactListWidget;
 struct RowPixmapCache {
     QPixmap pix;
     int width = 0;
+    int rowId = -1;
+    QString rowType;
 };
 
 class ContactListView : public QWidget {

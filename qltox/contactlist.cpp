@@ -233,11 +233,19 @@ void ContactListView::truncateRowData(RowData* rd, int w) {
     if (nameW < 20) { nameW = 20; }
 
     QString displayName = rd->name.isEmpty() ? _("no_name") : rd->name;
-    if (fm.width(displayName) > nameW) {
-        while (!displayName.isEmpty() && fm.width(displayName + "...") > nameW) {
-            displayName.truncate(displayName.length() - 1);
+    {
+        int ellipsisW = fm.width("...");
+        int total = fm.width(displayName);
+        if (total > nameW) {
+            int accum = 0, lastFit = 0;
+            for (int i = 0; i < displayName.length(); ++i) {
+                int cw = fm.width(displayName[i]);
+                if (accum + cw + ellipsisW > nameW) { break; }
+                accum += cw;
+                lastFit = i + 1;
+            }
+            displayName = displayName.left(lastFit) + "...";
         }
-        displayName += "...";
     }
     rd->truncatedName = displayName;
 
@@ -245,11 +253,19 @@ void ContactListView::truncateRowData(RowData* rd, int w) {
     msg.replace('\n', ' ');
     int msgW = w - cx - kRightPad - kRightAreaW;
     if (msgW < 20) { msgW = 20; }
-    if (!msg.isEmpty() && sfm.width(msg) > msgW) {
-        while (!msg.isEmpty() && sfm.width(msg + "...") > msgW) {
-            msg.truncate(msg.length() - 1);
+    {
+        int ellipsisW = sfm.width("...");
+        int total = sfm.width(msg);
+        if (!msg.isEmpty() && total > msgW) {
+            int accum = 0, lastFit = 0;
+            for (int i = 0; i < msg.length(); ++i) {
+                int cw = sfm.width(msg[i]);
+                if (accum + cw + ellipsisW > msgW) { break; }
+                accum += cw;
+                lastFit = i + 1;
+            }
+            msg = msg.left(lastFit) + "...";
         }
-        msg += "...";
     }
     rd->truncatedMsg = msg;
     rd->cachedWidth = w;
@@ -463,6 +479,9 @@ void ContactListView::paintEvent(QPaintEvent*) {
             int y = i * h - m_scrollY;
 #ifdef QT3_BUILD
             Q_UNUSED(m_rowCache);
+            if (rd->cachedWidth != width()) {
+                truncateRowData(rd, width());
+            }
             uint32_t cp_emoji = typeToEmojiCp(rd->type);
             QPixmap av = getCircularAvatar(cp_emoji, kAvatarSz - 4);
             paintContactRow(p, 0, y, width(), h,
@@ -478,7 +497,9 @@ void ContactListView::paintEvent(QPaintEvent*) {
                                 rd->isConnected, rd->unread, rd->lastMessage, rd->timeStr,
                                 rd->pinnedIndex, rd->truncatedName, rd->truncatedMsg, av);
             } else {
-                if (i >= (int)m_rowCache.size() || m_rowCache[i].width != width()) {
+                if (i >= (int)m_rowCache.size() || m_rowCache[i].width != width()
+                    || m_rowCache[i].rowId != rd->id
+                    || m_rowCache[i].rowType != rd->type) {
                     renderRowToCache(i, width());
                 }
                 if (!m_rowCache[i].pix.isNull()) {
@@ -555,6 +576,8 @@ void ContactListView::renderRowToCache(int i, int w) {
     cp.end();
     rc.pix = pm;
     rc.width = w;
+    rc.rowId = rd->id;
+    rc.rowType = rd->type;
 }
 
 void ContactListView::invalidateRowCache(int i) {
@@ -672,12 +695,14 @@ void ContactListWidget::setContacts(ContactList& contacts) {
     }
     m_list.sort(m_sortCriteria);
     m_view->invalidateTruncation();
+    m_view->invalidateAllCaches();
     refreshView();
 }
 
 void ContactListWidget::clear() {
     m_list.clear();
     m_view->setSelectedIndex(-1);
+    m_view->invalidateAllCaches();
     refreshView();
 }
 
@@ -689,6 +714,7 @@ void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
     rd->cachedWidth = 0;
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
+        m_view->invalidateAllCaches();
         refreshView();
     }
 }
@@ -700,9 +726,11 @@ void ContactListWidget::updateFriendConnectionStatus(int friendId, const QString
     rd->cachedWidth = 0;
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
+        m_view->invalidateAllCaches();
         refreshView();
     }
 }
+
 
 void ContactListWidget::updateContact(int id, const QString& type, const QString& name,
                                        const QString& chatId, const QString& status) {
@@ -716,9 +744,11 @@ void ContactListWidget::updateContact(int id, const QString& type, const QString
     if (!status.isEmpty()) { rd->status = status; rd->cachedWidth = 0; }
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
+        m_view->invalidateAllCaches();
         refreshView();
     }
 }
+
 
 void ContactListWidget::addContact(Contact* c) {
     auto key = std::make_pair(c->id, std::string(qToUtf8(c->type).data()));
@@ -750,9 +780,11 @@ void ContactListWidget::addContact(Contact* c) {
 
     if (!m_batchLevel) {
         m_list.adjustBySort(result->index);
+        m_view->invalidateAllCaches();
         refreshView();
     }
 }
+
 
 void ContactListWidget::removeContact(int id, const QString& type) {
     RowData* rd = m_list.get(id, type);
@@ -766,6 +798,7 @@ void ContactListWidget::removeContact(int id, const QString& type) {
         m_view->setSelectedIndex(newSel);
     }
 
+    m_view->invalidateAllCaches();
     if (!m_batchLevel) refreshView();
 }
 
@@ -791,6 +824,7 @@ void ContactListWidget::updateContactLastMessage(int id, const QString& type, co
     rd->lastActive = QDateTime::currentDateTime().toTime_t();
     rd->cachedWidth = 0;
     m_list.adjustBySort(rd->index);
+    m_view->invalidateAllCaches();
     if (!m_batchLevel) refreshView();
 }
 
@@ -838,6 +872,7 @@ void ContactListWidget::togglePin(int id, const QString& type) {
     }
 
     m_list.sort(m_sortCriteria);
+    m_view->invalidateAllCaches();
     m_view->invalidateTruncation();
     if (!m_batchLevel) { resolveSelection(); refreshView(); }
 }
@@ -851,6 +886,7 @@ void ContactListWidget::endBatch() {
     if (--m_batchLevel <= 0) {
         m_batchLevel = 0;
         m_list.unfreeze(m_sortCriteria);
+        m_view->invalidateAllCaches();
         refreshView();
     }
 }
@@ -878,12 +914,28 @@ void ContactListWidget::refreshView() {
     resolveSelection();
     updateScrollBar();
     int w = m_view->width();
+#ifdef QT3_BUILD
     for (int i = 0; i < m_list.size(); ++i) {
         RowData* rd = m_list.at(i);
         if (rd->cachedWidth != w) {
             m_view->truncateRowData(rd, w);
         }
     }
+#else
+    int totalH = m_list.size() * m_itemHeight;
+    int viewH  = m_view->height();
+    int scrollY = m_view->scrollY();
+    int firstRow = (totalH > 0 && viewH > 0) ? scrollY / m_itemHeight : 0;
+    int lastRow  = (totalH > 0 && viewH > 0)
+        ? std::min((scrollY + viewH - 1) / m_itemHeight, m_list.size() - 1)
+        : -1;
+    for (int i = firstRow; i <= lastRow; ++i) {
+        RowData* rd = m_list.at(i);
+        if (rd && rd->cachedWidth != w) {
+            m_view->truncateRowData(rd, w);
+        }
+    }
+#endif
     int visible = 0;
     if (m_searchText.isEmpty()) {
         visible = m_list.size();
@@ -981,6 +1033,7 @@ void ContactListWidget::onSortMenuClicked() {
 #endif
 
     m_list.sort(m_sortCriteria);
+    m_view->invalidateAllCaches();
     refreshView();
 }
 
