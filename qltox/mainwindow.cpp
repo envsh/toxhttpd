@@ -24,6 +24,11 @@
 #include "placeholderlineedit.h"
 #include "sound.h"
 #include <qfile.h>
+#ifdef QT3_BUILD
+#include <qfileinfo.h>
+#else
+#include <QFileInfo>
+#endif
 #include "toastwidget.h"
 #include "sharedstatusbar.h"
 #include "photoviewer.h"
@@ -472,6 +477,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(resendMessage(int)), this, SLOT(onResendMessage(int)));
     connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
+    connect(chatWidget, SIGNAL(fileSendRequested(const QString&)),
+            this, SLOT(onFileSendRequested(const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 启动事件轮询引擎
@@ -2626,6 +2633,63 @@ void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {
             }
             QApplication::postEvent(this, ev);
         });
+}
+
+void MainWindow::onFileSendRequested(const QString& filePath) {
+    if (currentChatId == -1 || currentChatType.isEmpty()) { return; }
+
+    QFileInfo fi(filePath);
+    if (!fi.exists() || !fi.isFile()) { return; }
+
+#ifdef QT3_BUILD
+    long sz = fi.size();
+    const long kMaxFileSize = 5 * 1024 * 1024;
+#else
+    qint64 sz = fi.size();
+    const qint64 kMaxFileSize = 5 * 1024 * 1024;
+#endif
+    if (sz > kMaxFileSize) {
+        QMessageBox::warning(this, _("file_too_large"),
+            _("file_size_limit").arg((int)(kMaxFileSize / 1024 / 1024)));
+        return;
+    }
+    if (sz == 0) {
+        QMessageBox::warning(this, _("file_empty"), _("file_empty"));
+        return;
+    }
+
+    QFile f(filePath);
+#ifdef QT3_BUILD
+    if (!f.open(IO_ReadOnly)) { return; }
+#else
+    if (!f.open(QIODevice::ReadOnly)) { return; }
+#endif
+    QByteArray data = f.readAll();
+    f.close();
+
+    QString fn = filePath;
+#ifdef QT3_BUILD
+    int slash = fn.findRev('/');
+#else
+    int slash = fn.lastIndexOf('/');
+#endif
+    if (slash >= 0) fn = fn.mid(slash + 1);
+
+    ChatElement el;
+    el.etype = ChatElement::File;
+    el.category = "self";
+    el.senderName = "Me";
+    el.time = getCurrentTime();
+    el.localPath = filePath;
+    el.fileName = fn;
+    el.fileSize = (int)sz;
+    el.sendState = ChatElement::SendSending;
+    chatWidget->appendMessage(el);
+
+    ToxAPI::sendMessage(currentChatId, std::string(qToUtf8(currentChatType)),
+                         "", std::string(),
+                         std::string(data.data(), data.size()),
+                         std::string(qToUtf8(fn)));
 }
 
 void MainWindow::onSourceClicked(int msgIndex) {

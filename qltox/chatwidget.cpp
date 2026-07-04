@@ -9,6 +9,11 @@
 #endif
 
 #include "ThemeManager.h"
+#ifdef QT3_BUILD
+#include <qfiledialog.h>
+#else
+#include <QFileDialog>
+#endif
 
 ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN") {
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 0, 0);
@@ -409,13 +414,19 @@ void ChatWidget::onEmojiInsert(const QString& emoji) {
 }
 
 void ChatWidget::onFileClicked() {
-    // TODO: open file dialog and send file
-    qWarning("onFileClicked: not implemented");
+    QString path;
+#ifdef QT3_BUILD
+    path = QFileDialog::getOpenFileName(QString::null, QString::null, this);
+#else
+    path = QFileDialog::getOpenFileName(this, QString(), QString());
+#endif
+    if (path.isEmpty()) { return; }
+    emit fileSendRequested(path);
 }
 
 void ChatWidget::onFilePaste(const QString& filePath) {
-    // TODO: actually send the file
-    qWarning("onFilePaste: %s", qToUtf8(filePath).data());
+    if (filePath.isEmpty()) { return; }
+    emit fileSendRequested(filePath);
 }
 
 void ChatWidget::onMentionClicked(const QString& username) {

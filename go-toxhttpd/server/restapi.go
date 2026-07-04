@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -274,6 +275,35 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	var fileData []byte
+	var fileName string
+	const maxFileSize = 5 * 1024 * 1024
+
+	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			writeErr(w, "failed to parse multipart: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err == nil {
+			fileData, _ = io.ReadAll(file)
+			fileName = header.Filename
+			file.Close()
+		}
+	}
+
+	if len(fileData) > maxFileSize {
+		writeErr(w, "file too large (max 5MB)", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	var mediaInfo *MediaDataInfo
+	if len(fileData) > 0 {
+		info := getMediaDataInfo(fileData, fileName)
+		mediaInfo = &info
+	}
+
 	params, err := getRequestParams(r)
 	if err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
@@ -285,7 +315,11 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 	message := params.Get("message")
 	hexID := params.Get("hexid")
 
-	if chatType == "" || message == "" {
+	if message == "" && len(fileData) > 0 {
+		message = fileName
+	}
+
+	if chatType == "" || (message == "" && len(fileData) == 0) {
 		writeErr(w, "missing required parameters", http.StatusBadRequest)
 		return
 	}
@@ -325,7 +359,7 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 
 	switch chatType {
 	case "friend":
-		msgID, err := h.m.SendFriendMessage(id, message)
+		msgID, err := h.m.SendFriendMessage(id, message, mediaInfo)
 		if err != nil {
 			writeErr(w, err.Error(), http.StatusBadRequest)
 			return
@@ -333,7 +367,7 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{"message_id": msgID})
 
 	case "conference":
-		err := h.m.SendConferenceMessage(id, message)
+		err := h.m.SendConferenceMessage(id, message, mediaInfo)
 		if err != nil {
 			writeErr(w, err.Error(), http.StatusBadRequest)
 			return
@@ -342,7 +376,7 @@ func (h *Restapi) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 
 	case "group":
 		messageType := params.Get("message_type")
-		msgId, err := h.m.SendGroupMessage(id, messageType, message)
+		msgId, err := h.m.SendGroupMessage(id, messageType, message, mediaInfo)
 		if err != nil {
 			writeErr(w, err.Error(), http.StatusBadRequest)
 			return

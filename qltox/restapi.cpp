@@ -251,11 +251,34 @@ void ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
 }
 
 void ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message,
-                          const std::string& idOverride) {
+                          const std::string& idOverride,
+                          const std::string& fileData,
+                          const std::string& filename) {
     auto* ctx = new ApiCtx(ApiSendMessage, chatId, message, type);
     std::string idStr = idOverride.empty() ? std::to_string(chatId) : idOverride;
-    request({"/api/messages/send", "POST",
-            "type=" + type + "&id=" + urlEncode(idStr) + "&message=" + urlEncode(message)}, ctx);
+
+    if (fileData.empty()) {
+        request({"/api/messages/send", "POST",
+                "type=" + type + "&id=" + urlEncode(idStr) + "&message=" + urlEncode(message)}, ctx);
+    } else {
+        std::string boundary = "----toxhttpd" + std::to_string(time(nullptr));
+        std::string body;
+        auto af = [&](const std::string& n, const std::string& v) {
+            body += "--" + boundary + "\r\n"
+                    "Content-Disposition: form-data; name=\"" + n + "\"\r\n\r\n" + v + "\r\n";
+        };
+        af("type", type);
+        af("id", idStr);
+        af("message", message);
+        af("filename", filename);
+        body += "--" + boundary + "\r\n"
+                "Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n"
+                "Content-Type: application/octet-stream\r\n\r\n";
+        body += fileData;
+        body += "\r\n--" + boundary + "--\r\n";
+        request({"/api/messages/send", "POST", body, 120,
+            {{"Content-Type", "multipart/form-data; boundary=" + boundary}}}, ctx);
+    }
 }
 
 void ToxAPI::addFriend(const std::string& publicKey) {

@@ -277,7 +277,12 @@ func (m *Midapi) FriendsInfo(ids []string) []FriendInfo {
 
 // ── Messages ──
 
-func (m *Midapi) SendFriendMessage(friendID uint32, message string) (uint32, error) {
+func (m *Midapi) SendFriendMessage(friendID uint32, message string, mediaOpt ...*MediaDataInfo) (uint32, error) {
+	var media *MediaDataInfo
+	if len(mediaOpt) > 0 {
+		media = mediaOpt[0]
+	}
+
 	msgID, err := m.ctx.Tox.FriendSendMessage(friendID, message)
 	if err != nil {
 		return 0, err
@@ -287,17 +292,41 @@ func (m *Midapi) SendFriendMessage(friendID uint32, message string) (uint32, err
 	chanidInt, _ := m.getOrCreatePubKeyID(friendPubKey)
 	selfPubKey := m.ctx.Tox.SelfGetPublicKey()
 	senderInt, _ := m.getOrCreatePubKeyID(selfPubKey)
-	data, _ := json.Marshal(map[string]interface{}{
+
+	evt := map[string]interface{}{
 		"message":   message,
 		"sender":    senderInt,
 		"direction": "sent",
-	})
+	}
+	if media != nil {
+		evt["msgtype"] = media.MsgType
+		evt["file_size"] = media.Size
+		evt["filename"] = media.Filename
+		evt["mime_type"] = media.MimeType
+		evt["media_url"] = ""
+		if media.Width > 0 {
+			evt["width"] = media.Width
+			evt["height"] = media.Height
+		}
+		evt["info"] = map[string]interface{}{
+			"mimetype": media.MimeType,
+			"size":     media.Size,
+			"w":        media.Width,
+			"h":        media.Height,
+		}
+	}
+	data, _ := json.Marshal(evt)
 	m.persistEventToSQLite(chanidInt, string(data))
 
 	return msgID, nil
 }
 
-func (m *Midapi) SendGroupMessage(gn uint32, messageType string, message string) (uint64, error) {
+func (m *Midapi) SendGroupMessage(gn uint32, messageType string, message string, mediaOpt ...*MediaDataInfo) (uint64, error) {
+	var media *MediaDataInfo
+	if len(mediaOpt) > 0 {
+		media = mediaOpt[0]
+	}
+
 	mt := tox.MESSAGE_TYPE_NORMAL
 	if messageType == "action" {
 		mt = tox.MESSAGE_TYPE_ACTION
@@ -312,17 +341,41 @@ func (m *Midapi) SendGroupMessage(gn uint32, messageType string, message string)
 	chanidInt, _ := m.getOrCreatePubKeyID(chatId)
 	selfPubKey := m.ctx.Tox.SelfGetPublicKey()
 	senderInt, _ := m.getOrCreatePubKeyID(selfPubKey)
-	data, _ := json.Marshal(map[string]interface{}{
+
+	evt := map[string]interface{}{
 		"message":   message,
 		"sender":    senderInt,
 		"direction": "sent",
-	})
+	}
+	if media != nil {
+		evt["msgtype"] = media.MsgType
+		evt["file_size"] = media.Size
+		evt["filename"] = media.Filename
+		evt["mime_type"] = media.MimeType
+		evt["media_url"] = ""
+		if media.Width > 0 {
+			evt["width"] = media.Width
+			evt["height"] = media.Height
+		}
+		evt["info"] = map[string]interface{}{
+			"mimetype": media.MimeType,
+			"size":     media.Size,
+			"w":        media.Width,
+			"h":        media.Height,
+		}
+	}
+	data, _ := json.Marshal(evt)
 	m.persistEventToSQLite(chanidInt, string(data))
 
 	return uint64(msgId), nil
 }
 
-func (m *Midapi) SendConferenceMessage(confID uint32, message string) error {
+func (m *Midapi) SendConferenceMessage(confID uint32, message string, mediaOpt ...*MediaDataInfo) error {
+	var media *MediaDataInfo
+	if len(mediaOpt) > 0 {
+		media = mediaOpt[0]
+	}
+
 	_, err := m.ctx.Tox.ConferenceSendMessage(confID, tox.MESSAGE_TYPE_NORMAL, message)
 	if err != nil {
 		return err
@@ -332,11 +385,30 @@ func (m *Midapi) SendConferenceMessage(confID uint32, message string) error {
 	chanidInt, _ := m.getOrCreatePubKeyID(chatId)
 	selfPubKey := m.ctx.Tox.SelfGetPublicKey()
 	senderInt, _ := m.getOrCreatePubKeyID(selfPubKey)
-	data, _ := json.Marshal(map[string]interface{}{
+
+	evt := map[string]interface{}{
 		"message":   message,
 		"sender":    senderInt,
 		"direction": "sent",
-	})
+	}
+	if media != nil {
+		evt["msgtype"] = media.MsgType
+		evt["file_size"] = media.Size
+		evt["filename"] = media.Filename
+		evt["mime_type"] = media.MimeType
+		evt["media_url"] = ""
+		if media.Width > 0 {
+			evt["width"] = media.Width
+			evt["height"] = media.Height
+		}
+		evt["info"] = map[string]interface{}{
+			"mimetype": media.MimeType,
+			"size":     media.Size,
+			"w":        media.Width,
+			"h":        media.Height,
+		}
+	}
+	data, _ := json.Marshal(evt)
 	m.persistEventToSQLite(chanidInt, string(data))
 
 	return nil

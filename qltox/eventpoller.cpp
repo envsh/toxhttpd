@@ -146,8 +146,15 @@ void EventPoller::run() {
                 if (curlResult != 0) {
                     ALOG_WARN("!!", ctx->urlStr, resp.curlErrStr);
                 }
-                ALOG_INFO("<<", httpCode, ctx->urlStr,
-                          resp.elapsedMs, "ms", resp.body.size(), "bytes");
+                if (httpCode >= 400 && !resp.body.empty()) {
+                    std::string snippet = resp.body.substr(0, 99);
+                    ALOG_INFO("<<", httpCode, ctx->urlStr,
+                        resp.elapsedMs, "ms", resp.body.size(), "bytes",
+                        "| body:", snippet);
+                } else {
+                    ALOG_INFO("<<", httpCode, ctx->urlStr,
+                        resp.elapsedMs, "ms", resp.body.size(), "bytes");
+                }
 
                 curl_multi_remove_handle(multi, msg->easy_handle);
                 curl_easy_cleanup(msg->easy_handle);
