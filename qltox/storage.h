@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdio>
 #include <sqlite3.h>
+#include <pthread.h>
 #include <qglobal.h>
 #include <qmutex.h>
 #include <qthread.h>
@@ -15,16 +16,18 @@
 struct SlowGuard {
     const char* op;
     int thresholdMs;
+    const char* detail;
     std::chrono::steady_clock::time_point start;
-    SlowGuard(const char* op, int thresholdMs)
-        : op(op), thresholdMs(thresholdMs)
+    SlowGuard(const char* op, int thresholdMs, const char* detail = nullptr)
+        : op(op), thresholdMs(thresholdMs), detail(detail)
         , start(std::chrono::steady_clock::now()) {}
     ~SlowGuard() {
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start).count();
         if (ms > thresholdMs) {
-            qWarning("[SLOW] %s took %lldms (threshold %dms)",
-                     op, (long long)ms, thresholdMs);
+            qWarning("[SLOW] %s took %lldms (threshold %dms)%s%s",
+                     op, (long long)ms, thresholdMs,
+                     detail ? " key=" : "", detail ? detail : "");
         }
     }
 };
@@ -101,27 +104,55 @@ class SqliteConnectionSafe;
 
 class SqliteLockedDb {
     friend class SqliteConnectionSafe;
-    QMutex* m_mutex = nullptr;
+    pthread_rwlock_t* m_rwlock = nullptr;
     SqliteDb* m_db = nullptr;
-    explicit SqliteLockedDb(QMutex& mutex, SqliteDb& db)
-        : m_mutex(&mutex), m_db(&db) { m_mutex->lock(); }
+    bool m_writeMode = false;
+    SqliteLockedDb() : m_rwlock(nullptr), m_db(nullptr) {}
+    explicit SqliteLockedDb(pthread_rwlock_t& rwlock, SqliteDb& db, bool writeMode)
+        : m_rwlock(&rwlock), m_db(&db), m_writeMode(writeMode) {
+        if (writeMode)
+            pthread_rwlock_wrlock(m_rwlock);
+        else
+            pthread_rwlock_rdlock(m_rwlock);
+    }
 public:
-    ~SqliteLockedDb() { if (m_mutex) { m_mutex->unlock(); m_mutex = nullptr; } }
+    ~SqliteLockedDb() {
+        if (m_rwlock) { pthread_rwlock_unlock(m_rwlock); m_rwlock = nullptr; }
+    }
     SqliteLockedDb(SqliteLockedDb&& other) noexcept
-        : m_mutex(other.m_mutex), m_db(other.m_db) { other.m_mutex = nullptr; }
+        : m_rwlock(other.m_rwlock), m_db(other.m_db), m_writeMode(other.m_writeMode) {
+        other.m_rwlock = nullptr;
+    }
     SqliteLockedDb(const SqliteLockedDb&) = delete;
     SqliteLockedDb& operator=(const SqliteLockedDb&) = delete;
 
+    bool isLocked() const { return m_rwlock != nullptr; }
+    operator bool() const { return m_rwlock != nullptr; }
     SqliteDb* operator->() { return m_db; }
     SqliteDb& operator*() { return *m_db; }
 };
 
 class SqliteConnectionSafe {
-    QMutex m_mutex;
+    pthread_rwlock_t m_rwlock;
     SqliteDb m_db;
 public:
-    explicit SqliteConnectionSafe(sqlite3* db) : m_db(db) {}
-    SqliteLockedDb get() { return SqliteLockedDb(m_mutex, m_db); }
+    explicit SqliteConnectionSafe(sqlite3* db) : m_db(db) {
+        pthread_rwlock_init(&m_rwlock, nullptr);
+    }
+    ~SqliteConnectionSafe() { pthread_rwlock_destroy(&m_rwlock); }
+
+    SqliteLockedDb get() { return SqliteLockedDb(m_rwlock, m_db, true); }
+    SqliteLockedDb getRead() { return SqliteLockedDb(m_rwlock, m_db, false); }
+    SqliteLockedDb tryRead() {
+        if (pthread_rwlock_tryrdlock(&m_rwlock) == 0) {
+            SqliteLockedDb d;
+            d.m_rwlock = &m_rwlock;
+            d.m_db = &m_db;
+            d.m_writeMode = false;
+            return d;
+        }
+        return SqliteLockedDb();
+    }
 };
 
 class ChannelDbSyncInterface;

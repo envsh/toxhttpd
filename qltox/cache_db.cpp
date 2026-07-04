@@ -1,6 +1,7 @@
 #include "cache_db.h"
 #include "cache_fs.h"
 #include <ctime>
+#include <atomic>
 
 namespace {
 
@@ -37,7 +38,7 @@ public:
     }
 
     std::vector<uint8_t> get(const char* key, std::string* out_mime) override {
-        SlowGuard _w("cache::get", 30);
+        SlowGuard _w("cache::get", 30, key);
         auto _lock = m_cacheConn->get();
         TimedReadGuard _t(_lock->raw(), 50);
         std::vector<uint8_t> result;
@@ -129,7 +130,7 @@ public:
     }
 
     std::string get_ref_path(const char* key) override {
-        SlowGuard _w("cache::get_ref", 30);
+        SlowGuard _w("cache::get_ref", 30, key);
         auto _lock = m_cacheConn->get();
         TimedReadGuard _t(_lock->raw(), 50);
         auto stmt = _lock->prepare(
@@ -171,7 +172,20 @@ public:
     }
 
     std::vector<uint8_t> loadMedia(const char* key, std::string* out_mime) override {
-        auto _lock = m_cacheConn->get();
+        auto _lock = m_cacheConn->tryRead();
+        static std::atomic<int> s_total{0};
+        static std::atomic<int> s_skip{0};
+        s_total++;
+        if (!_lock) {
+            int n = ++s_skip;
+            int t = s_total.load();
+            if (n <= 10 || n % 500 == 0) {
+                qWarning("loadMedia: tryRead blocked %d/%d (%.1f%%)",
+                         n, t, (double)n / t * 100.0);
+            }
+            return {};
+        }
+
         auto stmt = _lock->prepare(
             "SELECT file_path,mime_type FROM file_refs WHERE key=?1");
         if (stmt.isPrepared() && stmt.bind(1, key) && stmt.stepRow()) {
@@ -190,7 +204,35 @@ public:
                 return data;
             }
         }
-        return get(key, out_mime);
+
+        SlowGuard _w("cache::get", 30, key);
+        TimedReadGuard _t(_lock->raw(), 50);
+        std::vector<uint8_t> result;
+        auto stmt2 = _lock->prepare(
+            "SELECT data,mime_type FROM cache WHERE key=?1");
+        if (!stmt2.isPrepared()) { return result; }
+        if (!stmt2.bind(1, key)) { return result; }
+        if (!stmt2.stepRow()) {
+            if (_t.timedOut()) { qWarning("cache::get timed out for '%s'", key); }
+            return result;
+        }
+
+        int bytes = stmt2.columnBytes(0);
+        const void* blob = stmt2.columnBlob(0);
+        if (blob && bytes > 0) {
+            const uint8_t* p = (const uint8_t*)blob;
+            result.assign(p, p + bytes);
+        }
+        if (out_mime) { *out_mime = stmt2.columnText(1); }
+
+        auto upd2 = _lock->prepare(
+            "UPDATE cache SET access_time=?1 WHERE key=?2");
+        if (upd2.isPrepared()) {
+            upd2.bind(1, (int64_t)std::time(nullptr));
+            upd2.bind(2, key);
+            upd2.step();
+        }
+        return result;
     }
 
     bool evict(int64_t target_size) override {
