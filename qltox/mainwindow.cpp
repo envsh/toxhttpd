@@ -2638,6 +2638,18 @@ void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {
 void MainWindow::onFileSendRequested(const QString& filePath) {
     if (currentChatId == -1 || currentChatType.isEmpty()) { return; }
 
+    std::string fileType = std::string(qToUtf8(currentChatType).data());
+    std::string fileIdOverride;
+    if (fileType == kGomuksRoomType || fileType == kUnktoxConferenceType
+        || fileType == kUnktoxFriendType || fileType == kUnktoxGroupType) {
+        for (const auto& cd : m_accumulatedContactData) {
+            if (cd.id == currentChatId && cd.type == fileType) {
+                fileIdOverride = cd.chatId;
+                break;
+            }
+        }
+    }
+
     QFileInfo fi(filePath);
     if (!fi.exists() || !fi.isFile()) { return; }
 
@@ -2686,8 +2698,8 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
     el.sendState = ChatElement::SendSending;
     chatWidget->appendMessage(el);
 
-    ToxAPI::sendMessage(currentChatId, std::string(qToUtf8(currentChatType)),
-                         "", std::string(),
+    ToxAPI::sendMessage(currentChatId, fileType,
+                         std::string(), fileIdOverride,
                          std::string(data.data(), data.size()),
                          std::string(qToUtf8(fn)));
 }
