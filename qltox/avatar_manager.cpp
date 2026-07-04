@@ -102,7 +102,7 @@ void AvatarManager::store(const QString& mxcUrl, const QPixmap& source, int size
         std::string key = mediaCacheKey("avatar", mxcUrl);
         const auto* raw = reinterpret_cast<const uint8_t*>(pngBytes.data());
         std::vector<uint8_t> data(raw, raw + pngBytes.size());
-        Storage::instance().cacheDbAsync()->put(
+        Storage::instance().cacheDbAsync()->storeMedia(
             std::move(key), std::move(data), "image/png", 1, nullptr);
     }
 }

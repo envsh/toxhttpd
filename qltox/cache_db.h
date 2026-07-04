@@ -11,8 +11,6 @@ public:
     virtual ~CacheDbSyncInterface() = default;
 
     // cache 表（inline BLOB ≤1MB）
-    virtual bool put(const char* key, const void* data, size_t size,
-                     const char* mime, int tag) = 0;
     virtual std::vector<uint8_t> get(const char* key,
                                      std::string* out_mime = nullptr) = 0;
     virtual bool exists(const char* key) = 0;
@@ -51,9 +49,6 @@ class WriteQueue;
 class CacheDbAsyncInterface {
 public:
     virtual ~CacheDbAsyncInterface() = default;
-    virtual void put(std::string key, std::vector<uint8_t> data,
-                     std::string mime, int tag,
-                     std::function<void(bool)> done) = 0;
     virtual void get(std::string key,
                      std::function<void(std::vector<uint8_t>, std::string)> done) = 0;
     virtual void exists(std::string key,

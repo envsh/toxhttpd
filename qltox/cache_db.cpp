@@ -8,13 +8,15 @@ namespace {
 class CacheDbSync final : public CacheDbSyncInterface {
     std::shared_ptr<SqliteConnectionSafe> m_cacheConn;
     std::string m_baseDir;
+
 public:
     CacheDbSync(std::shared_ptr<SqliteConnectionSafe> cacheConn,
                 const char* baseDir)
         : m_cacheConn(std::move(cacheConn)), m_baseDir(baseDir) {}
 
-    bool put(const char* key, const void* data, size_t size,
-             const char* mime, int tag) override {
+private:
+    bool putInternal(const char* key, const void* data, size_t size,
+             const char* mime, int tag) {
         SlowGuard _w("cache::put", 60);
         auto _lock = m_cacheConn->get();
         auto stmt = _lock->prepare(
@@ -37,6 +39,7 @@ public:
         return true;
     }
 
+public:
     std::vector<uint8_t> get(const char* key, std::string* out_mime) override {
         SlowGuard _w("cache::get", 30, key);
         auto _lock = m_cacheConn->get();
@@ -163,7 +166,7 @@ public:
                     const char* mime, int tag) override {
         const int64_t kMaxInline = 1 * 1024 * 1024;
         if (size <= (size_t)kMaxInline) {
-            return put(key, data, size, mime, tag);
+            return putInternal(key, data, size, mime, tag);
         }
         std::string relPath = makeCacheFsPath(key);
         std::string fullPath = m_baseDir + "/" + relPath;
@@ -304,18 +307,6 @@ public:
         : m_sync(std::move(sync)), m_queue(std::move(queue)) {}
 
     void post(std::function<void()> task) { m_queue->post(std::move(task)); }
-
-    void put(std::string key, std::vector<uint8_t> data,
-             std::string mime, int tag,
-             std::function<void(bool)> done) override {
-        auto sync = m_sync;
-        post([sync, key, data,
-              mime, tag, done]() {
-            bool ok = sync->get().put(key.c_str(), data.data(), data.size(),
-                                      mime.c_str(), tag);
-            if (done) { done(ok); }
-        });
-    }
 
     void get(std::string key,
              std::function<void(std::vector<uint8_t>, std::string)> done) override {
