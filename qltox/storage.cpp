@@ -306,7 +306,7 @@ bool Storage::openDb(const char *path) {
 
     sqlite3* db = nullptr;
     int rc = sqlite3_open_v2(path, &db,
-        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
+        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nullptr);
     if (rc != SQLITE_OK) {
         qWarning("DB open failed [%s]: %s", path, sqlite3_errmsg(db));
         if (db) { sqlite3_close(db); }

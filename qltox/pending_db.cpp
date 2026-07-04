@@ -8,10 +8,9 @@ public:
     explicit PendingDbSync(std::shared_ptr<SqliteConnectionSafe> conn)
         : m_conn(std::move(conn)) {}
 
-    SqliteDb& db() { return *m_conn->get(); }
-
     int64_t insert_pending(const PendingRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT INTO pending_messages "
             "(chanid,peer_number,data,etype,message_text,"
             " media_url,file_name,file_size,retry_count,"
@@ -34,10 +33,11 @@ public:
             qWarning("PendingDb::insert_pending failed");
             return 0;
         }
-        return sqlite3_last_insert_rowid(db().raw());
+        return sqlite3_last_insert_rowid(_->raw());
     }
 
     bool update_pending(int64_t id, const PendingUpdate& upd) override {
+        auto _ = m_conn->get();
         std::string sql = "UPDATE pending_messages SET ";
         int n = 0;
         auto addField = [&](const char* name) {
@@ -50,7 +50,7 @@ public:
         if (upd.hasStatus)     { addField("status"); }
         if (n == 0) { return true; }
         sql += " WHERE id=?1";
-        auto stmt = db().prepare(sql.c_str());
+        auto stmt = _->prepare(sql.c_str());
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, id)) { return false; }
         int idx = 2;
@@ -61,14 +61,16 @@ public:
     }
 
     bool delete_pending(int64_t id) override {
-        auto stmt = db().prepare("DELETE FROM pending_messages WHERE id=?1");
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("DELETE FROM pending_messages WHERE id=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, id)) { return false; }
         return stmt.step();
     }
 
     std::unique_ptr<PendingRow> get_pending(int64_t id) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "SELECT id,chanid,peer_number,data,etype,message_text,"
             " media_url,file_name,file_size,retry_count,"
             " max_retries,last_error,status "
@@ -95,8 +97,9 @@ public:
     }
 
     std::vector<PendingRow> load_pending(int status) override {
+        auto _ = m_conn->get();
         std::vector<PendingRow> rows;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT id,chanid,peer_number,data,etype,message_text,"
             " media_url,file_name,file_size,retry_count,"
             " max_retries,last_error,status "
@@ -125,8 +128,8 @@ public:
         return rows;
     }
 
-    bool begin_write_transaction() override { return db().beginTransaction(); }
-    bool commit_transaction() override { return db().commitTransaction(); }
+    bool begin_write_transaction() override { auto _ = m_conn->get(); return _->beginTransaction(); }
+    bool commit_transaction() override { auto _ = m_conn->get(); return _->commitTransaction(); }
 };
 
 class PendingDbSyncSafe final : public PendingDbSyncSafeInterface {

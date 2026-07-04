@@ -8,10 +8,9 @@ public:
     explicit ChannelDbSync(std::shared_ptr<SqliteConnectionSafe> conn)
         : m_conn(std::move(conn)) {}
 
-    SqliteDb& db() { return *m_conn->get(); }
-
     bool add_channel(const ChannelRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT OR REPLACE INTO channels "
             "(chanid,proto_type,last_message_rowid,last_read_rowid,"
             " unread_count,pinned_order,draft_text,muted) "
@@ -33,7 +32,8 @@ public:
     }
 
     std::unique_ptr<ChannelRow> get_channel(const char* chanid) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "SELECT chanid,proto_type,last_message_rowid,last_read_rowid,"
             "       unread_count,pinned_order,draft_text,muted,"
             "       name,status,is_connected,last_message_text,last_message_time,last_active,auto_translate "
@@ -61,6 +61,7 @@ public:
     }
 
     bool update_channel(const char* chanid, const ChannelUpdate& upd) override {
+        auto _ = m_conn->get();
         std::string sql = "UPDATE channels SET ";
         int n = 0;
         auto addField = [&](const char* name) {
@@ -80,7 +81,7 @@ public:
         if (upd.hasLastActive)       addField("last_active");
         if (n == 0) { return true; }
         sql += " WHERE chanid=?1";
-        auto stmt = db().prepare(sql.c_str());
+        auto stmt = _->prepare(sql.c_str());
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, chanid)) { return false; }
         int idx = 2;
@@ -98,15 +99,17 @@ public:
     }
 
     bool delete_channel(const char* chanid) override {
-        auto stmt = db().prepare("DELETE FROM channels WHERE chanid=?1");
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("DELETE FROM channels WHERE chanid=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, chanid)) { return false; }
         return stmt.step();
     }
 
     std::vector<ChannelRow> load_pinned() override {
+        auto _ = m_conn->get();
         std::vector<ChannelRow> rows;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT chanid,proto_type,last_message_rowid,last_read_rowid,"
             "       unread_count,pinned_order,draft_text,muted,"
             "       name,status,is_connected,last_message_text,last_message_time,last_active,auto_translate "
@@ -135,7 +138,8 @@ public:
     }
 
     bool add_peer(const PeerRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT OR REPLACE INTO peers "
             "(chanid,peer_number,public_key,name,nickname,"
             " avatar_url,status_text,status_str,user_status,"
@@ -161,7 +165,8 @@ public:
     }
 
     bool update_peer(const PeerRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT INTO peers "
             "(chanid,peer_number,public_key,name,nickname,"
             " avatar_url,status_text,status_str,user_status,"
@@ -201,7 +206,8 @@ public:
     }
 
     std::unique_ptr<PeerRow> get_chan_peer(const char* chanid, int peer_number) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "SELECT chanid,peer_number,public_key,name,nickname,"
             " avatar_url,status_text,status_str,user_status,"
             " peer_ip,role,role_str,is_self,last_seen,status "
@@ -231,8 +237,9 @@ public:
     }
 
     std::vector<PeerRow> load_chan_peers(const char* chanid) override {
+        auto _ = m_conn->get();
         std::vector<PeerRow> rows;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT chanid,peer_number,public_key,name,nickname,"
             " avatar_url,status_text,status_str,user_status,"
             " peer_ip,role,role_str,is_self,last_seen,status "
@@ -264,14 +271,16 @@ public:
     }
 
     bool remove_chan_peers(const char* chanid) override {
-        auto stmt = db().prepare("DELETE FROM peers WHERE chanid=?1");
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("DELETE FROM peers WHERE chanid=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, chanid)) { return false; }
         return stmt.step();
     }
 
     bool add_contact_channel(const ChannelRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT OR REPLACE INTO channels "
             "(chanid,proto_type,name,status,is_connected,"
             " last_message_text,last_message_time,last_active,"
@@ -294,7 +303,8 @@ public:
     }
 
     bool update_contact_channel(const ChannelRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT INTO channels "
             "(chanid,proto_type,name,status,is_connected,icon_url,pubkey,"
             " last_message_text,last_message_time,last_active,"
@@ -328,7 +338,8 @@ public:
     }
 
     bool increment_unread(const char* chanid, int delta) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "UPDATE channels SET unread_count = unread_count + ?1 WHERE chanid=?2");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, delta)) { return false; }
@@ -336,8 +347,8 @@ public:
         return stmt.step();
     }
 
-    bool begin_write_transaction() override { return db().beginTransaction(); }
-    bool commit_transaction() override { return db().commitTransaction(); }
+    bool begin_write_transaction() override { auto _ = m_conn->get(); return _->beginTransaction(); }
+    bool commit_transaction() override { auto _ = m_conn->get(); return _->commitTransaction(); }
 };
 
 class ChannelDbSyncSafe final : public ChannelDbSyncSafeInterface {

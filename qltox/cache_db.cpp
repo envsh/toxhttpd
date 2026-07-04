@@ -12,12 +12,11 @@ public:
                 const char* baseDir)
         : m_cacheConn(std::move(cacheConn)), m_baseDir(baseDir) {}
 
-    SqliteDb& cacheDb() { return *m_cacheConn->get(); }
-
     bool put(const char* key, const void* data, size_t size,
              const char* mime, int tag) override {
         SlowGuard _w("cache::put", 60);
-        auto stmt = cacheDb().prepare(
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare(
             "INSERT INTO cache "
             "(key,data,mime_type,tag,access_time,size) "
             "VALUES (?1,?2,?3,?4,?5,?6) "
@@ -31,7 +30,7 @@ public:
         if (!stmt.bind(6, (int64_t)size)) { return false; }
         if (!stmt.step()) {
             qWarning("CacheDb::put failed for %s: %s",
-                     key, sqliteError(cacheDb()));
+                     key, sqliteError(*_lock));
             return false;
         }
         return true;
@@ -39,9 +38,10 @@ public:
 
     std::vector<uint8_t> get(const char* key, std::string* out_mime) override {
         SlowGuard _w("cache::get", 30);
-        TimedReadGuard _t(cacheDb().raw(), 50);
+        auto _lock = m_cacheConn->get();
+        TimedReadGuard _t(_lock->raw(), 50);
         std::vector<uint8_t> result;
-        auto stmt = cacheDb().prepare(
+        auto stmt = _lock->prepare(
             "SELECT data,mime_type FROM cache WHERE key=?1");
         if (!stmt.isPrepared()) { return result; }
         if (!stmt.bind(1, key)) { return result; }
@@ -58,7 +58,7 @@ public:
         }
         if (out_mime) { *out_mime = stmt.columnText(1); }
 
-        auto upd = cacheDb().prepare(
+        auto upd = _lock->prepare(
             "UPDATE cache SET access_time=?1 WHERE key=?2");
         if (upd.isPrepared()) {
             upd.bind(1, (int64_t)std::time(nullptr));
@@ -69,37 +69,41 @@ public:
     }
 
     bool exists(const char* key) override {
-        auto stmt = cacheDb().prepare("SELECT 1 FROM cache WHERE key=?1");
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare("SELECT 1 FROM cache WHERE key=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, key)) { return false; }
         return stmt.stepRow();
     }
 
     bool remove(const char* key) override {
-        auto stmt = cacheDb().prepare("DELETE FROM cache WHERE key=?1");
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare("DELETE FROM cache WHERE key=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, key)) { return false; }
         return stmt.step();
     }
 
     bool clear_by_tag(int tag) override {
+        auto _lock = m_cacheConn->get();
         if (tag == 0) {
-            return cacheDb().exec("DELETE FROM cache") &&
-                   cacheDb().exec("DELETE FROM file_refs");
+            return _lock->exec("DELETE FROM cache") &&
+                   _lock->exec("DELETE FROM file_refs");
         }
-        cacheDb().exec(std::string("DELETE FROM cache WHERE tag=" +
-                       std::to_string(tag)).c_str());
-        cacheDb().exec(std::string("DELETE FROM file_refs WHERE tag=" +
-                       std::to_string(tag)).c_str());
+        _lock->exec(std::string("DELETE FROM cache WHERE tag=" +
+                      std::to_string(tag)).c_str());
+        _lock->exec(std::string("DELETE FROM file_refs WHERE tag=" +
+                      std::to_string(tag)).c_str());
         return true;
     }
 
     int64_t total_cache_size() override {
-        auto stmt = cacheDb().prepare("SELECT COALESCE(SUM(size),0) FROM cache");
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare("SELECT COALESCE(SUM(size),0) FROM cache");
         if (!stmt.isPrepared()) { return 0; }
         if (!stmt.stepRow()) { return 0; }
         int64_t s1 = stmt.columnInt64(0);
-        auto stmt2 = cacheDb().prepare("SELECT COALESCE(SUM(size),0) FROM file_refs");
+        auto stmt2 = _lock->prepare("SELECT COALESCE(SUM(size),0) FROM file_refs");
         if (!stmt2.isPrepared()) { return s1; }
         if (!stmt2.stepRow()) { return s1; }
         return s1 + stmt2.columnInt64(0);
@@ -108,7 +112,8 @@ public:
     bool put_ref(const char* key, const char* file_path,
                  const char* mime, int tag, int64_t size) override {
         SlowGuard _w("cache::put_ref", 60);
-        auto stmt = cacheDb().prepare(
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare(
             "INSERT INTO file_refs "
             "(key,file_path,mime_type,tag,access_time,size) "
             "VALUES (?1,?2,?3,?4,?5,?6) "
@@ -125,8 +130,9 @@ public:
 
     std::string get_ref_path(const char* key) override {
         SlowGuard _w("cache::get_ref", 30);
-        TimedReadGuard _t(cacheDb().raw(), 50);
-        auto stmt = cacheDb().prepare(
+        auto _lock = m_cacheConn->get();
+        TimedReadGuard _t(_lock->raw(), 50);
+        auto stmt = _lock->prepare(
             "SELECT file_path FROM file_refs WHERE key=?1");
         if (!stmt.isPrepared()) { return {}; }
         if (!stmt.bind(1, key)) { return {}; }
@@ -134,7 +140,7 @@ public:
             if (_t.timedOut()) { qWarning("cache::get_ref timed out for '%s'", key); }
             return {};
         }
-        auto upd = cacheDb().prepare(
+        auto upd = _lock->prepare(
             "UPDATE file_refs SET access_time=?1 WHERE key=?2");
         if (upd.isPrepared()) {
             upd.bind(1, (int64_t)std::time(nullptr));
@@ -145,7 +151,8 @@ public:
     }
 
     bool remove_ref(const char* key) override {
-        auto stmt = cacheDb().prepare("DELETE FROM file_refs WHERE key=?1");
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare("DELETE FROM file_refs WHERE key=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, key)) { return false; }
         return stmt.step();
@@ -164,7 +171,8 @@ public:
     }
 
     std::vector<uint8_t> loadMedia(const char* key, std::string* out_mime) override {
-        auto stmt = cacheDb().prepare(
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare(
             "SELECT file_path,mime_type FROM file_refs WHERE key=?1");
         if (stmt.isPrepared() && stmt.bind(1, key) && stmt.stepRow()) {
             std::string relPath = stmt.columnText(0);
@@ -172,7 +180,7 @@ public:
             std::string fullPath = m_baseDir + "/" + relPath;
             auto data = readCacheFile(fullPath);
             if (!data.empty()) {
-                auto upd = cacheDb().prepare(
+                auto upd = _lock->prepare(
                     "UPDATE file_refs SET access_time=?1 WHERE key=?2");
                 if (upd.isPrepared()) {
                     upd.bind(1, (int64_t)std::time(nullptr));
@@ -187,6 +195,7 @@ public:
 
     bool evict(int64_t target_size) override {
         SlowGuard _w("cache::evict", 500);
+        auto _lock = m_cacheConn->get();
         int64_t now = (int64_t)std::time(nullptr);
         int64_t total = total_cache_size();
 
@@ -194,14 +203,14 @@ public:
             std::string sql =
                 "DELETE FROM cache WHERE access_time < " +
                 std::to_string(now - 30 * 86400) + " AND size > 2097152";
-            cacheDb().exec(sql.c_str());
-            auto stmt = cacheDb().prepare(
+            _lock->exec(sql.c_str());
+            auto stmt = _lock->prepare(
                 "DELETE FROM cache WHERE rowid IN ("
                 "  SELECT rowid FROM cache"
                 "  ORDER BY access_time ASC LIMIT 100)");
             if (stmt.isPrepared()) { stmt.step(); }
 
-            auto refStmt = cacheDb().prepare(
+            auto refStmt = _lock->prepare(
                 "SELECT key,file_path FROM file_refs"
                 "  WHERE access_time < ?1"
                 "  ORDER BY access_time ASC LIMIT 100");
@@ -220,14 +229,17 @@ public:
     }
 
     bool vacuum() override {
-        return cacheDb().exec("VACUUM");
+        auto _lock = m_cacheConn->get();
+        return _lock->exec("VACUUM");
     }
 
     bool begin_write_transaction() override {
-        return cacheDb().beginTransaction();
+        auto _lock = m_cacheConn->get();
+        return _lock->beginTransaction();
     }
     bool commit_transaction() override {
-        return cacheDb().commitTransaction();
+        auto _lock = m_cacheConn->get();
+        return _lock->commitTransaction();
     }
 };
 

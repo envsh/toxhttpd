@@ -9,11 +9,10 @@ public:
     explicit MessageDbSync(std::shared_ptr<SqliteConnectionSafe> conn)
         : m_conn(std::move(conn)) {}
 
-    SqliteDb& db() { return *m_conn->get(); }
-
     int64_t insert_message(const MessageRow& row) override {
         SlowGuard _w("msg::insert", 200);
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT INTO messages "
             "(event_id,chanid,data,etype,"
             " sender_name,sender_nick,peer_number,sender_pubkey,"
@@ -62,11 +61,12 @@ public:
             qWarning("MessageDb::insert_message failed");
             return 0;
         }
-        return sqlite3_last_insert_rowid(db().raw());
+        return sqlite3_last_insert_rowid(_->raw());
     }
 
     bool update_message(int64_t rowid, const MessageUpdate& upd) override {
         SlowGuard _w("msg::update", 200);
+        auto _ = m_conn->get();
         std::string sql = "UPDATE messages SET ";
         int n = 0;
         auto addField = [&](const char* name) {
@@ -95,7 +95,7 @@ public:
         if (upd.hasMention)      addField("mention");
         if (n == 0) { return true; }
         sql += " WHERE rowid=?1";
-        auto stmt = db().prepare(sql.c_str());
+        auto stmt = _->prepare(sql.c_str());
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, rowid)) { return false; }
         int idx = 2;
@@ -123,7 +123,8 @@ public:
 
     bool delete_message(int64_t rowid) override {
         SlowGuard _w("msg::delete", 200);
-        auto stmt = db().prepare("DELETE FROM messages WHERE rowid=?1");
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("DELETE FROM messages WHERE rowid=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, rowid)) { return false; }
         return stmt.step();
@@ -131,7 +132,8 @@ public:
 
     std::unique_ptr<MessageRow> get_message(int64_t rowid) override {
         SlowGuard _w("msg::get", 200);
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "SELECT rowid,event_id,chanid,data,etype,"
             " sender_name,sender_nick,peer_number,sender_pubkey,"
             " signature,avatar_url,time_text,ip_address,"
@@ -182,8 +184,9 @@ public:
 
     std::vector<MessageRow> load_messages(const char* chanid, int limit) override {
         SlowGuard _w("msg::load", 200);
+        auto _ = m_conn->get();
         std::vector<MessageRow> rows;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT rowid,event_id,chanid,data,etype,"
             " sender_name,sender_nick,peer_number,sender_pubkey,"
             " signature,avatar_url,time_text,ip_address,"
@@ -207,8 +210,9 @@ public:
     std::vector<MessageRow> load_messages_before(
         const char* chanid, int64_t before_rowid, int limit) override {
         SlowGuard _w("msg::load_before", 200);
+        auto _ = m_conn->get();
         std::vector<MessageRow> rows;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT rowid,event_id,chanid,data,etype,"
             " sender_name,sender_nick,peer_number,sender_pubkey,"
             " signature,avatar_url,time_text,ip_address,"
@@ -231,8 +235,9 @@ public:
     }
 
     std::vector<int64_t> search_messages(const char* query, int limit) override {
+        auto _ = m_conn->get();
         std::vector<int64_t> ids;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT rowid FROM messages_fts "
             "WHERE messages_fts MATCH ?1 "
             "ORDER BY rank LIMIT ?2");
@@ -247,7 +252,8 @@ public:
 
     bool add_reaction(int64_t msg_rowid, const char* emoji,
                       const char* sender) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT OR IGNORE INTO reactions "
             "(message_rowid,emoji,sender_name) VALUES (?1,?2,?3)");
         if (!stmt.isPrepared()) { return false; }
@@ -259,7 +265,8 @@ public:
 
     bool remove_reaction(int64_t msg_rowid, const char* emoji,
                          const char* sender) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "DELETE FROM reactions "
             "WHERE message_rowid=?1 AND emoji=?2 AND sender_name=?3");
         if (!stmt.isPrepared()) { return false; }
@@ -270,8 +277,9 @@ public:
     }
 
     std::vector<ReactionRow> get_reactions(int64_t msg_rowid) override {
+        auto _ = m_conn->get();
         std::vector<ReactionRow> rows;
-        auto stmt = db().prepare(
+        auto stmt = _->prepare(
             "SELECT message_rowid,emoji,sender_name FROM reactions "
             "WHERE message_rowid=?1");
         if (!stmt.isPrepared()) { return rows; }
@@ -287,7 +295,8 @@ public:
     }
 
     bool set_translation(const TranslationRow& row) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT OR REPLACE INTO translations "
             "(message_rowid,target_lang,translated_text,"
             " translated_entities,source_lang,provider) "
@@ -304,7 +313,8 @@ public:
 
     std::unique_ptr<TranslationRow> get_translation(
         int64_t msg_rowid, const char* lang) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "SELECT message_rowid,target_lang,translated_text,"
             " translated_entities,source_lang,provider "
             "FROM translations WHERE message_rowid=?1 AND target_lang=?2");
@@ -323,7 +333,8 @@ public:
     }
 
     bool clear_translations_by_lang(const char* lang) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "DELETE FROM translations WHERE target_lang=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, lang)) { return false; }
@@ -332,7 +343,8 @@ public:
 
     bool add_bookmark(int64_t msg_rowid, const char* chanid,
                       const char* note) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "INSERT OR IGNORE INTO bookmarks "
             "(message_rowid,chanid,note) VALUES (?1,?2,?3)");
         if (!stmt.isPrepared()) { return false; }
@@ -343,7 +355,8 @@ public:
     }
 
     bool remove_bookmark(int64_t msg_rowid) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "DELETE FROM bookmarks WHERE message_rowid=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, msg_rowid)) { return false; }
@@ -351,7 +364,8 @@ public:
     }
 
     std::unique_ptr<BookmarkRow> get_bookmark(int64_t msg_rowid) override {
-        auto stmt = db().prepare(
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
             "SELECT id,message_rowid,chanid,note,tag "
             "FROM bookmarks WHERE message_rowid=?1");
         if (!stmt.isPrepared()) { return nullptr; }
@@ -367,22 +381,23 @@ public:
     }
 
     bool clear_channel(const char* chanid) override {
-        auto s1 = db().prepare(
+        auto _ = m_conn->get();
+        auto s1 = _->prepare(
             "DELETE FROM reactions WHERE message_rowid IN "
             "(SELECT rowid FROM messages WHERE chanid=?1)");
         if (s1.isPrepared()) { s1.bind(1, chanid); s1.step(); }
 
-        auto s2 = db().prepare("DELETE FROM bookmarks WHERE chanid=?1");
+        auto s2 = _->prepare("DELETE FROM bookmarks WHERE chanid=?1");
         if (s2.isPrepared()) { s2.bind(1, chanid); s2.step(); }
 
-        auto s3 = db().prepare("DELETE FROM messages WHERE chanid=?1");
+        auto s3 = _->prepare("DELETE FROM messages WHERE chanid=?1");
         if (s3.isPrepared()) { s3.bind(1, chanid); s3.step(); }
 
         return true;
     }
 
-    bool begin_write_transaction() override { return db().beginTransaction(); }
-    bool commit_transaction() override { return db().commitTransaction(); }
+    bool begin_write_transaction() override { auto _ = m_conn->get(); return _->beginTransaction(); }
+    bool commit_transaction() override { auto _ = m_conn->get(); return _->commitTransaction(); }
 
 private:
     static MessageRow readRow(SqliteStatement& stmt) {
