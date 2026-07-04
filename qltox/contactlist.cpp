@@ -419,7 +419,7 @@ ContactListView::ContactListView(ContactListWidget* widget)
       , nullptr, WNoAutoErase
 #endif
       )
-    , m_widget(widget), m_scrollBar(nullptr)
+    , m_widget(widget), m_scrollBar(nullptr), m_scrollDelta(0)
 {
     setMouseTracking(false);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -530,10 +530,22 @@ void ContactListView::mousePressEvent(QMouseEvent* e) {
 }
 
 void ContactListView::wheelEvent(QWheelEvent* e) {
+#ifndef QT3_BUILD
+    // Qt4 macOS sends separate events for horizontal/vertical; ignore horizontal
+    if (e->orientation() != Qt::Vertical) {
+        e->ignore();
+        return;
+    }
+#endif
+    m_scrollDelta += e->delta();
+    int steps = m_scrollDelta / 120;
+    if (steps == 0) { return; }
+    m_scrollDelta -= steps * 120;
+
     int h = m_widget->itemHeight();
     if (h <= 0) return;
     int step = h * 3;
-    int newY = m_scrollY + (e->delta() > 0 ? -step : step);
+    int newY = m_scrollY + (steps > 0 ? -step : step);
     int totalH = totalHeight();
     int viewH = height();
     int maxScroll = totalH > viewH ? totalH - viewH : 0;
@@ -543,6 +555,7 @@ void ContactListView::wheelEvent(QWheelEvent* e) {
     m_scrollBar->setValue(m_scrollY);
     m_scrollBar->blockSignals(false);
     update();
+    e->accept();
 }
 
 void ContactListView::resizeEvent(QResizeEvent* e) {

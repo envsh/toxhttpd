@@ -2003,7 +2003,7 @@ ChatView::ChatView(QWidget* parent)
       )
     , m_clickCount(0), m_clickMsgIndex(-1)
     , m_selMsgIndex(-1), m_selStart(0), m_selEnd(0), m_selecting(false)
-    , m_fm(font()), m_emojiW(0), m_bmpW(NULL)
+    , m_fm(font()), m_emojiW(0), m_bmpW(NULL), m_scrollDelta(0)
 {
     m_totalHeight = 0;
     m_scrollPos = 0;
@@ -2543,13 +2543,33 @@ void ChatView::copyFullMessage(int msgIndex) {
 }
 
 void ChatView::wheelEvent(QWheelEvent* event) {
+#ifndef QT3_BUILD
+    // Qt4 macOS sends separate events for horizontal/vertical; ignore horizontal
+    if (event->orientation() != Qt::Vertical) {
+        event->ignore();
+        return;
+    }
+#endif
+    // Accumulate delta (macOS smooth scrolling: small values, many events)
+    m_scrollDelta += event->delta();
+    int steps = m_scrollDelta / 120;
+    if (steps == 0) { return; }
+    m_scrollDelta -= steps * 120;
+
 #ifdef QT3_BUILD
     int step = m_vScrollBar->lineStep();
+    int maxVal = m_vScrollBar->maxValue();
 #else
     int step = m_vScrollBar->singleStep();
+    int maxVal = m_vScrollBar->maximum();
 #endif
-    int newVal = m_vScrollBar->value() + (event->delta() > 0 ? -step * 5 : step * 5);
-    m_vScrollBar->setValue(newVal);
+    int delta = m_scrollPos + (steps > 0 ? -step * 5 : step * 5);
+    delta = std::max(0, std::min(delta, maxVal));
+    m_scrollPos = delta;
+    m_vScrollBar->blockSignals(true);
+    m_vScrollBar->setValue(delta);
+    m_vScrollBar->blockSignals(false);
+    update();
     event->accept();
 }
 

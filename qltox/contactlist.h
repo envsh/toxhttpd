@@ -97,6 +97,7 @@ private:
     int m_selId = -1;
     QString m_selType;
     int m_scrollY = 0;
+    int m_scrollDelta;
     std::map<uint32_t, QPixmap> m_circularAvatarCache;
     std::vector<RowPixmapCache> m_rowCache;
     int m_avatarSize = 0;

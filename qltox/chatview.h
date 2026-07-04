@@ -220,6 +220,7 @@ private:
     int m_emojiW;
     uint8_t m_ascW[128];
     uint8_t* m_bmpW;
+    int m_scrollDelta;
 
 };
 
