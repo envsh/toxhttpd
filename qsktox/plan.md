@@ -36,4 +36,16 @@ API 23 - 34 <=> Android 6 - 14
 
 同qt6.7.3联用，ndk r18 编译通过但运行报错，dlopen failed: cannot locate symbol "_ZTVNSt6__ndk13pmr25monotonic_buffer_resourceE" referenced by "libQt6Core_arm64-v8a.so"
 	
-	
+### qskinny 编译
+
+/mnt/sda5/aur/qskinny-master/build-arm64.sh
+
+8bc872f9b67268f17c9ab0e5b21a581142a8c283
+
+
+### 调试
+
+term1: ssh -p 8022 me@192.168.1.94 "su -c logcat 2>&1" > droid.log
+
+term2: echo > droid.log && tail -f droid.log |grep -a -i tox
+

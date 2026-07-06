@@ -27,8 +27,13 @@ cmake --build "$BUILD_DIR" -j$(nproc) --target qsktox
 
 # 3. prepare android-build dir (copy .so + Qt deps, no Gradle)
 APK_DIR="$BUILD_DIR/android-build"
-mkdir -p "$APK_DIR/libs/arm64-v8a"
-cp "$BUILD_DIR/libqsktox_arm64-v8a.so" "$APK_DIR/libs/arm64-v8a/"
+LIB_DIR="$APK_DIR/libs/arm64-v8a"
+mkdir -p "$LIB_DIR"
+cp "$BUILD_DIR/libqsktox_arm64-v8a.so" "$LIB_DIR/"
+
+# 平铺复制 qskinny 皮肤插件到 JNI lib 根目录（Android 无子目录）
+cp "$QSK_ANDROID/lib/qskinny/plugins/skins/"*.so "$LIB_DIR/"
+cp "$QSK_ANDROID/lib/qskinny/plugins/platforminputcontexts/"*.so "$LIB_DIR/"
 
 "$QT_HOST/bin/androiddeployqt" \
     --input "$BUILD_DIR/android-qsktox-deployment-settings.json" \
