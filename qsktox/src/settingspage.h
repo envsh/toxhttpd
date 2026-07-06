@@ -36,6 +36,7 @@ protected:
 
 private:
     bool m_signalsConnected = false;
+    int m_currentAnimatorIdx = 3;   // 当前 animator 类型索引，避免重复分配
     QskComboBox* m_transitionCombo = nullptr;
     QskComboBox* m_skinCombo = nullptr;
     QskSwitchButton* m_darkSwitch = nullptr;

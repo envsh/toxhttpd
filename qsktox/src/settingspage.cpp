@@ -120,6 +120,10 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     // ── Connect signal handlers (fire on user interaction, not on restore) ──
     connect(m_transitionCombo, &QskComboBox::currentIndexChanged,
         this, [this](int index) {
+            // 跳过同一类型的重复分配（例如从 Perspective 切到 Perspective）
+            if (index == m_currentAnimatorIdx) return;
+            m_currentAnimatorIdx = index;
+
             QSettings().setValue("transition", index);
             auto* sb = pageManager() ? pageManager()->stackBox() : nullptr;
             if (!sb) return;
