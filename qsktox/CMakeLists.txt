@@ -27,6 +27,10 @@ qt_add_executable(qsktox
     src/loginpage.cpp
     src/mainpage.h
     src/mainpage.cpp
+    src/settingspage.h
+    src/settingspage.cpp
+    src/aboutpage.h
+    src/aboutpage.cpp
 )
 
 target_link_libraries(qsktox PRIVATE Qsk::QSkinny)

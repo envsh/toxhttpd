@@ -12,6 +12,9 @@
 #include <QskStackBox.h>
 #include "loginpage.h"
 #include "mainpage.h"
+#include "settingspage.h"
+#include "aboutpage.h"
+#include <QskStackBoxAnimator.h>
 
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
@@ -98,8 +101,15 @@ int main(int argc, char* argv[]) {
     auto* loginPage = new LoginPage();
     auto* mainPage = new MainPage();
 
-    stackBox->addItem(loginPage);
-    stackBox->addItem(mainPage);
+    auto* settingsPage = new SettingsPage();
+    auto* aboutPage = new AboutPage();
+
+    stackBox->addItem(loginPage);    // index 0
+    stackBox->addItem(mainPage);     // index 1
+    stackBox->addItem(settingsPage); // index 2
+    stackBox->addItem(aboutPage);    // index 3
+
+    stackBox->setAnimator(new QskStackBoxAnimator3(stackBox));
     stackBox->setCurrentIndex(0);
 
     QObject::connect(loginPage, &LoginPage::accepted,
@@ -107,6 +117,17 @@ int main(int argc, char* argv[]) {
             qDebug() << "[qsktox] connecting to:" << url;
             stackBox->setCurrentIndex(1);
         });
+
+    QObject::connect(mainPage, &MainPage::settingsRequested,
+        [stackBox]() { stackBox->setCurrentIndex(2); });
+    QObject::connect(mainPage, &MainPage::aboutRequested,
+        [stackBox]() { stackBox->setCurrentIndex(3); });
+    QObject::connect(mainPage, &MainPage::logoutRequested,
+        [stackBox]() { stackBox->setCurrentIndex(0); });
+    QObject::connect(settingsPage, &SettingsPage::backRequested,
+        [stackBox]() { stackBox->setCurrentIndex(1); });
+    QObject::connect(aboutPage, &AboutPage::backRequested,
+        [stackBox]() { stackBox->setCurrentIndex(1); });
 
     QskWindow window;
     window.addItem(rootBox);
