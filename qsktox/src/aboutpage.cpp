@@ -6,6 +6,7 @@
 #include <QskFontRole.h>
 #include <QSysInfo>
 #include <QGuiApplication>
+#include <QQuickWindow>
 #include <QScreen>
 
 AboutPage::AboutPage(QQuickItem* parent)
@@ -58,6 +59,7 @@ void AboutPage::onCreate(const QVariantMap&, const QVariantMap&)
     addRow("Name", "qsktox");
     addRow("Version", "0.1.0");
     addRow("Qt", QT_VERSION_STR);
+    addRow("RHI", QQuickWindow::sceneGraphBackend());
 #ifdef Q_PROCESSOR_ARM_V8
     addRow("Arch", "arm64-v8a");
 #else

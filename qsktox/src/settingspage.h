@@ -4,6 +4,7 @@
 #include "page.h"
 #include <QskComboBox.h>
 #include <QskSwitchButton.h>
+#include <QPointer>
 #include <memory>
 #include <functional>
 
@@ -26,6 +27,9 @@ public:
     QskSwitchButton* darkModeSwitch() const { return m_darkSwitch; }
     QskComboBox* fontScaleCombo() const { return m_fontScaleCombo; }
 
+    static void changeFontScale(int delta);
+    ~SettingsPage();
+
     // Shared state accessible from main.cpp
     static std::shared_ptr<FontSizes> sharedFontSizes;
     static std::function<void()>     applyAndroidFonts;
@@ -41,6 +45,9 @@ private:
     QskComboBox* m_skinCombo = nullptr;
     QskSwitchButton* m_darkSwitch = nullptr;
     QskComboBox* m_fontScaleCombo = nullptr;
+    QskSwitchButton* m_debugBgSwitch = nullptr;
+
+    static QPointer<SettingsPage> s_instance;
 };
 
 #endif

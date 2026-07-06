@@ -45,8 +45,16 @@ cp "$QSK_ANDROID/lib/qskinny/plugins/platforminputcontexts/"*.so "$LIB_DIR/"
 # 复制自定义 Java 源码到 Android 构建目录
 mkdir -p "$APK_DIR/src/main/java"
 cp -R android/src/java/* "$APK_DIR/src/main/java/"
+# 复制应用图标到 Android res
+mkdir -p "$APK_DIR/res/drawable"
+cp app_icon.png "$APK_DIR/res/drawable/ic_launcher.png"
+
 # 移除 renderscript.srcDirs 配置（build-tools 34+ 不再支持，且会干扰自定义 Java 源码）
 sed -i '/renderscript\.srcDirs/d' "$APK_DIR/build.gradle"
+
+# 设置应用图标
+sed -i '/android:fullBackupOnly/i\        android:icon="@drawable/ic_launcher"' \
+    "$APK_DIR/AndroidManifest.xml"
 
 # 替换包名为 qsktox.fedlet.io
 sed -i 's/package="org\.qtproject\.example\.qsktox"/package="io.fedlet.qsktox"/' \

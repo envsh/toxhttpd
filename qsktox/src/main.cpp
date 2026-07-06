@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include <QIcon>
 #include <QSettings>
 #include <QCoreApplication>
 #include <QDir>
@@ -9,6 +10,9 @@
 #include <QEvent>
 #include <QKeyEvent>
 #include <QElapsedTimer>
+#include <QTimer>
+#include <QShortcut>
+#include <QQuickItem>
 #include <QskSkinManager.h>
 #include <QskFontRole.h>
 #include <QskWindow.h>
@@ -89,6 +93,38 @@ void applyAndroidFonts(const std::shared_ptr<FontSizes>& fontSizes)
 #endif
 }
 
+static int countItems(const QQuickItem* item)
+{
+    if (!item) return 0;
+    int count = 1;
+    const auto children = item->childItems();
+    for (const auto* c : children)
+        count += countItems(c);
+    return count;
+}
+
+static QTimer* s_statsTimer = nullptr;
+static void toggleStatsTimer(QskWindow* win)
+{
+    if (s_statsTimer && s_statsTimer->isActive()) {
+        s_statsTimer->stop();
+        win->setTitle("qsktox");
+        qDebug() << "[qsktox] stats timer stopped";
+        return;
+    }
+    if (!s_statsTimer) {
+        s_statsTimer = new QTimer(win);
+        QObject::connect(s_statsTimer, &QTimer::timeout, [win]() {
+            int n = countItems(win->contentItem());
+            win->setTitle(QString("qsktox | items: %1").arg(n));
+        });
+    }
+    s_statsTimer->start(3000);
+    int n = countItems(win->contentItem());
+    win->setTitle(QString("qsktox | items: %1").arg(n));
+    qDebug() << "[qsktox] stats timer started";
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -99,6 +135,9 @@ int main(int argc, char* argv[]) {
 
 #ifdef Q_OS_ANDROID
     qputenv("QSG_RENDER_LOOP", "basic");
+#else
+    QString iconPath = QCoreApplication::applicationDirPath() + "/../app_icon.png";
+    app.setWindowIcon(QIcon(iconPath));
 #endif
 
 #ifdef Q_OS_ANDROID
@@ -270,6 +309,7 @@ int main(int argc, char* argv[]) {
 
     // ── Window ──
     QskWindow window;
+    window.setTitle("qsktox");
     window.addItem(rootBox);
 
 #ifdef Q_OS_ANDROID
@@ -281,6 +321,22 @@ int main(int argc, char* argv[]) {
 #else
     window.setPreferredSize({420, 780});
     window.show();
+#endif
+
+#ifndef Q_OS_ANDROID
+    {
+        auto* sc = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_F), &window);
+        QObject::connect(sc, &QShortcut::activated,
+            []{ SettingsPage::changeFontScale(+1); });
+
+        sc = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_G), &window);
+        QObject::connect(sc, &QShortcut::activated,
+            []{ SettingsPage::changeFontScale(-1); });
+
+        sc = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_K), &window);
+        QObject::connect(sc, &QShortcut::activated,
+            [&window]{ toggleStatsTimer(&window); });
+    }
 #endif
 
     app.installEventFilter(new BackButtonFilter(pageManager));

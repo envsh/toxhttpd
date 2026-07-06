@@ -9,6 +9,8 @@
 #include <QskSeparator.h>
 #include <QskStackBox.h>
 #include <QskStackBoxAnimator.h>
+#include <QskSetup.h>
+#include <QskItem.h>
 #include <QskSkinManager.h>
 #include <QskSkin.h>
 #include <QSettings>
@@ -17,8 +19,11 @@
 std::shared_ptr<FontSizes> SettingsPage::sharedFontSizes;
 std::function<void()>      SettingsPage::applyAndroidFonts;
 
+QPointer<SettingsPage> SettingsPage::s_instance;
+
 SettingsPage::SettingsPage(QQuickItem* parent)
     : Page(parent)
+    , m_debugBgSwitch(nullptr)
 {
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
@@ -102,17 +107,62 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     m_fontScaleCombo->addOption(QskLabelData("Extra Large"));
     m_fontScaleCombo->setCurrentIndex(1);
 
+    new QskSeparator(Qt::Horizontal, layout);
+
+    // ── Row 5: Debug Background ──
+    auto* row5 = new QskLinearBox(Qt::Horizontal, layout);
+    row5->setPreferredHeight(48);
+    row5->setSpacing(12);
+    auto* debugLabel = new QskTextLabel("Debug Background", row5);
+    debugLabel->setPreferredWidth(160);
+    m_debugBgSwitch = new QskSwitchButton(row5);
+
     layout->addStretch(1);
+}
+
+SettingsPage::~SettingsPage()
+{
+    if (s_instance == this)
+        s_instance = nullptr;
+}
+
+void SettingsPage::changeFontScale(int delta)
+{
+    QSettings s;
+    int idx = qBound(0, s.value("fontScale", 1).toInt() + delta, 3);
+    s.setValue("fontScale", idx);
+
+    static const int sizes[][4] = {
+        {16, 22, 14, 12}, {21, 29, 19, 16},
+        {28, 39, 25, 21}, {35, 48, 32, 27},
+    };
+    if (sharedFontSizes) {
+        sharedFontSizes->body    = sizes[idx][0];
+        sharedFontSizes->title   = sizes[idx][1];
+        sharedFontSizes->caption = sizes[idx][2];
+        sharedFontSizes->global  = sizes[idx][3];
+    }
+    if (applyAndroidFonts) applyAndroidFonts();
+
+    // Sync SettingsPage combo if open
+    if (s_instance && s_instance->m_fontScaleCombo) {
+        s_instance->m_fontScaleCombo->blockSignals(true);
+        s_instance->m_fontScaleCombo->setCurrentIndex(idx);
+        s_instance->m_fontScaleCombo->blockSignals(false);
+    }
 }
 
 void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
 {
+    s_instance = this;
+
     // Restore persisted values (before connecting handlers)
     QSettings settings;
     m_transitionCombo->setCurrentIndex(settings.value("transition", 3).toInt());
     m_skinCombo->setCurrentIndex(settings.value("skin", 0).toInt());
     m_darkSwitch->setChecked(settings.value("darkMode", false).toBool());
     m_fontScaleCombo->setCurrentIndex(settings.value("fontScale", 1).toInt());
+    m_debugBgSwitch->setChecked(settings.value("debugBackground", false).toBool());
 
     if (m_signalsConnected) return;
     m_signalsConnected = true;
@@ -175,4 +225,19 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
                 SettingsPage::applyAndroidFonts();
             }
         });
+
+    // ── Row 5: Debug Background toggle ──
+    connect(m_debugBgSwitch, &QskAbstractButton::toggled,
+        this, [](bool checked) {
+            QSettings().setValue("debugBackground", checked);
+            QskSetup::setUpdateFlag(
+                QskItem::DebugForceBackground, checked);
+            qDebug() << "[qsktox] debug background:" << checked;
+        });
+
+    // Sync debug background (restored value may differ from QskSetup default)
+    if (m_debugBgSwitch->isChecked() != QskSetup::testUpdateFlag(QskItem::DebugForceBackground)) {
+        QskSetup::setUpdateFlag(
+            QskItem::DebugForceBackground, m_debugBgSwitch->isChecked());
+    }
 }
