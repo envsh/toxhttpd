@@ -42,12 +42,16 @@ cp "$QSK_ANDROID/lib/qskinny/plugins/platforminputcontexts/"*.so "$LIB_DIR/"
     --builddir "$BUILD_DIR" \
     --aux-mode
 
+# 替换包名为 qsktox.fedlet.io
+sed -i 's/package="org\.qtproject\.example\.qsktox"/package="qsktox.fedlet.io"/' \
+    "$APK_DIR/AndroidManifest.xml"
+
 # 4. append Qt-specific properties (missing from --aux-mode)
 cat >> "$APK_DIR/gradle.properties" <<PROPS
 androidBuildToolsVersion=34.0.0
 androidCompileSdkVersion=android-33
 androidNdkVersion=26.1.10909125
-androidPackageName=org.qtproject.example.qsktox
+androidPackageName=qsktox.fedlet.io
 buildDir=build
 qtAndroidDir=${QT_ANDROID}/src/android/java
 qtMinSdkVersion=23
