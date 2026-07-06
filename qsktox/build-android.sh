@@ -56,6 +56,20 @@ sed -i 's/package="org\.qtproject\.example\.qsktox"/package="qsktox.fedlet.io"/'
 sed -i '/android:fullBackupOnly/a\        android:enableOnBackInvokedCallback="false"' \
     "$APK_DIR/AndroidManifest.xml"
 
+# KeepAlive FG Service: permissions
+sed -i '/<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>/a\
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n\
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n\
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' \
+    "$APK_DIR/AndroidManifest.xml"
+
+# KeepAlive FG Service: service declaration (before </application>)
+sed -i '/<\/application>/ i\    <service\n\
+        android:name="mobutil.fedlet.io.KeepAliveService"\n\
+        android:foregroundServiceType="dataSync"\n\
+        android:exported="false"\/>' \
+    "$APK_DIR/AndroidManifest.xml"
+
 # 4. append Qt-specific properties (missing from --aux-mode)
 cat >> "$APK_DIR/gradle.properties" <<PROPS
 androidBuildToolsVersion=34.0.0

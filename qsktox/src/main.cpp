@@ -23,6 +23,7 @@
 #include "settingspage.h"
 #include "aboutpage.h"
 #include "logpage.h"
+#include "keepalive.h"
 #include "pagemanager.h"
 
 #include <memory>
@@ -283,6 +284,11 @@ int main(int argc, char* argv[]) {
 #endif
 
     app.installEventFilter(new BackButtonFilter(pageManager));
+
+#ifdef Q_OS_ANDROID
+    KeepAlive::start();
+    qDebug() << "[qsktox] KeepAlive service started";
+#endif
 
     return app.exec();
 }

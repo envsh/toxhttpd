@@ -23,6 +23,8 @@ endif()
 
 qt_add_executable(qsktox
     src/main.cpp
+    src/keepalive.h
+    src/keepalive.cpp
     src/page.h
     src/page.cpp
     src/pagemanager.h
