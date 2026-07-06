@@ -21,7 +21,13 @@ if(ANDROID)
     _fix_qskinny_abi_target(Qt6OpenGL_arm64-v8a Qt6::OpenGL)
 endif()
 
-qt_add_executable(qsktox src/main.cpp)
+qt_add_executable(qsktox
+    src/main.cpp
+    src/loginpage.h
+    src/loginpage.cpp
+    src/mainpage.h
+    src/mainpage.cpp
+)
 
 target_link_libraries(qsktox PRIVATE Qsk::QSkinny)
 

@@ -6,10 +6,11 @@
 #include <QStandardPaths>
 #include <QScreen>
 #include <QskSkinManager.h>
-#include <QskLinearBox.h>
 #include <QskWindow.h>
-#include <QskBox.h>
-#include <QskTextLabel.h>
+#include <QskLinearBox.h>
+#include <QskStackBox.h>
+#include "loginpage.h"
+#include "mainpage.h"
 
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
@@ -73,23 +74,34 @@ int main(int argc, char* argv[]) {
     qskSkinManager->setSkin("Fusion");
     qDebug() << "[qsktox] skin OK:" << qskSkinManager->skinName();
 
-    auto* box = new QskLinearBox(Qt::Vertical);
-    box->setPanel(true);
-    auto* label = new QskTextLabel("Hello qsktox", box);
-    label->setAlignment(Qt::AlignCenter);
+    auto* rootBox = new QskLinearBox(Qt::Vertical);
+    rootBox->setPanel(true);
+    auto* stackBox = new QskStackBox(rootBox);
+    stackBox->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Expanding);
+    auto* loginPage = new LoginPage();
+    auto* mainPage = new MainPage();
+
+    stackBox->addItem(loginPage);
+    stackBox->addItem(mainPage);
+    stackBox->setCurrentIndex(0);
+
+    QObject::connect(loginPage, &LoginPage::accepted,
+        [stackBox](const QString& url) {
+            qDebug() << "[qsktox] connecting to:" << url;
+            stackBox->setCurrentIndex(1);
+        });
 
     QskWindow window;
-    window.addItem(box);
-    window.setAutoLayoutChildren(true);
+    window.addItem(rootBox);
 
 #ifdef Q_OS_ANDROID
-    window.showFullScreen();
+    window.show();
     qDebug() << "[qsktox] window size:" << window.size()
              << "contentItem size:" << window.contentItem()->size()
              << "isExposed:" << window.isExposed();
     window.update();
 #else
-    window.setPreferredSize({400, 300});
+    window.setPreferredSize({420, 780});
     window.show();
 #endif
 
