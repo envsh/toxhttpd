@@ -11,7 +11,7 @@ qt6.7 x64目录，/opt/qt/6.7.3/gcc_64/
 qskiny arm64安装目录，/opt/qt/qskinny-arm64/
 qt6.7 arm64目录，/opt/qt/6.7.3/android_arm64_v8a/
 
-ndk 目录，/opt/android-ndk/
+ndk 目录，/opt/android-ndk-r26b
 tools 目录，/opt/android-sdk/
 jdk 目录，/opt/jdk-17.0.13+11/
 
