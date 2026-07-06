@@ -42,6 +42,12 @@ cp "$QSK_ANDROID/lib/qskinny/plugins/platforminputcontexts/"*.so "$LIB_DIR/"
     --builddir "$BUILD_DIR" \
     --aux-mode
 
+# 复制自定义 Java 源码到 Android 构建目录
+mkdir -p "$APK_DIR/src/main/java"
+cp -R android/src/java/* "$APK_DIR/src/main/java/"
+# 移除 renderscript.srcDirs 配置（build-tools 34+ 不再支持，且会干扰自定义 Java 源码）
+sed -i '/renderscript\.srcDirs/d' "$APK_DIR/build.gradle"
+
 # 替换包名为 qsktox.fedlet.io
 sed -i 's/package="org\.qtproject\.example\.qsktox"/package="qsktox.fedlet.io"/' \
     "$APK_DIR/AndroidManifest.xml"
@@ -71,3 +77,6 @@ if [ -n "$APK" ]; then
     echo "=== APK built: $APK ==="
     ls -lh "$APK"
 fi
+
+
+### todo kill java of this process forked
