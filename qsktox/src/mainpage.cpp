@@ -1,4 +1,5 @@
 #include "mainpage.h"
+#include "menuoverlay.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskTextField.h>
@@ -65,6 +66,8 @@ MainPage::MainPage(QQuickItem* parent)
         // 清理旧菜单（避免残留动画状态导致崩溃）
         for (auto* old : findChildren<QskMenu*>())
             old->deleteLater();
+        for (auto* old : findChildren<MenuOverlay*>())
+            old->deleteLater();
 
         auto* menu = new QskMenu(this);
         menu->setModal(true);
@@ -99,6 +102,11 @@ MainPage::MainPage(QQuickItem* parent)
             if (auto* m = qobject_cast<QskMenu*>(sender()))
                 m->close();
         });
+
+        {
+            auto* overlay = new MenuOverlay(menu);
+            connect(menu, &QObject::destroyed, overlay, &QObject::deleteLater);
+        }
 
         menu->open();
     });

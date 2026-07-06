@@ -25,6 +25,8 @@ qt_add_executable(qsktox
     src/main.cpp
     src/loginpage.h
     src/loginpage.cpp
+    src/menuoverlay.h
+    src/menuoverlay.cpp
     src/mainpage.h
     src/mainpage.cpp
     src/settingspage.h
