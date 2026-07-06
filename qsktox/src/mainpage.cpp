@@ -6,6 +6,7 @@
 #include <QskMenu.h>
 #include <QskBoxShapeMetrics.h>
 #include <QskLabelData.h>
+#include <QTimer>
 
 MainPage::MainPage(QQuickItem* parent)
     : QskControl(parent)
@@ -37,28 +38,34 @@ MainPage::MainPage(QQuickItem* parent)
     optionsBtn->setBoxShapeHint(QskPushButton::Panel,
         QskBoxShapeMetrics(8, Qt::AbsoluteSize));
 
-    // Options menu (popup)
-    auto* optionsMenu = new QskMenu(topBar);
-    optionsMenu->setOrigin(QPointF(0, 56));
-    optionsMenu->addOption(QskLabelData("Settings"));
-    optionsMenu->addSeparator();
-    optionsMenu->addOption(QskLabelData("About"));
-    optionsMenu->addSeparator();
-    optionsMenu->addOption(QskLabelData("Logout"));
+    connect(optionsBtn, &QskAbstractButton::clicked, [this, optionsBtn]() {
+        // 清理旧菜单（避免残留动画状态导致崩溃）
+        for (auto* old : findChildren<QskMenu*>())
+            old->deleteLater();
 
-    connect(optionsBtn, &QskAbstractButton::clicked, [optionsMenu]() {
-        optionsMenu->open();
-    });
-    connect(optionsMenu, &QskMenu::triggered, this,
-        [this, optionsMenu](int index) {
-            if (index == 0)
-                emit settingsRequested();
-            else if (index == 2)
-                emit aboutRequested();
-            else if (index == 4)
-                emit logoutRequested();
-            optionsMenu->close();
+        auto* menu = new QskMenu(this);
+        menu->setPopupFlag(QskPopup::CloseOnPressOutside, true);
+        menu->addOption(QskLabelData("Settings"));
+        menu->addSeparator();
+        menu->addOption(QskLabelData("About"));
+        menu->addSeparator();
+        menu->addOption(QskLabelData("Logout"));
+
+        QPointF btnPos = optionsBtn->mapToItem(this, QPointF(0, 0));
+        qreal menuW = menu->implicitWidth();
+        if (menuW <= 0) menuW = 200;
+        menu->setOrigin(QPointF(
+            btnPos.x() + optionsBtn->width() - menuW,
+            btnPos.y() + optionsBtn->height()));
+
+        connect(menu, &QskMenu::triggered, this, [this](int index) {
+            if (index == 0) emit settingsRequested();
+            else if (index == 2) emit aboutRequested();
+            else if (index == 4) emit logoutRequested();
         });
+
+        menu->open();
+    });
 
     // ── ChatArea ──
     auto* chatArea = new QskLinearBox(Qt::Vertical, layout);
@@ -69,6 +76,16 @@ MainPage::MainPage(QQuickItem* parent)
     auto* welcome = new QskTextLabel("Welcome to qsktox", chatArea);
     welcome->setAlignment(Qt::AlignCenter);
     chatArea->addStretch(1);
+
+    // ── Toast label (initially hidden) ──
+    m_toastLabel = new QskTextLabel("", chatArea);
+    m_toastLabel->setAlignment(Qt::AlignCenter);
+    m_toastLabel->setVisible(false);
+    m_toastTimer = new QTimer(this);
+    m_toastTimer->setSingleShot(true);
+    connect(m_toastTimer, &QTimer::timeout, this, [this]() {
+        m_toastLabel->setVisible(false);
+    });
 
     // ── InputBar ──
     auto* inputBar = new QskLinearBox(Qt::Horizontal, layout);
@@ -85,4 +102,10 @@ MainPage::MainPage(QQuickItem* parent)
     sendBtn->setPreferredWidth(48);
     sendBtn->setPreferredHeight(40);
     inputBar->addSpacer(8, 0);
+}
+
+void MainPage::showToast(const QString& msg, int durationMs) {
+    m_toastLabel->setText(msg);
+    m_toastLabel->setVisible(true);
+    m_toastTimer->start(durationMs);
 }

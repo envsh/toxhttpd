@@ -52,6 +52,10 @@ sed -i '/renderscript\.srcDirs/d' "$APK_DIR/build.gradle"
 sed -i 's/package="org\.qtproject\.example\.qsktox"/package="qsktox.fedlet.io"/' \
     "$APK_DIR/AndroidManifest.xml"
 
+# Android 13+ gesture back bypasses Qt key handling
+sed -i '/android:fullBackupOnly/a\        android:enableOnBackInvokedCallback="false"' \
+    "$APK_DIR/AndroidManifest.xml"
+
 # 4. append Qt-specific properties (missing from --aux-mode)
 cat >> "$APK_DIR/gradle.properties" <<PROPS
 androidBuildToolsVersion=34.0.0
@@ -69,7 +73,7 @@ PROPS
 sed -i 's/-Xmx[0-9]*m/-Xmx386m/' "$APK_DIR/gradle.properties"
 
 # 6. build debug APK (auto-signed with Android debug key)
-GRADLE_OPTS="-Xmx386m" "$APK_DIR/gradlew" --no-daemon -p "$APK_DIR" assembleDebug
+GRADLE_OPTS="-Xmx386m" "$APK_DIR/gradlew" --no-daemon --max-workers=2 -p "$APK_DIR" assembleDebug
 
 # 6. verify output
 APK=$(find "$APK_DIR/build/outputs" -name "*.apk" 2>/dev/null | head -1)
@@ -78,5 +82,6 @@ if [ -n "$APK" ]; then
     ls -lh "$APK"
 fi
 
+find build-android -name *qsktox*.so | xargs ls -lh
 
 ### todo kill java of this process forked
