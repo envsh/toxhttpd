@@ -3,7 +3,11 @@
 #include "menuoverlay.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
+#ifdef __ANDROID__
 #include <QskTextField.h>
+#else
+#include <QskTextInput.h>
+#endif
 #include <QskPushButton.h>
 #include <QskMenu.h>
 #include <QskBoxShapeMetrics.h>
@@ -11,7 +15,9 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include <QSettings>
+#ifdef Q_OS_ANDROID
 #include <QJniObject>
+#endif
 
 static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;
 
@@ -71,7 +77,7 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     title->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
 
     // Right: Options button
-    auto* optionsBtn = new QskPushButton(QString::fromUtf8("\u22EE"), topBar);
+    auto* optionsBtn = new QskPushButton(QString::fromUtf8("⋮"), topBar);
     optionsBtn->setPreferredSize(44, 44);
     optionsBtn->setBoxShapeHint(QskPushButton::Panel,
         QskBoxShapeMetrics(8, Qt::AbsoluteSize));
@@ -85,8 +91,10 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
         auto* menu = new QskMenu(this);
         menu->setModal(true);
         menu->addOption(QskLabelData(
-            m_keepScreenOn ? QString::fromUtf8("\u2713 Keep Screen On")
+            m_keepScreenOn ? QString::fromUtf8("✓ Keep Screen On")
                            : QString("  Keep Screen On")));
+        menu->addSeparator();
+        menu->addOption(QskLabelData("App Log"));
         menu->addSeparator();
         menu->addOption(QskLabelData("Settings"));
         menu->addSeparator();
@@ -107,10 +115,12 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
                 jniKeepScreenOn(m_keepScreenOn);
                 emit keepScreenOnChanged(m_keepScreenOn);
             } else if (index == 2) {
-                pageManager()->open("settings");
+                pageManager()->open("logs");
             } else if (index == 4) {
-                pageManager()->open("about");
+                pageManager()->open("settings");
             } else if (index == 6) {
+                pageManager()->open("about");
+            } else if (index == 8) {
                 pageManager()->replace("login");
             }
             if (auto* m = qobject_cast<QskMenu*>(sender()))
@@ -151,12 +161,17 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     inputBar->setPreferredHeight(56);
 
     inputBar->addSpacer(8, 0);
+#ifdef __ANDROID__
     auto* input = new QskTextField(inputBar);
     input->setPlaceholderText("Type a message");
+#else
+    auto* input = new QskTextInput(inputBar);
+    input->setDescription("Type a message");
+#endif
     input->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
     input->setPreferredHeight(40);
 
-    auto* sendBtn = new QskPushButton(QString::fromUtf8("\u2192"), inputBar);
+    auto* sendBtn = new QskPushButton(QString::fromUtf8("→"), inputBar);
     sendBtn->setPreferredWidth(48);
     sendBtn->setPreferredHeight(40);
     inputBar->addSpacer(8, 0);

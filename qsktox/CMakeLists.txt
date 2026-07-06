@@ -27,6 +27,10 @@ qt_add_executable(qsktox
     src/page.cpp
     src/pagemanager.h
     src/pagemanager.cpp
+    src/logmodel.h
+    src/logmodel.cpp
+    src/logpage.h
+    src/logpage.cpp
     src/loginpage.h
     src/loginpage.cpp
     src/menuoverlay.h

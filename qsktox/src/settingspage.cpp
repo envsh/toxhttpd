@@ -29,7 +29,7 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     topBar->setPanel(true);
     topBar->setPreferredHeight(56);
 
-    auto* backBtn = new QskPushButton(QString::fromUtf8("\u2190"), topBar);
+    auto* backBtn = new QskPushButton(QString::fromUtf8("←"), topBar);
     backBtn->setPreferredSize(44, 44);
     auto* title = new QskTextLabel("Settings", topBar);
     title->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);

@@ -22,6 +22,7 @@
 #include "mainpage.h"
 #include "settingspage.h"
 #include "aboutpage.h"
+#include "logpage.h"
 #include "pagemanager.h"
 
 #include <memory>
@@ -246,6 +247,10 @@ int main(int argc, char* argv[]) {
 
     pageManager->registerPage("about", []() -> Page* {
         return new AboutPage();
+    }, {CachePolicy::Transient, LaunchMode::Standard});
+
+    pageManager->registerPage("logs", []() -> Page* {
+        return new LogPage();
     }, {CachePolicy::Transient, LaunchMode::Standard});
 
     // ── Start with login page ──
