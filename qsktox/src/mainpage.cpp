@@ -7,10 +7,32 @@
 #include <QskBoxShapeMetrics.h>
 #include <QskLabelData.h>
 #include <QTimer>
+#include <QJniObject>
+
+static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;
+
+static void setKeepScreenOn(bool on) {
+#ifdef Q_OS_ANDROID
+    auto activity = QJniObject::callStaticObjectMethod(
+        "org/qtproject/qt/android/QtNative",
+        "activity", "()Landroid/app/Activity;");
+    if (!activity.isValid()) return;
+    auto window = activity.callObjectMethod(
+        "getWindow", "()Landroid/view/Window;");
+    if (!window.isValid()) return;
+    if (on)
+        window.callMethod<void>("addFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
+    else
+        window.callMethod<void>("clearFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
+#else
+    Q_UNUSED(on)
+#endif
+}
 
 MainPage::MainPage(QQuickItem* parent)
     : QskControl(parent)
 {
+    setKeepScreenOn(true);
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
     layout->setPanel(true);
@@ -45,6 +67,10 @@ MainPage::MainPage(QQuickItem* parent)
 
         auto* menu = new QskMenu(this);
         menu->setPopupFlag(QskPopup::CloseOnPressOutside, true);
+        menu->addOption(QskLabelData(
+            m_keepScreenOn ? QString::fromUtf8("\u2713 Keep Screen On")
+                           : QString("  Keep Screen On")));
+        menu->addSeparator();
         menu->addOption(QskLabelData("Settings"));
         menu->addSeparator();
         menu->addOption(QskLabelData("About"));
@@ -59,9 +85,16 @@ MainPage::MainPage(QQuickItem* parent)
             btnPos.y() + optionsBtn->height()));
 
         connect(menu, &QskMenu::triggered, this, [this](int index) {
-            if (index == 0) emit settingsRequested();
-            else if (index == 2) emit aboutRequested();
-            else if (index == 4) emit logoutRequested();
+            if (index == 0) {
+                m_keepScreenOn = !m_keepScreenOn;
+                setKeepScreenOn(m_keepScreenOn);
+            } else if (index == 2) {
+                emit settingsRequested();
+            } else if (index == 4) {
+                emit aboutRequested();
+            } else if (index == 6) {
+                emit logoutRequested();
+            }
         });
 
         menu->open();

@@ -22,6 +22,7 @@ Q_SIGNALS:
 private:
     QskTextLabel* m_toastLabel = nullptr;
     QTimer* m_toastTimer = nullptr;
+    bool m_keepScreenOn = true;
 };
 
 #endif
