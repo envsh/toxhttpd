@@ -9,7 +9,11 @@
 #include <QScreen>
 
 AboutPage::AboutPage(QQuickItem* parent)
-    : QskControl(parent)
+    : Page(parent)
+{
+}
+
+void AboutPage::onCreate(const QVariantMap&, const QVariantMap&)
 {
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
@@ -26,8 +30,9 @@ AboutPage::AboutPage(QQuickItem* parent)
     title->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
     title->setAlignment(Qt::AlignCenter);
 
-    connect(backBtn, &QskAbstractButton::clicked,
-        this, &AboutPage::backRequested);
+    connect(backBtn, &QskAbstractButton::clicked, this, [this]() {
+        finish();
+    });
 
     // Helper: section header
     auto addSection = [layout](const QString& heading) {

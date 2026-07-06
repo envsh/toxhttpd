@@ -1,4 +1,5 @@
 #include "settingspage.h"
+#include "pagemanager.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -6,9 +7,18 @@
 #include <QskSwitchButton.h>
 #include <QskLabelData.h>
 #include <QskSeparator.h>
+#include <QskStackBox.h>
+#include <QskStackBoxAnimator.h>
+#include <QskSkinManager.h>
+#include <QskSkin.h>
+#include <QSettings>
+#include <QDebug>
+
+std::shared_ptr<FontSizes> SettingsPage::sharedFontSizes;
+std::function<void()>      SettingsPage::applyAndroidFonts;
 
 SettingsPage::SettingsPage(QQuickItem* parent)
-    : QskControl(parent)
+    : Page(parent)
 {
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
@@ -25,8 +35,9 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     title->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
     title->setAlignment(Qt::AlignCenter);
 
-    connect(backBtn, &QskAbstractButton::clicked,
-        this, &SettingsPage::backRequested);
+    connect(backBtn, &QskAbstractButton::clicked, this, [this]() {
+        finish();
+    });
 
     layout->addSpacer(24, 0);
 
@@ -92,4 +103,72 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     m_fontScaleCombo->setCurrentIndex(1);
 
     layout->addStretch(1);
+}
+
+void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
+{
+    // Restore persisted values (before connecting handlers)
+    QSettings settings;
+    m_transitionCombo->setCurrentIndex(settings.value("transition", 3).toInt());
+    m_skinCombo->setCurrentIndex(settings.value("skin", 0).toInt());
+    m_darkSwitch->setChecked(settings.value("darkMode", false).toBool());
+    m_fontScaleCombo->setCurrentIndex(settings.value("fontScale", 1).toInt());
+
+    if (m_signalsConnected) return;
+    m_signalsConnected = true;
+
+    // ── Connect signal handlers (fire on user interaction, not on restore) ──
+    connect(m_transitionCombo, &QskComboBox::currentIndexChanged,
+        this, [this](int index) {
+            QSettings().setValue("transition", index);
+            auto* sb = pageManager() ? pageManager()->stackBox() : nullptr;
+            if (!sb) return;
+            QskStackBoxAnimator* newAnim = nullptr;
+            switch (index) {
+                case 0: newAnim = new QskStackBoxAnimator1(sb); break;
+                case 1: newAnim = new QskStackBoxAnimator2(sb); break;
+                case 2: newAnim = new QskStackBoxAnimator3(sb); break;
+                case 3: newAnim = new QskStackBoxAnimator4(sb); break;
+            }
+            if (newAnim) sb->setAnimator(newAnim);
+        });
+
+    connect(m_skinCombo, &QskComboBox::currentIndexChanged,
+        this, [](int index) {
+            QSettings().setValue("skin", index);
+            static const char* names[] = {"Fusion", "Fluent2", "Material3"};
+            if (index >= 0 && index < 3) {
+                qskSkinManager->setSkin(names[index]);
+            }
+        });
+
+    connect(m_darkSwitch, &QskAbstractButton::toggled,
+        this, [](bool checked) {
+            QSettings().setValue("darkMode", checked);
+            auto* s = qskSkinManager->skin();
+            if (s) {
+                s->setColorScheme(checked
+                    ? QskSkin::DarkScheme : QskSkin::LightScheme);
+            }
+        });
+
+    connect(m_fontScaleCombo, &QskComboBox::currentIndexChanged,
+        this, [](int index) {
+            QSettings().setValue("fontScale", index);
+            static const int sizes[][4] = {
+                {16, 22, 14, 12},
+                {21, 29, 19, 16},
+                {28, 39, 25, 21},
+                {35, 48, 32, 27},
+            };
+            if (index >= 0 && index < 4 && SettingsPage::sharedFontSizes) {
+                SettingsPage::sharedFontSizes->body    = sizes[index][0];
+                SettingsPage::sharedFontSizes->title   = sizes[index][1];
+                SettingsPage::sharedFontSizes->caption = sizes[index][2];
+                SettingsPage::sharedFontSizes->global  = sizes[index][3];
+            }
+            if (SettingsPage::applyAndroidFonts) {
+                SettingsPage::applyAndroidFonts();
+            }
+        });
 }

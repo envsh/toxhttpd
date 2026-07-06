@@ -22,19 +22,17 @@
 #include "mainpage.h"
 #include "settingspage.h"
 #include "aboutpage.h"
+#include "pagemanager.h"
 
 #include <memory>
 
-struct FontSizes {
-    int body, title, caption, global;
-};
-
 namespace {
+
 class BackButtonFilter : public QObject
 {
 public:
-    BackButtonFilter(QskStackBox* sb, MainPage* mp, QObject* parent = nullptr)
-        : QObject(parent), m_stackBox(sb), m_mainPage(mp) {}
+    BackButtonFilter(PageManager* pm, QObject* parent = nullptr)
+        : QObject(parent), m_pageManager(pm) {}
 
 protected:
     bool eventFilter(QObject*, QEvent* event) override
@@ -43,18 +41,24 @@ protected:
             auto* ke = static_cast<QKeyEvent*>(event);
             if (ke->key() == Qt::Key_Back) {
                 event->accept();
-                int idx = m_stackBox->currentIndex();
-                if (idx == 2 || idx == 3) {
-                    m_stackBox->setCurrentIndex(1);
-                } else if (idx == 1) {
-                    if (m_backTimer.isValid() && m_backTimer.elapsed() < 2000) {
-                        QCoreApplication::quit();
-                    } else {
-                        m_backTimer.start();
-                        m_mainPage->showToast("Press again to exit");
-                    }
+                if (m_pageManager->depth() > 1) {
+                    m_pageManager->back();
                 } else {
-                    QCoreApplication::quit();
+                    QString id = m_pageManager->currentPageId();
+                    if (id == "main") {
+                        if (m_backTimer.isValid() && m_backTimer.elapsed() < 2000) {
+                            QCoreApplication::quit();
+                        } else {
+                            m_backTimer.start();
+                            auto* mainPage = qobject_cast<MainPage*>(
+                                m_pageManager->findPage("main"));
+                            if (mainPage) {
+                                mainPage->showToast("Press again to exit");
+                            }
+                        }
+                    } else {
+                        QCoreApplication::quit();
+                    }
                 }
                 return true;
             }
@@ -63,10 +67,26 @@ protected:
     }
 
 private:
-    QskStackBox* m_stackBox;
-    MainPage* m_mainPage;
+    PageManager* m_pageManager;
     QElapsedTimer m_backTimer;
 };
+
+void applyAndroidFonts(const std::shared_ptr<FontSizes>& fontSizes)
+{
+#ifdef Q_OS_ANDROID
+    auto* s = qskSkinManager->skin();
+    if (!s) return;
+    auto makeFont = [](int pt) { QFont f; f.setPointSizeF(pt); return f; };
+    s->setFont({QskFontRole::Body, QskFontRole::Normal},    makeFont(fontSizes->body));
+    s->setFont({QskFontRole::Title, QskFontRole::Normal},   makeFont(fontSizes->title));
+    s->setFont({QskFontRole::Caption, QskFontRole::Normal}, makeFont(fontSizes->caption));
+    QGuiApplication::setFont(makeFont(fontSizes->global));
+    qDebug() << "[qsktox] fonts re-applied (default family, CJK via font merging)";
+#else
+    Q_UNUSED(fontSizes)
+#endif
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -136,161 +156,102 @@ int main(int argc, char* argv[]) {
     qDebug() << "[qsktox] DPI:" << QGuiApplication::primaryScreen()->logicalDotsPerInch()
              << "dpr:" << QGuiApplication::primaryScreen()->devicePixelRatio();
 
-    // Shared font sizes (updated by SettingsPage font scale combo)
-    auto fontSizes = std::make_shared<FontSizes>(FontSizes{21, 29, 19, 16});
+    // ── Shared font state ──
+    auto fontSizes = std::make_shared<FontSizes>();
+    fontSizes->body    = 21;
+    fontSizes->title   = 29;
+    fontSizes->caption = 19;
+    fontSizes->global  = 16;
 
-    // Font override lambda — re-applies on skin switch at runtime
-    auto applyAndroidFonts = [fontSizes]() {
-#ifdef Q_OS_ANDROID
-        auto* s = qskSkinManager->skin();
-        if (!s) {
-            return;
-        }
-        auto makeFont = [](int pt) { QFont f; f.setPointSizeF(pt); return f; };
-        s->setFont({QskFontRole::Body, QskFontRole::Normal},    makeFont(fontSizes->body));
-        s->setFont({QskFontRole::Title, QskFontRole::Normal},   makeFont(fontSizes->title));
-        s->setFont({QskFontRole::Caption, QskFontRole::Normal}, makeFont(fontSizes->caption));
-        QGuiApplication::setFont(makeFont(fontSizes->global));
-        qDebug() << "[qsktox] fonts re-applied (default family, CJK via font merging)";
-#endif
-    };
-    applyAndroidFonts();
+    auto fontApplier = [fontSizes]() { applyAndroidFonts(fontSizes); };
+    fontApplier();
+
+    SettingsPage::sharedFontSizes = fontSizes;
+    SettingsPage::applyAndroidFonts = fontApplier;
+
     QObject::connect(qskSkinManager, &QskSkinManager::skinChanged,
-        &app, applyAndroidFonts);
+        &app, fontApplier);
 
+    // ── Root layout ──
     auto* rootBox = new QskLinearBox(Qt::Vertical);
     rootBox->setPanel(true);
     auto* stackBox = new QskStackBox(rootBox);
     stackBox->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Expanding);
-    QskStackBoxAnimator* currentAnimator = new QskStackBoxAnimator4(stackBox);
-    stackBox->setAnimator(currentAnimator);
-    auto* loginPage = new LoginPage();
-    auto* mainPage = new MainPage();
+    auto* defaultAnimator = new QskStackBoxAnimator4(stackBox);
+    stackBox->setAnimator(defaultAnimator);
 
-    auto* settingsPage = new SettingsPage();
-    auto* aboutPage = new AboutPage();
+    // ── PageManager ──
+    auto* pageManager = new PageManager(stackBox);
 
-    stackBox->addItem(loginPage);    // index 0
-    stackBox->addItem(mainPage);     // index 1
-    stackBox->addItem(settingsPage); // index 2
-    stackBox->addItem(aboutPage);    // index 3
-
-    stackBox->setCurrentIndex(0);
-
-    QObject::connect(loginPage, &LoginPage::accepted,
-        [stackBox](const QString& url) {
-            qDebug() << "[qsktox] connecting to:" << url;
-            stackBox->setCurrentIndex(1);
-        });
-
-    QObject::connect(mainPage, &MainPage::settingsRequested,
-        [stackBox]() { stackBox->setCurrentIndex(2); });
-    QObject::connect(mainPage, &MainPage::aboutRequested,
-        [stackBox]() { stackBox->setCurrentIndex(3); });
-    QObject::connect(mainPage, &MainPage::logoutRequested,
-        [stackBox]() { stackBox->setCurrentIndex(0); });
-    QObject::connect(settingsPage, &SettingsPage::backRequested,
-        [stackBox]() { stackBox->setCurrentIndex(1); });
-    QObject::connect(aboutPage, &AboutPage::backRequested,
-        [stackBox]() { stackBox->setCurrentIndex(1); });
-
-    // ── SettingsPage control connections ──
-    QObject::connect(settingsPage->transitionCombo(),
-        &QskComboBox::currentIndexChanged,
-        [stackBox, &currentAnimator](int index) {
-            QSettings().setValue("transition", index);
-            qDebug() << "[qsktox] saved transition:" << index;
-            QskStackBoxAnimator* newAnim = nullptr;
-            switch (index) {
-                case 0: newAnim = new QskStackBoxAnimator1(stackBox); break;
-                case 1: newAnim = new QskStackBoxAnimator2(stackBox); break;
-                case 2: newAnim = new QskStackBoxAnimator3(stackBox); break;
-                case 3: newAnim = new QskStackBoxAnimator4(stackBox); break;
-            }
-            if (newAnim) {
-                stackBox->setAnimator(newAnim);
-                currentAnimator = newAnim;
-            }
-        });
-
-    QObject::connect(settingsPage->skinCombo(),
-        &QskComboBox::currentIndexChanged,
-        [](int index) {
-            QSettings().setValue("skin", index);
-            qDebug() << "[qsktox] saved skin:" << index;
-            static const char* names[] = {"Fusion", "Fluent2", "Material3"};
-            if (index >= 0 && index < 3) {
-                qskSkinManager->setSkin(names[index]);
-            }
-        });
-
-    QObject::connect(settingsPage->darkModeSwitch(),
-        &QskAbstractButton::toggled,
-        [](bool checked) {
-            QSettings().setValue("darkMode", checked);
-            qDebug() << "[qsktox] saved darkMode:" << checked;
-            auto* s = qskSkinManager->skin();
-            if (s) {
-                s->setColorScheme(checked
-                    ? QskSkin::DarkScheme : QskSkin::LightScheme);
-            }
-        });
-
-    QObject::connect(settingsPage->fontScaleCombo(),
-        &QskComboBox::currentIndexChanged,
-        [fontSizes, applyAndroidFonts](int index) {
-            QSettings().setValue("fontScale", index);
-            qDebug() << "[qsktox] saved fontScale:" << index;
-            static const int sizes[][4] = {
-                {16, 22, 14, 12},   // Small    (0.75x)
-                {21, 29, 19, 16},   // Medium   (1.0x)
-                {28, 39, 25, 21},   // Large    (1.33x)
-                {35, 48, 32, 27},   // XL       (1.66x)
-            };
-            if (index >= 0 && index < 4) {
-                fontSizes->body    = sizes[index][0];
-                fontSizes->title   = sizes[index][1];
-                fontSizes->caption = sizes[index][2];
-                fontSizes->global  = sizes[index][3];
-            }
-            applyAndroidFonts();
-        });
-
-    // ── keepScreenOn 保存 ──
-    QObject::connect(mainPage, &MainPage::keepScreenOnChanged,
-        [](bool on) {
-            QSettings().setValue("keepScreenOn", on);
-            qDebug() << "[qsktox] saved keepScreenOn:" << on;
-        });
-
-    // ── 从持久化存储恢复设置 ──
+    // ── Restore persisted settings and apply to global state ──
     {
-        QSettings settings;
+        QSettings s;
 
-        int v;
-        v = settings.value("transition", 3).toInt();
-        settingsPage->transitionCombo()->setCurrentIndex(v);
-        qDebug() << "[qsktox] restored transition:" << v;
-
-        v = settings.value("skin", 0).toInt();
-        settingsPage->skinCombo()->setCurrentIndex(v);
-        qDebug() << "[qsktox] restored skin:" << v;
-
-        bool b = settings.value("darkMode", false).toBool();
-        settingsPage->darkModeSwitch()->setChecked(b);
-        qDebug() << "[qsktox] restored darkMode:" << b;
-
-        v = settings.value("fontScale", 1).toInt();
-        settingsPage->fontScaleCombo()->setCurrentIndex(v);
-        qDebug() << "[qsktox] restored fontScale:" << v;
-
-        b = settings.value("keepScreenOn", true).toBool();
-        mainPage->setKeepScreenOn(b);
-        qDebug() << "[qsktox] restored keepScreenOn:" << b
-                 << "(JNI deferred to 50ms timer)";
+        int skinIdx = s.value("skin", 0).toInt();
+        if (skinIdx > 0) {
+            static const char* names[] = {"Fusion", "Fluent2", "Material3"};
+            if (skinIdx < 3) {
+                qskSkinManager->setSkin(names[skinIdx]);
+            }
+        }
+        bool dark = s.value("darkMode", false).toBool();
+        if (dark) {
+            auto* skin = qskSkinManager->skin();
+            if (skin) skin->setColorScheme(QskSkin::DarkScheme);
+        }
+        int fontIdx = s.value("fontScale", 1).toInt();
+        if (fontIdx >= 0 && fontIdx < 4) {
+            static const int sizes[][4] = {
+                {16, 22, 14, 12},
+                {21, 29, 19, 16},
+                {28, 39, 25, 21},
+                {35, 48, 32, 27},
+            };
+            fontSizes->body    = sizes[fontIdx][0];
+            fontSizes->title   = sizes[fontIdx][1];
+            fontSizes->caption = sizes[fontIdx][2];
+            fontSizes->global  = sizes[fontIdx][3];
+            fontApplier();
+        }
+        int transIdx = s.value("transition", 3).toInt();
+        if (transIdx != 3) {
+            QskStackBoxAnimator* a = nullptr;
+            switch (transIdx) {
+                case 0: a = new QskStackBoxAnimator1(stackBox); break;
+                case 1: a = new QskStackBoxAnimator2(stackBox); break;
+                case 2: a = new QskStackBoxAnimator3(stackBox); break;
+            }
+            if (a) stackBox->setAnimator(a);
+        }
     }
 
-    // ── Android 生命周期 sync ──
+    // ── Register pages ──
+    pageManager->registerPage("login", []() -> Page* {
+        return new LoginPage();
+    }, {CachePolicy::Transient, LaunchMode::Standard});
+
+    pageManager->registerPage("main", [&]() -> Page* {
+        auto* page = new MainPage();
+        QObject::connect(page, &MainPage::keepScreenOnChanged,
+            [](bool on) {
+                QSettings().setValue("keepScreenOn", on);
+                qDebug() << "[qsktox] saved keepScreenOn:" << on;
+            });
+        return page;
+    }, {CachePolicy::Permanent, LaunchMode::Standard});
+
+    pageManager->registerPage("settings", []() -> Page* {
+        return new SettingsPage();
+    }, {CachePolicy::Permanent, LaunchMode::Standard});
+
+    pageManager->registerPage("about", []() -> Page* {
+        return new AboutPage();
+    }, {CachePolicy::Transient, LaunchMode::Standard});
+
+    // ── Start with login page ──
+    pageManager->open("login");
+
+    // ── Application lifecycle → sync QSettings ──
     QObject::connect(&app, &QGuiApplication::applicationStateChanged,
         [](Qt::ApplicationState state) {
             if (state == Qt::ApplicationInactive
@@ -301,6 +262,7 @@ int main(int argc, char* argv[]) {
             }
         });
 
+    // ── Window ──
     QskWindow window;
     window.addItem(rootBox);
 
@@ -315,7 +277,7 @@ int main(int argc, char* argv[]) {
     window.show();
 #endif
 
-    app.installEventFilter(new BackButtonFilter(stackBox, mainPage));
+    app.installEventFilter(new BackButtonFilter(pageManager));
 
     return app.exec();
 }

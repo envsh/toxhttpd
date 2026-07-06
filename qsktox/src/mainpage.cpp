@@ -1,4 +1,5 @@
 #include "mainpage.h"
+#include "pagemanager.h"
 #include "menuoverlay.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
@@ -9,6 +10,7 @@
 #include <QskLabelData.h>
 #include <QTimer>
 #include <QCoreApplication>
+#include <QSettings>
 #include <QJniObject>
 
 static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;
@@ -32,9 +34,21 @@ static void jniKeepScreenOn(bool on) {
 }
 
 MainPage::MainPage(QQuickItem* parent)
-    : QskControl(parent)
+    : Page(parent)
 {
+}
+
+void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
+{
+    QString url = launchArgs.value("url").toString();
+    if (!url.isEmpty()) {
+        qDebug() << "[MainPage] connecting to:" << url;
+    }
+
+    // Restore keepScreenOn, defer JNI to after window is ready
+    m_keepScreenOn = QSettings().value("keepScreenOn", true).toBool();
     QTimer::singleShot(50, this, [this]() { jniKeepScreenOn(m_keepScreenOn); });
+
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
     layout->setPanel(true);
@@ -63,7 +77,6 @@ MainPage::MainPage(QQuickItem* parent)
         QskBoxShapeMetrics(8, Qt::AbsoluteSize));
 
     connect(optionsBtn, &QskAbstractButton::clicked, [this, optionsBtn]() {
-        // 清理旧菜单（避免残留动画状态导致崩溃）
         for (auto* old : findChildren<QskMenu*>())
             old->deleteLater();
         for (auto* old : findChildren<MenuOverlay*>())
@@ -94,11 +107,11 @@ MainPage::MainPage(QQuickItem* parent)
                 jniKeepScreenOn(m_keepScreenOn);
                 emit keepScreenOnChanged(m_keepScreenOn);
             } else if (index == 2) {
-                emit settingsRequested();
+                pageManager()->open("settings");
             } else if (index == 4) {
-                emit aboutRequested();
+                pageManager()->open("about");
             } else if (index == 6) {
-                emit logoutRequested();
+                pageManager()->replace("login");
             }
             if (auto* m = qobject_cast<QskMenu*>(sender()))
                 m->close();
@@ -147,6 +160,14 @@ MainPage::MainPage(QQuickItem* parent)
     sendBtn->setPreferredWidth(48);
     sendBtn->setPreferredHeight(40);
     inputBar->addSpacer(8, 0);
+}
+
+void MainPage::onNewIntent(const QVariantMap& launchArgs)
+{
+    QString url = launchArgs.value("url").toString();
+    if (!url.isEmpty()) {
+        qDebug() << "[MainPage] onNewIntent, url:" << url;
+    }
 }
 
 void MainPage::showToast(const QString& msg, int durationMs) {

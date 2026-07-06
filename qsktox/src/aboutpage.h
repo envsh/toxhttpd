@@ -1,16 +1,16 @@
 #ifndef ABOUT_PAGE_H
 #define ABOUT_PAGE_H
 
-#include <QskControl.h>
+#include "page.h"
 
-class AboutPage : public QskControl
+class AboutPage : public Page
 {
-    Q_OBJECT
 public:
     AboutPage(QQuickItem* parent = nullptr);
 
-Q_SIGNALS:
-    void backRequested();
+protected:
+    void onCreate(const QVariantMap& launchArgs,
+                  const QVariantMap& savedState) override;
 };
 
 #endif

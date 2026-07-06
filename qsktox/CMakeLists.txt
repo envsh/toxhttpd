@@ -23,6 +23,10 @@ endif()
 
 qt_add_executable(qsktox
     src/main.cpp
+    src/page.h
+    src/page.cpp
+    src/pagemanager.h
+    src/pagemanager.cpp
     src/loginpage.h
     src/loginpage.cpp
     src/menuoverlay.h

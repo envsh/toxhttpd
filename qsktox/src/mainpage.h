@@ -1,12 +1,12 @@
 #ifndef MAIN_PAGE_H
 #define MAIN_PAGE_H
 
-#include <QskControl.h>
+#include "page.h"
 
 class QskTextLabel;
 class QTimer;
 
-class MainPage : public QskControl
+class MainPage : public Page
 {
     Q_OBJECT
 public:
@@ -17,10 +17,12 @@ public:
     void setKeepScreenOn(bool on);
 
 Q_SIGNALS:
-    void settingsRequested();
-    void aboutRequested();
-    void logoutRequested();
     void keepScreenOnChanged(bool on);
+
+protected:
+    void onCreate(const QVariantMap& launchArgs,
+                  const QVariantMap& savedState) override;
+    void onNewIntent(const QVariantMap& launchArgs) override;
 
 private:
     QskTextLabel* m_toastLabel = nullptr;

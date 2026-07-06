@@ -1,16 +1,16 @@
 #ifndef LOGIN_PAGE_H
 #define LOGIN_PAGE_H
 
-#include <QskControl.h>
+#include "page.h"
 
-class LoginPage : public QskControl
+class LoginPage : public Page
 {
-    Q_OBJECT
 public:
     LoginPage(QQuickItem* parent = nullptr);
 
-Q_SIGNALS:
-    void accepted(const QString& url);
+protected:
+    void onCreate(const QVariantMap& launchArgs,
+                  const QVariantMap& savedState) override;
 };
 
 #endif

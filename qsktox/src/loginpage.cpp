@@ -1,10 +1,15 @@
 #include "loginpage.h"
+#include "pagemanager.h"
 #include <QskLinearBox.h>
 #include <QskPushButton.h>
 #include <QskTextLabel.h>
 
 LoginPage::LoginPage(QQuickItem* parent)
-    : QskControl(parent)
+    : Page(parent)
+{
+}
+
+void LoginPage::onCreate(const QVariantMap&, const QVariantMap&)
 {
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
@@ -33,7 +38,7 @@ LoginPage::LoginPage(QQuickItem* parent)
         btn->setPreferredHeight(52);
         const QString url(entries[i].url);
         connect(btn, &QskAbstractButton::clicked, this, [this, url]() {
-            emit accepted(url);
+            pageManager()->replace("main", {{"url", url}});
         });
     }
 

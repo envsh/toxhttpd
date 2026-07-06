@@ -1,13 +1,18 @@
 #ifndef SETTINGS_PAGE_H
 #define SETTINGS_PAGE_H
 
-#include <QskControl.h>
+#include "page.h"
 #include <QskComboBox.h>
 #include <QskSwitchButton.h>
+#include <memory>
+#include <functional>
 
-class SettingsPage : public QskControl
+struct FontSizes {
+    int body = 21, title = 29, caption = 19, global = 16;
+};
+
+class SettingsPage : public Page
 {
-    Q_OBJECT
 public:
     SettingsPage(QQuickItem* parent = nullptr);
 
@@ -21,10 +26,16 @@ public:
     QskSwitchButton* darkModeSwitch() const { return m_darkSwitch; }
     QskComboBox* fontScaleCombo() const { return m_fontScaleCombo; }
 
-Q_SIGNALS:
-    void backRequested();
+    // Shared state accessible from main.cpp
+    static std::shared_ptr<FontSizes> sharedFontSizes;
+    static std::function<void()>     applyAndroidFonts;
+
+protected:
+    void onCreate(const QVariantMap& launchArgs,
+                  const QVariantMap& savedState) override;
 
 private:
+    bool m_signalsConnected = false;
     QskComboBox* m_transitionCombo = nullptr;
     QskComboBox* m_skinCombo = nullptr;
     QskSwitchButton* m_darkSwitch = nullptr;
