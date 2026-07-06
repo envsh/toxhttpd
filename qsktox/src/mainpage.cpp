@@ -7,23 +7,24 @@
 #include <QskBoxShapeMetrics.h>
 #include <QskLabelData.h>
 #include <QTimer>
+#include <QCoreApplication>
 #include <QJniObject>
 
 static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;
 
 static void setKeepScreenOn(bool on) {
 #ifdef Q_OS_ANDROID
-    auto activity = QJniObject::callStaticObjectMethod(
-        "org/qtproject/qt/android/QtNative",
-        "activity", "()Landroid/app/Activity;");
-    if (!activity.isValid()) return;
-    auto window = activity.callObjectMethod(
-        "getWindow", "()Landroid/view/Window;");
-    if (!window.isValid()) return;
-    if (on)
-        window.callMethod<void>("addFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
-    else
-        window.callMethod<void>("clearFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([on]() {
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        if (!activity.isValid()) return;
+        QJniObject window = activity.callObjectMethod(
+            "getWindow", "()Landroid/view/Window;");
+        if (!window.isValid()) return;
+        if (on)
+            window.callMethod<void>("addFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
+        else
+            window.callMethod<void>("clearFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
+    }).waitForFinished();
 #else
     Q_UNUSED(on)
 #endif
@@ -32,7 +33,7 @@ static void setKeepScreenOn(bool on) {
 MainPage::MainPage(QQuickItem* parent)
     : QskControl(parent)
 {
-    setKeepScreenOn(true);
+    QTimer::singleShot(50, this, [this]() { setKeepScreenOn(true); });
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
     layout->setPanel(true);
@@ -66,7 +67,7 @@ MainPage::MainPage(QQuickItem* parent)
             old->deleteLater();
 
         auto* menu = new QskMenu(this);
-        menu->setPopupFlag(QskPopup::CloseOnPressOutside, true);
+        menu->setModal(true);
         menu->addOption(QskLabelData(
             m_keepScreenOn ? QString::fromUtf8("\u2713 Keep Screen On")
                            : QString("  Keep Screen On")));
@@ -95,6 +96,8 @@ MainPage::MainPage(QQuickItem* parent)
             } else if (index == 6) {
                 emit logoutRequested();
             }
+            if (auto* m = qobject_cast<QskMenu*>(sender()))
+                m->close();
         });
 
         menu->open();
