@@ -13,7 +13,7 @@
 
 static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;
 
-static void setKeepScreenOn(bool on) {
+static void jniKeepScreenOn(bool on) {
 #ifdef Q_OS_ANDROID
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([on]() {
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
@@ -34,7 +34,7 @@ static void setKeepScreenOn(bool on) {
 MainPage::MainPage(QQuickItem* parent)
     : QskControl(parent)
 {
-    QTimer::singleShot(50, this, [this]() { setKeepScreenOn(true); });
+    QTimer::singleShot(50, this, [this]() { jniKeepScreenOn(m_keepScreenOn); });
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
     layout->setPanel(true);
@@ -91,7 +91,8 @@ MainPage::MainPage(QQuickItem* parent)
         connect(menu, &QskMenu::triggered, this, [this](int index) {
             if (index == 0) {
                 m_keepScreenOn = !m_keepScreenOn;
-                setKeepScreenOn(m_keepScreenOn);
+                jniKeepScreenOn(m_keepScreenOn);
+                emit keepScreenOnChanged(m_keepScreenOn);
             } else if (index == 2) {
                 emit settingsRequested();
             } else if (index == 4) {
@@ -152,4 +153,9 @@ void MainPage::showToast(const QString& msg, int durationMs) {
     m_toastLabel->setText(msg);
     m_toastLabel->setVisible(true);
     m_toastTimer->start(durationMs);
+}
+
+void MainPage::setKeepScreenOn(bool on) {
+    if (m_keepScreenOn == on) return;
+    m_keepScreenOn = on;
 }

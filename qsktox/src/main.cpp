@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include <QSettings>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -70,6 +71,9 @@ private:
 
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
+
+    QCoreApplication::setOrganizationName("fedlet");
+    QCoreApplication::setApplicationName("qsktox");
 
 #ifdef Q_OS_ANDROID
     qputenv("QSG_RENDER_LOOP", "basic");
@@ -194,6 +198,8 @@ int main(int argc, char* argv[]) {
     QObject::connect(settingsPage->transitionCombo(),
         &QskComboBox::currentIndexChanged,
         [stackBox, &currentAnimator](int index) {
+            QSettings().setValue("transition", index);
+            qDebug() << "[qsktox] saved transition:" << index;
             QskStackBoxAnimator* newAnim = nullptr;
             switch (index) {
                 case 0: newAnim = new QskStackBoxAnimator1(stackBox); break;
@@ -210,6 +216,8 @@ int main(int argc, char* argv[]) {
     QObject::connect(settingsPage->skinCombo(),
         &QskComboBox::currentIndexChanged,
         [](int index) {
+            QSettings().setValue("skin", index);
+            qDebug() << "[qsktox] saved skin:" << index;
             static const char* names[] = {"Fusion", "Fluent2", "Material3"};
             if (index >= 0 && index < 3) {
                 qskSkinManager->setSkin(names[index]);
@@ -219,6 +227,8 @@ int main(int argc, char* argv[]) {
     QObject::connect(settingsPage->darkModeSwitch(),
         &QskAbstractButton::toggled,
         [](bool checked) {
+            QSettings().setValue("darkMode", checked);
+            qDebug() << "[qsktox] saved darkMode:" << checked;
             auto* s = qskSkinManager->skin();
             if (s) {
                 s->setColorScheme(checked
@@ -229,6 +239,8 @@ int main(int argc, char* argv[]) {
     QObject::connect(settingsPage->fontScaleCombo(),
         &QskComboBox::currentIndexChanged,
         [fontSizes, applyAndroidFonts](int index) {
+            QSettings().setValue("fontScale", index);
+            qDebug() << "[qsktox] saved fontScale:" << index;
             static const int sizes[][4] = {
                 {16, 22, 14, 12},   // Small    (0.75x)
                 {21, 29, 19, 16},   // Medium   (1.0x)
@@ -242,6 +254,51 @@ int main(int argc, char* argv[]) {
                 fontSizes->global  = sizes[index][3];
             }
             applyAndroidFonts();
+        });
+
+    // ── keepScreenOn 保存 ──
+    QObject::connect(mainPage, &MainPage::keepScreenOnChanged,
+        [](bool on) {
+            QSettings().setValue("keepScreenOn", on);
+            qDebug() << "[qsktox] saved keepScreenOn:" << on;
+        });
+
+    // ── 从持久化存储恢复设置 ──
+    {
+        QSettings settings;
+
+        int v;
+        v = settings.value("transition", 3).toInt();
+        settingsPage->transitionCombo()->setCurrentIndex(v);
+        qDebug() << "[qsktox] restored transition:" << v;
+
+        v = settings.value("skin", 0).toInt();
+        settingsPage->skinCombo()->setCurrentIndex(v);
+        qDebug() << "[qsktox] restored skin:" << v;
+
+        bool b = settings.value("darkMode", false).toBool();
+        settingsPage->darkModeSwitch()->setChecked(b);
+        qDebug() << "[qsktox] restored darkMode:" << b;
+
+        v = settings.value("fontScale", 1).toInt();
+        settingsPage->fontScaleCombo()->setCurrentIndex(v);
+        qDebug() << "[qsktox] restored fontScale:" << v;
+
+        b = settings.value("keepScreenOn", true).toBool();
+        mainPage->setKeepScreenOn(b);
+        qDebug() << "[qsktox] restored keepScreenOn:" << b
+                 << "(JNI deferred to 50ms timer)";
+    }
+
+    // ── Android 生命周期 sync ──
+    QObject::connect(&app, &QGuiApplication::applicationStateChanged,
+        [](Qt::ApplicationState state) {
+            if (state == Qt::ApplicationInactive
+             || state == Qt::ApplicationSuspended) {
+                qDebug() << "[qsktox] applicationState:" << state
+                         << "-> syncing QSettings";
+                QSettings().sync();
+            }
         });
 
     QskWindow window;

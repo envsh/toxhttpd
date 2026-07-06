@@ -2,15 +2,19 @@
 #define SETTINGS_PAGE_H
 
 #include <QskControl.h>
-
-class QskComboBox;
-class QskSwitchButton;
+#include <QskComboBox.h>
+#include <QskSwitchButton.h>
 
 class SettingsPage : public QskControl
 {
     Q_OBJECT
 public:
     SettingsPage(QQuickItem* parent = nullptr);
+
+    int transitionIndex() const { return m_transitionCombo->currentIndex(); }
+    int skinIndex() const { return m_skinCombo->currentIndex(); }
+    bool isDarkMode() const { return m_darkSwitch->isChecked(); }
+    int fontScaleIndex() const { return m_fontScaleCombo->currentIndex(); }
 
     QskComboBox* transitionCombo() const { return m_transitionCombo; }
     QskComboBox* skinCombo() const { return m_skinCombo; }
