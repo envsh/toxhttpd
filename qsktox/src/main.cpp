@@ -6,6 +6,7 @@
 #include <QStandardPaths>
 #include <QScreen>
 #include <QskSkinManager.h>
+#include <QskFontRole.h>
 #include <QskWindow.h>
 #include <QskLinearBox.h>
 #include <QskStackBox.h>
@@ -73,6 +74,22 @@ int main(int argc, char* argv[]) {
 
     qskSkinManager->setSkin("Fusion");
     qDebug() << "[qsktox] skin OK:" << qskSkinManager->skinName();
+    qDebug() << "[qsktox] DPI:" << QGuiApplication::primaryScreen()->logicalDotsPerInch()
+             << "dpr:" << QGuiApplication::primaryScreen()->devicePixelRatio();
+
+#ifdef Q_OS_ANDROID
+    // Override skin fonts to use pointSize (DPI-aware) instead of Fusion's pixelSize
+    auto* skin = qskSkinManager->skin();
+    if (skin) {
+        QFont body("sans-serif", 16);
+        skin->setFont({QskFontRole::Body, QskFontRole::Normal}, body);
+
+        QFont title("sans-serif", 22);
+        skin->setFont({QskFontRole::Title, QskFontRole::Normal}, title);
+        skin->setFont({QskFontRole::Caption, QskFontRole::Normal}, QFont("sans-serif", 14));
+        qDebug() << "[qsktox] fonts overridden for Android DPI";
+    }
+#endif
 
     auto* rootBox = new QskLinearBox(Qt::Vertical);
     rootBox->setPanel(true);
