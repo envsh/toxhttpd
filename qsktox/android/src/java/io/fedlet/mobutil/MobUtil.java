@@ -1,4 +1,4 @@
-package mobutil.fedlet.io;
+package io.fedlet.mobutil;
 
 import android.app.Activity;
 import android.view.WindowInsets;

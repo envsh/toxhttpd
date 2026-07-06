@@ -11,8 +11,15 @@ void KeepAlive::start()
 #ifdef Q_OS_ANDROID
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
+
         QJniObject::callStaticMethod<void>(
-            "mobutil/fedlet/io/KeepAliveService",
+            "io/fedlet/mobutil/PermissionHelper",
+            "requestNotificationPermission",
+            "(Landroid/app/Activity;)V",
+            ctx.object());
+
+        QJniObject::callStaticMethod<void>(
+            "io/fedlet/mobutil/KeepAliveService",
             "startService",
             "(Landroid/content/Context;)V",
             ctx.object());
@@ -26,7 +33,7 @@ void KeepAlive::stop()
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
         QJniObject::callStaticMethod<void>(
-            "mobutil/fedlet/io/KeepAliveService",
+            "io/fedlet/mobutil/KeepAliveService",
             "stopService",
             "(Landroid/content/Context;)V",
             ctx.object());

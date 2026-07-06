@@ -49,7 +49,7 @@ cp -R android/src/java/* "$APK_DIR/src/main/java/"
 sed -i '/renderscript\.srcDirs/d' "$APK_DIR/build.gradle"
 
 # 替换包名为 qsktox.fedlet.io
-sed -i 's/package="org\.qtproject\.example\.qsktox"/package="qsktox.fedlet.io"/' \
+sed -i 's/package="org\.qtproject\.example\.qsktox"/package="io.fedlet.qsktox"/' \
     "$APK_DIR/AndroidManifest.xml"
 
 # Android 13+ gesture back bypasses Qt key handling
@@ -60,12 +60,13 @@ sed -i '/android:fullBackupOnly/a\        android:enableOnBackInvokedCallback="f
 sed -i '/<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>/a\
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n\
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n\
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' \
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>\n\
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" \/>' \
     "$APK_DIR/AndroidManifest.xml"
 
 # KeepAlive FG Service: service declaration (before </application>)
 sed -i '/<\/application>/ i\    <service\n\
-        android:name="mobutil.fedlet.io.KeepAliveService"\n\
+        android:name="io.fedlet.mobutil.KeepAliveService"\n\
         android:foregroundServiceType="dataSync"\n\
         android:exported="false"\/>' \
     "$APK_DIR/AndroidManifest.xml"
@@ -75,7 +76,7 @@ cat >> "$APK_DIR/gradle.properties" <<PROPS
 androidBuildToolsVersion=34.0.0
 androidCompileSdkVersion=android-33
 androidNdkVersion=26.1.10909125
-androidPackageName=qsktox.fedlet.io
+androidPackageName=io.fedlet.qsktox
 buildDir=build
 qtAndroidDir=${QT_ANDROID}/src/android/java
 qtMinSdkVersion=23

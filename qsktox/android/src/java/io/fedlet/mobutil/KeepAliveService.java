@@ -1,4 +1,4 @@
-package mobutil.fedlet.io;
+package io.fedlet.mobutil;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
