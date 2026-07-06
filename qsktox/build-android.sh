@@ -15,4 +15,6 @@ cmake .. \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo
   make -j$(nproc)
   echo "=== native build done ==="
-  echo "Run: GRADLE_OPTS=\"-Xmx512m\" make apk"
+  GRADLE_PROP=build-android/android-build/gradle.properties
+  test -f "$GRADLE_PROP" && sed -i 's/-Xmx[0-9]*m/-Xmx386m/' "$GRADLE_PROP"
+  echo "Run: cd build-android/android-build && GRADLE_OPTS=\"-Xmx386m\" ./gradlew --no-daemon assembleDebug"
