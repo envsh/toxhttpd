@@ -525,6 +525,8 @@ bool init_channel_db(SqliteDb& db) {
         "  pubkey             TEXT DEFAULT '',"
         "  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")");
+    ok = ok && db.exec(
+        "CREATE INDEX IF NOT EXISTS idx_channels_last_active ON channels(last_active DESC)");
     // peers v2: drop old single-key table, recreate with composite PK
     // db.exec("DROP TABLE IF EXISTS peers");
     ok = ok && db.exec(
