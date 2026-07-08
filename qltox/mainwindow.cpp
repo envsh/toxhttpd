@@ -486,45 +486,56 @@ MainWindow::MainWindow(QWidget* parent)
     ToxAPI::setEventTarget(this);
     ToxAPI::startPollEvent();
     
-    // 先填充虚拟联系人，确保即使 API 未加载也能看到 Unknown/Sysevent
+    // 从本地 SQLite 加载联系人列表（秒开），然后异步从服务器刷新
     {
-        ContactList seedList;
-        Contact* c = new Contact();
-        c->id = VIRTUAL_UNKNOWN_ID; c->name = "Unknown";
-        c->type = kUnknownType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        c = new Contact();
-        c->id = VIRTUAL_SYSEVENT_ID; c->name = "Sysevent";
-        c->type = kSyseventType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        c = new Contact();
-        c->id = VIRTUAL_REDDIT_ID; c->name = "Reddit";
-        c->type = kTopicType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        c = new Contact();
-        c->id = VIRTUAL_BOOKMARK_ID; c->name = "Bookmark";
-        c->type = kBookmarkType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        c = new Contact();
-        c->id = VIRTUAL_AICHAT_ID; c->name = "AI Chat";
-        c->type = kAichatType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        c = new Contact();
-        c->id = VIRTUAL_PASTEBIN_ID; c->name = "Paste Bin";
-        c->type = kPastebinType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        c = new Contact();
-        c->id = VIRTUAL_TRANSLATE_ID; c->name = "Translate";
-        c->type = kTranslateType; c->status = "online";
-        c->chat_id = ""; c->is_connected = false;
-        seedList.append(c);
-        contactListWidget->setContacts(seedList);
+        auto channels = Storage::instance().channelDb()->load_all_channels();
+        if (!channels.empty()) {
+            ContactList list;
+            m_accumulatedContactData.clear();
+            for (const auto& row : channels) {
+                auto sep = row.chanid.rfind('_');
+                if (sep == std::string::npos) { continue; }
+                std::string type = row.chanid.substr(0, sep);
+                int id = std::stoi(row.chanid.substr(sep + 1));
+
+                ContactData cd;
+                cd.id = id;
+                cd.type = type;
+                cd.name = row.name;
+                cd.status = row.status;
+                cd.chatId = row.pubkey;
+                cd.isConnected = row.is_connected != 0;
+                cd.iconUrl = row.icon_url;
+                m_accumulatedContactData.push_back(cd);
+
+                Contact* c = new Contact();
+                c->id = id;
+                c->name = qFromUtf8(cd.name);
+                c->type = qFromUtf8(cd.type);
+                c->status = qFromUtf8(cd.status);
+                c->chat_id = qFromUtf8(cd.chatId);
+                c->is_connected = cd.isConnected;
+                list.append(c);
+            }
+            contactListWidget->setContacts(list);
+        } else {
+            // 首次运行，DB 为空，用虚拟联系人占位
+            ContactList seedList;
+            auto addSeed = [&](int id, const char* name, const char* type) {
+                Contact* c = new Contact();
+                c->id = id; c->name = name; c->type = type;
+                c->status = "online"; c->chat_id = ""; c->is_connected = false;
+                seedList.append(c);
+            };
+            addSeed(VIRTUAL_UNKNOWN_ID, "Unknown", kUnknownType);
+            addSeed(VIRTUAL_SYSEVENT_ID, "Sysevent", kSyseventType);
+            addSeed(VIRTUAL_REDDIT_ID, "Reddit", kTopicType);
+            addSeed(VIRTUAL_BOOKMARK_ID, "Bookmark", kBookmarkType);
+            addSeed(VIRTUAL_AICHAT_ID, "AI Chat", kAichatType);
+            addSeed(VIRTUAL_PASTEBIN_ID, "Paste Bin", kPastebinType);
+            addSeed(VIRTUAL_TRANSLATE_ID, "Translate", kTranslateType);
+            contactListWidget->setContacts(seedList);
+        }
     }
     
     // 异步加载初始数据

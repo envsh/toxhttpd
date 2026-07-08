@@ -137,6 +137,42 @@ public:
         return rows;
     }
 
+    std::vector<ChannelRow> load_all_channels() override {
+        auto _ = m_conn->get();
+        std::vector<ChannelRow> rows;
+        auto stmt = _->prepare(
+            "SELECT chanid,proto_type,last_message_rowid,last_read_rowid,"
+            "       unread_count,pinned_order,draft_text,muted,"
+            "       name,status,is_connected,last_message_text,"
+            "       last_message_time,last_active,auto_translate,"
+            "       icon_url,pubkey "
+            "FROM channels ORDER BY last_active DESC");
+        if (!stmt.isPrepared()) { return rows; }
+        while (stmt.stepRow()) {
+            ChannelRow row;
+            int i = 0;
+            row.chanid            = stmt.columnText(i++);
+            row.proto_type        = stmt.columnText(i++);
+            row.last_message_rowid= stmt.columnInt64(i++);
+            row.last_read_rowid   = stmt.columnInt64(i++);
+            row.unread_count      = stmt.columnInt(i++);
+            row.pinned_order      = stmt.columnInt(i++);
+            row.draft_text        = stmt.columnText(i++);
+            row.muted             = stmt.columnInt(i++);
+            row.name              = stmt.columnText(i++);
+            row.status            = stmt.columnText(i++);
+            row.is_connected      = stmt.columnInt(i++);
+            row.last_message_text = stmt.columnText(i++);
+            row.last_message_time = stmt.columnText(i++);
+            row.last_active       = stmt.columnInt64(i++);
+            row.auto_translate    = stmt.columnInt(i++);
+            row.icon_url          = stmt.columnText(i++);
+            row.pubkey            = stmt.columnText(i++);
+            rows.push_back(std::move(row));
+        }
+        return rows;
+    }
+
     bool add_peer(const PeerRow& row) override {
         auto _ = m_conn->get();
         auto stmt = _->prepare(
@@ -409,6 +445,15 @@ public:
         auto sync = m_sync;
         post([sync, done]() {
             auto rows = sync->get().load_pinned();
+            if (done) { done(std::move(rows)); }
+        });
+    }
+
+    void load_all_channels(
+            std::function<void(std::vector<ChannelRow>)> done) override {
+        auto sync = m_sync;
+        post([sync, done]() {
+            auto rows = sync->get().load_all_channels();
             if (done) { done(std::move(rows)); }
         });
     }

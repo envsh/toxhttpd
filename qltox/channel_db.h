@@ -65,6 +65,7 @@ public:
     virtual bool update_channel(const char* chanid, const ChannelUpdate& upd) = 0;
     virtual bool delete_channel(const char* chanid) = 0;
     virtual std::vector<ChannelRow> load_pinned() = 0;
+    virtual std::vector<ChannelRow> load_all_channels() = 0;
 
     virtual bool add_contact_channel(const ChannelRow& row) = 0;
     virtual bool update_contact_channel(const ChannelRow& row) = 0;
@@ -98,6 +99,8 @@ public:
                                 std::function<void(bool)> done) = 0;
     virtual void delete_channel(std::string chanid, std::function<void(bool)> done) = 0;
     virtual void load_pinned(std::function<void(std::vector<ChannelRow>)> done) = 0;
+    virtual void load_all_channels(
+        std::function<void(std::vector<ChannelRow>)> done) = 0;
     virtual void add_contact_channel(ChannelRow row, std::function<void(bool)> done) = 0;
     virtual void update_contact_channel(ChannelRow row, std::function<void(bool)> done) = 0;
     virtual void increment_unread(std::string chanid, int delta,
