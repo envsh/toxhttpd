@@ -15,8 +15,6 @@ class LoginDialog : public QDialog {
 public:
     explicit LoginDialog(QWidget* parent = nullptr);
     std::string selectedUrl() const { return m_selectedUrl; }
-    static QString configValue(const QString& key);
-    static bool setConfigValue(const QString& key, const QString& value);
 private slots:
     void onConnect();
     void onClearHistory();

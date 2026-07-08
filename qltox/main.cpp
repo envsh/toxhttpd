@@ -8,18 +8,19 @@
 #include "ThemeManager.h"
 #include "LimeStyle.h"
 #include "chatwidget.h"
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 
 // 读取保存的语言设置（从 config.json）
 static QString loadSavedLanguage() {
-    QString lang = LoginDialog::configValue("lang");
+    QString lang = Config::value("lang");
     return lang.isEmpty() ? "zh-CN" : lang;
 }
 
 // 保存语言设置
 static void saveLanguage(const QString& lang) {
-    LoginDialog::setConfigValue("lang", lang);
+    Config::setValue("lang", lang);
 }
 
 #include "app_icon.xpm"

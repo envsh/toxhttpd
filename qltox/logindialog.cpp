@@ -2,17 +2,13 @@
 #include "translator.h"
 #include "restapi.h"
 #include "limelog.h"
-#include "cJSON.h"
+#include "config.h"
 #ifdef QT3_BUILD
 #include <qtimer.h>
 #else
 #include <QTimer>
 #endif
 #include <thread>
-#include <fstream>
-#include <sstream>
-#include <qdir.h>
-#include <cstdlib>
 
 static size_t writeCb(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total = size * nmemb;
@@ -22,39 +18,6 @@ static size_t writeCb(void* contents, size_t size, size_t nmemb, void* userp) {
 
 static std::string qStrToStd(const QString& s) {
     return std::string(qToUtf8(s).data());
-}
-
-static QString configDir() {
-#ifdef QT3_BUILD
-    return QDir::homeDirPath() + "/.config/qltox";
-#else
-    return QDir::homePath() + "/.config/qltox";
-#endif
-}
-
-static std::string configFilePath() {
-    return qStrToStd(configDir()) + "/config.json";
-}
-
-static cJSON* loadConfig() {
-    std::string path = configFilePath();
-    std::ifstream ifs(path);
-    if (!ifs.is_open()) return nullptr;
-    std::stringstream ss;
-    ss << ifs.rdbuf();
-    return cJSON_Parse(ss.str().c_str());
-}
-
-static bool saveConfig(cJSON* root) {
-    std::string path = configFilePath();
-    std::string dir = path.substr(0, path.rfind('/'));
-    qMkdir(qFromUtf8(dir));
-    char* jsonStr = cJSON_Print(root);
-    std::ofstream ofs(path);
-    bool ok = ofs.is_open();
-    if (ok) { ofs << jsonStr; }
-    free(jsonStr);
-    return ok;
 }
 
 static void qComboAddItem(QComboBox* combo, const QString& text) {
@@ -132,7 +95,7 @@ LoginDialog::LoginDialog(QWidget* parent) : QDialog(parent) {
 
 void LoginDialog::loadHistory() {
     m_urlCombo->clear();
-    cJSON* root = loadConfig();
+    cJSON* root = Config::loadRoot();
     if (!root) {
         qComboAddItem(m_urlCombo, "http://localhost:8181");
         qComboSetCurrent(m_urlCombo, 0);
@@ -167,7 +130,7 @@ void LoginDialog::loadHistory() {
 }
 
 void LoginDialog::saveHistory(const std::string& url) {
-    cJSON* root = loadConfig();
+    cJSON* root = Config::loadRoot();
     if (!root) { root = cJSON_CreateObject(); }
 
     cJSON_DeleteItemFromObject(root, "last_server");
@@ -191,27 +154,8 @@ void LoginDialog::saveHistory(const std::string& url) {
     }
     cJSON_AddItemToObject(root, "server_history", hist);
 
-    saveConfig(root);
+    Config::saveRoot(root);
     cJSON_Delete(root);
-}
-
-QString LoginDialog::configValue(const QString& key) {
-    cJSON* root = loadConfig();
-    if (!root) { return QString(); }
-    cJSON* item = cJSON_GetObjectItem(root, qToUtf8(key).data());
-    QString val = (item && cJSON_IsString(item)) ? qFromUtf8(item->valuestring) : QString();
-    cJSON_Delete(root);
-    return val;
-}
-
-bool LoginDialog::setConfigValue(const QString& key, const QString& value) {
-    cJSON* root = loadConfig();
-    if (!root) { root = cJSON_CreateObject(); }
-    cJSON_DeleteItemFromObject(root, qToUtf8(key).data());
-    cJSON_AddStringToObject(root, qToUtf8(key).data(), qToUtf8(value).data());
-    bool ok = saveConfig(root);
-    cJSON_Delete(root);
-    return ok;
 }
 
 void LoginDialog::onConnect() {
@@ -289,11 +233,11 @@ void LoginDialog::onClearHistory() {
     qComboAddItem(m_urlCombo, "http://localhost:8181");
     qComboSetCurrent(m_urlCombo, 0);
 
-    cJSON* root = loadConfig();
+    cJSON* root = Config::loadRoot();
     if (root) {
         cJSON_DeleteItemFromObject(root, "last_server");
         cJSON_DeleteItemFromObject(root, "server_history");
-        saveConfig(root);
+        Config::saveRoot(root);
         cJSON_Delete(root);
     }
 }
