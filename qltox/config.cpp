@@ -9,6 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <map>
 
 static std::string qStrToStd(const QString& s) {
     return std::string(qToUtf8(s).data());
@@ -55,12 +56,23 @@ bool Config::saveRoot(cJSON* root) {
     return saveConfig(root);
 }
 
+static const std::map<std::string, std::string>& defaultValues() {
+    static const std::map<std::string, std::string> m = {
+        {"uilang", "zh-CN"},
+        {"translate_tolang", "zh-CN"}
+    };
+    return m;
+}
+
 QString Config::value(const QString& key) {
     auto res = hjsonLoad(configFilePath());
-    if (res.isErr()) { return QString(); }
-    Hjson::Value item = res.unwrap()[qToUtf8(key).data()];
-    if (!item.defined()) { return QString(); }
-    return qFromUtf8(item.to_string());
+    std::string k = qToUtf8(key).data();
+    if (res.isOk()) {
+        Hjson::Value item = res.unwrap()[k];
+        if (item.defined()) { return qFromUtf8(item.to_string()); }
+    }
+    auto it = defaultValues().find(k);
+    return it != defaultValues().end() ? qFromUtf8(it->second) : QString();
 }
 
 bool Config::setValue(const QString& key, const QString& value) {

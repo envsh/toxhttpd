@@ -209,9 +209,6 @@ private:
     bool m_selecting;
 
     std::vector<ChatElement> m_items;
-    QString m_targetLang;
-public:
-    void setTargetLang(const QString& lang) { m_targetLang = lang; }
 private:
     std::vector<char> m_gifFrameUpdated;
     int m_totalHeight;

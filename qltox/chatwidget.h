@@ -54,7 +54,8 @@ signals:
 
 private slots:
     void onSendClicked();
-    void onLanguageChanged(int index);
+    void onUilangChanged(int index);
+    void onTranslateTolangChanged(int index);
     void onThemeToggled(bool checked);
     void onStyleChanged(int index);
     void onEmojiClicked();
@@ -88,7 +89,6 @@ private:
     QPushButton* sendBtn;
     QPushButton* m_sendEnBtn;
     EmojiPicker* emojiPicker;
-    std::string m_targetLang;
     bool m_autoTranslateEnabled = false;
 };
 

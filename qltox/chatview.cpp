@@ -2,6 +2,7 @@
 #include "avatar_manager.h"
 #include "chatview.h"
 #include "translate_util.h"
+#include "config.h"
 #include "photoviewer.h"
 #include "LimeScrollBar.h"
 #include "LimeStyle.h"
@@ -3130,15 +3131,14 @@ void ChatView::paintEvent(QPaintEvent* event) {
                 && el.translatedText.isEmpty()
                 && !el.translationInProgress
                 && !el.autoTranslatePending
-                && !m_targetLang.isEmpty()
-                && needsAutoTranslate(el.messageText, m_targetLang))
+                && needsAutoTranslate(el.messageText, Config::value("translate_tolang")))
             {
                 el.autoTranslatePending = true;
                 el.translationInProgress = true;
                 qWarning("ChatView: auto-trigger translate msgIndex=%d lang=%s text=[%.60s]",
-                         (int)i, qToUtf8(m_targetLang).data(),
+                         (int)i, qToUtf8(Config::value("translate_tolang")).data(),
                          qToUtf8(el.messageText).data());
-                emit autoTranslateRequested((int)i, el.messageText, m_targetLang);
+                emit autoTranslateRequested((int)i, el.messageText, Config::value("translate_tolang"));
             }
         }
         if (y > vpH) { break; }

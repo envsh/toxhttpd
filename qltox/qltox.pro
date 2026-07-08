@@ -35,10 +35,10 @@ include(../qlcomp/qlite.pri)
 INCLUDEPATH += ../qlcomp
 macx {
     INCLUDEPATH += /opt/vcpkg/installed/x64-osx-dynamic/include
-    LIBS += -L/opt/vcpkg/installed/x64-osx-dynamic/lib -lhjson
+    LIBS += -L/opt/vcpkg/installed/x64-osx-dynamic/lib -Wl,-rpath,/opt/vcpkg/installed/x64-osx-dynamic/lib -lhjson
 } else {
     INCLUDEPATH += /opt/vcpkg/installed/x64-linux-dynamic/include
-    LIBS += -L/opt/vcpkg/installed/x64-linux-dynamic/lib -lhjson
+    LIBS += -L/opt/vcpkg/installed/x64-linux-dynamic/lib -Wl,-rpath,/opt/vcpkg/installed/x64-linux-dynamic/lib -lhjson
 }
 
 # moc 处理

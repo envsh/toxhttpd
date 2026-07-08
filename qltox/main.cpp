@@ -14,14 +14,9 @@
 
 // 读取保存的语言设置（从 config.json）
 static QString loadSavedLanguage() {
-    QString lang = Config::value("lang");
-    return lang.isEmpty() ? "zh-CN" : lang;
+    return Config::value("uilang");
 }
 
-// 保存语言设置
-static void saveLanguage(const QString& lang) {
-    Config::setValue("lang", lang);
-}
 
 #include "app_icon.xpm"
 

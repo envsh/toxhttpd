@@ -13,6 +13,7 @@
 #include "storage.h"
 #include "channel_db.h"
 #include "cache_db.h"
+#include "config.h"
 #include "cJSON.h"
 #include "jsonview.h"
 #include "appsetup.h"
@@ -330,17 +331,6 @@ static QString formatElapsedMs(int64_t ms) {
         return QString::number((int)ms) + "ms";
     }
     return QString::number((int)(ms / 1000)) + "." + QString::number((int)((ms % 1000) / 100)) + "s";
-}
-
-// 保存语言设置
-static void saveLanguage(const QString& lang) {
-    QString home = qGetHomePath();
-    QFile file(home + "/.q3tox_lang");
-    if (qOpenWriteOnly(file)) {
-        QTextStream stream(&file);
-        stream << lang << "\n";
-        file.close();
-    }
 }
 
 static void initDemoWidgets() {
@@ -1915,7 +1905,6 @@ void MainWindow::handleEvents(const EventList& events) {
 }
 
 void MainWindow::onLanguageChanged(const QString& langCode) {
-    saveLanguage(langCode);
     Translator::instance().loadLanguage(langCode);
     QtappSetup::installQtTranslations(langCode);
 }

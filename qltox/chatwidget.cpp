@@ -9,6 +9,7 @@
 #include <QTimer>
 #endif
 
+#include "config.h"
 #include "ThemeManager.h"
 #ifdef QT3_BUILD
 #include <qfiledialog.h>
@@ -16,7 +17,7 @@
 #include <QFileDialog>
 #endif
 
-ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN") {
+ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     if (s_autoTranslateArg) { m_autoTranslateEnabled = true; }
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 0, 0);
     mainLayout->setSpacing(0);
@@ -50,7 +51,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     langSelector->insertItem(2, qFromUtf8("English"));
     langSelector->setCurrentIndex(0);
 #endif
-    connect(langSelector, SIGNAL(activated(int)), this, SLOT(onLanguageChanged(int)));
+    connect(langSelector, SIGNAL(activated(int)), this, SLOT(onUilangChanged(int)));
+    connect(langSelector, SIGNAL(activated(int)), this, SLOT(onTranslateTolangChanged(int)));
     headerLayout->addWidget(langSelector);
 
     // 风格选择器
@@ -341,16 +343,22 @@ void ChatWidget::retranslateUi() {
     }
 }
 
-void ChatWidget::onLanguageChanged(int index) {
-    QString langCode;
-    if (index == 0) { langCode = "zh-CN"; }
-    else if (index == 1) langCode = "zh-TW";
-    else if (index == 2) langCode = "en-US";
-    else langCode = "zh-CN"; // 默认
-    m_targetLang = std::string(qToUtf8(langCode).data());
-    messageArea->setTargetLang(langCode);
-    qWarning("ChatWidget: language changed to %s", qToUtf8(langCode).data());
+static QString langCodeFromIndex(int index) {
+    if (index == 0) return "zh-CN";
+    if (index == 1) return "zh-TW";
+    if (index == 2) return "en-US";
+    return "zh-CN";
+}
+
+void ChatWidget::onUilangChanged(int index) {
+    QString langCode = langCodeFromIndex(index);
+    Config::setValue("uilang", langCode);
+    qWarning("ChatWidget: uilang changed to %s", qToUtf8(langCode).data());
     emit languageChanged(langCode);
+}
+
+void ChatWidget::onTranslateTolangChanged(int index) {
+    Config::setValue("translate_tolang", langCodeFromIndex(index));
 }
 
 void ChatWidget::onTranslateClicked(int msgIndex) {
@@ -368,7 +376,7 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
     msg.translationInProgress = true;
     messageArea->triggerRelayout(msgIndex);
     emit translateRequested(msgIndex, msg.messageText,
-                            qFromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
+                            Config::value("translate_tolang"));
 }
 
 void ChatWidget::onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang) {
