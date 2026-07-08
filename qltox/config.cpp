@@ -1,5 +1,6 @@
 #include "config.h"
 #include "compat34.h"
+#include "hjson_wrap.h"
 #ifdef QT3_BUILD
 #include <qdir.h>
 #else
@@ -55,20 +56,18 @@ bool Config::saveRoot(cJSON* root) {
 }
 
 QString Config::value(const QString& key) {
-    cJSON* root = loadConfig();
-    if (!root) { return QString(); }
-    cJSON* item = cJSON_GetObjectItem(root, qToUtf8(key).data());
-    QString val = (item && cJSON_IsString(item)) ? qFromUtf8(item->valuestring) : QString();
-    cJSON_Delete(root);
-    return val;
+    auto res = hjsonLoad(configFilePath());
+    if (res.isErr()) { return QString(); }
+    Hjson::Value item = res.unwrap()[qToUtf8(key).data()];
+    if (!item.defined()) { return QString(); }
+    return qFromUtf8(item.to_string());
 }
 
 bool Config::setValue(const QString& key, const QString& value) {
-    cJSON* root = loadConfig();
-    if (!root) { root = cJSON_CreateObject(); }
-    cJSON_DeleteItemFromObject(root, qToUtf8(key).data());
-    cJSON_AddStringToObject(root, qToUtf8(key).data(), qToUtf8(value).data());
-    bool ok = saveConfig(root);
-    cJSON_Delete(root);
-    return ok;
+    auto res = hjsonLoad(configFilePath());
+    Hjson::Value root = res.isOk()
+        ? std::move(res.unwrap())
+        : Hjson::Value(Hjson::Type::Map);
+    root[qToUtf8(key).data()] = qToUtf8(value).data();
+    return hjsonSave(root, configFilePath()).isOk();
 }

@@ -33,6 +33,13 @@ include(../qlcomp/qlite.pri)
 
 # 使 qltox/ 中的 #include "compat34.h" 能找到 qlcomp/
 INCLUDEPATH += ../qlcomp
+macx {
+    INCLUDEPATH += /opt/vcpkg/installed/x64-osx-dynamic/include
+    LIBS += -L/opt/vcpkg/installed/x64-osx-dynamic/lib -lhjson
+} else {
+    INCLUDEPATH += /opt/vcpkg/installed/x64-linux-dynamic/include
+    LIBS += -L/opt/vcpkg/installed/x64-linux-dynamic/lib -lhjson
+}
 
 # moc 处理
 MOC_DIR = .
