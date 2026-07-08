@@ -101,6 +101,9 @@ private:
     std::map<uint32_t, QPixmap> m_circularAvatarCache;
     std::vector<RowPixmapCache> m_rowCache;
     int m_avatarSize = 0;
+#ifdef QT3_BUILD
+    QPixmap m_backBuffer;
+#endif
 public:
     int selectedId() const { return m_selId; }
     QString selectedType() const { return m_selType; }
