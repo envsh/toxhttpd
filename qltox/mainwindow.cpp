@@ -489,53 +489,44 @@ MainWindow::MainWindow(QWidget* parent)
     // 从本地 SQLite 加载联系人列表（秒开），然后异步从服务器刷新
     {
         auto channels = Storage::instance().channelDb()->load_all_channels();
-        if (!channels.empty()) {
-            ContactList list;
-            m_accumulatedContactData.clear();
-            for (const auto& row : channels) {
-                auto sep = row.chanid.rfind('_');
-                if (sep == std::string::npos) { continue; }
-                std::string type = row.chanid.substr(0, sep);
-                int id = std::stoi(row.chanid.substr(sep + 1));
+        ContactList list;
+        m_accumulatedContactData.clear();
 
-                ContactData cd;
-                cd.id = id;
-                cd.type = type;
-                cd.name = row.name;
-                cd.status = row.status;
-                cd.chatId = row.pubkey;
-                cd.isConnected = row.is_connected != 0;
-                cd.iconUrl = row.icon_url;
-                m_accumulatedContactData.push_back(cd);
+        for (const auto& row : channels) {
+            // 解析 chanid: "friend_5" → type="friend", id=5
+            auto sep = row.chanid.rfind('_');
+            if (sep == std::string::npos) { continue; }
+            std::string type = row.chanid.substr(0, sep);
+            int id = std::stoi(row.chanid.substr(sep + 1));
 
-                Contact* c = new Contact();
-                c->id = id;
-                c->name = qFromUtf8(cd.name);
-                c->type = qFromUtf8(cd.type);
-                c->status = qFromUtf8(cd.status);
-                c->chat_id = qFromUtf8(cd.chatId);
-                c->is_connected = cd.isConnected;
-                list.append(c);
-            }
-            contactListWidget->setContacts(list);
-        } else {
-            // 首次运行，DB 为空，用虚拟联系人占位
-            ContactList seedList;
-            auto addSeed = [&](int id, const char* name, const char* type) {
-                Contact* c = new Contact();
-                c->id = id; c->name = name; c->type = type;
-                c->status = "online"; c->chat_id = ""; c->is_connected = false;
-                seedList.append(c);
-            };
-            addSeed(VIRTUAL_UNKNOWN_ID, "Unknown", kUnknownType);
-            addSeed(VIRTUAL_SYSEVENT_ID, "Sysevent", kSyseventType);
-            addSeed(VIRTUAL_REDDIT_ID, "Reddit", kTopicType);
-            addSeed(VIRTUAL_BOOKMARK_ID, "Bookmark", kBookmarkType);
-            addSeed(VIRTUAL_AICHAT_ID, "AI Chat", kAichatType);
-            addSeed(VIRTUAL_PASTEBIN_ID, "Paste Bin", kPastebinType);
-            addSeed(VIRTUAL_TRANSLATE_ID, "Translate", kTranslateType);
-            contactListWidget->setContacts(seedList);
+            ContactData cd;
+            cd.id = id; cd.type = type; cd.name = row.name;
+            cd.status = row.status; cd.chatId = row.pubkey;
+            cd.isConnected = row.is_connected != 0; cd.iconUrl = row.icon_url;
+            m_accumulatedContactData.push_back(cd);
+
+            Contact* c = new Contact();
+            c->id = id; c->name = qFromUtf8(cd.name);
+            c->type = qFromUtf8(cd.type); c->status = qFromUtf8(cd.status);
+            c->chat_id = qFromUtf8(cd.chatId); c->is_connected = cd.isConnected;
+            list.append(c);
         }
+
+        // 追加虚拟联系人（不查 DB，纯硬编码 UI 占位符）
+        auto addSeed = [&](int id, const char* name, const char* type) {
+            Contact* c = new Contact();
+            c->id = id; c->name = name; c->type = type;
+            c->status = "online"; c->chat_id = ""; c->is_connected = false;
+            list.append(c);
+        };
+        addSeed(VIRTUAL_UNKNOWN_ID, "Unknown", kUnknownType);
+        addSeed(VIRTUAL_SYSEVENT_ID, "Sysevent", kSyseventType);
+        addSeed(VIRTUAL_REDDIT_ID, "Reddit", kTopicType);
+        addSeed(VIRTUAL_BOOKMARK_ID, "Bookmark", kBookmarkType);
+        addSeed(VIRTUAL_AICHAT_ID, "AI Chat", kAichatType);
+        addSeed(VIRTUAL_PASTEBIN_ID, "Paste Bin", kPastebinType);
+        addSeed(VIRTUAL_TRANSLATE_ID, "Translate", kTranslateType);
+        contactListWidget->setContacts(list);
     }
     
     // 异步加载初始数据
