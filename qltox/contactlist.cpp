@@ -7,6 +7,7 @@
 #include "LimeStyle.h"
 #include <qmessagebox.h>
 #include <algorithm>
+#include <set>
 #include <qpainter.h>
 #ifdef QT3_BUILD
 #include <qregion.h>
@@ -677,8 +678,26 @@ void ContactListWidget::setContacts(ContactList& contacts) {
             activeBackup[{rd->id, rd->type}] = rd->lastActive;
         }
     }
+    int savedScrollY = m_view->scrollY();
+    int savedSelId = m_view->selectedId();
+    QString savedSelType = m_view->selectedType();
 
-    m_list.clear();
+    // 收集新数据的 key，用于删除过期行
+    std::set<std::pair<int, QString>> newKeys;
+    for (uint i = 0; i < contacts.count(); ++i) {
+        Contact* c = contacts.at(i);
+        newKeys.insert({c->id, c->type});
+    }
+
+    // 删除旧数据中不存在于新数据的行
+    for (int i = m_list.size() - 1; i >= 0; --i) {
+        RowData* rd = m_list.at(i);
+        if (newKeys.find({rd->id, rd->type}) == newKeys.end()) {
+            m_list.remove(rd->id, rd->type);
+        }
+    }
+
+    // Upsert：addToEnd 在已存在时原地更新，不存在时追加
     for (uint i = 0; i < contacts.count(); ++i) {
         Contact* c = contacts.at(i);
         auto rd = std::unique_ptr<RowData>(new RowData());
@@ -706,10 +725,28 @@ void ContactListWidget::setContacts(ContactList& contacts) {
         m_list.addToEnd(std::move(rd));
         delete c;
     }
+
     m_list.sort(m_sortCriteria);
     m_view->invalidateTruncation();
     m_view->invalidateAllCaches();
     refreshView();
+
+    // 恢复选中行
+    if (savedSelId >= 0) {
+        RowData* newRd = m_list.get(savedSelId, savedSelType);
+        m_view->setSelectedIndex(newRd ? newRd->index : -1);
+    }
+
+    // 恢复滚动位置（钳位到新范围）
+    int totalH = m_list.size() * m_itemHeight;
+    int viewH = m_view->height();
+    int maxScroll = (totalH > viewH) ? totalH - viewH : 0;
+    if (savedScrollY > maxScroll) { savedScrollY = maxScroll; }
+    if (savedScrollY < 0) { savedScrollY = 0; }
+    m_view->setScrollY(savedScrollY);
+    m_scrollBar->blockSignals(true);
+    m_scrollBar->setValue(savedScrollY);
+    m_scrollBar->blockSignals(false);
 }
 
 void ContactListWidget::clear() {
