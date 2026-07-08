@@ -87,6 +87,13 @@ jobs:
           sudo ln -sv /opt /opu
           curl -sL "https://github.com/qtchina/qt_build_scripts/releases/download/qt4.8/tde-qt338sh-linux-cjkinput-x64.tar.gz" \
             | sudo tar xzf - -C /opt
+      - name: Install vcpkg and hjson-cpp
+        run: |
+          sudo mkdir -p /opt/vcpkg
+          sudo chown "$(whoami)" /opt/vcpkg
+          git clone --depth 1 https://github.com/Microsoft/vcpkg.git /opt/vcpkg
+          /opt/vcpkg/bootstrap-vcpkg.sh
+          /opt/vcpkg/vcpkg install hjson-cpp --triplet x64-linux-dynamic
       - name: Build qltox with Qt3
         run: |
           export PATH=/opt/qt338sh/bin:$PATH
@@ -118,6 +125,13 @@ jobs:
         run: |
           qmake -v
           which qmake
+      - name: Install vcpkg and hjson-cpp
+        run: |
+          sudo mkdir -p /opt/vcpkg
+          sudo chown "$(whoami)" /opt/vcpkg
+          git clone --depth 1 https://github.com/Microsoft/vcpkg.git /opt/vcpkg
+          /opt/vcpkg/bootstrap-vcpkg.sh
+          /opt/vcpkg/vcpkg install hjson-cpp --triplet x64-osx-dynamic
       - name: Build qltox with Qt5
         run: |
           cd qltox

@@ -1,3 +1,4 @@
+// hjson-cpp 2.6
 #include "hjson_wrap.h"
 #include <cstdio>
 
