@@ -463,6 +463,10 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSending(const QString&)));
     connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
             this, SLOT(onLanguageChanged(const QString&)));
+    /*
+     * Qt3 SIGNAL/SLOT 空格问题：见 chatwidget.cpp 注释
+     * (connect() 不归一化空格，多参数 SIGNAL/SLOT 逗号后空格致静默失败)
+     */
     connect(chatWidget, SIGNAL(translateRequested(int, const QString&, const QString&)),
             this, SLOT(onTranslateRequested(int, const QString&, const QString&)));
     connect(chatWidget, SIGNAL(translateForSendRequested(const QString&, const QString&)),

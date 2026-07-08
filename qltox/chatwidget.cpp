@@ -1,6 +1,7 @@
 #include "chatwidget.h"
 #include "translator.h"
 #include "compat34.h"
+#include <cassert>
 #include "restapi.h"
 #include "translate_util.h"
 #ifdef QT3_BUILD
@@ -96,6 +97,23 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     // 消息区域（虚拟化列表）
     messageArea = new ChatView(this);
     mainLayout->addWidget(messageArea, 1);
+    /*
+     * Qt3 SIGNAL/SLOT 空格问题：
+     *    Qt3 的 connect() 不自动归一化空格 (normalizeSignalSlot 是 protected，
+     *    connect() 不会调用它)。多参数 SIGNAL/SLOT 中逗号后的空格会导致
+     *    moc 字符串与运行时字符串不匹配，连接静默失败。
+     *    Qt4+ 才开始在 connect() 内部 fallback 调用 normalizedSignature()。
+     *
+     * 出处:
+     *   - https://doc.qt.io/archives/3.3/qobject-h.html
+     *     connect() 是 public static，normalizeSignalSlot 是 static protected
+     *   - https://www.trinitydesktop.org/docs/qt3/tqobject.html
+     *     normalizeSignalSlot: "removes unnecessary whitespace" [static protected]
+     *   - https://marcmutz.wordpress.com/effective-qt/prefer-to-use-normalised-signalslot-signatures/
+     *     Qt4 connect() 源码: 首次查找失败后才调用 normalizedSignature()
+     *   - https://github.com/lxqt/libqtxdg/commit/39e75f0
+     *     lxqt 2018 年 normalize 提交：移除 SIGNAL 中空格
+     */
     connect(messageArea, SIGNAL(translateClicked(int)), this, SLOT(onTranslateClicked(int)));
     connect(messageArea, SIGNAL(sourceClicked(int)), this, SIGNAL(sourceClicked(int)));
     connect(messageArea, SIGNAL(retryClicked(int, const QString&, const QString&)), this, SIGNAL(retryClicked(int, const QString&, const QString&)));
@@ -363,31 +381,36 @@ void ChatWidget::onTranslateTolangChanged(int index) {
 
 void ChatWidget::onTranslateClicked(int msgIndex) {
     ChatElement& msg = messageArea->messageAt(msgIndex);
-    if (msg.translationInProgress) { return; }
+    if (msg.transState == TransState::InFlight) { return; }
 
     // Toggle: if already translated, just toggle display
-    if (!msg.translatedText.isEmpty()) {
+    if (msg.transState == TransState::Done && !msg.translatedText.isEmpty()) {
         msg.showTranslation = !msg.showTranslation;
         messageArea->triggerRelayout(msgIndex);
         return;
     }
 
     msg.translateError = QString();
-    msg.translationInProgress = true;
+    msg.transState = TransState::InFlight;
     messageArea->triggerRelayout(msgIndex);
     emit translateRequested(msgIndex, msg.messageText,
                             Config::value("translate_tolang"));
 }
 
 void ChatWidget::onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang) {
-    if (!m_autoTranslateEnabled) { return; }
-    qWarning("ChatWidget: auto-translate request msgIndex=%d toLang=%s text=[%.80s]",
-             msgIndex, qToUtf8(toLang).data(), qToUtf8(text).data());
     if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) { return; }
     ChatElement& msg = messageArea->messageAt(msgIndex);
-    if (msg.translationInProgress || !msg.translatedText.isEmpty()) { return; }
+    assert(msg.transState == TransState::Scheduled);
+
+    if (!m_autoTranslateEnabled) {
+        msg.transState = TransState::None;
+        return;
+    }
+
+    qWarning("ChatWidget: auto-translate request msgIndex=%d toLang=%s text=[%.80s]",
+             msgIndex, qToUtf8(toLang).data(), qToUtf8(text).data());
     msg.translateError = QString();
-    msg.translationInProgress = true;
+    msg.transState = TransState::InFlight;
     messageArea->triggerRelayout(msgIndex);
     emit translateRequested(msgIndex, text, toLang);
 }
@@ -395,13 +418,13 @@ void ChatWidget::onAutoTranslateRequested(int msgIndex, const QString& text, con
 void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage) {
     if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) return;
     ChatElement& msg = messageArea->messageAt(msgIndex);
-    msg.translationInProgress = false;
-    msg.autoTranslatePending = false;
     if (success) {
+        msg.transState = TransState::Done;
         msg.translatedText = translatedText;
         msg.showTranslation = true;
         msg.translateError = QString();
     } else {
+        msg.transState = TransState::Done;
         msg.translateError = errorMessage;
     }
     messageArea->triggerRelayout(msgIndex);

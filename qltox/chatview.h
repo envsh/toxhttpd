@@ -23,6 +23,8 @@
 #include <QMovie>
 #endif
 
+enum class TransState { None, Scheduled, InFlight, Done };
+
 // Block index for binary-search accelerated Y-position lookup.
 // Each block has at most kBlockSize messages; cumulativeHeight is
 // the absolute Y of the first message in the block (including kPad).
@@ -54,8 +56,7 @@ struct ChatElement {
     QString translatedText;
     QString translateError;
     bool showTranslation;
-    bool translationInProgress;
-    bool autoTranslatePending;
+    TransState transState;
     QRect translateBtnRect;
     QRect sourceBtnRect;
 
@@ -94,7 +95,7 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , translationInProgress(false), autoTranslatePending(false), downloadState(NotRequested)
+        , transState(TransState::None), downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , cachedWidth(-1), height(0), firstInGroup(1), sendState(SendSending) {}

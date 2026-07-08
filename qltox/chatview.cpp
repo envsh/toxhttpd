@@ -2622,7 +2622,7 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
             // Check translate button click
             if (m_items[msgIndex].etype != ChatElement::File
                 && m_items[msgIndex].translateBtnRect.contains(event->pos())) {
-                if (!m_items[msgIndex].translationInProgress) {
+                if (m_items[msgIndex].transState != TransState::InFlight) {
                     emit translateClicked(msgIndex);
                 }
                 return;
@@ -3128,13 +3128,10 @@ void ChatView::paintEvent(QPaintEvent* event) {
 
             if (el.etype == ChatElement::Text
                 && !el.messageText.isEmpty()
-                && el.translatedText.isEmpty()
-                && !el.translationInProgress
-                && !el.autoTranslatePending
+                && el.transState == TransState::None
                 && needsAutoTranslate(el.messageText, Config::value("translate_tolang")))
             {
-                el.autoTranslatePending = true;
-                el.translationInProgress = true;
+                el.transState = TransState::Scheduled;
                 qWarning("ChatView: auto-trigger translate msgIndex=%d lang=%s text=[%.60s]",
                          (int)i, qToUtf8(Config::value("translate_tolang")).data(),
                          qToUtf8(el.messageText).data());
