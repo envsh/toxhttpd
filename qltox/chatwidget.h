@@ -18,6 +18,7 @@ class ChatWidget : public QWidget {
     Q_OBJECT
 public:
     ChatWidget(QWidget* parent = 0);
+    static bool s_autoTranslateArg;
     
     void setHeaderText(const QString& text);
     void appendMessage(const QString& message, const QString& type, 
@@ -38,6 +39,7 @@ public:
     void repaintMessages() { messageArea->update(); }
     void retranslateUi();
     void showUnreadBanner(int count);
+    void setAutoTranslateEnabled(bool enabled) { m_autoTranslateEnabled = enabled; }
     
 signals:
     void messageSent(const QString& message);
@@ -61,6 +63,7 @@ private slots:
     void onFilePaste(const QString& filePath);
     void onSendEnClicked();
     void onTranslateClicked(int msgIndex);
+    void onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
     void onMentionClicked(const QString& username);
     void hideUnreadBanner();
 
@@ -86,6 +89,7 @@ private:
     QPushButton* m_sendEnBtn;
     EmojiPicker* emojiPicker;
     std::string m_targetLang;
+    bool m_autoTranslateEnabled = false;
 };
 
 #endif // CHATWIDGET_H

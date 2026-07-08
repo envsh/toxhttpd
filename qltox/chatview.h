@@ -55,6 +55,7 @@ struct ChatElement {
     QString translateError;
     bool showTranslation;
     bool translationInProgress;
+    bool autoTranslatePending;
     QRect translateBtnRect;
     QRect sourceBtnRect;
 
@@ -93,7 +94,7 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , translationInProgress(false), downloadState(NotRequested)
+        , translationInProgress(false), autoTranslatePending(false), downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , cachedWidth(-1), height(0), firstInGroup(1), sendState(SendSending) {}
@@ -162,6 +163,7 @@ signals:
     void downloadNeeded(int msgIndex, const QString& mediaUrl);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
     void resendMessage(int msgIndex);
+    void autoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
 
 private slots:
     void onScrollChanged(int value);
@@ -207,6 +209,10 @@ private:
     bool m_selecting;
 
     std::vector<ChatElement> m_items;
+    QString m_targetLang;
+public:
+    void setTargetLang(const QString& lang) { m_targetLang = lang; }
+private:
     std::vector<char> m_gifFrameUpdated;
     int m_totalHeight;
     int m_scrollPos;

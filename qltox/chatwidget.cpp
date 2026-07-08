@@ -2,6 +2,7 @@
 #include "translator.h"
 #include "compat34.h"
 #include "restapi.h"
+#include "translate_util.h"
 #ifdef QT3_BUILD
 #include <qtimer.h>
 #else
@@ -16,6 +17,7 @@
 #endif
 
 ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN") {
+    if (s_autoTranslateArg) { m_autoTranslateEnabled = true; }
     QBoxLayout* mainLayout = qNewBoxLayout(this, QBoxLayout::TopToBottom, 0, 0);
     mainLayout->setSpacing(0);
     qSetMargins(mainLayout, 0, 0, 0, 0);
@@ -99,6 +101,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent), m_targetLang("zh-CN")
     connect(messageArea, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SIGNAL(openFullSizeImage(int, const QString&)));
     connect(messageArea, SIGNAL(mentionClicked(const QString&)), this, SLOT(onMentionClicked(const QString&)));
+    connect(messageArea, SIGNAL(autoTranslateRequested(int, const QString&, const QString&)),
+            this, SLOT(onAutoTranslateRequested(int, const QString&, const QString&)));
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD
@@ -344,6 +348,7 @@ void ChatWidget::onLanguageChanged(int index) {
     else if (index == 2) langCode = "en-US";
     else langCode = "zh-CN"; // 默认
     m_targetLang = std::string(qToUtf8(langCode).data());
+    messageArea->setTargetLang(langCode);
     qWarning("ChatWidget: language changed to %s", qToUtf8(langCode).data());
     emit languageChanged(langCode);
 }
@@ -366,10 +371,24 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
                             qFromUtf8(m_targetLang.data(), (int)m_targetLang.size()));
 }
 
+void ChatWidget::onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang) {
+    if (!m_autoTranslateEnabled) { return; }
+    qWarning("ChatWidget: auto-translate request msgIndex=%d toLang=%s text=[%.80s]",
+             msgIndex, qToUtf8(toLang).data(), qToUtf8(text).data());
+    if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) { return; }
+    ChatElement& msg = messageArea->messageAt(msgIndex);
+    if (msg.translationInProgress || !msg.translatedText.isEmpty()) { return; }
+    msg.translateError = QString();
+    msg.translationInProgress = true;
+    messageArea->triggerRelayout(msgIndex);
+    emit translateRequested(msgIndex, text, toLang);
+}
+
 void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& translatedText, const QString& errorMessage) {
     if (msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) return;
     ChatElement& msg = messageArea->messageAt(msgIndex);
     msg.translationInProgress = false;
+    msg.autoTranslatePending = false;
     if (success) {
         msg.translatedText = translatedText;
         msg.showTranslation = true;
@@ -428,6 +447,8 @@ void ChatWidget::onFilePaste(const QString& filePath) {
     if (filePath.isEmpty()) { return; }
     emit fileSendRequested(filePath);
 }
+
+bool ChatWidget::s_autoTranslateArg = false;
 
 void ChatWidget::onMentionClicked(const QString& username) {
     QString mention = "@" + username + " ";

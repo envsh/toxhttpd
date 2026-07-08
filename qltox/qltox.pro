@@ -13,7 +13,8 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
               unknownparser.cpp photoviewer.cpp avatar_manager.cpp \
                media_shmem_cache.cpp \
                channel_db.cpp message_db.cpp \
-              pending_db.cpp cache_db.cpp cache_fs.cpp
+                pending_db.cpp cache_db.cpp cache_fs.cpp \
+                translate_util.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
              chatwidget.h chatview.h contactlist.h selfinfo.h \
@@ -23,7 +24,8 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                unknownparser.h photoviewer.h avatar_manager.h \
                media_shmem_cache.h \
                channel_db.h message_db.h \
-              pending_db.h cache_db.h cache_fs.h
+                pending_db.h cache_db.h cache_fs.h \
+                translate_util.h
             
 include(../qlcomp/qlite.pri)
 
