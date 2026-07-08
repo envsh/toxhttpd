@@ -144,6 +144,13 @@ inline TimePoint timeNow() {
     return tp;
 }
 
+inline long long elapsedMs(const TimePoint& start) {
+    TimePoint now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (now.tv_sec - start.tv_sec) * 1000LL
+         + (now.tv_nsec - start.tv_nsec) / 1000000LL;
+}
+
 inline std::string timeSince(const TimePoint& start) {
     TimePoint now;
     clock_gettime(CLOCK_MONOTONIC, &now);

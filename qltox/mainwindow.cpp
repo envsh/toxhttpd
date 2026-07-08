@@ -50,13 +50,18 @@ static const int VIRTUAL_TRANSLATE_ID = -106;
 
 // ── media thumbnail 辅助函数（从原始字节解码 → 缩放到显示尺寸）──
 static QPixmap decodeRawToThumb(const char* data, int len, int mediaW, int mediaH, int maxW) {
+    TimePoint _t0 = timeNow();
     QPixmap tmp;
     tmp.loadFromData((const uchar*)data, len);
     if (tmp.isNull()) {
         std::string s(data, len);
         tmp = decodeWebP(s);
     }
-    if (tmp.isNull()) return QPixmap();
+    if (tmp.isNull()) {
+        long long _el = elapsedMs(_t0); if (_el >= 50) qWarning("SLOW [hangui] decodeRawToThumb took %lldms", _el);
+        return QPixmap();
+    }
+    long long _el = elapsedMs(_t0); if (_el >= 50) qWarning("SLOW [hangui] decodeRawToThumb took %lldms", _el);
     return makeScaledThumb(tmp, mediaW, mediaH, maxW);
 }
 
@@ -573,6 +578,7 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::customEvent(CustomEventBase* event) {
+    TimePoint _t0 = timeNow();
     // 事件轮询结果
     if (event->type() == EventListReadyType) {
         EventListEvent* e = static_cast<EventListEvent*>(event);
@@ -1010,6 +1016,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
             return;
         }
     }
+    long long _el = elapsedMs(_t0); if (_el >= 200) qWarning("SLOW [hangui] customEvent took %lldms", _el);
 }
 
 bool MainWindow::event(QEvent* event) {
@@ -1044,6 +1051,7 @@ void MainWindow::onFirstPaintComplete() {
 }
 
 void MainWindow::onContactSelected(int id, const QString& type, const QString& name) {
+    TimePoint _t0 = timeNow();
     // 如果已经是当前选中的聊天对象，不重新加载（避免清空消息）
     if (id == currentChatId && type == currentChatType) {
         qWarning("onContactSelected: same contact, ignoring");
@@ -1165,6 +1173,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         chatWidget->loadingBar()->showLoading(kLoadMembers, _("loading_members"));
         ToxAPI::getConferenceMembers(id);
     }
+    long long _el = elapsedMs(_t0); if (_el >= 200) qWarning("SLOW [hangui] onContactSelected(%d,%s) took %lldms", id, qToUtf8(type).data(), _el);
 }
 
 // ── 虚拟联系人消息截留 stub ──
@@ -1257,6 +1266,7 @@ void MainWindow::onMessageSending(const QString& message) {
 }
 
 void MainWindow::handleEvents(const EventList& events) {
+    TimePoint _t0 = timeNow();
     contactListWidget->beginBatch();
     for (size_t i = 0; i < events.size(); ++i) {
         const Event& e = events[i];
@@ -1901,6 +1911,7 @@ void MainWindow::handleEvents(const EventList& events) {
         }
     }
     contactListWidget->endBatch();
+    long long _el = elapsedMs(_t0); if (_el >= 500) qWarning("SLOW [hangui] handleEvents(%zu events) took %lldms", events.size(), _el);
 }
 
 void MainWindow::onLanguageChanged(const QString& langCode) {

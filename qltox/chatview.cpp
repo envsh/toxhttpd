@@ -2081,6 +2081,7 @@ void ChatView::attachMessages(std::vector<ChatElement> msgs) {
 }
 
 void ChatView::appendMessage(const ChatElement& msg) {
+    TimePoint _t0 = timeNow();
     // Block index maintenance: start a new block when the last one is full.
     if (m_blocks.empty()) {
         m_blocks.push_back({kPad});
@@ -2128,6 +2129,7 @@ void ChatView::appendMessage(const ChatElement& msg) {
         m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
         updateRect(QRect(width() - 150, height() - 40, 150, 40));
     }
+    long long _el = elapsedMs(_t0); if (_el >= 30) qWarning("SLOW [hangui] appendMessage took %lldms", _el);
 }
 
 void ChatView::clearMessages() {
@@ -3088,6 +3090,7 @@ std::pair<int,int> ChatView::visibleMessageRange() const {
 }
 
 void ChatView::paintEvent(QPaintEvent* event) {
+    TimePoint _t0 = timeNow();
     if (m_backBuffer.size() != size()) {
         m_backBuffer = QPixmap(size());
     }
@@ -3147,6 +3150,7 @@ void ChatView::paintEvent(QPaintEvent* event) {
 
     QPainter p(this);
     p.drawPixmap(0, 0, m_backBuffer);
+    long long _el = elapsedMs(_t0); if (_el >= 50) qWarning("SLOW [hangui] paintEvent took %lldms", _el);
 }
 
 void ChatView::resizeEvent(QResizeEvent* event) {

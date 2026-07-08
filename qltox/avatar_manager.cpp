@@ -51,10 +51,13 @@ QPixmap AvatarManager::makeThumbnail(const QPixmap& source, int size) {
 
 QPixmap AvatarManager::get(const QString& mxcUrl,
                            const QString& senderName, int peerNumber, int size) {
+    TimePoint _t0 = timeNow();
     if (!mxcUrl.isEmpty()) {
         auto it = m_cache.find(mxcUrl);
-        if (it != m_cache.end())
+        if (it != m_cache.end()) {
+            long long _el = elapsedMs(_t0); if (_el >= 50) qWarning("SLOW [hangui] AvatarManager::get(cache) took %lldms", _el);
             return it->second;
+        }
 
         auto dbData = Storage::instance().cacheDb()->get(
             mediaCacheKey("avatar", mxcUrl).c_str());
@@ -62,9 +65,11 @@ QPixmap AvatarManager::get(const QString& mxcUrl,
         if (!dbData.empty() && raw.loadFromData(dbData.data(), dbData.size())) {
             QPixmap scaled = makeThumbnail(raw, size);
             m_cache[mxcUrl] = scaled;
+            long long _el = elapsedMs(_t0); if (_el >= 50) qWarning("SLOW [hangui] AvatarManager::get(db) took %lldms", _el);
             return scaled;
         }
     }
+    long long _el = elapsedMs(_t0); if (_el >= 50) qWarning("SLOW [hangui] AvatarManager::get(identicon) took %lldms", _el);
     return generateIdenticon(avatarSeed(senderName, peerNumber), size);
 }
 
