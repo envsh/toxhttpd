@@ -187,7 +187,13 @@ int main(int argc, char* argv[]) {
 #endif
 
     qDebug() << "[qsktox] calling setPluginPaths...";
-    qskSkinManager->setPluginPaths(QCoreApplication::libraryPaths());
+    {
+        QStringList paths = QCoreApplication::libraryPaths();
+#ifndef Q_OS_ANDROID
+        paths.prepend("/opt/qt/qskinny/lib/qskinny/plugins");
+#endif
+        qskSkinManager->setPluginPaths(paths);
+    }
 
     const auto availableSkins = qskSkinManager->skinNames();
     qDebug() << "[qsktox] available skins:" << availableSkins;
@@ -293,8 +299,27 @@ int main(int argc, char* argv[]) {
         return new LogPage();
     }, {CachePolicy::Transient, LaunchMode::Standard});
 
-    // ── Start with login page ──
+    // ── Window ──
+    QskWindow window;
+    window.setTitle("qsktox");
+    window.addItem(rootBox);
+
+#ifdef Q_OS_ANDROID
+    window.show();
+    qDebug() << "[qsktox] window size:" << window.size()
+             << "contentItem size:" << window.contentItem()->size()
+             << "isExposed:" << window.isExposed();
+#else
+    window.setPreferredSize({420, 780});
+    window.show();
+#endif
+
+    // ── Start with login page ──  (window 已就绪，控件可正常解析 skin hint)
     pageManager->open("login");
+
+#ifdef Q_OS_ANDROID
+    window.update();
+#endif
 
     // ── Application lifecycle → sync QSettings ──
     QObject::connect(&app, &QGuiApplication::applicationStateChanged,
@@ -306,22 +331,6 @@ int main(int argc, char* argv[]) {
                 QSettings().sync();
             }
         });
-
-    // ── Window ──
-    QskWindow window;
-    window.setTitle("qsktox");
-    window.addItem(rootBox);
-
-#ifdef Q_OS_ANDROID
-    window.show();
-    qDebug() << "[qsktox] window size:" << window.size()
-             << "contentItem size:" << window.contentItem()->size()
-             << "isExposed:" << window.isExposed();
-    window.update();
-#else
-    window.setPreferredSize({420, 780});
-    window.show();
-#endif
 
 #ifndef Q_OS_ANDROID
     {

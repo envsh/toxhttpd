@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Gui Qml OpenGL)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick)
 find_package(QSkinny REQUIRED)
 
 if(ANDROID)
@@ -45,7 +45,7 @@ qt_add_executable(qsktox
     src/aboutpage.cpp
 )
 
-target_link_libraries(qsktox PRIVATE Qsk::QSkinny)
+target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick)
 
 if(ANDROID)
     set_target_properties(qsktox PROPERTIES WIN32_EXECUTABLE TRUE)

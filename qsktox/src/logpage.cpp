@@ -2,11 +2,7 @@
 #include "pagemanager.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
-#ifdef __ANDROID__
 #include <QskTextField.h>
-#else
-#include <QskTextInput.h>
-#endif
 #include <QskPushButton.h>
 #include <QskComboBox.h>
 #include <QskScrollView.h>
@@ -60,19 +56,11 @@ void LogPage::onCreate(const QVariantMap&, const QVariantMap&)
     m_levelCombo->addOption(QskLabelData("Error"));
     m_levelCombo->setPreferredWidth(100);
 
-#ifdef __ANDROID__
     {
         auto* field = new QskTextField(filterBar);
         field->setPlaceholderText(QString::fromUtf8("🔍 Search..."));
         m_searchField = field;
     }
-#else
-    {
-        auto* field = new QskTextInput(filterBar);
-        field->setDescription(QString::fromUtf8("🔍 Search..."));
-        m_searchField = field;
-    }
-#endif
     m_searchField->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
     m_searchField->setPreferredHeight(40);
 

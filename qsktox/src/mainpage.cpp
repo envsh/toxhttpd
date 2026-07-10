@@ -3,11 +3,7 @@
 #include "menuoverlay.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
-#ifdef __ANDROID__
 #include <QskTextField.h>
-#else
-#include <QskTextInput.h>
-#endif
 #include <QskPushButton.h>
 #include <QskMenu.h>
 #include <QskBoxShapeMetrics.h>
@@ -161,13 +157,8 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     inputBar->setPreferredHeight(56);
 
     inputBar->addSpacer(8, 0);
-#ifdef __ANDROID__
     auto* input = new QskTextField(inputBar);
     input->setPlaceholderText("Type a message");
-#else
-    auto* input = new QskTextInput(inputBar);
-    input->setDescription("Type a message");
-#endif
     input->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
     input->setPreferredHeight(40);
 
