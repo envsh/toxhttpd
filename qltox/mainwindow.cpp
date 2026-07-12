@@ -26,6 +26,11 @@
 #include "sound.h"
 #include <qfile.h>
 #ifdef QT3_BUILD
+#include <qdatetime.h>
+#else
+#include <QDateTime>
+#endif
+#ifdef QT3_BUILD
 #include <qfileinfo.h>
 #else
 #include <QFileInfo>
@@ -500,6 +505,12 @@ MainWindow::MainWindow(QWidget* parent)
 #endif
 
     m_savedPlayedColor = m_lyrics->playedColor();
+
+    // 时钟显示（无提示时显示当前时间）
+    m_clockTimer = new QTimer(this);
+    connect(m_clockTimer, SIGNAL(timeout()), this, SLOT(showClockOnLyrics()));
+    m_clockTimer->start(1000);
+    showClockOnLyrics();
 
     // 从本地 SQLite 加载联系人列表（秒开），然后异步从服务器刷新
     {
@@ -2441,8 +2452,29 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
 }
 
 void MainWindow::clearLyricsHint() {
-    m_lyrics->setLrcText(QString());
     m_lyrics->setPlayedColor(m_savedPlayedColor);
+    showClockOnLyrics();
+}
+
+void MainWindow::showClockOnLyrics()
+{
+    if (m_msgTimer->isActive()) return;
+
+    static const char* weekDays[] = {
+        "星期一","星期二","星期三","星期四","星期五","星期六","星期日"
+    };
+    time_t raw = time(0);
+    struct tm* now = localtime(&raw);
+    char tzBuf[16] = {};
+    strftime(tzBuf, sizeof(tzBuf), "%z", now);
+    QDate d = QDate::currentDate();
+    QTime t = QTime::currentTime();
+    QString ts = d.toString("yyyy-MM-dd") + " "
+        + t.toString("HH:mm:ss") + " "
+        + tzBuf + " "
+        + weekDays[d.dayOfWeek() - 1];
+    m_lyrics->setLrcText("[00:00.000]" + ts);
+    m_lyrics->setPosition(0);
 }
 
 void MainWindow::onSwitchAccount() {

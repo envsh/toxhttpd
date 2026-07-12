@@ -51,6 +51,7 @@ protected slots:
     void onSetConferenceTitleRequested(int conferenceId);
     void onSwitchAccount();
     void clearLyricsHint();
+    void showClockOnLyrics();
     void loadMessageHistory();
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
     void onTranslateForSendRequested(const QString& text, const QString& targetLang);
@@ -97,6 +98,7 @@ private:
 
     DesktopLyrics* m_lyrics;
     QTimer* m_msgTimer;
+    QTimer* m_clockTimer;
     QColor m_savedPlayedColor;
 };
 
