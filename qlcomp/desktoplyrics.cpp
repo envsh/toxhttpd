@@ -129,16 +129,6 @@ void DesktopLyrics::setupWindow()
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
     setMouseTracking(true);
-    {
-        Display* dpy = QPaintDevice::x11Display();
-        Window win = winId();
-        Atom netWmState = XInternAtom(dpy, "_NET_WM_STATE", False);
-        Atom above = XInternAtom(dpy, "_NET_WM_STATE_ABOVE", False);
-        if (netWmState && above) {
-            XChangeProperty(dpy, win, netWmState, XA_ATOM, 32,
-                            PropModeReplace, (unsigned char*)&above, 1);
-        }
-    }
 #endif
 }
 
