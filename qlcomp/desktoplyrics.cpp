@@ -288,11 +288,8 @@ void DesktopLyrics::parseLrc(const QString& content, std::vector<LrcLine>& out)
             if (colon < 0) continue;
 
             bool ok1 = false, ok2 = false;
-            int min = tag.left(colon).toInt(&ok1);
-            int secEnd = 0;
-            while (secEnd < (int)tag.length() - colon - 1
-                   && tag[colon + 1 + secEnd].isDigit()) secEnd++;
-            int sec = tag.mid(colon + 1, secEnd).toInt(&ok2);
+            int min = tag.left(2).toInt(&ok1);
+            int sec = tag.mid(3, 2).toInt(&ok2);
             if (!ok1 || !ok2) {
                 LrcLine lrc;
                 lrc.time = 0;
