@@ -833,7 +833,8 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
     else if (m_lineMode == LineMode::Suitable) lineMenu->setItemChecked(idSuit, true);
 
     QPopupMenu* fontSizeMenu = new QPopupMenu(&menu);
-    for (int sz = 10; sz <= 40; sz++) {
+    fontSizeMenu->setMinimumWidth(120);
+    for (int sz = 10; sz <= 50; sz += 5) {
         int id = fontSizeMenu->insertItem(QString::number(sz), 1000 + sz);
         if (sz == m_font.pointSize()) fontSizeMenu->setItemChecked(id, true);
     }
@@ -894,7 +895,7 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
 
     QMenu* fontSizeMenu = menu.addMenu("字号");
     QList<QAction*> fontActions;
-    for (int sz = 10; sz <= 40; sz++) {
+    for (int sz = 10; sz <= 50; sz += 5) {
         QAction* a = fontSizeMenu->addAction(QString::number(sz));
         a->setCheckable(true);
         a->setChecked(sz == m_font.pointSize());
