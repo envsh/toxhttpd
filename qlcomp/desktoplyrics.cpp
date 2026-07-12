@@ -6,6 +6,7 @@
 #include <qcolordialog.h>
 #include <qbitmap.h>
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <X11/extensions/shape.h>
 #else
 #include <QPainter>
@@ -32,9 +33,9 @@ static void lrcTrim(QString& s)
 DesktopLyrics::DesktopLyrics()
     : QWidget(0
 #ifdef QT3_BUILD
-      , 0, WStyle_StaysOnTop | WStyle_Customize | WStyle_NoBorder | WStyle_Tool
+      , 0, WStyle_StaysOnTop | WStyle_Customize | WStyle_NoBorder
 #else
-      , Qt::WindowStaysOnTopHint | Qt::FramelessWindowHint | Qt::Tool
+      , Qt::WindowStaysOnTopHint | Qt::FramelessWindowHint
 #endif
       )
     , m_position(0)
@@ -104,11 +105,44 @@ void DesktopLyrics::setupWindow()
         XShapeCombineMask(dpy, win, ShapeInput, 0, 0, None, ShapeSet);
         XSetWindowBackground(dpy, win, BlackPixel(dpy, DefaultScreen(dpy)));
     }
+    {
+        XEvent ev = {};
+        ev.xclient.type = ClientMessage;
+        ev.xclient.display = dpy;
+        ev.xclient.window = win;
+        ev.xclient.message_type = XInternAtom(dpy, "_NET_WM_STATE", False);
+        ev.xclient.format = 32;
+        ev.xclient.data.l[0] = 1; // _NET_WM_STATE_ADD
+        ev.xclient.data.l[1] = XInternAtom(dpy, "_NET_WM_STATE_ABOVE", False);
+        ev.xclient.data.l[2] = 0;
+        ev.xclient.data.l[3] = 0;
+        ev.xclient.data.l[4] = 0;
+        XSendEvent(dpy, DefaultRootWindow(dpy), False,
+                   SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+    }
+    {
+        Atom dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+        Atom typeAtom = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
+        if (dock && typeAtom) {
+            XChangeProperty(dpy, win, typeAtom, XA_ATOM, 32,
+                            PropModeReplace, (unsigned char*)&dock, 1);
+        }
+    }
     XFlush(dpy);
 #else
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
     setMouseTracking(true);
+    {
+        Display* dpy = QPaintDevice::x11Display();
+        Window win = winId();
+        Atom netWmState = XInternAtom(dpy, "_NET_WM_STATE", False);
+        Atom above = XInternAtom(dpy, "_NET_WM_STATE_ABOVE", False);
+        if (netWmState && above) {
+            XChangeProperty(dpy, win, netWmState, XA_ATOM, 32,
+                            PropModeReplace, (unsigned char*)&above, 1);
+        }
+    }
 #endif
 }
 
@@ -119,6 +153,26 @@ void DesktopLyrics::showLyrics()
     QRect screen = QApplication::desktop()->screenGeometry();
     move((screen.width() - width()) / 2, 50);
     raise();
+    // show() 之后再次发送置顶请求（WM 可能在 map 时重置状态）
+#ifdef QT3_BUILD
+    {
+        Display* dpy = QPaintDevice::x11Display();
+        XEvent ev = {};
+        ev.xclient.type = ClientMessage;
+        ev.xclient.display = dpy;
+        ev.xclient.window = winId();
+        ev.xclient.message_type = XInternAtom(dpy, "_NET_WM_STATE", False);
+        ev.xclient.format = 32;
+        ev.xclient.data.l[0] = 1; // _NET_WM_STATE_ADD
+        ev.xclient.data.l[1] = XInternAtom(dpy, "_NET_WM_STATE_ABOVE", False);
+        ev.xclient.data.l[2] = 0;
+        ev.xclient.data.l[3] = 0;
+        ev.xclient.data.l[4] = 0;
+        XSendEvent(dpy, DefaultRootWindow(dpy), False,
+                   SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+        XFlush(dpy);
+    }
+#endif
 }
 
 void DesktopLyrics::hideLyrics()

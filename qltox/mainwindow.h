@@ -99,6 +99,7 @@ private:
     DesktopLyrics* m_lyrics;
     QTimer* m_msgTimer;
     QTimer* m_clockTimer;
+    bool m_hintActive;
     QColor m_savedPlayedColor;
 };
 

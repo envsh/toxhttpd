@@ -504,6 +504,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_msgTimer, SIGNAL(timeout()), this, SLOT(clearLyricsHint()));
 #endif
 
+    m_hintActive = false;
     m_savedPlayedColor = m_lyrics->playedColor();
 
     // 时钟显示（无提示时显示当前时间）
@@ -952,6 +953,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
                 m_lyrics->setPlayedColor(QColor(0xFF,0x44,0x44));
                 m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送失败"));
+                m_hintActive = true;
 #ifdef QT3_BUILD
                 m_msgTimer->start(5000, true);
 #else
@@ -962,6 +964,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 ToastWidget::show(chatWidget, _("send_success").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 2000);
                 m_lyrics->setPlayedColor(QColor(0x00,0xB4,0xD8));
                 m_lyrics->setLrcText(qFromUtf8("[00:00.000]已发送"));
+                m_hintActive = true;
 #ifdef QT3_BUILD
                 m_msgTimer->start(5000, true);
 #else
@@ -1260,6 +1263,7 @@ void MainWindow::onMessageSending(const QString& message) {
         chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
         m_lyrics->setPlayedColor(QColor(0xBB,0xBB,0xBB));
         m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送中..."));
+        m_hintActive = true;
 #ifdef QT3_BUILD
         m_msgTimer->start(5000, true);
 #else
@@ -2452,13 +2456,14 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
 }
 
 void MainWindow::clearLyricsHint() {
+    m_hintActive = false;
     m_lyrics->setPlayedColor(m_savedPlayedColor);
     showClockOnLyrics();
 }
 
 void MainWindow::showClockOnLyrics()
 {
-    if (m_msgTimer->isActive()) return;
+    if (m_hintActive) return;
 
     static const char* weekDays[] = {
         "星期一","星期二","星期三","星期四","星期五","星期六","星期日"
@@ -2472,7 +2477,7 @@ void MainWindow::showClockOnLyrics()
     QString ts = d.toString("yyyy-MM-dd") + " "
         + t.toString("HH:mm:ss") + " "
         + tzBuf + " "
-        + weekDays[d.dayOfWeek() - 1];
+        + qFromUtf8(weekDays[d.dayOfWeek() - 1]);
     m_lyrics->setLrcText("[00:00.000]" + ts);
     m_lyrics->setPosition(0);
 }
