@@ -11,6 +11,8 @@
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
+#include <qtimer.h>
+#include "desktoplyrics.h"
 #include "restapi.h"
 #include "translator.h"
 #include "FramelessHelper.h"
@@ -48,6 +50,7 @@ protected slots:
     void onSetGroupTopicRequested(int groupId);
     void onSetConferenceTitleRequested(int conferenceId);
     void onSwitchAccount();
+    void clearLyricsHint();
     void loadMessageHistory();
     void onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang);
     void onTranslateForSendRequested(const QString& text, const QString& targetLang);
@@ -91,6 +94,10 @@ private:
 
     // 消息缓存：key=(contactId, contactType)，切换联系人时暂存/恢复
     std::map<std::pair<int, std::string>, std::vector<ChatElement>> m_messageCache;
+
+    DesktopLyrics* m_lyrics;
+    QTimer* m_msgTimer;
+    QColor m_savedPlayedColor;
 };
 
 #endif // MAINWINDOW_H

@@ -484,7 +484,23 @@ MainWindow::MainWindow(QWidget* parent)
     EventPoller::start();
     ToxAPI::setEventTarget(this);
     ToxAPI::startPollEvent();
-    
+
+    // 桌面歌词（消息发送/结果提示）
+    m_lyrics = new DesktopLyrics();
+    m_lyrics->setFontSize(24);
+    m_lyrics->setLocked(true);
+    m_lyrics->showLyrics();
+
+    m_msgTimer = new QTimer(this);
+#ifdef QT3_BUILD
+    connect(m_msgTimer, SIGNAL(timeout()), this, SLOT(clearLyricsHint()));
+#else
+    m_msgTimer->setSingleShot(true);
+    connect(m_msgTimer, SIGNAL(timeout()), this, SLOT(clearLyricsHint()));
+#endif
+
+    m_savedPlayedColor = m_lyrics->playedColor();
+
     // 从本地 SQLite 加载联系人列表（秒开），然后异步从服务器刷新
     {
         auto channels = Storage::instance().channelDb()->load_all_channels();
@@ -923,9 +939,24 @@ void MainWindow::customEvent(CustomEventBase* event) {
             }
             if (!evt->success) {
                 ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
+                m_lyrics->setPlayedColor(QColor(0xFF,0x44,0x44));
+                m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送失败"));
+#ifdef QT3_BUILD
+                m_msgTimer->start(5000, true);
+#else
+                m_msgTimer->start(5000);
+#endif
             }
-            else
+            else {
                 ToastWidget::show(chatWidget, _("send_success").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 2000);
+                m_lyrics->setPlayedColor(QColor(0x00,0xB4,0xD8));
+                m_lyrics->setLrcText(qFromUtf8("[00:00.000]已发送"));
+#ifdef QT3_BUILD
+                m_msgTimer->start(5000, true);
+#else
+                m_msgTimer->start(5000);
+#endif
+            }
             chatWidget->repaintMessages();
             return;
         }
@@ -1216,6 +1247,13 @@ void MainWindow::onMessageSending(const QString& message) {
         handleTranslateMessage(message);
     } else {
         chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
+        m_lyrics->setPlayedColor(QColor(0xBB,0xBB,0xBB));
+        m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送中..."));
+#ifdef QT3_BUILD
+        m_msgTimer->start(5000, true);
+#else
+        m_msgTimer->start(5000);
+#endif
         ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
     }
 #else
@@ -2400,6 +2438,11 @@ void MainWindow::onGroupInviteReceived(int friendNumber, const QString& chatId) 
             QMessageBox::information(this, _("group_rejected"), _("group_rejected"));
         }
     }
+}
+
+void MainWindow::clearLyricsHint() {
+    m_lyrics->setLrcText(QString());
+    m_lyrics->setPlayedColor(m_savedPlayedColor);
 }
 
 void MainWindow::onSwitchAccount() {

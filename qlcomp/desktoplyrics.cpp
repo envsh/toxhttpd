@@ -4,6 +4,7 @@
 #include <qapplication.h>
 #include <qpopupmenu.h>
 #include <qcolordialog.h>
+#include <qbitmap.h>
 #else
 #include <QPainter>
 #include <QApplication>
@@ -60,7 +61,11 @@ DesktopLyrics::DesktopLyrics()
     m_font.setPixelSize(28);
     m_font.setBold(true);
 #ifdef QT3_BUILD
-    m_backing = new QPixmap(600, 80);
+    if (!m_transparentBg) {
+        m_backing = new QPixmap(600, 80);
+    } else {
+        m_backing = 0;
+    }
 #endif
     setupWindow();
     updateMinSize();
@@ -86,13 +91,12 @@ void DesktopLyrics::setupWindow()
 #ifdef QT3_BUILD
     setBackgroundMode(Qt::NoBackground);
     setAutoMask(false);
-    setEraseColor(QColor(0, 0, 0));
-#else
     if (m_transparentBg) {
-        setAttribute(Qt::WA_TranslucentBackground);
     } else {
-        setAttribute(Qt::WA_OpaquePaintEvent);
+        clearMask();
     }
+#else
+    setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
     setMouseTracking(true);
 #endif
@@ -424,35 +428,67 @@ void DesktopLyrics::drawLine(QPainter& p, const QString& text, int x, int y, flo
 void DesktopLyrics::paintEvent(QPaintEvent*)
 {
 #ifdef QT3_BUILD
-    if (!m_backing || m_backing->isNull() || m_backing->size() != size()) {
-        delete m_backing;
-        m_backing = new QPixmap(size());
+    bool useBacking = !m_transparentBg;
+    QPainter* pp;
+    if (useBacking) {
+        if (!m_backing || m_backing->isNull() || m_backing->size() != size()) {
+            delete m_backing;
+            m_backing = new QPixmap(size());
+        }
+        pp = new QPainter(m_backing);
+    } else {
+        pp = new QPainter(this);
     }
-    QPainter p(m_backing);
+    QPainter& p = *pp;
 #else
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::TextAntialiasing);
 #endif
 
-    QColor bgColor = m_bgColor;
-    if (m_transparentBg) {
-#ifdef QT3_BUILD
-        bgColor = QColor(20, 20, 20);
-#else
-        bgColor = QColor(0, 0, 0, 180);
-#endif
-    }
     QRect r = rect();
-    p.fillRect(r, bgColor);
+
+    if (!m_transparentBg) {
+        p.fillRect(r, m_bgColor);
+    }
+
+    QRect textBounds;
+    bool hasText = false;
+    int minX = width(), maxX = 0, minY = height(), maxY = 0;
+    auto recordText = [&](int x, int y, int w, int h) {
+        if (x < minX) minX = x; if (x + w > maxX) maxX = x + w;
+        if (y < minY) minY = y; if (y + h > maxY) maxY = y + h;
+        hasText = true;
+    };
 
     if (m_lines.empty() || m_currentLine < 0 || m_currentLine >= (int)m_lines.size()) {
-        p.setPen(QColor(0x88, 0x88, 0x88));
+        QString msg = "No Lyrics";
         p.setFont(m_font);
-        p.drawText(r, Qt::AlignCenter, "No Lyrics");
+        QFontMetrics fm = p.fontMetrics();
+        int tw = fm.width(msg) + 16;
+        int th = fm.height() + 8;
+        int tx = (width() - tw) / 2;
+        int ty = (height() - th) / 2;
+        QRect bgR(tx, ty, tw, th);
+        if (m_transparentBg) {
 #ifdef QT3_BUILD
-        p.end();
-        bitBlt(this, 0, 0, m_backing);
+            // Qt3 不支持 alpha，只靠文字 Stroke
+#else
+            QPainterPath path;
+            path.addRoundedRect(bgR, 6, 6);
+            p.fillPath(path, QColor(0, 0, 0, 180));
+#endif
+            textBounds = bgR;
+        }
+        p.setPen(QColor(0x88, 0x88, 0x88));
+        p.drawText(bgR, Qt::AlignCenter, msg);
+#ifdef QT3_BUILD
+        delete pp;
+        if (useBacking) {
+            bitBlt(this, 0, 0, m_backing);
+        } else if (m_transparentBg) {
+            updateMask(textBounds);
+        }
 #endif
         return;
     }
@@ -465,35 +501,49 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
                     && m_nextLine < (int)m_lines.size();
 
     if (m_lineMode == LineMode::Single || !showNext) {
-        // Single line: center vertically
         const LrcLine& current = m_lines[m_currentLine];
         QString text = current.text;
         int textWidth = fm.width(text);
         int x = (width() - textWidth) / 2;
         if (x < 4) x = 4;
         int y = height() / 2 + fm.ascent() / 2;
+        recordText(x, y - fm.ascent(), textWidth, fh);
         drawLine(p, text, x, y, m_animProgress);
     } else {
-        // Double / Suitable: current line at top, next at bottom
         const LrcLine& current = m_lines[m_currentLine];
+        const LrcLine& next = m_lines[m_nextLine];
         QString curText = current.text;
+        QString nextText = next.text;
         int curTextWidth = fm.width(curText);
+        int nextTextWidth = fm.width(nextText);
         int curX = (width() - curTextWidth) / 2;
         if (curX < 4) curX = 4;
         int curY = height() / 4 + fh / 2;
+        recordText(curX, curY - fm.ascent(), curTextWidth, fh);
         drawLine(p, curText, curX, curY, m_animProgress);
-
-        const LrcLine& next = m_lines[m_nextLine];
-        QString nextText = next.text;
-        int nextTextWidth = fm.width(nextText);
         int nextX = (width() - nextTextWidth) / 2;
         if (nextX < 4) nextX = 4;
         int nextY = height() * 3 / 4 + fh / 2;
+        recordText(nextX, nextY - fm.ascent(), nextTextWidth, fh);
         drawTextWithStroke(p, nextText, nextX, nextY, m_unplayedColor);
     }
 
-    // Hover overlay
-    if (m_hovered) {
+    // Transparent mode: draw rounded bg rect behind text
+    if (m_transparentBg && hasText) {
+        QRect bgRect(minX - 8, minY - 4, maxX - minX + 16, maxY - minY + 8);
+#ifdef QT3_BUILD
+        // Qt3 不支持 alpha，不画背景块，只靠文字 Stroke 保证可读
+#else
+        bgRect = bgRect.intersected(r);
+        QPainterPath path;
+        path.addRoundedRect(bgRect, 6, 6);
+        p.fillPath(path, QColor(0, 0, 0, 180));
+#endif
+        textBounds = bgRect;
+    }
+
+    // Hover overlay (opaque mode only)
+    if (m_hovered && !m_transparentBg) {
 #ifdef QT3_BUILD
         p.fillRect(0, 0, width(), 3, QColor(64, 64, 64));
 #else
@@ -506,15 +556,19 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
     }
 
 #ifdef QT3_BUILD
-    p.end();
-    bitBlt(this, 0, 0, m_backing);
+    delete pp;
+    if (useBacking) {
+        bitBlt(this, 0, 0, m_backing);
+    } else if (m_transparentBg) {
+        updateMask(textBounds);
+    }
 #endif
 }
 
 void DesktopLyrics::resizeEvent(QResizeEvent*)
 {
 #ifdef QT3_BUILD
-    if (m_backing) {
+    if (!m_transparentBg && m_backing) {
         delete m_backing;
         m_backing = new QPixmap(size());
     }
@@ -719,6 +773,27 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
     }
 #endif
 }
+
+#ifdef QT3_BUILD
+void DesktopLyrics::updateMask(const QRect& contentRect)
+{
+    if (contentRect.isEmpty()) {
+        clearMask();
+        return;
+    }
+    QBitmap bm(size());
+    bm.fill(Qt::color0);
+    QPainter bp(&bm);
+    bp.setBrush(Qt::color1);
+    bp.setPen(Qt::NoPen);
+    QRect mr(contentRect.x() - 4, contentRect.y() - 2,
+             contentRect.width() + 8, contentRect.height() + 4);
+    mr = mr.intersect(rect());
+    bp.drawRoundRect(mr, 20, 20);
+    bp.end();
+    setMask(bm);
+}
+#endif
 
 /* 使用示例：
    lyrics->setSetting(LyricsSettings()
