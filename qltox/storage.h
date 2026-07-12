@@ -164,6 +164,8 @@ class MessageDbAsyncInterface;
 class PendingDbSyncInterface;
 class PendingDbSyncSafeInterface;
 class PendingDbAsyncInterface;
+class StickerDbSyncInterface;
+class StickerDbSyncSafeInterface;
 class CacheDbSyncInterface;
 class CacheDbSyncSafeInterface;
 class CacheDbAsyncInterface;
@@ -194,6 +196,7 @@ public:
     MessageDbSyncInterface*    messageDb();
     PendingDbSyncInterface*    pendingDb();
     CacheDbSyncInterface*      cacheDb();
+    StickerDbSyncInterface*    stickerDb();
 
     // 域类 accessors — async（投递到写队列）
     ChannelDbAsyncInterface*   channelDbAsync();
@@ -233,6 +236,7 @@ private:
     std::shared_ptr<MessageDbAsyncInterface>    m_messageDbAsync;
     std::shared_ptr<PendingDbSyncSafeInterface> m_pendingDb;
     std::shared_ptr<PendingDbAsyncInterface>    m_pendingDbAsync;
+    std::shared_ptr<StickerDbSyncSafeInterface> m_stickerDb;
     std::shared_ptr<CacheDbSyncSafeInterface>   m_cacheDbObj;
     std::shared_ptr<CacheDbAsyncInterface>      m_cacheDbAsync;
 

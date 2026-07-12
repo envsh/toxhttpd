@@ -4,6 +4,7 @@
 #include "pending_db.h"
 #include "cache_db.h"
 #include "cache_fs.h"
+#include "sticker_db.h"
 #include <qstring.h>
 
 std::string mediaCacheKey(const char* prefix, const QString& mxcUrl) {
@@ -351,6 +352,7 @@ bool Storage::initSyncDomains() {
     if (!init_channel_db(m_msgDb))   { return false; }
     if (!init_message_db(m_msgDb))   { return false; }
     if (!init_pending_db(m_msgDb))   { return false; }
+    if (!init_sticker_db(m_msgDb))   { return false; }
     if (!init_cache_db(m_cacheDb))   { return false; }
 
     // schema_version
@@ -364,9 +366,10 @@ bool Storage::initSyncDomains() {
     m_channelDb = create_channel_db(m_msgConn);
     m_messageDb = create_message_db(m_msgConn);
     m_pendingDb = create_pending_db(m_msgConn);
+    m_stickerDb = create_sticker_db(m_msgConn);
     m_cacheDbObj = create_cache_db(m_cacheConn, m_dataDir.c_str());
 
-    qDebug("Domain layer init complete in %lldms (4 domains, 10 tables)",
+    qDebug("Domain layer init complete in %lldms (5 domains, 12 tables)",
            elapsedMs(start));
     return true;
 }
@@ -410,6 +413,10 @@ PendingDbSyncInterface* Storage::pendingDb() {
 
 CacheDbSyncInterface* Storage::cacheDb() {
     return m_cacheDbObj ? &m_cacheDbObj->get() : nullptr;
+}
+
+StickerDbSyncInterface* Storage::stickerDb() {
+    return m_stickerDb ? &m_stickerDb->get() : nullptr;
 }
 
 ChannelDbAsyncInterface* Storage::channelDbAsync() {

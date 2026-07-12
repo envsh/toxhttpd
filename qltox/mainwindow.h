@@ -61,6 +61,7 @@ protected slots:
     void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
+    void openStickerManager();
     void onMenu1Stub();
     void onMenu2Stub();
     void openHomePage();

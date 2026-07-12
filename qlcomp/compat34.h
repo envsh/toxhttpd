@@ -15,6 +15,7 @@
 #include <qpopupmenu.h>      // QPopupMenu
 #include <qwidgetstack.h>    // QWidgetStack
 #include <qptrlist.h>        // Qt3 原生 QPtrList<T>
+#include <qobjectlist.h>     // Qt3 QObjectList（完整定义，用于 children()）
 #include <qtextcodec.h>      // QTextCodec
 #else
 #include <qpushbutton.h>     // QPushButton
@@ -123,6 +124,15 @@ typedef QStackedWidget StackedWidget;
 
 void qStackSetCurrent(StackedWidget* stack, QWidget* page);
 void qSetLabelSelectable(QLabel* label);
+
+// ========== Scroll 兼容 ==========
+#ifdef QT3_BUILD
+#include <qscrollview.h>     // QScrollView
+typedef QScrollView ScrollArea;
+#else
+#include <qscrollarea.h>     // QScrollArea
+typedef QScrollArea ScrollArea;
+#endif
 
 // ========== 活动窗口检测 ==========
 bool qIsAppActive(const QWidget* widget = 0);

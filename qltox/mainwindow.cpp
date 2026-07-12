@@ -23,6 +23,7 @@
 #include <qradiobutton.h>
 #include <qinputdialog.h>
 #include "placeholderlineedit.h"
+#include "stickermanager.h"
 #include "sound.h"
 #include <qfile.h>
 #ifdef QT3_BUILD
@@ -582,6 +583,7 @@ MainWindow::MainWindow(QWidget* parent)
     MenuWidget34* tool = mb->addMenu(qFromUtf8("工具(&T)"));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("统计(&T)..."), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("日志(&L)..."), this, SLOT(onMenu1Stub()));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("贴纸管理器(&S)..."), this, SLOT(openStickerManager()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(openSettings()));
 
     MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));
@@ -2979,6 +2981,14 @@ void MainWindow::onSettingsSaved(const SettingsChangedMap& changed) {
                  qPrintable(it.value().toString()));
 #endif
     }
+}
+
+void MainWindow::openStickerManager() {
+    StickerManager* mgr = new StickerManager(_("stickermanager.title"), nullptr);
+    StickerDbSyncInterface* db = Storage::instance().stickerDb();
+    if (db) { mgr->setStickerDb(db); }
+    mgr->loadData();
+    mgr->show();
 }
 
 void MainWindow::onMenu1Stub() {
