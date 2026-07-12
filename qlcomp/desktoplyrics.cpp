@@ -1,5 +1,6 @@
 #include "desktoplyrics.h"
 #ifdef QT3_BUILD
+#include <qdatetime.h>
 #include <qpainter.h>
 #include <qapplication.h>
 #include <qpopupmenu.h>
@@ -9,6 +10,7 @@
 #include <X11/Xatom.h>
 #include <X11/extensions/shape.h>
 #else
+#include <QDateTime>
 #include <QPainter>
 #include <QApplication>
 #include <QDesktopWidget>
@@ -287,8 +289,19 @@ void DesktopLyrics::parseLrc(const QString& content, std::vector<LrcLine>& out)
 
             bool ok1 = false, ok2 = false;
             int min = tag.left(colon).toInt(&ok1);
-            int sec = tag.mid(colon + 1).toInt(&ok2);
-            if (!ok1 || !ok2) continue;
+            int secEnd = 0;
+            while (secEnd < (int)tag.length() - colon - 1
+                   && tag[colon + 1 + secEnd].isDigit()) secEnd++;
+            int sec = tag.mid(colon + 1, secEnd).toInt(&ok2);
+            if (!ok1 || !ok2) {
+                LrcLine lrc;
+                lrc.time = 0;
+                lrc.endTime = -1;
+                lrc.text = QString("[ERR] tag=") + tag + " ok1=" + (ok1?"1":"0") + " ok2=" + (ok2?"1":"0")
+                           + " line=" + line;
+                out.push_back(lrc);
+                continue;
+            }
 
             int frac = 0;
             int dot = -1;
@@ -322,7 +335,14 @@ void DesktopLyrics::parseLrc(const QString& content, std::vector<LrcLine>& out)
             }
         }
 
-        if (startTimes.empty()) continue;
+        if (startTimes.empty()) {
+            LrcLine lrc;
+            lrc.time = 0;
+            lrc.endTime = -1;
+            lrc.text = QString("[ERR] no timestamps in: ") + line;
+            out.push_back(lrc);
+            continue;
+        }
 
         QString text = line.mid(pos);
         lrcTrim(text);
@@ -454,6 +474,36 @@ void DesktopLyrics::setPosition(long long msec)
         m_animTarget = 0.0f;
         update();
     }
+}
+
+void DesktopLyrics::testShowTime()
+{
+    m_lines.clear();
+    LrcLine lrc;
+    lrc.time = 0;
+    lrc.endTime = -1;
+
+    QDate d = QDate::currentDate();
+    QTime t = QTime::currentTime();
+    time_t raw = time(0);
+    struct tm* now = localtime(&raw);
+    char tzBuf[16] = {};
+    strftime(tzBuf, sizeof(tzBuf), "%z", now);
+    static const char* weekDays[] = {
+        "星期一","星期二","星期三","星期四","星期五","星期六","星期日"
+    };
+    QString ts = d.toString("yyyy-MM-dd") + " "
+        + t.toString("HH:mm:ss") + " "
+        + tzBuf + " "
+        + qFromUtf8(weekDays[d.dayOfWeek() - 1]);
+    lrc.text = ts;
+    m_lines.push_back(lrc);
+    m_currentLine = 0;
+    m_nextLine = -1;
+    m_position = 0;
+    m_animProgress = 0.0f;
+    m_animTarget = 0.0f;
+    update();
 }
 
 void DesktopLyrics::drawTextWithStroke(QPainter& p, const QString& text,

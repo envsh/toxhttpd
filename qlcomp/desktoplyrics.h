@@ -79,6 +79,7 @@ public:
 
     void setLrcText(const QString& lrcContent);
     void setPosition(long long msec);
+    void testShowTime();
     void setPlaying(bool playing);
 
     void setPlayedColor(const QColor& c) { m_playedColor = c; update(); }
