@@ -493,7 +493,6 @@ MainWindow::MainWindow(QWidget* parent)
     // 桌面歌词（消息发送/结果提示）
     m_lyrics = new DesktopLyrics();
     m_lyrics->setFontSize(24);
-    m_lyrics->setLocked(true);
     m_lyrics->showLyrics();
 
     m_msgTimer = new QTimer(this);

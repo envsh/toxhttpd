@@ -99,9 +99,6 @@ void DesktopLyrics::setupWindow()
     Window win = winId();
     if (m_transparentBg) {
         XSetWindowBackgroundPixmap(dpy, win, None);
-        Region empty = XCreateRegion();
-        XShapeCombineRegion(dpy, win, ShapeInput, 0, 0, empty, ShapeSet);
-        XDestroyRegion(empty);
     } else {
         clearMask();
         XShapeCombineMask(dpy, win, ShapeInput, 0, 0, None, ShapeSet);
@@ -726,6 +723,8 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         Pixmap xm = (Pixmap)bm.handle();
         XShapeCombineMask(QPaintDevice::x11Display(), winId(),
                           ShapeBounding, 0, 0, xm, ShapeSet);
+        XShapeCombineMask(QPaintDevice::x11Display(), winId(),
+                          ShapeInput, 0, 0, xm, ShapeSet);
         XFlush(QPaintDevice::x11Display());
     }
 #endif
@@ -826,9 +825,9 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
     QPopupMenu menu;
 
     QPopupMenu* lineMenu = new QPopupMenu(&menu);
-    int idSingle = lineMenu->insertItem("单行", 200);
-    int idDouble = lineMenu->insertItem("双行", 201);
-    int idSuit = lineMenu->insertItem("自适应", 202);
+    int idSingle = lineMenu->insertItem(qFromUtf8("单行"), 200);
+    int idDouble = lineMenu->insertItem(qFromUtf8("双行"), 201);
+    int idSuit = lineMenu->insertItem(qFromUtf8("自适应"), 202);
     if (m_lineMode == LineMode::Single) lineMenu->setItemChecked(idSingle, true);
     else if (m_lineMode == LineMode::Double) lineMenu->setItemChecked(idDouble, true);
     else if (m_lineMode == LineMode::Suitable) lineMenu->setItemChecked(idSuit, true);
@@ -839,17 +838,20 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
         if (sz == m_font.pointSize()) fontSizeMenu->setItemChecked(id, true);
     }
 
-    int idPlayed = menu.insertItem("已播放颜色", 300);
-    int idUnplayed = menu.insertItem("未播放颜色", 301);
-    int idStroke = menu.insertItem("描边颜色", 302);
+    int idPlayed = menu.insertItem(qFromUtf8("已播放颜色"), 300);
+    int idUnplayed = menu.insertItem(qFromUtf8("未播放颜色"), 301);
+    int idStroke = menu.insertItem(qFromUtf8("描边颜色"), 302);
     menu.insertSeparator();
-    menu.insertItem("行模式", lineMenu);
-    menu.insertItem("字号", fontSizeMenu);
+    menu.insertItem(qFromUtf8("行模式"), lineMenu);
+    menu.insertItem(qFromUtf8("字号"), fontSizeMenu);
     menu.insertSeparator();
-    int idTrans = menu.insertItem("透明模式", 303);
+    int idTrans = menu.insertItem(qFromUtf8("透明模式"), 303);
     if (m_transparentBg) menu.setItemChecked(idTrans, true);
     menu.insertSeparator();
-    int idHide = menu.insertItem("隐藏", 304);
+    int idLock = menu.insertItem(qFromUtf8("锁定位置"), 305);
+    if (m_locked) menu.setItemChecked(idLock, true);
+    menu.insertSeparator();
+    int idHide = menu.insertItem(qFromUtf8("隐藏"), 304);
 
     int choice = menu.exec(e->globalPos());
 
@@ -874,6 +876,8 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
         m_transparentBg = !m_transparentBg;
         setupWindow();
         update();
+    } else if (choice == 305) {
+        m_locked = !m_locked;
     } else if (choice == 304) {
         hide();
         emit hideRequested();
@@ -905,6 +909,9 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
     QAction* actTrans = menu.addAction("透明模式");
     actTrans->setCheckable(true);
     actTrans->setChecked(m_transparentBg);
+    QAction* actLock = menu.addAction("锁定位置");
+    actLock->setCheckable(true);
+    actLock->setChecked(m_locked);
     menu.addSeparator();
     QAction* actHide = menu.addAction("隐藏");
 
@@ -933,6 +940,8 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
         m_transparentBg = !m_transparentBg;
         setupWindow();
         update();
+    } else if (chosen == actLock) {
+        m_locked = !m_locked;
     } else if (chosen == actHide) {
         hide();
         emit hideRequested();
