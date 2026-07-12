@@ -66,11 +66,8 @@ DesktopLyrics::DesktopLyrics()
     m_font.setPixelSize(28);
     m_font.setBold(true);
 #ifdef QT3_BUILD
-    if (!m_transparentBg) {
-        m_backing = new QPixmap(600, 80);
-    } else {
-        m_backing = 0;
-    }
+    m_backing = new QPixmap(600, 80);
+    m_backing->fill(Qt::color0);
 #endif
     setupWindow();
     updateMinSize();
@@ -537,17 +534,11 @@ void DesktopLyrics::drawLine(QPainter& p, const QString& text, int x, int y, flo
 void DesktopLyrics::paintEvent(QPaintEvent*)
 {
 #ifdef QT3_BUILD
-    bool useBacking = !m_transparentBg;
-    QPainter* pp;
-    if (useBacking) {
-        if (!m_backing || m_backing->isNull() || m_backing->size() != size()) {
-            delete m_backing;
-            m_backing = new QPixmap(size());
-        }
-        pp = new QPainter(m_backing);
-    } else {
-        pp = new QPainter(this);
+    if (!m_backing || m_backing->size() != size()) {
+        delete m_backing;
+        m_backing = new QPixmap(size());
     }
+    QPainter* pp = new QPainter(m_backing);
     QPainter& p = *pp;
 #else
     QPainter p(this);
@@ -556,10 +547,6 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
 #endif
 
     QRect r = rect();
-
-    if (!m_transparentBg) {
-        p.fillRect(r, m_bgColor);
-    }
 
     bool hasText = false;
     int minX = width(), maxX = 0, minY = height(), maxY = 0;
@@ -598,6 +585,8 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
                 Pixmap xm = (Pixmap)bm.handle();
                 XShapeCombineMask(QPaintDevice::x11Display(), winId(),
                                   ShapeBounding, 0, 0, xm, ShapeSet);
+                XShapeCombineMask(QPaintDevice::x11Display(), winId(),
+                                  ShapeInput, 0, 0, xm, ShapeSet);
                 XFlush(QPaintDevice::x11Display());
             }
 #else
@@ -613,9 +602,7 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         }
 #ifdef QT3_BUILD
         delete pp;
-        if (useBacking) {
-            bitBlt(this, 0, 0, m_backing);
-        }
+        bitBlt(this, 0, 0, m_backing);
 #endif
         return;
     }
@@ -681,59 +668,56 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
 
 #ifdef QT3_BUILD
     delete pp;
-    if (useBacking) {
-        bitBlt(this, 0, 0, m_backing);
-    } else if (m_transparentBg) {
-        QBitmap bm(size());
-        bm.fill(Qt::color0);
+    bitBlt(this, 0, 0, m_backing);
+    QBitmap bm(size());
+    bm.fill(Qt::color0);
+    {
+        QPainter bp(&bm);
+        bp.setFont(m_font);
+        QFontMetrics bfm = bp.fontMetrics();
+        int fh2 = bfm.height();
+        bp.setPen(Qt::color1);
+        auto maskAll = [&](int x, int y, const QString& t) {
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                    bp.drawText(x + dx, y + dy, t);
+        };
+        if (m_lineMode == LineMode::Single
+            || !(m_nextLine >= 0 && m_nextLine < (int)m_lines.size()))
         {
-            QPainter bp(&bm);
-            bp.setFont(m_font);
-            QFontMetrics bfm = bp.fontMetrics();
-            int fh2 = bfm.height();
-            bp.setPen(Qt::color1);
-            auto maskAll = [&](int x, int y, const QString& t) {
-                for (int dx = -1; dx <= 1; dx++)
-                    for (int dy = -1; dy <= 1; dy++)
-                        bp.drawText(x + dx, y + dy, t);
-            };
-            if (m_lineMode == LineMode::Single
-                || !(m_nextLine >= 0 && m_nextLine < (int)m_lines.size()))
-            {
-                const QString& t = m_lines[m_currentLine].text;
-                int tw = bfm.width(t);
-                int x = (width() - tw) / 2;
-                if (x < 4) x = 4;
-                int y = height() / 2 + bfm.ascent() / 2;
-                maskAll(x, y, t);
-            } else {
-                const QString& ct = m_lines[m_currentLine].text;
-                const QString& nt = m_lines[m_nextLine].text;
-                int cw = bfm.width(ct), nw = bfm.width(nt);
-                int cx = (width() - cw) / 2;
-                if (cx < 4) cx = 4;
-                int cy = height() / 4 + fh2 / 2;
-                maskAll(cx, cy, ct);
-                int nx = (width() - nw) / 2;
-                if (nx < 4) nx = 4;
-                int ny = height() * 3 / 4 + fh2 / 2;
-                maskAll(nx, ny, nt);
-            }
+            const QString& t = m_lines[m_currentLine].text;
+            int tw = bfm.width(t);
+            int x = (width() - tw) / 2;
+            if (x < 4) x = 4;
+            int y = height() / 2 + bfm.ascent() / 2;
+            maskAll(x, y, t);
+        } else {
+            const QString& ct = m_lines[m_currentLine].text;
+            const QString& nt = m_lines[m_nextLine].text;
+            int cw = bfm.width(ct), nw = bfm.width(nt);
+            int cx = (width() - cw) / 2;
+            if (cx < 4) cx = 4;
+            int cy = height() / 4 + fh2 / 2;
+            maskAll(cx, cy, ct);
+            int nx = (width() - nw) / 2;
+            if (nx < 4) nx = 4;
+            int ny = height() * 3 / 4 + fh2 / 2;
+            maskAll(nx, ny, nt);
         }
-        Pixmap xm = (Pixmap)bm.handle();
-        XShapeCombineMask(QPaintDevice::x11Display(), winId(),
-                          ShapeBounding, 0, 0, xm, ShapeSet);
-        XShapeCombineMask(QPaintDevice::x11Display(), winId(),
-                          ShapeInput, 0, 0, xm, ShapeSet);
-        XFlush(QPaintDevice::x11Display());
     }
+    Pixmap xm = (Pixmap)bm.handle();
+    XShapeCombineMask(QPaintDevice::x11Display(), winId(),
+                      ShapeBounding, 0, 0, xm, ShapeSet);
+    XShapeCombineMask(QPaintDevice::x11Display(), winId(),
+                      ShapeInput, 0, 0, xm, ShapeSet);
+    XFlush(QPaintDevice::x11Display());
 #endif
 }
 
 void DesktopLyrics::resizeEvent(QResizeEvent*)
 {
 #ifdef QT3_BUILD
-    if (!m_transparentBg && m_backing) {
+    if (m_backing) {
         delete m_backing;
         m_backing = new QPixmap(size());
     }
