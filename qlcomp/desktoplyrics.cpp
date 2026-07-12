@@ -18,6 +18,7 @@
 #include <QEasingCurve>
 #include <QMenu>
 #include <QColorDialog>
+#include <QPainterPath>
 #endif
 
 static void lrcTrim(QString& s)

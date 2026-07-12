@@ -17,8 +17,10 @@ $QTDIR/bin/qt-cmake .. \
     -DCMAKE_VERBOSE_MAKEFILE=on \
     -D CMAKE_CXX_FLAGS="-O1" -D CMAKE_C_FLAGS="-O1"
 
-# hotfix
-sed -i 's/-lQt6Qml -lQt6Quick -lQt6OpenGL//g' CMakeFiles/qsktox.dir/link.txt
+# hotfix (Linux only: macOS doesn't have these libs, and BSD sed needs different -i syntax)
+if [ "$(uname)" != "Darwin" ]; then
+    sed -i 's/-lQt6Qml -lQt6Quick -lQt6OpenGL//g' CMakeFiles/qsktox.dir/link.txt
+fi
 
 make -j$(nproc)
 echo "=== done: LD_LIBRARY_PATH=/opt/qt/qskinny/lib/qskinny:$QTDIR/lib ./build-x64/qsktox ==="
