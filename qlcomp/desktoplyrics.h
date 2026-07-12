@@ -129,9 +129,7 @@ private:
     void setupWindow();
     void parseLrc(const QString& content, std::vector<LrcLine>& out);
     void updateMinSize();
-#ifdef QT3_BUILD
-    void updateMask(const QRect& contentRect);
-#endif
+
     void drawLine(QPainter& p, const QString& text, int x, int y, float progress);
     void drawTextWithStroke(QPainter& p, const QString& text, int x, int y,
                             const QColor& fillColor);

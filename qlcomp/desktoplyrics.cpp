@@ -5,6 +5,8 @@
 #include <qpopupmenu.h>
 #include <qcolordialog.h>
 #include <qbitmap.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/shape.h>
 #else
 #include <QPainter>
 #include <QApplication>
@@ -89,12 +91,20 @@ DesktopLyrics::~DesktopLyrics()
 void DesktopLyrics::setupWindow()
 {
 #ifdef QT3_BUILD
-    setBackgroundMode(Qt::NoBackground);
     setAutoMask(false);
+    Display* dpy = QPaintDevice::x11Display();
+    Window win = winId();
     if (m_transparentBg) {
+        XSetWindowBackgroundPixmap(dpy, win, None);
+        Region empty = XCreateRegion();
+        XShapeCombineRegion(dpy, win, ShapeInput, 0, 0, empty, ShapeSet);
+        XDestroyRegion(empty);
     } else {
         clearMask();
+        XShapeCombineMask(dpy, win, ShapeInput, 0, 0, None, ShapeSet);
+        XSetWindowBackground(dpy, win, BlackPixel(dpy, DefaultScreen(dpy)));
     }
+    XFlush(dpy);
 #else
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
@@ -452,7 +462,6 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         p.fillRect(r, m_bgColor);
     }
 
-    QRect textBounds;
     bool hasText = false;
     int minX = width(), maxX = 0, minY = height(), maxY = 0;
     auto recordText = [&](int x, int y, int w, int h) {
@@ -472,22 +481,41 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         QRect bgR(tx, ty, tw, th);
         if (m_transparentBg) {
 #ifdef QT3_BUILD
-            // Qt3 不支持 alpha，只靠文字 Stroke
+            p.setPen(QColor(0x88, 0x88, 0x88));
+            p.drawText(bgR, Qt::AlignCenter, msg);
+            {
+                QBitmap bm(size());
+                bm.fill(Qt::color0);
+                QPainter bp(&bm);
+                bp.setFont(m_font);
+                bp.setPen(Qt::color1);
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++) {
+                        QRect r2(bgR.x() + dx, bgR.y() + dy,
+                                 bgR.width(), bgR.height());
+                        bp.drawText(r2, Qt::AlignCenter, msg);
+                    }
+                bp.end();
+                Pixmap xm = (Pixmap)bm.handle();
+                XShapeCombineMask(QPaintDevice::x11Display(), winId(),
+                                  ShapeBounding, 0, 0, xm, ShapeSet);
+                XFlush(QPaintDevice::x11Display());
+            }
 #else
             QPainterPath path;
             path.addRoundedRect(bgR, 6, 6);
             p.fillPath(path, QColor(0, 0, 0, 180));
+            p.setPen(QColor(0x88, 0x88, 0x88));
+            p.drawText(bgR, Qt::AlignCenter, msg);
 #endif
-            textBounds = bgR;
+        } else {
+            p.setPen(QColor(0x88, 0x88, 0x88));
+            p.drawText(bgR, Qt::AlignCenter, msg);
         }
-        p.setPen(QColor(0x88, 0x88, 0x88));
-        p.drawText(bgR, Qt::AlignCenter, msg);
 #ifdef QT3_BUILD
         delete pp;
         if (useBacking) {
             bitBlt(this, 0, 0, m_backing);
-        } else if (m_transparentBg) {
-            updateMask(textBounds);
         }
 #endif
         return;
@@ -528,19 +556,16 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         drawTextWithStroke(p, nextText, nextX, nextY, m_unplayedColor);
     }
 
-    // Transparent mode: draw rounded bg rect behind text
+    // Transparent bg rect behind text (Qt4 only)
+#ifndef QT3_BUILD
     if (m_transparentBg && hasText) {
         QRect bgRect(minX - 8, minY - 4, maxX - minX + 16, maxY - minY + 8);
-#ifdef QT3_BUILD
-        // Qt3 不支持 alpha，不画背景块，只靠文字 Stroke 保证可读
-#else
         bgRect = bgRect.intersected(r);
         QPainterPath path;
         path.addRoundedRect(bgRect, 6, 6);
         p.fillPath(path, QColor(0, 0, 0, 180));
-#endif
-        textBounds = bgRect;
     }
+#endif
 
     // Hover overlay (opaque mode only)
     if (m_hovered && !m_transparentBg) {
@@ -560,7 +585,46 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
     if (useBacking) {
         bitBlt(this, 0, 0, m_backing);
     } else if (m_transparentBg) {
-        updateMask(textBounds);
+        QBitmap bm(size());
+        bm.fill(Qt::color0);
+        {
+            QPainter bp(&bm);
+            bp.setFont(m_font);
+            QFontMetrics bfm = bp.fontMetrics();
+            int fh2 = bfm.height();
+            bp.setPen(Qt::color1);
+            auto maskAll = [&](int x, int y, const QString& t) {
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        bp.drawText(x + dx, y + dy, t);
+            };
+            if (m_lineMode == LineMode::Single
+                || !(m_nextLine >= 0 && m_nextLine < (int)m_lines.size()))
+            {
+                const QString& t = m_lines[m_currentLine].text;
+                int tw = bfm.width(t);
+                int x = (width() - tw) / 2;
+                if (x < 4) x = 4;
+                int y = height() / 2 + bfm.ascent() / 2;
+                maskAll(x, y, t);
+            } else {
+                const QString& ct = m_lines[m_currentLine].text;
+                const QString& nt = m_lines[m_nextLine].text;
+                int cw = bfm.width(ct), nw = bfm.width(nt);
+                int cx = (width() - cw) / 2;
+                if (cx < 4) cx = 4;
+                int cy = height() / 4 + fh2 / 2;
+                maskAll(cx, cy, ct);
+                int nx = (width() - nw) / 2;
+                if (nx < 4) nx = 4;
+                int ny = height() * 3 / 4 + fh2 / 2;
+                maskAll(nx, ny, nt);
+            }
+        }
+        Pixmap xm = (Pixmap)bm.handle();
+        XShapeCombineMask(QPaintDevice::x11Display(), winId(),
+                          ShapeBounding, 0, 0, xm, ShapeSet);
+        XFlush(QPaintDevice::x11Display());
     }
 #endif
 }
@@ -773,28 +837,6 @@ void DesktopLyrics::contextMenuEvent(QContextMenuEvent* e)
     }
 #endif
 }
-
-#ifdef QT3_BUILD
-void DesktopLyrics::updateMask(const QRect& contentRect)
-{
-    if (contentRect.isEmpty()) {
-        clearMask();
-        return;
-    }
-    QBitmap bm(size());
-    bm.fill(Qt::color0);
-    QPainter bp(&bm);
-    bp.setBrush(Qt::color1);
-    bp.setPen(Qt::NoPen);
-    QRect mr(contentRect.x() - 4, contentRect.y() - 2,
-             contentRect.width() + 8, contentRect.height() + 4);
-    mr = mr.intersect(rect());
-    bp.drawRoundRect(mr, 20, 20);
-    bp.end();
-    setMask(bm);
-}
-#endif
-
 /* 使用示例：
    lyrics->setSetting(LyricsSettings()
        .withPlayedColor("#FF0000")
