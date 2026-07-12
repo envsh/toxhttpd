@@ -224,6 +224,7 @@ void DesktopLyrics::setPlaying(bool playing)
     }
 }
 
+// 备用解析器见 thirdparty/LrcParser.h（遇到 bug 时可替换）
 void DesktopLyrics::parseLrc(const QString& content, std::vector<LrcLine>& out)
 {
     out.clear();
