@@ -1016,7 +1016,6 @@ void MainWindow::customEvent(CustomEventBase* event) {
             }
             if (evt->contactId == currentChatId && evt->contactType == std::string(qToUtf8(currentChatType).data())) {
                 qWarning("MessageHistoryLoaded: %d messages for %s %d", (int)evt->messages.size(), evt->contactType.c_str(), evt->contactId);
-                chatWidget->clearMessages();
                 renderHistoryMessages(evt->messages);
             }
             return;
@@ -1107,12 +1106,6 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         return;
     }
     
-    // 保存当前联系人的消息到缓存（move，不复制）
-    if (currentChatId != -1 && !currentChatType.isEmpty()) {
-        auto key = std::make_pair(currentChatId, std::string(qToUtf8(currentChatType).data()));
-        m_messageCache[key] = chatWidget->detachMessages();
-    }
-    
     qWarning("onContactSelected: id=%d, type=%s", id, qToUtf8(type).data());
     currentChatId = id;
     currentChatType = type;
@@ -1174,34 +1167,17 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         chatWidget->showUnreadBanner(prevUnread);
     
     std::string typeStr = std::string(qToUtf8(type).data());
-    auto key = std::make_pair(id, typeStr);
-    auto cacheIt = m_messageCache.find(key);
-    bool hasCache = (cacheIt != m_messageCache.end());
+    ChatHistory& hist = m_chatbuf.getOrCreate(id, typeStr);
+    chatWidget->setBuffer(&hist);
     
-    if (hasCache) {
-        // 缓存命中：恢复缓存消息，同时后台拉取刷新
-        qWarning("Cache HIT for %s %d: %d msgs", typeStr.c_str(), id, (int)cacheIt->second.size());
-        chatWidget->attachMessages(std::move(cacheIt->second));
-        if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
-            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
-            && type != kFilesyncType && type != kClipboardType
-            && type != kBookmarkType && type != kAichatType
-            && type != kPastebinType && type != kTranslateType) {
-            chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
-            ToxAPI::getMessagesHistory(id, typeStr);
-        }
-    } else {
-        // 缓存未命中
-        qWarning("Cache MISS for %s %d", typeStr.c_str(), id);
-        chatWidget->clearMessages();
-        if (id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
-            && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
-            && type != kFilesyncType && type != kClipboardType
-            && type != kBookmarkType && type != kAichatType
-            && type != kPastebinType && type != kTranslateType) {
-            chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
-            ToxAPI::getMessagesHistory(id, typeStr);
-        }
+    // deque 为空时（首次打开），后台拉取历史
+    if (hist.empty() && id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
+        && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
+        && type != kFilesyncType && type != kClipboardType
+        && type != kBookmarkType && type != kAichatType
+        && type != kPastebinType && type != kTranslateType) {
+        chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
+        ToxAPI::getMessagesHistory(id, typeStr);
     }
     
     // 异步预加载成员列表到 peerInfoMap 缓存（虚拟联系人跳过）
@@ -1296,18 +1272,24 @@ void MainWindow::onMessageSending(const QString& message) {
     }
 #endif
 
-    // 乐观更新：先显示在界面
-    chatWidget->appendMessage(message, "self", "Me", QString(), -1, getCurrentTime());
+    // 乐观更新：先写入 buffer，再显示在界面
     {
-        int lastIdx = chatWidget->messageCount() - 1;
-        if (lastIdx >= 0) {
-            ChatElement& el = chatWidget->mutableMessageAt(lastIdx);
-            el.sendState = ChatElement::SendSending;
-            if (type == kBookmarkType || type == kAichatType
-                || type == kPastebinType || type == kTranslateType) {
-                el.sendState = ChatElement::SendSent;
-            }
+        std::string typeStr = std::string(qToUtf8(currentChatType).data());
+        ChatElement el;
+        el.messageText = message;
+        el.category = "self";
+        el.senderName = "Me";
+        el.peerNumber = -1;
+        el.time = getCurrentTime();
+        m_chatbuf.append(currentChatId, typeStr, el);
+        ChatHistory& hist = m_chatbuf.getOrCreate(currentChatId, typeStr);
+        ChatElement& backEl = hist.back();
+        backEl.sendState = ChatElement::SendSending;
+        if (type == kBookmarkType || type == kAichatType
+            || type == kPastebinType || type == kTranslateType) {
+            backEl.sendState = ChatElement::SendSent;
         }
+        chatWidget->scrollBottomIfNeeded();
     }
     contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message, timenowhm());
     db_writeLastMessage(currentChatId, currentChatType, message, timenowhm());
@@ -1328,9 +1310,14 @@ void MainWindow::handleEvents(const EventList& events) {
                 if (friendIdItem && messageItem) {
                     int friendId = friendIdItem->valueint;
                     QString message = qFromUtf8(cJSON_GetStringValue(messageItem));
+                    ChatElement el;
+                    el.messageText = message;
+                    el.category = "other";
+                    el.peerNumber = friendId;
+                    el.time = getCurrentTime();
+                    m_chatbuf.append(friendId, "friend", el);
                     if (friendId == currentChatId && currentChatType == "friend") {
-                        chatWidget->appendMessage(message, "other", QString(), QString(),
-                                         friendId, getCurrentTime());
+                        chatWidget->scrollBottomIfNeeded();
                     } else {
                         contactListWidget->incrementUnread(friendId, "friend");
                         db_writeUnreadIncrement(friendId, "friend");
@@ -1426,17 +1413,23 @@ void MainWindow::handleEvents(const EventList& events) {
                         updatePeerInDb(key, it->second);
                     }
 
-                    if (confNumber == currentChatId && currentChatType == "conference") {
-                        QString senderName;
-                        QString senderNickname;
+                    {
+                        ChatElement el;
+                        el.messageText = message;
+                        el.category = "other";
+                        el.peerNumber = peerNumber;
+                        el.time = getCurrentTime();
                         if (it != peerInfoMap.end()) {
-                            senderName = qFromUtf8(it->second.name);
+                            el.senderName = qFromUtf8(it->second.name);
                             if (!it->second.nickname.empty())
-                                senderNickname = qFromUtf8(it->second.nickname);
+                                el.senderNickname = qFromUtf8(it->second.nickname);
                         } else if (peerNameItem && cJSON_IsString(peerNameItem)) {
-                            senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
+                            el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
-                        chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime());
+                        m_chatbuf.append(confNumber, "conference", el);
+                    }
+                    if (confNumber == currentChatId && currentChatType == "conference") {
+                        chatWidget->scrollBottomIfNeeded();
                     } else {
                         contactListWidget->incrementUnread(confNumber, "conference");
                         db_writeUnreadIncrement(confNumber, "conference");
@@ -1528,19 +1521,24 @@ void MainWindow::handleEvents(const EventList& events) {
                         updatePeerInDb(key, it->second);
                     }
 
-                    if (groupNumber == currentChatId && currentChatType == "group") {
-                        QString senderName;
-                        QString senderNickname;
-                        QString ipAddress;
+                    {
+                        ChatElement el;
+                        el.messageText = message;
+                        el.category = "other";
+                        el.peerNumber = peerNumber;
+                        el.time = getCurrentTime();
                         if (it != peerInfoMap.end()) {
-                            senderName = qFromUtf8(it->second.name);
-                            ipAddress = qFromUtf8(it->second.peerIp);
+                            el.senderName = qFromUtf8(it->second.name);
+                            el.ipAddress = qFromUtf8(it->second.peerIp);
                             if (!it->second.nickname.empty())
-                                senderNickname = qFromUtf8(it->second.nickname);
+                                el.senderNickname = qFromUtf8(it->second.nickname);
                         } else if (peerNameItem && cJSON_IsString(peerNameItem)) {
-                            senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
+                            el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
-                        chatWidget->appendMessage(message, "other", senderName, senderNickname, peerNumber, getCurrentTime(), "", ipAddress);
+                        m_chatbuf.append(groupNumber, "group", el);
+                    }
+                    if (groupNumber == currentChatId && currentChatType == "group") {
+                        chatWidget->scrollBottomIfNeeded();
                     } else {
                         contactListWidget->incrementUnread(groupNumber, "group");
                         db_writeUnreadIncrement(groupNumber, "group");
@@ -1669,9 +1667,9 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
                 qWarning("Cache PUSH to sysevent %d: type=%s (event.Evt)", VIRTUAL_SYSEVENT_ID, e.type.c_str());
-                m_messageCache[{VIRTUAL_SYSEVENT_ID, kSyseventType}].push_back(msg);
+                m_chatbuf.append(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
-                    chatWidget->appendMessage(msg);
+                    chatWidget->scrollBottomIfNeeded();
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
                     db_writeUnreadIncrement(VIRTUAL_SYSEVENT_ID, kSyseventType);
@@ -1691,9 +1689,9 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_SYSEVENT_ID;
                 msg.time = getCurrentTime();
                 qWarning("Cache PUSH to sysevent %d: type=%s", VIRTUAL_SYSEVENT_ID, e.type.c_str());
-                m_messageCache[{VIRTUAL_SYSEVENT_ID, kSyseventType}].push_back(msg);
+                m_chatbuf.append(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
-                    chatWidget->appendMessage(msg);
+                    chatWidget->scrollBottomIfNeeded();
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
                     db_writeUnreadIncrement(VIRTUAL_SYSEVENT_ID, kSyseventType);
@@ -1868,12 +1866,13 @@ void MainWindow::handleEvents(const EventList& events) {
                     contactListWidget->updateContactLastMessage(
                         chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
                     db_writeLastMessage(chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
+                    m_chatbuf.append(chatId, chatType, msg);
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
-                        chatWidget->appendMessage(msg);
-                        int newIdx = chatWidget->messageCount() - 1;
+                        chatWidget->scrollBottomIfNeeded();
+                        int newIdx = m_chatbuf.getOrCreate(chatId, chatType).size() - 1;
                         if (!hm.mediaUrl.empty() && hm.msgtype != "file") {
                             QString mxc = qFromUtf8(hm.mediaUrl);
-                            ChatElement& el = chatWidget->mutableMessageAt(newIdx);
+                            ChatElement& el = m_chatbuf.getOrCreate(chatId, chatType)[newIdx];
 
                             QByteArray rawBytes = MediaShmemCache::inst().getThumb(mxc);
                             if (!rawBytes.isEmpty()) {
@@ -1897,7 +1896,6 @@ void MainWindow::handleEvents(const EventList& events) {
                             }
                         }
                     } else {
-                        m_messageCache[{chatId, chatType}].push_back(msg);
                         contactListWidget->incrementUnread(chatId, qFromUtf8(chatType));
                         db_writeUnreadIncrement(chatId, qFromUtf8(chatType));
                     }
@@ -1921,12 +1919,12 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_REDDIT_ID;
                 qWarning("Cache PUSH to reddit %d: sender=%s",
                          VIRTUAL_REDDIT_ID, qToUtf8(msg.senderName).data());
-                m_messageCache[{VIRTUAL_REDDIT_ID, kTopicType}].push_back(msg);
+                m_chatbuf.append(VIRTUAL_REDDIT_ID, kTopicType, msg);
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
                 db_writeLastMessage(VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
                 if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType) {
-                    chatWidget->appendMessage(msg);
+                    chatWidget->scrollBottomIfNeeded();
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
                     db_writeUnreadIncrement(VIRTUAL_REDDIT_ID, kTopicType);
@@ -1945,12 +1943,12 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.peerNumber = VIRTUAL_UNKNOWN_ID;
                 qWarning("Cache PUSH to unknown %d: type=%s, handled=%d, sender=%s",
                          VIRTUAL_UNKNOWN_ID, e.type.c_str(), pr.handled, qToUtf8(msg.senderName).data());
-                m_messageCache[{VIRTUAL_UNKNOWN_ID, kUnknownType}].push_back(msg);
+                m_chatbuf.append(VIRTUAL_UNKNOWN_ID, kUnknownType, msg);
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
                 db_writeLastMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
                 if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType) {
-                    chatWidget->appendMessage(msg);
+                    chatWidget->scrollBottomIfNeeded();
                 } else {
                     contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, kUnknownType);
                     db_writeUnreadIncrement(VIRTUAL_UNKNOWN_ID, kUnknownType);
@@ -2273,12 +2271,12 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
         }
         
         if (success) {
-            // 如果是当前聊天对象，清空聊天区
+            // 如果是当前聊天对象，重置视图状态
             if (id == currentChatId && type == currentChatType) {
                 currentChatId = -1;
                 currentChatType = "";
                 chatWidget->setHeaderText(_("select_chat_object"));
-                chatWidget->clearMessages();
+                chatWidget->setBuffer(nullptr);
             }
             // 重新加载联系人列表
             chatWidget->loadingBar()->showLoading(kLoadAll, _("loading_data"));
@@ -2502,7 +2500,8 @@ void MainWindow::onSwitchAccount() {
     currentChatType = "";
     selfPubkey.clear();
     contactListWidget->clear();
-    chatWidget->clearMessages();
+    m_chatbuf = ChatBuffer();
+    chatWidget->setBuffer(nullptr);
     chatWidget->setHeaderText("");
 
     // 重新加载数据
@@ -2513,7 +2512,9 @@ void MainWindow::onSwitchAccount() {
 
 void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messages) {
     if (currentChatId == -1 || currentChatType.isEmpty()) return;
-    
+    std::string typeStr = std::string(qToUtf8(currentChatType).data());
+    ChatHistory& hist = m_chatbuf.getOrCreate(currentChatId, typeStr);
+
     for (const auto& msg : messages) {
         bool isSelf  = (msg.sender_pubkey == selfPubkey);
         QString senderLabel;
@@ -2619,8 +2620,9 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
             el.etype = ChatElement::File;
         }
 
-        chatWidget->appendMessage(el);
+        m_chatbuf.append(currentChatId, typeStr, el);
     }
+    chatWidget->setBuffer(&hist);
 }
 
 void MainWindow::loadMessageHistory() {
@@ -2783,7 +2785,11 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
     el.fileName = fn;
     el.fileSize = (int)sz;
     el.sendState = ChatElement::SendSending;
-    chatWidget->appendMessage(el);
+    {
+        std::string typeStr = std::string(qToUtf8(currentChatType).data());
+        m_chatbuf.append(currentChatId, typeStr, el);
+    }
+    chatWidget->scrollBottomIfNeeded();
 
     ToxAPI::sendMessage(currentChatId, fileType,
                          std::string(), fileIdOverride,

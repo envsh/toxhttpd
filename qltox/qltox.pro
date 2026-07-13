@@ -6,7 +6,7 @@ CONFIG += sdk_no_version_check
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.7
 
 SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
-             chatwidget.cpp chatview.cpp contactlist.cpp selfinfo.cpp \
+             chatwidget.cpp chatview.cpp chatbuffer.cpp contactlist.cpp selfinfo.cpp \
              cJSON.c editinfodialog.cpp conferenceinvitedialog.cpp groupinvitedialog.cpp \
              friendinfodialog.cpp memberlistdialog.cpp logindialog.cpp \
              messageinput.cpp sound.c loadingbar.cpp \
@@ -19,7 +19,7 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
                 sticker_db.cpp stickerpicker.cpp stickermanager.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
-             chatwidget.h chatview.h contactlist.h selfinfo.h \
+             chatwidget.h chatview.h chatbuffer.h contactlist.h selfinfo.h \
              editinfodialog.h conferenceinvitedialog.h groupinvitedialog.h \
              friendinfodialog.h memberlistdialog.h logindialog.h \
               messageinput.h sound.h loadingbar.h \

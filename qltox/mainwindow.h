@@ -1,7 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <map>
 #include <vector>
 #include <utility>
 #include "compat34.h"
@@ -11,6 +10,7 @@
 #include "selfinfo.h"
 #include "contactlist.h"
 #include "chatwidget.h"
+#include "chatbuffer.h"
 #include <qtimer.h>
 #include "desktoplyrics.h"
 #include "restapi.h"
@@ -94,8 +94,8 @@ private:
     // 增量累积的 contacts（值类型，避免指针所有权混乱）
     std::vector<ContactData> m_accumulatedContactData;
 
-    // 消息缓存：key=(contactId, contactType)，切换联系人时暂存/恢复
-    std::map<std::pair<int, std::string>, std::vector<ChatElement>> m_messageCache;
+    // 消息缓存：每个联系人的 ChatHistory，ChatBuffer 统一管理
+    ChatBuffer m_chatbuf;
 
     DesktopLyrics* m_lyrics;
     QTimer* m_msgTimer;

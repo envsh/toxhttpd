@@ -1,6 +1,7 @@
 #include "identicon.h"
 #include "avatar_manager.h"
 #include "chatview.h"
+#include "chatbuffer.h"
 #include "translate_util.h"
 #include "config.h"
 #include "photoviewer.h"
@@ -1915,11 +1916,12 @@ void ChatElement::stopAnimation() {
 void ChatView::rebuildBlocks() {
     m_blocks.clear();
     int absY = kPad;
-    for (size_t i = 0; i < m_items.size(); i += kBlockSize) {
+    int n = m_history->size();
+    for (int i = 0; i < n; i += kBlockSize) {
         m_blocks.push_back({absY});
-        size_t end = std::min(i + kBlockSize, m_items.size());
-        for (size_t j = i; j < end; ++j) {
-            absY += m_items[j].height;
+        int end = std::min(i + kBlockSize, n);
+        for (int j = i; j < end; ++j) {
+            absY += (*m_history)[j].height;
         }
     }
 }
@@ -1939,14 +1941,14 @@ int ChatView::blockForIndex(int msgIndex) const {
 }
 
 int ChatView::msgAbsY(int msgIndex) const {
-    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) { return -1; }
+    if (msgIndex < 0 || msgIndex >= (int)m_history->size()) { return -1; }
     int blockIdx = blockForIndex(msgIndex);
     if (blockIdx < 0) { return kPad; }
     int absY = m_blocks[blockIdx].cumulativeHeight;
     int blockStart = blockIdx * kBlockSize;
-    int blockEnd = std::min(blockStart + kBlockSize, (int)m_items.size());
+    int blockEnd = std::min(blockStart + kBlockSize, (int)m_history->size());
     for (int i = blockStart; i < msgIndex && i < blockEnd; ++i) {
-        absY += m_items[i].height;
+        absY += (*m_history)[i].height;
     }
     return absY;
 }
@@ -1967,9 +1969,9 @@ int ChatView::findByAbsY(int absY) const {
     int blockIdx = lo - 1;
     int absPos = m_blocks[blockIdx].cumulativeHeight;
     int start = blockIdx * kBlockSize;
-    int end = std::min(start + kBlockSize, (int)m_items.size());
+    int end = std::min(start + kBlockSize, (int)m_history->size());
     for (int i = start; i < end; ++i) {
-        int h = m_items[i].height;
+        int h = (*m_history)[i].height;
         if (absY >= absPos && absY < absPos + h) { return i; }
         absPos += h;
     }
@@ -1983,9 +1985,9 @@ void ChatView::updateFull() {
 }
 
 QRect ChatView::messageRect(int msgIndex) const {
-    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) { return QRect(); }
+    if (msgIndex < 0 || msgIndex >= (int)m_history->size()) { return QRect(); }
     int y = msgAbsY(msgIndex) - m_scrollPos;
-    return QRect(0, y, contentWidth(), m_items[msgIndex].height);
+    return QRect(0, y, contentWidth(), (*m_history)[msgIndex].height);
 }
 
 void ChatView::updateRect(const QRect& r) {
@@ -2003,6 +2005,7 @@ ChatView::ChatView(QWidget* parent)
       , nullptr, WNoAutoErase
 #endif
       )
+    , m_history(&ChatHistory::kEmpty)
     , m_clickCount(0), m_clickMsgIndex(-1)
     , m_selMsgIndex(-1), m_selStart(0), m_selEnd(0), m_selecting(false)
     , m_fm(font()), m_emojiW(0), m_bmpW(NULL), m_scrollDelta(0)
@@ -2044,51 +2047,21 @@ ChatView::ChatView(QWidget* parent)
 
 ChatView::~ChatView() {
     m_animTimer->stop();
-    clearMessages();
+    resetCanvas();
     delete[] m_bmpW;
 }
 
-void ChatView::restoreMessages(const std::vector<ChatElement>& msgs) {
-    m_scrollDownPill.setCount(0);
-    m_items = msgs;
-    for (size_t i = 1; i < m_items.size(); ++i) {
-        m_items[i].firstInGroup = !isSameSender(m_items[i - 1], m_items[i]);
-    }
-    m_gifFrameUpdated.assign(msgs.size(), 0);
-    relayout();
-    scrollToBottom();
-}
 
-std::vector<ChatElement> ChatView::detachMessages() {
-    auto ret = std::move(m_items);
-    for (auto& el : ret) { el.stopAnimation(); }
-    m_items.clear();
-    m_gifFrameUpdated.clear();
-    m_blocks.clear();
-    m_totalHeight = 0;
-    m_scrollPos = 0;
-    m_vScrollBar->setRange(0, 0);
-    return ret;
-}
 
-void ChatView::attachMessages(std::vector<ChatElement> msgs) {
-    m_items = std::move(msgs);
-    for (size_t i = 1; i < m_items.size(); ++i) {
-        m_items[i].firstInGroup = !isSameSender(m_items[i - 1], m_items[i]);
-    }
-    m_gifFrameUpdated.assign(m_items.size(), 0);
-    relayout();
-    scrollToBottom();
-}
-
-void ChatView::appendMessage(const ChatElement& msg) {
+void ChatView::scrollBottomIfNeeded() {
     TimePoint _t0 = timeNow();
-    // Block index maintenance: start a new block when the last one is full.
+    if (!m_history || m_history->empty()) { return; }
+
     if (m_blocks.empty()) {
         m_blocks.push_back({kPad});
     } else {
         int lastBlockStart = ((int)m_blocks.size() - 1) * kBlockSize;
-        int lastBlockCount = (int)m_items.size() - lastBlockStart;
+        int lastBlockCount = (int)m_history->size() - lastBlockStart;
         if (lastBlockCount >= kBlockSize) {
             m_blocks.push_back({m_totalHeight});
         }
@@ -2104,11 +2077,11 @@ void ChatView::appendMessage(const ChatElement& msg) {
 
     int w = contentWidth();
     if (w <= 0) { w = 400; }
-    m_items.push_back(msg);
     m_gifFrameUpdated.push_back(0);
-    ChatElement& el = m_items.back();
-    if (m_items.size() >= 2) {
-        el.firstInGroup = !isSameSender(m_items[m_items.size() - 2], el);
+    int lastIdx = (int)m_history->size() - 1;
+    ChatElement& el = (*m_history)[lastIdx];
+    if (m_history->size() >= 2) {
+        el.firstInGroup = !isSameSender((*m_history)[lastIdx - 1], el);
     }
     el.height = el.calcHeight(w, m_fm, m_emojiW, font());
     el.cachedWidth = (short)w;
@@ -2130,12 +2103,13 @@ void ChatView::appendMessage(const ChatElement& msg) {
         m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
         updateRect(QRect(width() - 150, height() - 40, 150, 40));
     }
-    long long _el = elapsedMs(_t0); if (_el >= 30) qWarning("SLOW [hangui] appendMessage took %lldms", _el);
+    long long _el = elapsedMs(_t0); if (_el >= 30) qWarning("SLOW [hangui] scrollBottomIfNeeded took %lldms", _el);
 }
 
-void ChatView::clearMessages() {
-    for (auto& el : m_items) { el.stopAnimation(); }
-    m_items.clear();
+void ChatView::resetCanvas() {
+    if (m_history) {
+        for (auto& el : *m_history) { el.stopAnimation(); }
+    }
     m_gifFrameUpdated.clear();
     m_blocks.clear();
     m_totalHeight = 0;
@@ -2144,6 +2118,17 @@ void ChatView::clearMessages() {
     m_selMsgIndex = -1;
     m_selStart = m_selEnd = 0;
     m_scrollDownPill.setCount(0);
+    updateFull();
+}
+
+void ChatView::setBuffer(ChatHistory* hist) {
+    resetCanvas();
+    m_history = hist ? hist : &ChatHistory::kEmpty;
+    if (m_history) {
+        m_gifFrameUpdated.assign(m_history->size(), 0);
+    }
+    relayout();
+    scrollToBottom();
     updateFull();
 }
 
@@ -2158,19 +2143,20 @@ void ChatView::scrollToBottom() {
 }
 
 ChatElement& ChatView::messageAt(int index) {
-    return m_items[index];
+    return (*m_history)[index];
 }
 
 int ChatView::messageCount() const {
-    return (int)m_items.size();
+    return m_history ? (int)m_history->size() : 0;
 }
 
 void ChatView::triggerRelayout(int msgIndex) {
-    if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
-        m_items[msgIndex].cachedWidth = -1;
-        m_items[msgIndex].height = 0;
+    if (!m_history) { return; }
+    if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
+        (*m_history)[msgIndex].cachedWidth = -1;
+        (*m_history)[msgIndex].height = 0;
     } else {
-        for (auto& el : m_items) {
+        for (auto& el : *m_history) {
             el.cachedWidth = -1;
             el.height = 0;
         }
@@ -2186,14 +2172,16 @@ int ChatView::contentWidth() const {
 void ChatView::relayout() {
     int w = contentWidth();
     if (w <= 0) { w = 400; }
+    if (!m_history) { return; }
 
     m_totalHeight = kPad;
-    for (size_t i = 0; i < m_items.size(); ++i) {
-        if (m_items[i].cachedWidth != w) {
-            m_items[i].height = m_items[i].calcHeight(w, m_fm, m_emojiW, font());
-            m_items[i].cachedWidth = (short)w;
+    for (size_t i = 0; i < m_history->size(); ++i) {
+        ChatElement& el = (*m_history)[i];
+        if (el.cachedWidth != w) {
+            el.height = el.calcHeight(w, m_fm, m_emojiW, font());
+            el.cachedWidth = (short)w;
         }
-        m_totalHeight += m_items[i].height;
+        m_totalHeight += el.height;
     }
 
     int vpH = height();
@@ -2307,8 +2295,8 @@ int ChatView::findMessageAtY(int y) const {
 
 // Get character position in a message from local coordinates
 int ChatView::charPosAt(int msgIndex, int localX, int localY) {
-    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return -1;
-    const ChatElement& msg = m_items[msgIndex];
+    if (msgIndex < 0 || msgIndex >= (int)m_history->size()) return -1;
+    const ChatElement& msg = (*m_history)[msgIndex];
     const QString& text = msg.messageText;
     int textLen = text.length();
     if (textLen == 0) { return 0; }
@@ -2404,7 +2392,7 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
     int end = std::max(m_selStart, m_selEnd);
     if (start == end) { return rects; }
 
-    const ChatElement& msg = m_items[msgIndex];
+    const ChatElement& msg = (*m_history)[msgIndex];
     int textLen = msg.messageText.length();
     if (start >= textLen || end <= 0) { return rects; }
 
@@ -2488,17 +2476,17 @@ std::vector<QRect> ChatView::selectionRects(int msgIndex) {
 }
 
 QString ChatView::selectedText() const {
-    if (m_selMsgIndex < 0 || m_selMsgIndex >= (int)m_items.size()) return QString();
+    if (m_selMsgIndex < 0 || m_selMsgIndex >= (int)m_history->size()) return QString();
     int start = std::min(m_selStart, m_selEnd);
     int end = std::max(m_selStart, m_selEnd);
     if (start == end) { return QString(); }
-    return m_items[m_selMsgIndex].messageText.mid(start, end - start);
+    return (*m_history)[m_selMsgIndex].messageText.mid(start, end - start);
 }
 
 void ChatView::selectWordAt(int msgIndex, int charPos) {
-    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return;
+    if (msgIndex < 0 || msgIndex >= (int)m_history->size()) return;
     int oldIdx = m_selMsgIndex;
-    const QString& text = m_items[msgIndex].messageText;
+    const QString& text = (*m_history)[msgIndex].messageText;
     int start, end;
     wordBoundaries(text, charPos, start, end);
     m_selMsgIndex = msgIndex;
@@ -2515,9 +2503,9 @@ void ChatView::selectWordAt(int msgIndex, int charPos) {
 }
 
 void ChatView::selectLineAt(int msgIndex, int charPos) {
-    if (msgIndex < 0 || msgIndex >= (int)m_items.size()) return;
+    if (msgIndex < 0 || msgIndex >= (int)m_history->size()) return;
     int oldIdx = m_selMsgIndex;
-    const QString& text = m_items[msgIndex].messageText;
+    const QString& text = (*m_history)[msgIndex].messageText;
     int start, end;
     lineBoundaries(text, charPos, start, end);
     m_selMsgIndex = msgIndex;
@@ -2541,8 +2529,8 @@ void ChatView::copySelectedText() {
 }
 
 void ChatView::copyFullMessage(int msgIndex) {
-    if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
-        QApplication::clipboard()->setText(m_items[msgIndex].messageText);
+    if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
+        QApplication::clipboard()->setText((*m_history)[msgIndex].messageText);
     }
 }
 
@@ -2618,43 +2606,43 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
     }
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
-        if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+        if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
             // Check translate button click
-            if (m_items[msgIndex].etype != ChatElement::File
-                && m_items[msgIndex].translateBtnRect.contains(event->pos())) {
-                if (m_items[msgIndex].transState != TransState::InFlight) {
+            if ((*m_history)[msgIndex].etype != ChatElement::File
+                && (*m_history)[msgIndex].translateBtnRect.contains(event->pos())) {
+                if ((*m_history)[msgIndex].transState != TransState::InFlight) {
                     emit translateClicked(msgIndex);
                 }
                 return;
             }
 
             // Check source button click
-            if (m_items[msgIndex].etype != ChatElement::File
-                && m_items[msgIndex].sourceBtnRect.contains(event->pos())) {
+            if ((*m_history)[msgIndex].etype != ChatElement::File
+                && (*m_history)[msgIndex].sourceBtnRect.contains(event->pos())) {
                 emit sourceClicked(msgIndex);
                 return;
             }
 
             // Check download button click (handled in release, prevent text selection)
-            if (!m_items[msgIndex].downloadBtnRect.isNull() &&
-                m_items[msgIndex].downloadBtnRect.contains(event->pos())) {
+            if (!(*m_history)[msgIndex].downloadBtnRect.isNull() &&
+                (*m_history)[msgIndex].downloadBtnRect.contains(event->pos())) {
                 return;
             }
             // Check retry button click
-            if (!m_items[msgIndex].retryBtnRect.isNull() &&
-                m_items[msgIndex].retryBtnRect.contains(event->pos())) {
+            if (!(*m_history)[msgIndex].retryBtnRect.isNull() &&
+                (*m_history)[msgIndex].retryBtnRect.contains(event->pos())) {
                 return;
             }
             // Check resend via status icon
-            if (m_items[msgIndex].category == "self"
-                && m_items[msgIndex].sendState == ChatElement::SendFailed
-                && m_items[msgIndex].resendIconRect.contains(event->pos())) {
+            if ((*m_history)[msgIndex].category == "self"
+                && (*m_history)[msgIndex].sendState == ChatElement::SendFailed
+                && (*m_history)[msgIndex].resendIconRect.contains(event->pos())) {
                 return;
             }
 
             // Compute local Y relative to message
             int curY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) { curY += m_items[i].height; }
+            for (int i = 0; i < msgIndex; i++) { curY += (*m_history)[i].height; }
             int localY = event->y() - curY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
@@ -2672,7 +2660,7 @@ void ChatView::mousePressEvent(QMouseEvent* event) {
                 m_clickTime = now;
 
                 // Check if clicked on a URL
-                auto links = extractLinks(m_items[msgIndex].messageText);
+                auto links = extractLinks((*m_history)[msgIndex].messageText);
                 for (const LinkSpan& link : links) {
                     qWarning("  PRESS link [%d,%d): %s",
                              link.start, link.end, qToUtf8(link.url).data());
@@ -2714,7 +2702,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
         QWidget::mouseMoveEvent(event);
         return;
     }
-    if (m_selecting && m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_items.size()) {
+    if (m_selecting && m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_history->size()) {
         int msgIndex = findMessageAtY(event->y());
         if (msgIndex == m_selMsgIndex) {
             int msgY = msgAbsY(msgIndex) - m_scrollPos;
@@ -2723,32 +2711,32 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
             int charPos = charPosAt(msgIndex, localX, localY);
             if (charPos >= 0) {
                 m_selEnd = charPos;
-                updateRect(QRect(0, msgY, width(), m_items[m_selMsgIndex].height));
+                updateRect(QRect(0, msgY, width(), (*m_history)[m_selMsgIndex].height));
             }
         }
     }
     // Set cursor based on whether over URL
     int msgIndex = findMessageAtY(event->y());
-    if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+    if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
         // Check header action buttons first
-        if (m_items[msgIndex].translateBtnRect.contains(event->pos())) {
-            QString tip = m_items[msgIndex].translateError.isEmpty()
+        if ((*m_history)[msgIndex].translateBtnRect.contains(event->pos())) {
+            QString tip = (*m_history)[msgIndex].translateError.isEmpty()
                 ? qFromUtf8("Translate")
-                : m_items[msgIndex].translateError;
-            showTempTooltip(this, m_items[msgIndex].translateBtnRect, tip);
+                : (*m_history)[msgIndex].translateError;
+            showTempTooltip(this, (*m_history)[msgIndex].translateBtnRect, tip);
             setCursor(QCursor(Qt::PointingHandCursor));
             QWidget::mouseMoveEvent(event);
             return;
         }
-        if (m_items[msgIndex].sourceBtnRect.contains(event->pos())) {
-            showTempTooltip(this, m_items[msgIndex].sourceBtnRect, qFromUtf8("Source"));
+        if ((*m_history)[msgIndex].sourceBtnRect.contains(event->pos())) {
+            showTempTooltip(this, (*m_history)[msgIndex].sourceBtnRect, qFromUtf8("Source"));
             setCursor(QCursor(Qt::PointingHandCursor));
             QWidget::mouseMoveEvent(event);
             return;
         }
         // Nickname tooltip: 显示 nickname 时，hover 名字区域显示 username
         {
-            const auto& item = m_items[msgIndex];
+            const auto& item = (*m_history)[msgIndex];
             if (!item.senderNickname.isEmpty() && !item.senderName.isEmpty()
                 && item.senderNickname != item.senderName) {
                 int msgY = msgAbsY(msgIndex) - m_scrollPos;
@@ -2771,7 +2759,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 
         // Debug: hover avatar to see identicon seed info
         {
-            const auto& item = m_items[msgIndex];
+            const auto& item = (*m_history)[msgIndex];
             int msgY = msgAbsY(msgIndex) - m_scrollPos;
             int ax = (item.category == "self")
                 ? (width() - kPad - kAvatarSize) : kPad;
@@ -2791,7 +2779,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 
         // Send error tooltip
         {
-            const auto& item = m_items[msgIndex];
+            const auto& item = (*m_history)[msgIndex];
             if (item.sendState == ChatElement::SendFailed
                 && !item.sendErrorMsg.isEmpty()
                 && item.resendIconRect.contains(event->pos())) {
@@ -2802,7 +2790,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 
             // Resend icon cursor
             {
-                const auto& item = m_items[msgIndex];
+                const auto& item = (*m_history)[msgIndex];
                 if (item.sendState == ChatElement::SendFailed
                     && item.category == "self"
                     && item.resendIconRect.contains(event->pos())) {
@@ -2817,7 +2805,7 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
         int localX = event->x();
         int charPos = charPosAt(msgIndex, localX, localY);
         if (charPos >= 0) {
-            auto links = extractLinks(m_items[msgIndex].messageText);
+            auto links = extractLinks((*m_history)[msgIndex].messageText);
             for (const LinkSpan& link : links) {
                 if (charPos >= link.start && charPos < link.end) {
 #ifdef QT3_BUILD
@@ -2846,8 +2834,8 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
 void ChatView::mouseReleaseEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
-        if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
-            ChatElement& el = m_items[msgIndex];
+        if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
+            ChatElement& el = (*m_history)[msgIndex];
             // Send failed retry
             if (el.sendState == ChatElement::SendFailed && el.category == "self"
                 && !el.retryBtnRect.isNull() && el.retryBtnRect.contains(event->pos())) {
@@ -2895,29 +2883,29 @@ void ChatView::mouseReleaseEvent(QMouseEvent* event) {
 void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         int msgIndex = findMessageAtY(event->y());
-        if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
+        if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
             // 双击下载/重试按钮时不打开 PhotoViewer、不进入选择
-            if (!m_items[msgIndex].downloadBtnRect.isNull() &&
-                m_items[msgIndex].downloadBtnRect.contains(event->pos())) {
+            if (!(*m_history)[msgIndex].downloadBtnRect.isNull() &&
+                (*m_history)[msgIndex].downloadBtnRect.contains(event->pos())) {
                 return;
             }
-            if (!m_items[msgIndex].retryBtnRect.isNull() &&
-                m_items[msgIndex].retryBtnRect.contains(event->pos())) {
+            if (!(*m_history)[msgIndex].retryBtnRect.isNull() &&
+                (*m_history)[msgIndex].retryBtnRect.contains(event->pos())) {
                 return;
             }
             // 双击媒体缩略图 → 异步从磁盘加载原图
-            if ((m_items[msgIndex].etype == ChatElement::Image ||
-                 m_items[msgIndex].etype == ChatElement::Video ||
-                 m_items[msgIndex].etype == ChatElement::Gif) &&
-                !m_items[msgIndex].scaledDisplay.isNull() &&
-                m_items[msgIndex].thumbnailRect.contains(event->pos())) {
-                emit openFullSizeImage(msgIndex, m_items[msgIndex].mediaUrl);
+            if (((*m_history)[msgIndex].etype == ChatElement::Image ||
+                 (*m_history)[msgIndex].etype == ChatElement::Video ||
+                 (*m_history)[msgIndex].etype == ChatElement::Gif) &&
+                !(*m_history)[msgIndex].scaledDisplay.isNull() &&
+                (*m_history)[msgIndex].thumbnailRect.contains(event->pos())) {
+                emit openFullSizeImage(msgIndex, (*m_history)[msgIndex].mediaUrl);
                 return;
             }
         }
         if (msgIndex >= 0) {
             int msgY = kPad - m_scrollPos;
-            for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
+            for (int i = 0; i < msgIndex; i++) { msgY += (*m_history)[i].height; }
             int localY = event->y() - msgY;
             int localX = event->x();
             int charPos = charPosAt(msgIndex, localX, localY);
@@ -2938,11 +2926,11 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     // 检测是否在名字区域上
     bool onName = false;
     QString displayName;
-    if (msgIndex >= 0 && msgIndex < (int)m_items.size()) {
-        const ChatElement& item = m_items[msgIndex];
+    if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
+        const ChatElement& item = (*m_history)[msgIndex];
         displayName = item.senderNickname.isEmpty() ? item.senderName : item.senderNickname;
         int msgY = kPad - m_scrollPos;
-        for (int i = 0; i < msgIndex; i++) { msgY += m_items[i].height; }
+        for (int i = 0; i < msgIndex; i++) { msgY += (*m_history)[i].height; }
         QFont nf;
         nf.setPointSize(11);
         QFontMetrics nfm(nf);
@@ -2955,16 +2943,16 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
 #else
     QMenu menu(this);
 #endif
-    bool canRetry = (msgIndex >= 0 && msgIndex < (int)m_items.size()
-                     && m_items[msgIndex].sendState == ChatElement::SendFailed
-                     && m_items[msgIndex].category == "self");
+    bool canRetry = (msgIndex >= 0 && msgIndex < (int)m_history->size()
+                     && (*m_history)[msgIndex].sendState == ChatElement::SendFailed
+                     && (*m_history)[msgIndex].category == "self");
     // Copy full message
 #ifdef QT3_BUILD
     int copyMsgId = menu.insertItem(_("context.copy_message"));
     int retryMsgId = canRetry ? menu.insertItem(qFromUtf8("重发")) : -1;
     int selectAllId = menu.insertItem(_("context.select_all"));
     int sourceMsgId = -1, translateMsgId = -1;
-    if (msgIndex >= 0 && m_items[msgIndex].etype != ChatElement::File) {
+    if (msgIndex >= 0 && (*m_history)[msgIndex].etype != ChatElement::File) {
         sourceMsgId = menu.insertItem(qFromUtf8("查看原文"));
         translateMsgId = menu.insertItem(qFromUtf8("翻译"));
     }
@@ -2979,7 +2967,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     QAction* selectAllAction = menu.addAction(_("context.select_all"));
     QAction* sourceMsgAction = nullptr;
     QAction* translateMsgAction = nullptr;
-    if (msgIndex >= 0 && m_items[msgIndex].etype != ChatElement::File) {
+    if (msgIndex >= 0 && (*m_history)[msgIndex].etype != ChatElement::File) {
         sourceMsgAction = menu.addAction("查看原文");
         translateMsgAction = menu.addAction("翻译");
     }
@@ -2995,14 +2983,14 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     if (choice == copyMsgId) {
         copyFullMessage(msgIndex);
     } else if (canRetry && choice == retryMsgId) {
-        m_items[msgIndex].sendState = ChatElement::SendSending;
-        updateRect(m_items[msgIndex].resendIconRect);
+        (*m_history)[msgIndex].sendState = ChatElement::SendSending;
+        updateRect((*m_history)[msgIndex].resendIconRect);
         emit resendMessage(msgIndex);
     } else if (choice == selectAllId) {
         // Select all text in all messages
         m_selMsgIndex = 0;
         m_selStart = 0;
-        m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
+        m_selEnd = m_history->empty() ? 0 : m_history->back().messageText.length();
         updateFull();
     } else if (sourceMsgId >= 0 && choice == sourceMsgId) {
         emit sourceClicked(msgIndex);
@@ -3011,20 +2999,20 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     } else if (choice == copyNickId) {
         QApplication::clipboard()->setText(displayName);
     } else if (choice == mentionId) {
-        emit mentionClicked(m_items[msgIndex].senderName);
+        emit mentionClicked((*m_history)[msgIndex].senderName);
     }
 #else
     QAction* chosen = menu.exec(event->globalPos());
     if (chosen == copyMsgAction) {
         copyFullMessage(msgIndex);
     } else if (canRetry && chosen == retryMsgAction) {
-        m_items[msgIndex].sendState = ChatElement::SendSending;
-        updateRect(m_items[msgIndex].resendIconRect);
+        (*m_history)[msgIndex].sendState = ChatElement::SendSending;
+        updateRect((*m_history)[msgIndex].resendIconRect);
         emit resendMessage(msgIndex);
     } else if (chosen == selectAllAction) {
         m_selMsgIndex = 0;
         m_selStart = 0;
-        m_selEnd = m_items.empty() ? 0 : m_items.back().messageText.length();
+        m_selEnd = m_history->empty() ? 0 : m_history->back().messageText.length();
         updateFull();
     } else if (sourceMsgAction && chosen == sourceMsgAction) {
         emit sourceClicked(msgIndex);
@@ -3033,31 +3021,32 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     } else if (chosen == copyNickAction) {
         QApplication::clipboard()->setText(displayName);
     } else if (chosen == mentionAction) {
-        emit mentionClicked(m_items[msgIndex].senderName);
+        emit mentionClicked((*m_history)[msgIndex].senderName);
     }
 #endif
 }
 
 void ChatView::manageAnimations() {
+    if (!m_history) { return; }
     int viewBottom = m_scrollPos + height();
     int first = findByAbsY(m_scrollPos);
     if (first < 0) { first = 0; }
     int absY = msgAbsY(first);
     int y = absY - m_scrollPos;
-    for (size_t i = first; i < m_items.size(); ++i) {
-        int h = m_items[i].height;
+    for (size_t i = first; i < m_history->size(); ++i) {
+        int h = (*m_history)[i].height;
         bool visible = (absY + h > m_scrollPos) && (absY < viewBottom);
-        if (m_items[i].etype == ChatElement::Gif) {
+        if ((*m_history)[i].etype == ChatElement::Gif) {
             if (visible) {
-                if (!m_items[i].movie) {
-                    m_items[i].startAnimation(this, i);
+                if (!(*m_history)[i].movie) {
+                    (*m_history)[i].startAnimation(this, i);
                 }
-                if (m_items[i].movie && i < m_gifFrameUpdated.size() && m_gifFrameUpdated[i]) {
+                if ((*m_history)[i].movie && i < m_gifFrameUpdated.size() && m_gifFrameUpdated[i]) {
                     m_gifFrameUpdated[i] = 0;
                     update(QRect(0, y, width(), h));
                 }
             } else {
-                m_items[i].stopAnimation();
+                (*m_history)[i].stopAnimation();
             }
         }
         if (absY > viewBottom) { break; }
@@ -3083,14 +3072,15 @@ std::pair<int,int> ChatView::visibleMessageRange() const {
     if (first < 0) { return {-1, -1}; }
     int absY = msgAbsY(first);
     int last = first;
-    while (last + 1 < (int)m_items.size() && absY + m_items[last].height < bottom) {
-        absY += m_items[last].height;
+    while (last + 1 < (int)m_history->size() && absY + (*m_history)[last].height < bottom) {
+        absY += (*m_history)[last].height;
         last++;
     }
     return {first, last};
 }
 
 void ChatView::paintEvent(QPaintEvent* event) {
+    if (!m_history) { return; }
     TimePoint _t0 = timeNow();
     if (m_backBuffer.size() != size()) {
         m_backBuffer = QPixmap(size());
@@ -3103,7 +3093,7 @@ void ChatView::paintEvent(QPaintEvent* event) {
     int vpH = height();
 
     std::vector<QRect> selRects;
-    if (m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_items.size()) {
+    if (m_selMsgIndex >= 0 && m_selMsgIndex < (int)m_history->size()) {
         selRects = selectionRects(m_selMsgIndex);
     }
 
@@ -3111,12 +3101,12 @@ void ChatView::paintEvent(QPaintEvent* event) {
     if (first < 0) { first = 0; }
     int absY = msgAbsY(first);
     int y = absY - m_scrollPos;
-    for (size_t i = first; i < m_items.size(); ++i) {
-        int h = m_items[i].height;
+    for (size_t i = first; i < m_history->size(); ++i) {
+        int h = (*m_history)[i].height;
         if (y + h >= 0 && y <= vpH) {
-            m_items[i].paint(bp, y, viewW, ((int)i == m_selMsgIndex), selRects,
+            (*m_history)[i].paint(bp, y, viewW, ((int)i == m_selMsgIndex), selRects,
                              m_fm, m_emojiW, font(), currentPalette());
-            ChatElement& el = m_items[i];
+            ChatElement& el = (*m_history)[i];
             if (el.downloadState == ChatElement::NotRequested
                 && el.scaledDisplay.isNull()
                 && !el.mediaUrl.isEmpty()

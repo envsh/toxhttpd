@@ -21,22 +21,14 @@ public:
     static bool s_autoTranslateArg;
     
     void setHeaderText(const QString& text);
-    void appendMessage(const QString& message, const QString& type, 
-                    const QString& senderName = QString(),
-                    const QString& senderNickname = QString(),
-                    int peerNumber = -1, const QString& time = "",
-                    const QString& avatarUrl = "",
-                    const QString& ipAddress = "");
-    void clearMessages();
+
+    void scrollBottomIfNeeded();
     int messageCount() const;
     ChatElement messageAt(int index) const;
     ChatElement& mutableMessageAt(int index);
-    void appendMessage(const ChatElement& msg);
-    void restoreMessages(const std::vector<ChatElement>& msgs);
-    std::vector<ChatElement> detachMessages();
-    void attachMessages(std::vector<ChatElement> msgs);
     void triggerRelayout(int msgIndex = -1);
     void repaintMessages() { messageArea->update(); }
+    void setBuffer(ChatHistory* hist);
     void retranslateUi();
     void showUnreadBanner(int count);
     void setAutoTranslateEnabled(bool enabled) { m_autoTranslateEnabled = enabled; }

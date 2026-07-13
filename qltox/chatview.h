@@ -7,6 +7,7 @@
 #include "lambdaslot.h"
 #include <string>
 #include <vector>
+#include <deque>
 #include <cstdint>
 #include <qdatetime.h>
 #include <qrect.h>
@@ -120,6 +121,7 @@ struct LinkSpan {
 };
 
 class LimeScrollBar;
+class ChatHistory;
 
 class ChatView : public QWidget {
     Q_OBJECT
@@ -127,12 +129,9 @@ public:
     ChatView(QWidget* parent = 0);
     ~ChatView();
 
-    void appendMessage(const ChatElement& msg);
-    void restoreMessages(const std::vector<ChatElement>& msgs);
-    std::vector<ChatElement> detachMessages();
-    void attachMessages(std::vector<ChatElement> msgs);
-    void clearMessages();
+    void setBuffer(ChatHistory* hist);
     void scrollToBottom();
+    void scrollBottomIfNeeded();
     ChatElement& messageAt(int index);
     int messageCount() const;
     void triggerRelayout(int msgIndex = -1);
@@ -173,10 +172,11 @@ private slots:
 private:
     void relayout();
     void rebuildBlocks();
+    void resetCanvas();
     int blockForIndex(int msgIndex) const;
     int msgAbsY(int msgIndex) const;
     int findByAbsY(int absY) const;
-    /// 全量刷新：切换上下文、滚动、clearMessages、relayout、全选等结构变化场景
+    /// 全量刷新：切换上下文、滚动、resetCanvas、relayout、全选等结构变化场景
     void updateFull();
     /// 增量刷新：appendMessage、pill 悬浮/计数、selection 拖拽等局部脏矩形场景
     void updateRect(const QRect& r);
@@ -209,8 +209,7 @@ private:
     int m_selEnd;
     bool m_selecting;
 
-    std::vector<ChatElement> m_items;
-private:
+    ChatHistory* m_history;
     std::vector<char> m_gifFrameUpdated;
     int m_totalHeight;
     int m_scrollPos;

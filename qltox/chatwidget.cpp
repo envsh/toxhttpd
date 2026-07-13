@@ -220,31 +220,17 @@ void ChatWidget::hideUnreadBanner() {
     m_unreadBanner->hide();
 }
 
-void ChatWidget::updateHeaderCount() {
-    setHeaderText(m_baseHeader);
-}
-
-void ChatWidget::appendMessage(const QString& message, const QString& type, 
-                              const QString& senderName,
-                              const QString& senderNickname,
-                              int peerNumber,
-                              const QString& time, const QString& avatarUrl,
-                              const QString& ipAddress) {
-    ChatElement msg;
-    msg.messageText = message;
-    msg.category = type;
-    msg.senderName = senderName;
-    msg.senderNickname = senderNickname;
-    msg.peerNumber = peerNumber;
-    msg.time = time;
-    msg.avatarUrl = avatarUrl;
-    msg.ipAddress = ipAddress;
-    messageArea->appendMessage(msg);
+void ChatWidget::setBuffer(ChatHistory* hist) {
+    messageArea->setBuffer(hist);
     updateHeaderCount();
 }
 
-void ChatWidget::clearMessages() {
-    messageArea->clearMessages();
+void ChatWidget::updateHeaderCount() {
+    headerText->setText(m_baseHeader + " (" + QString::number(messageCount()) + ")");
+}
+
+void ChatWidget::scrollBottomIfNeeded() {
+    messageArea->scrollBottomIfNeeded();
     updateHeaderCount();
 }
 
@@ -264,24 +250,7 @@ void ChatWidget::triggerRelayout(int msgIndex) {
     messageArea->triggerRelayout(msgIndex);
 }
 
-void ChatWidget::appendMessage(const ChatElement& msg) {
-    messageArea->appendMessage(msg);
-    updateHeaderCount();
-}
 
-void ChatWidget::restoreMessages(const std::vector<ChatElement>& msgs) {
-    messageArea->restoreMessages(msgs);
-    updateHeaderCount();
-}
-
-std::vector<ChatElement> ChatWidget::detachMessages() {
-    return messageArea->detachMessages();
-}
-
-void ChatWidget::attachMessages(std::vector<ChatElement> msgs) {
-    messageArea->attachMessages(std::move(msgs));
-    updateHeaderCount();
-}
 
 void ChatWidget::onSendClicked() {
     if (inputEdit->placeholderText().length() > 0) {
@@ -320,7 +289,6 @@ void ChatWidget::onSendEnClicked() {
     if (msg.isEmpty()) return;
 
     inputEdit->saveToHistory(msg);
-    appendMessage(msg, "self", "Me", QString(), -1, getCurrentTime());
 #ifdef QT3_BUILD
     inputEdit->selectAll();
     inputEdit->removeSelectedText();
