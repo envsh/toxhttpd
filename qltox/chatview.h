@@ -123,7 +123,18 @@ struct LinkSpan {
 class LimeScrollBar;
 class ChatHistory;
 
-class ChatView : public QWidget {
+class ChatHistoryObserver {
+public:
+    virtual ~ChatHistoryObserver() = default;
+    virtual void onInsertOne(size_t index) = 0;
+    virtual void onInsertRange(size_t start, size_t cnt) = 0;
+    virtual void onUpdateOne(size_t index) = 0;
+    virtual void onUpdateRange(size_t start, size_t cnt) = 0;
+    virtual void onRemoveOne(size_t index) = 0;
+    virtual void onRemoveRange(size_t start, size_t cnt) = 0;
+};
+
+class ChatView : public QWidget, public ChatHistoryObserver {
     Q_OBJECT
 public:
     ChatView(QWidget* parent = 0);
@@ -134,8 +145,17 @@ public:
     void scrollBottomIfNeeded();
     ChatElement& messageAt(int index);
     int messageCount() const;
-    void triggerRelayout(int msgIndex = -1);
+    void updateElement(int msgIndex);
+    void relayout();
     void onGifFrameUpdated(int msgIndex);
+
+    // ChatHistoryObserver
+    void onInsertOne(size_t index) override;
+    void onInsertRange(size_t start, size_t cnt) override;
+    void onUpdateOne(size_t index) override;
+    void onUpdateRange(size_t start, size_t cnt) override;
+    void onRemoveOne(size_t index) override;
+    void onRemoveRange(size_t start, size_t cnt) override;
 
     static const int kAvatarSize   = 42;
     static const int kPad          = 8;
@@ -168,10 +188,16 @@ signals:
 private slots:
     void onScrollChanged(int value);
     void onAnimTick();
+    void flushScrollUpdate();
 
 private:
-    void relayout();
+    bool m_scrollUpdatePending = false;
+    void scheduleScrollUpdate();
     void rebuildBlocks();
+    void _appendToBlocks(int elementHeight);
+    void _prependToBlocks(int count);
+    void _updateBlockFor(int idx, int oldHeight);
+    void _removeFromBlocks(int idx);
     void resetCanvas();
     int blockForIndex(int msgIndex) const;
     int msgAbsY(int msgIndex) const;
@@ -186,6 +212,7 @@ private:
     int charWidth(uint32_t cp);
     void manageAnimations();
     std::pair<int,int> visibleMessageRange() const;
+    void _updateScrollState();
 
     // Selection and link helpers
     int findMessageAtY(int y) const;

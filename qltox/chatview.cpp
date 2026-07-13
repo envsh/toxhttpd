@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <qimage.h>
+#include <qtimer.h>
 #include "translator.h"
 
 // ── Media display sizing ──
@@ -1926,6 +1927,64 @@ void ChatView::rebuildBlocks() {
     }
 }
 
+void ChatView::_appendToBlocks(int elementHeight) {
+    if (m_blocks.empty()) {
+        m_blocks.push_back({kPad});
+        return;
+    }
+    int lastIdx = (int)m_blocks.size() - 1;
+    int blkCnt = (int)m_history->size() - 1 - lastIdx * kBlockSize;
+    if (blkCnt >= kBlockSize) {
+        m_blocks.push_back({m_totalHeight + kPad});
+    }
+}
+
+void ChatView::_prependToBlocks(int count) {
+    if (count <= 0 || m_blocks.empty()) { rebuildBlocks(); return; }
+    int absY = kPad;
+    std::vector<MsgBlock> front;
+    for (int i = 0; i < count; i += kBlockSize) {
+        front.push_back({absY});
+        int end = std::min(i + kBlockSize, count);
+        for (int j = i; j < end; ++j) {
+            absY += (*m_history)[j].height;
+        }
+    }
+    int added = absY - kPad;
+    for (auto& blk : m_blocks) {
+        blk.cumulativeHeight += added;
+    }
+    m_blocks.insert(m_blocks.begin(), front.begin(), front.end());
+}
+
+void ChatView::_updateBlockFor(int idx, int oldHeight) {
+    int newHeight = (*m_history)[idx].height;
+    int diff = newHeight - oldHeight;
+    if (diff == 0) { return; }
+    int blk = blockForIndex(idx);
+    if (blk < 0) { rebuildBlocks(); return; }
+    for (size_t i = (size_t)(blk + 1); i < m_blocks.size(); ++i) {
+        m_blocks[i].cumulativeHeight += diff;
+    }
+    m_totalHeight += diff;
+}
+
+void ChatView::_removeFromBlocks(int idx) {
+    if (m_blocks.empty() || idx < 0) { return; }
+    int n = (int)m_history->size();
+    m_blocks.clear();
+    m_totalHeight = 0;
+    int absY = kPad;
+    for (int i = 0; i < n; i += kBlockSize) {
+        m_blocks.push_back({absY});
+        int end = std::min(i + kBlockSize, n);
+        for (int j = i; j < end; ++j) {
+            absY += (*m_history)[j].height;
+        }
+    }
+    m_totalHeight = absY - kPad;
+}
+
 int ChatView::blockForIndex(int msgIndex) const {
     if (m_blocks.empty() || msgIndex < 0) { return -1; }
     int lo = 0, hi = (int)m_blocks.size();
@@ -2057,6 +2116,14 @@ void ChatView::scrollBottomIfNeeded() {
     TimePoint _t0 = timeNow();
     if (!m_history || m_history->empty()) { return; }
 
+    // Skip redundant work when observer already laid out the last element
+    {
+        int _w = contentWidth();
+        if (_w <= 0) { _w = 400; }
+        ChatElement& _el = (*m_history)[m_history->size() - 1];
+        if (_el.cachedWidth == _w) { return; }
+    }
+
     if (m_blocks.empty()) {
         m_blocks.push_back({kPad});
     } else {
@@ -2122,9 +2189,14 @@ void ChatView::resetCanvas() {
 }
 
 void ChatView::setBuffer(ChatHistory* hist) {
+    m_scrollUpdatePending = false;
+    if (m_history && m_history != &ChatHistory::kEmpty) {
+        m_history->setObserver(nullptr);
+    }
     resetCanvas();
     m_history = hist ? hist : &ChatHistory::kEmpty;
-    if (m_history) {
+    if (m_history && m_history != &ChatHistory::kEmpty) {
+        m_history->setObserver(this);
         m_gifFrameUpdated.assign(m_history->size(), 0);
     }
     relayout();
@@ -2142,6 +2214,152 @@ void ChatView::scrollToBottom() {
     m_scrollPos = maxScroll;
 }
 
+void ChatView::scheduleScrollUpdate() {
+    if (!m_scrollUpdatePending) {
+        m_scrollUpdatePending = true;
+        QTimer::singleShot(0, this, SLOT(flushScrollUpdate()));
+    }
+}
+
+void ChatView::flushScrollUpdate() {
+    m_scrollUpdatePending = false;
+    if (!m_history) { return; }
+    _updateScrollState();
+}
+
+void ChatView::_updateScrollState() {
+    int vpH = height();
+    int maxScroll = std::max(0, m_totalHeight - vpH);
+    int curVal = m_vScrollBar->value();
+    int oldMax;
+#ifdef QT3_BUILD
+    oldMax = m_vScrollBar->maxValue();
+#else
+    oldMax = m_vScrollBar->maximum();
+#endif
+    bool atBottom = (oldMax - curVal) <= 20;
+    m_vScrollBar->setRange(0, maxScroll);
+    m_vScrollBar->setPageStep(vpH);
+    if (atBottom) {
+        m_scrollPos = maxScroll;
+        m_vScrollBar->blockSignals(true);
+        m_vScrollBar->setValue(maxScroll);
+        m_vScrollBar->blockSignals(false);
+        m_vScrollBar->showTemporarily();
+        updateFull();
+    } else {
+        m_scrollDownPill.setCount(m_scrollDownPill.count() + 1);
+        updateRect(QRect(width() - 150, height() - 40, 150, 40));
+    }
+}
+
+// ───── ChatHistoryObserver ─────
+void ChatView::onInsertOne(size_t index) {
+    if (!m_history || index >= m_history->size()) { return; }
+    int w = contentWidth();
+    if (w <= 0) { w = 400; }
+    m_gifFrameUpdated.push_back(0);
+    int i = (int)index;
+    ChatElement& el = (*m_history)[i];
+    if (i > 0) {
+        el.firstInGroup = !isSameSender((*m_history)[i - 1], el);
+    }
+    el.height = el.calcHeight(w, m_fm, m_emojiW, font());
+    el.cachedWidth = (short)w;
+    m_totalHeight += el.height;
+    _appendToBlocks(el.height);
+    scheduleScrollUpdate();
+}
+
+void ChatView::onInsertRange(size_t start, size_t cnt) {
+    if (!m_history || cnt == 0 || start != 0) { return; }
+    int w = contentWidth();
+    if (w <= 0) { w = 400; }
+    int addedH = 0;
+    for (size_t i = 0; i < cnt; ++i) {
+        ChatElement& el = (*m_history)[i];
+        el.height = el.calcHeight(w, m_fm, m_emojiW, font());
+        el.cachedWidth = (short)w;
+        if (i > 0) {
+            el.firstInGroup = !isSameSender((*m_history)[i - 1], el);
+        }
+        addedH += el.height;
+    }
+    m_totalHeight += addedH;
+    _prependToBlocks((int)cnt);
+    int vpH = height();
+    int maxScroll = std::max(0, m_totalHeight - vpH);
+    m_scrollPos += addedH;
+    m_vScrollBar->setRange(0, maxScroll);
+    m_vScrollBar->setPageStep(vpH);
+    m_vScrollBar->setValue(m_scrollPos);
+    m_vScrollBar->showTemporarily();
+    updateFull();
+}
+
+void ChatView::onUpdateOne(size_t index) {
+    if (!m_history || index >= m_history->size()) { return; }
+    int i = (int)index;
+    int oldH = (*m_history)[i].height;
+    int w = contentWidth();
+    if (w <= 0) { w = 400; }
+    ChatElement& el = (*m_history)[i];
+    el.cachedWidth = -1;
+    el.height = el.calcHeight(w, m_fm, m_emojiW, font());
+    el.cachedWidth = (short)w;
+    int diff = el.height - oldH;
+    if (diff != 0) {
+        _updateBlockFor(i, oldH);
+    }
+    QRect r = messageRect(i);
+    if (r.isValid()) { updateRect(r); }
+}
+
+void ChatView::onUpdateRange(size_t start, size_t cnt) {
+    if (!m_history) { return; }
+    int w = contentWidth();
+    for (size_t i = start; i < start + cnt && i < m_history->size(); ++i) {
+        ChatElement& el = (*m_history)[i];
+        int oldH = el.height;
+        el.cachedWidth = -1;
+        el.height = el.calcHeight(w, m_fm, m_emojiW, font());
+        el.cachedWidth = (short)w;
+        if (el.height != oldH) {
+            _updateBlockFor((int)i, oldH);
+        }
+    }
+    scheduleScrollUpdate();
+    QWidget::update();
+}
+
+void ChatView::onRemoveOne(size_t idx) {
+    if (!m_history) { return; }
+    _removeFromBlocks((int)idx);
+    int vpH = height();
+    int maxScroll = std::max(0, m_totalHeight - vpH);
+    m_vScrollBar->setRange(0, maxScroll);
+    m_vScrollBar->setPageStep(vpH);
+    if (m_scrollPos > maxScroll) {
+        m_scrollPos = maxScroll;
+        m_vScrollBar->setValue(maxScroll);
+    }
+    updateFull();
+}
+
+void ChatView::onRemoveRange(size_t start, size_t cnt) {
+    if (!m_history || cnt == 0) { return; }
+    _removeFromBlocks((int)start);
+    int vpH = height();
+    int maxScroll = std::max(0, m_totalHeight - vpH);
+    m_vScrollBar->setRange(0, maxScroll);
+    m_vScrollBar->setPageStep(vpH);
+    if (m_scrollPos > maxScroll) {
+        m_scrollPos = maxScroll;
+        m_vScrollBar->setValue(maxScroll);
+    }
+    updateFull();
+}
+
 ChatElement& ChatView::messageAt(int index) {
     return (*m_history)[index];
 }
@@ -2150,18 +2368,27 @@ int ChatView::messageCount() const {
     return m_history ? (int)m_history->size() : 0;
 }
 
-void ChatView::triggerRelayout(int msgIndex) {
-    if (!m_history) { return; }
-    if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
-        (*m_history)[msgIndex].cachedWidth = -1;
-        (*m_history)[msgIndex].height = 0;
-    } else {
-        for (auto& el : *m_history) {
-            el.cachedWidth = -1;
-            el.height = 0;
-        }
+void ChatView::updateElement(int msgIndex) {
+    if (!m_history || msgIndex < 0 || msgIndex >= (int)m_history->size()) { return; }
+    ChatElement& el = (*m_history)[msgIndex];
+    int oldH = el.height;
+    int w = contentWidth();
+    if (w <= 0) { w = 400; }
+    if (el.cachedWidth == w) {
+        QWidget::update();
+        return;
     }
-    relayout();
+    el.cachedWidth = -1;
+    el.height = el.calcHeight(w, m_fm, m_emojiW, font());
+    el.cachedWidth = (short)w;
+    if (el.height != oldH) {
+        _updateBlockFor(msgIndex, oldH);
+    }
+    int vpH = height();
+    int maxScroll = std::max(0, m_totalHeight - vpH);
+    m_vScrollBar->setRange(0, maxScroll);
+    m_vScrollBar->setPageStep(vpH);
+    QWidget::update();
 }
 
 int ChatView::contentWidth() const {

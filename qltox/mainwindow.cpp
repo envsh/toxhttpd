@@ -637,7 +637,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     }
 
                     el.downloadState = ChatElement::Completed;
-                    chatWidget->triggerRelayout(e->msgIndex);
+                    chatWidget->updateElement(e->msgIndex);
                 }
             } else {
                 qWarning("Media download failed: chat=%d/%s idx=%d err=%s",
@@ -646,7 +646,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
                     el.downloadState = ChatElement::Failed;
                     el.mediaUrl = qFromUtf8(e->mxcUrl);
-                    chatWidget->triggerRelayout(e->msgIndex);
+                    chatWidget->updateElement(e->msgIndex);
                 }
             }
         }
@@ -1185,7 +1185,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
                 els.push_back(msgRowToElement(row));
             }
             m_chatbuf.prepend(id, typeStr, els);
-            chatWidget->triggerRelayout(-1);
+            chatWidget->relayout();
         }
         hist.loadedLatest50FromDB = true;
     }
@@ -1315,7 +1315,6 @@ void MainWindow::onMessageSending(const QString& message) {
             || type == kPastebinType || type == kTranslateType) {
             backEl.sendState = ChatElement::SendSent;
         }
-        chatWidget->scrollBottomIfNeeded();
     }
     contactListWidget->updateContactLastMessage(currentChatId, currentChatType, message, timenowhm());
     db_writeLastMessage(currentChatId, currentChatType, message, timenowhm());
@@ -1343,9 +1342,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     el.time = getCurrentTime();
                     m_chatbuf.append(friendId, "friend", el);
                     db_writeMessage(friendId, "friend", el);
-                    if (friendId == currentChatId && currentChatType == "friend") {
-                        chatWidget->scrollBottomIfNeeded();
-                    } else {
+                    if (!(friendId == currentChatId && currentChatType == "friend")) {
                         contactListWidget->incrementUnread(friendId, "friend");
                         db_writeUnreadIncrement(friendId, "friend");
                     }
@@ -1456,9 +1453,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         m_chatbuf.append(confNumber, "conference", el);
                         db_writeMessage(confNumber, "conference", el);
                     }
-                    if (confNumber == currentChatId && currentChatType == "conference") {
-                        chatWidget->scrollBottomIfNeeded();
-                    } else {
+                    if (!(confNumber == currentChatId && currentChatType == "conference")) {
                         contactListWidget->incrementUnread(confNumber, "conference");
                         db_writeUnreadIncrement(confNumber, "conference");
                     }
@@ -1566,9 +1561,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         m_chatbuf.append(groupNumber, "group", el);
                         db_writeMessage(groupNumber, "group", el);
                     }
-                    if (groupNumber == currentChatId && currentChatType == "group") {
-                        chatWidget->scrollBottomIfNeeded();
-                    } else {
+                    if (!(groupNumber == currentChatId && currentChatType == "group")) {
                         contactListWidget->incrementUnread(groupNumber, "group");
                         db_writeUnreadIncrement(groupNumber, "group");
                     }
@@ -1698,9 +1691,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("Cache PUSH to sysevent %d: type=%s (event.Evt)", VIRTUAL_SYSEVENT_ID, e.type.c_str());
                 m_chatbuf.append(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
                 db_writeMessage(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
-                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
-                    chatWidget->scrollBottomIfNeeded();
-                } else {
+                if (!(currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType)) {
                     contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
                     db_writeUnreadIncrement(VIRTUAL_SYSEVENT_ID, kSyseventType);
                 }
@@ -1721,9 +1712,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("Cache PUSH to sysevent %d: type=%s", VIRTUAL_SYSEVENT_ID, e.type.c_str());
                 m_chatbuf.append(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
                 db_writeMessage(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
-                if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
-                    chatWidget->scrollBottomIfNeeded();
-                } else {
+                if (!(currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType)) {
                     contactListWidget->incrementUnread(VIRTUAL_SYSEVENT_ID, kSyseventType);
                     db_writeUnreadIncrement(VIRTUAL_SYSEVENT_ID, kSyseventType);
                 }
@@ -1900,7 +1889,6 @@ void MainWindow::handleEvents(const EventList& events) {
                     m_chatbuf.append(chatId, chatType, msg);
                     db_writeMessage(chatId, chatType, msg);
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
-                        chatWidget->scrollBottomIfNeeded();
                         int newIdx = m_chatbuf.getOrCreate(chatId, chatType).size() - 1;
                         if (!hm.mediaUrl.empty() && hm.msgtype != "file") {
                             QString mxc = qFromUtf8(hm.mediaUrl);
@@ -1956,12 +1944,10 @@ void MainWindow::handleEvents(const EventList& events) {
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
                 db_writeLastMessage(VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
-                if (currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType) {
-                    chatWidget->scrollBottomIfNeeded();
-                } else {
-                    contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
-                    db_writeUnreadIncrement(VIRTUAL_REDDIT_ID, kTopicType);
-                }
+                    if (!(currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType)) {
+                        contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
+                        db_writeUnreadIncrement(VIRTUAL_REDDIT_ID, kTopicType);
+                    }
             } else {
                 ChatElement msg;
                 msg.category = "other";
@@ -1981,9 +1967,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
                 db_writeLastMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
-                if (currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType) {
-                    chatWidget->scrollBottomIfNeeded();
-                } else {
+                if (!(currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType)) {
                     contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, kUnknownType);
                     db_writeUnreadIncrement(VIRTUAL_UNKNOWN_ID, kUnknownType);
                 }
@@ -2687,7 +2671,7 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl, const QSt
         el.scaledDisplay = decodeRawToThumb(rawBytes.data(), rawBytes.size(),
             el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
         el.downloadState = ChatElement::Completed;
-        chatWidget->triggerRelayout(msgIndex);
+        chatWidget->updateElement(msgIndex);
         return;
     }
     auto dbData = Storage::instance().cacheDb()->loadMedia(
@@ -2697,11 +2681,11 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl, const QSt
         el.scaledDisplay = decodeRawToThumb((const char*)dbData.data(), dbData.size(),
             el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
         el.downloadState = ChatElement::Completed;
-        chatWidget->triggerRelayout(msgIndex);
+        chatWidget->updateElement(msgIndex);
         return;
     }
 
-    chatWidget->triggerRelayout(msgIndex);
+    chatWidget->updateElement(msgIndex);
     el.downloadState = ChatElement::InProgress;
     ToxAPI::downloadMedia(currentChatId, std::string(qToUtf8(currentChatType).data()),
                           msgIndex, std::string(qToUtf8(mediaUrl).data()));
@@ -2825,8 +2809,6 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
         m_chatbuf.append(currentChatId, typeStr, el);
         db_writeMessage(currentChatId, typeStr, el);
     }
-    chatWidget->scrollBottomIfNeeded();
-
     ToxAPI::sendMessage(currentChatId, fileType,
                          std::string(), fileIdOverride,
                          std::string(data.data(), data.size()),

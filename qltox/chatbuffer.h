@@ -10,16 +10,7 @@
 
 class ChatBuffer;
 
-class ChatHistoryObserver {
-public:
-    virtual ~ChatHistoryObserver() = default;
-    virtual void onInsertOne(size_t index) = 0;
-    virtual void onInsertRange(size_t start, size_t cnt) = 0;
-    virtual void onUpdateOne(size_t index) = 0;
-    virtual void onUpdateRange(size_t start, size_t cnt) = 0;
-    virtual void onRemoveOne(size_t index) = 0;
-    virtual void onReset() = 0;
-};
+class ChatHistoryObserver;
 
 class ChatHistory {
     friend class ChatBuffer;

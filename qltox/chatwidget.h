@@ -22,11 +22,11 @@ public:
     
     void setHeaderText(const QString& text);
 
-    void scrollBottomIfNeeded();
     int messageCount() const;
     ChatElement messageAt(int index) const;
     ChatElement& mutableMessageAt(int index);
-    void triggerRelayout(int msgIndex = -1);
+    void updateElement(int msgIndex) { messageArea->updateElement(msgIndex); }
+    void relayout() { messageArea->relayout(); }
     void repaintMessages() { messageArea->update(); }
     void setBuffer(ChatHistory* hist);
     void retranslateUi();
@@ -70,6 +70,7 @@ private:
     QLabel* headerText;
     QLabel* m_unreadBanner;
     QString m_baseHeader;
+    void scrollBottomIfNeeded();
     void updateHeaderCount();
     QComboBox* langSelector;
     QComboBox* m_styleSelector;

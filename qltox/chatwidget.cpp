@@ -246,10 +246,6 @@ ChatElement& ChatWidget::mutableMessageAt(int index) {
     return messageArea->messageAt(index);
 }
 
-void ChatWidget::triggerRelayout(int msgIndex) {
-    messageArea->triggerRelayout(msgIndex);
-}
-
 
 
 void ChatWidget::onSendClicked() {
@@ -354,13 +350,13 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
     // Toggle: if already translated, just toggle display
     if (msg.transState == TransState::Done && !msg.translatedText.isEmpty()) {
         msg.showTranslation = !msg.showTranslation;
-        messageArea->triggerRelayout(msgIndex);
+        messageArea->updateElement(msgIndex);
         return;
     }
 
     msg.translateError = QString();
     msg.transState = TransState::InFlight;
-    messageArea->triggerRelayout(msgIndex);
+    messageArea->updateElement(msgIndex);
     emit translateRequested(msgIndex, msg.messageText,
                             Config::value("translate_tolang"));
 }
@@ -379,7 +375,7 @@ void ChatWidget::onAutoTranslateRequested(int msgIndex, const QString& text, con
              msgIndex, qToUtf8(toLang).data(), qToUtf8(text).data());
     msg.translateError = QString();
     msg.transState = TransState::InFlight;
-    messageArea->triggerRelayout(msgIndex);
+    messageArea->updateElement(msgIndex);
     emit translateRequested(msgIndex, text, toLang);
 }
 
@@ -395,7 +391,7 @@ void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& tr
         msg.transState = TransState::Done;
         msg.translateError = errorMessage;
     }
-    messageArea->triggerRelayout(msgIndex);
+    messageArea->updateElement(msgIndex);
 }
 
 void ChatWidget::onThemeToggled(bool checked) {
