@@ -8,3 +8,4 @@ make
 # package
 tar zcf qltox-qt5-osx-x64.tar.gz qltox.app/
 ls -lh qltox-*.gz
+ls -lh qltox.app/Contents/MacOS/
