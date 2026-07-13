@@ -15,8 +15,9 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
                channel_db.cpp message_db.cpp \
                 pending_db.cpp cache_db.cpp cache_fs.cpp \
                 translate_util.cpp \
-                config.cpp \
-                sticker_db.cpp stickerpicker.cpp stickermanager.cpp
+                 config.cpp \
+                 msgdb_helper.cpp \
+                 sticker_db.cpp stickerpicker.cpp stickermanager.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
              chatwidget.h chatview.h chatbuffer.h contactlist.h selfinfo.h \
@@ -28,8 +29,9 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                channel_db.h message_db.h \
                 pending_db.h cache_db.h cache_fs.h \
                 translate_util.h \
-                config.h \
-                sticker_db.h stickerpicker.h stickermanager.h
+                 config.h \
+                 msgdb_helper.h \
+                 sticker_db.h stickerpicker.h stickermanager.h
             
 include(../qlcomp/qlite.pri)
 

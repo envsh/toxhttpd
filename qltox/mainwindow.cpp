@@ -15,6 +15,7 @@
 #include "cache_db.h"
 #include "config.h"
 #include "cJSON.h"
+#include "msgdb_helper.h"
 #include "jsonview.h"
 #include "appsetup.h"
 #include <qmessagebox.h>
@@ -1170,7 +1171,20 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     ChatHistory& hist = m_chatbuf.getOrCreate(id, typeStr);
     chatWidget->setBuffer(&hist);
     
-    // deque 为空时（首次打开），后台拉取历史
+    // TODO Phase3: 从 DB load_messages 兜底，再 fallback 到 HTTP
+    // auto* db = Storage::instance().messageDb();
+    // if (db) {
+    //     std::string chanid = typeStr + "_" + std::to_string(id);
+    //     std::vector<MessageRow> rows = db->load_messages(chanid.c_str(), 200);
+    //     for (auto& row : rows) {
+    //         ChatElement el = msgRowToElement(row);
+    //         m_chatbuf.append(id, typeStr, el);
+    //     }
+    //     if (!rows.empty()) {
+    //         chatWidget->setBuffer(&hist);
+    //         chatWidget->scrollBottomIfNeeded();
+    //     }
+    // }
     if (hist.empty() && id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
         && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
         && type != kFilesyncType && type != kClipboardType
@@ -1282,6 +1296,7 @@ void MainWindow::onMessageSending(const QString& message) {
         el.peerNumber = -1;
         el.time = getCurrentTime();
         m_chatbuf.append(currentChatId, typeStr, el);
+        db_writeMessage(currentChatId, typeStr, el);
         ChatHistory& hist = m_chatbuf.getOrCreate(currentChatId, typeStr);
         ChatElement& backEl = hist.back();
         backEl.sendState = ChatElement::SendSending;
@@ -1316,6 +1331,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     el.peerNumber = friendId;
                     el.time = getCurrentTime();
                     m_chatbuf.append(friendId, "friend", el);
+                    db_writeMessage(friendId, "friend", el);
                     if (friendId == currentChatId && currentChatType == "friend") {
                         chatWidget->scrollBottomIfNeeded();
                     } else {
@@ -1427,6 +1443,7 @@ void MainWindow::handleEvents(const EventList& events) {
                             el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
                         m_chatbuf.append(confNumber, "conference", el);
+                        db_writeMessage(confNumber, "conference", el);
                     }
                     if (confNumber == currentChatId && currentChatType == "conference") {
                         chatWidget->scrollBottomIfNeeded();
@@ -1536,6 +1553,7 @@ void MainWindow::handleEvents(const EventList& events) {
                             el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
                         m_chatbuf.append(groupNumber, "group", el);
+                        db_writeMessage(groupNumber, "group", el);
                     }
                     if (groupNumber == currentChatId && currentChatType == "group") {
                         chatWidget->scrollBottomIfNeeded();
@@ -1668,6 +1686,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.time = getCurrentTime();
                 qWarning("Cache PUSH to sysevent %d: type=%s (event.Evt)", VIRTUAL_SYSEVENT_ID, e.type.c_str());
                 m_chatbuf.append(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
+                db_writeMessage(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
                     chatWidget->scrollBottomIfNeeded();
                 } else {
@@ -1690,6 +1709,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 msg.time = getCurrentTime();
                 qWarning("Cache PUSH to sysevent %d: type=%s", VIRTUAL_SYSEVENT_ID, e.type.c_str());
                 m_chatbuf.append(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
+                db_writeMessage(VIRTUAL_SYSEVENT_ID, kSyseventType, msg);
                 if (currentChatId == VIRTUAL_SYSEVENT_ID && currentChatType == kSyseventType) {
                     chatWidget->scrollBottomIfNeeded();
                 } else {
@@ -1867,6 +1887,7 @@ void MainWindow::handleEvents(const EventList& events) {
                         chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
                     db_writeLastMessage(chatId, qFromUtf8(chatType), msg.messageText, timenowhm());
                     m_chatbuf.append(chatId, chatType, msg);
+                    db_writeMessage(chatId, chatType, msg);
                     if (currentChatId == chatId && currentChatType == qFromUtf8(chatType)) {
                         chatWidget->scrollBottomIfNeeded();
                         int newIdx = m_chatbuf.getOrCreate(chatId, chatType).size() - 1;
@@ -1920,6 +1941,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("Cache PUSH to reddit %d: sender=%s",
                          VIRTUAL_REDDIT_ID, qToUtf8(msg.senderName).data());
                 m_chatbuf.append(VIRTUAL_REDDIT_ID, kTopicType, msg);
+                db_writeMessage(VIRTUAL_REDDIT_ID, kTopicType, msg);
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
                 db_writeLastMessage(VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
@@ -1944,6 +1966,7 @@ void MainWindow::handleEvents(const EventList& events) {
                 qWarning("Cache PUSH to unknown %d: type=%s, handled=%d, sender=%s",
                          VIRTUAL_UNKNOWN_ID, e.type.c_str(), pr.handled, qToUtf8(msg.senderName).data());
                 m_chatbuf.append(VIRTUAL_UNKNOWN_ID, kUnknownType, msg);
+                db_writeMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, msg);
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
                 db_writeLastMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
@@ -2621,6 +2644,7 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
         }
 
         m_chatbuf.append(currentChatId, typeStr, el);
+        db_writeMessage(currentChatId, typeStr, el);
     }
     chatWidget->setBuffer(&hist);
 }
@@ -2788,6 +2812,7 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
     {
         std::string typeStr = std::string(qToUtf8(currentChatType).data());
         m_chatbuf.append(currentChatId, typeStr, el);
+        db_writeMessage(currentChatId, typeStr, el);
     }
     chatWidget->scrollBottomIfNeeded();
 

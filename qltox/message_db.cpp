@@ -58,7 +58,8 @@ public:
         if (!stmt.bind(i++, row.forwarded_from.c_str())) { return 0; }
         if (!stmt.bind(i++, row.mention)) { return 0; }
         if (!stmt.step()) {
-            qWarning("MessageDb::insert_message failed");
+            qWarning("MessageDb::insert_message failed for chanid=%s: %s",
+                     row.chanid.c_str(), sqliteError(*_));
             return 0;
         }
         return sqlite3_last_insert_rowid(_->raw());
