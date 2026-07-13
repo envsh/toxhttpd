@@ -18,6 +18,7 @@
 #include "msgdb_helper.h"
 #include "jsonview.h"
 #include "appsetup.h"
+#include "assertf.h"
 #include <qmessagebox.h>
 #include <qtextcodec.h>
 #include <qtextstream.h>
@@ -1170,29 +1171,39 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
     std::string typeStr = std::string(qToUtf8(type).data());
     ChatHistory& hist = m_chatbuf.getOrCreate(id, typeStr);
     chatWidget->setBuffer(&hist);
-    
-    // TODO Phase3: 从 DB load_messages 兜底，再 fallback 到 HTTP
-    // auto* db = Storage::instance().messageDb();
-    // if (db) {
-    //     std::string chanid = typeStr + "_" + std::to_string(id);
-    //     std::vector<MessageRow> rows = db->load_messages(chanid.c_str(), 200);
-    //     for (auto& row : rows) {
-    //         ChatElement el = msgRowToElement(row);
-    //         m_chatbuf.append(id, typeStr, el);
-    //     }
-    //     if (!rows.empty()) {
-    //         chatWidget->setBuffer(&hist);
-    //         chatWidget->scrollBottomIfNeeded();
-    //     }
-    // }
-    if (hist.empty() && id >= 0 && type != kGomuksRoomType && type != kUnktoxFriendType
-        && type != kUnktoxConferenceType && type != kUnktoxGroupType && type != kImapMailType
-        && type != kFilesyncType && type != kClipboardType
-        && type != kBookmarkType && type != kAichatType
-        && type != kPastebinType && type != kTranslateType) {
-        chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
-        ToxAPI::getMessagesHistory(id, typeStr);
+
+    if (!hist.loadedLatest50FromDB) {
+        auto* db = Storage::instance().messageDb();
+        assertf(db, "Storage::messageDb() returned null, chanid=%s_%d",
+                typeStr.c_str(), id);
+        std::string chanid = typeStr + "_" + std::to_string(id);
+        std::vector<MessageRow> rows = db->load_messages(chanid.c_str(), 50);
+        if (!rows.empty()) {
+            std::vector<ChatElement> els;
+            els.reserve(rows.size());
+            for (auto& row : rows) {
+                els.push_back(msgRowToElement(row));
+            }
+            m_chatbuf.prepend(id, typeStr, els);
+            chatWidget->triggerRelayout(-1);
+        }
+        hist.loadedLatest50FromDB = true;
     }
+
+    // ── HTTP fallback ──
+    // TEMP: 暂注释，先验证 DB-on-load 路径。
+    //
+    // if (!hist.loadedLastest50FromNet && hist.empty() && id >= 0
+    //     && type != kGomuksRoomType && type != kUnktoxFriendType
+    //     && type != kUnktoxConferenceType && type != kUnktoxGroupType
+    //     && type != kImapMailType && type != kFilesyncType
+    //     && type != kClipboardType && type != kBookmarkType
+    //     && type != kAichatType && type != kPastebinType
+    //     && type != kTranslateType) {
+    //     hist.loadedLastest50FromNet = true;
+    //     chatWidget->loadingBar()->showLoading(kLoadMessages, _("loading_messages"));
+    //     ToxAPI::getMessagesHistory(id, typeStr);
+    // }
     
     // 异步预加载成员列表到 peerInfoMap 缓存（虚拟联系人跳过）
     if (id < 0) return;

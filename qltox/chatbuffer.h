@@ -32,6 +32,8 @@ public:
     int64_t oldestRowid = 0;
     int64_t newestRowid = 0;
     bool exhausted = false;
+    bool loadedLatest50FromDB = false;
+    bool loadedLastest50FromNet = false;
     static int getCapacity() { return m_capacity; }
     static ChatHistory kEmpty;
 
@@ -55,6 +57,7 @@ class ChatBuffer {
 public:
     ChatHistory& getOrCreate(int chatId, const std::string& chatType);
     void append(int chatId, const std::string& chatType, const ChatElement& el);
+    void prepend(int chatId, const std::string& chatType, const std::vector<ChatElement>& els);
     ChatHistory* ptr(int chatId, const std::string& chatType);
 private:
     std::map<std::pair<int, std::string>, ChatHistory> m_map;

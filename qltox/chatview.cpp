@@ -2201,6 +2201,9 @@ void ChatView::relayout() {
     m_vScrollBar->setPageStep(vpH);
     if (oldVal == oldMax && oldMax > 0) {
         m_vScrollBar->setValue(maxScroll);
+    } else if (oldMax == 0 && maxScroll > 0) {
+        // 首次加载：历史为空→有内容，自动滚底
+        m_vScrollBar->setValue(maxScroll);
     }
     m_vScrollBar->blockSignals(false);
     m_scrollPos = m_vScrollBar->value();

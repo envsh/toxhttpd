@@ -12,6 +12,10 @@ void ChatBuffer::append(int chatId, const std::string& chatType, const ChatEleme
     getOrCreate(chatId, chatType).append(el);
 }
 
+void ChatBuffer::prepend(int chatId, const std::string& chatType, const std::vector<ChatElement>& els) {
+    getOrCreate(chatId, chatType).prepend(els);
+}
+
 ChatHistory* ChatBuffer::ptr(int chatId, const std::string& chatType) {
     auto it = m_map.find(std::make_pair(chatId, chatType));
     return (it != m_map.end()) ? &it->second : nullptr;
