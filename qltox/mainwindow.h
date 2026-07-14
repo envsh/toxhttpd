@@ -17,6 +17,8 @@
 #include "translator.h"
 #include "FramelessHelper.h"
 #include "friendinfodialog.h"
+#include "screenshotmanager.h"
+#include "screenshotpreview.h"
 #include "memberlistdialog.h"
 #include "ConfigDialog.h"
 
@@ -64,6 +66,9 @@ protected slots:
     void openStickerManager();
     void onMenu1Stub();
     void onMenu2Stub();
+    void onScreenshotRequested();
+    void onScreenshotReady(const QString& filePath);
+    void onScreenshotCancelled();
     void openHomePage();
     void onSettingsSaved(const SettingsChangedMap& changed);
     
@@ -97,6 +102,7 @@ private:
     // 消息缓存：每个联系人的 ChatHistory，ChatBuffer 统一管理
     ChatBuffer m_chatbuf;
 
+    ScreenshotManager* m_screenshotMgr;
     DesktopLyrics* m_lyrics;
     QTimer* m_msgTimer;
     QTimer* m_clockTimer;

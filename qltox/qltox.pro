@@ -98,11 +98,11 @@ LIBS += $$system(pkg-config --libs openal 2>/dev/null)
 FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
 !isEmpty(FREETYPE_LIBS) {
     QMAKE_CXXFLAGS += $$system(pkg-config --cflags freetype2 2>/dev/null)
-    LIBS += -lcurl -lopenal -ldl $$FREETYPE_LIBS
+    LIBS += -lcurl -lopenal -ldl -lX11 $$FREETYPE_LIBS
     message("FreeType2: detected via pkg-config")
 } else {
     INCLUDEPATH += /usr/include/freetype2
-    LIBS += -lcurl -lfreetype
+    LIBS += -lcurl -lfreetype -lX11
     message("FreeType2: pkg-config not found, using fallback paths")
 }
 

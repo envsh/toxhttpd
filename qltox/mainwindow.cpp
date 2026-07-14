@@ -27,6 +27,8 @@
 #include "placeholderlineedit.h"
 #include "stickermanager.h"
 #include "sound.h"
+#include "screenshotmanager.h"
+#include "screenshotpreview.h"
 #include <qfile.h>
 #ifdef QT3_BUILD
 #include <qdatetime.h>
@@ -594,6 +596,29 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(help, qFromUtf8("关于(&A)..."), this, SLOT(onMenu1Stub()));
 
     mb->finalize();
+
+    // ── Screenshot 截图模块 ──
+    {
+        m_screenshotMgr = ScreenshotManager::instance();
+        m_screenshotMgr->setHideWindow(this);
+
+        // Config: 截图前隐藏主窗口
+        QString hideVal = Config::value("screenshot_hide_window");
+        m_screenshotMgr->setAutoHide(hideVal.isEmpty() || hideVal == "true");
+
+        // 「工具」菜单加截图项
+        // 快捷键 Ctrl+Shift+S 通过菜单文本中的 \t 自动注册
+        EmbeddedMenuBar::addItem(tool, qFromUtf8("截图(&S)...\tCtrl+Shift+S"),
+            this, SLOT(onScreenshotRequested()));
+
+        // 截图完成 → 弹出预览
+        connect(m_screenshotMgr, SIGNAL(screenshotReady(const QString&)),
+                this, SLOT(onScreenshotReady(const QString&)));
+
+        // 截图取消 → 静默忽略
+        connect(m_screenshotMgr, SIGNAL(cancelled()),
+                this, SLOT(onScreenshotCancelled()));
+    }
 }
 
 MainWindow::~MainWindow() {
@@ -3013,6 +3038,25 @@ void MainWindow::openStickerManager() {
     if (db) { mgr->setStickerDb(db); }
     mgr->loadData();
     mgr->show();
+}
+
+void MainWindow::onScreenshotRequested() {
+    // Default to region capture (most common).
+    // Options: captureFullScreen(), captureActiveWindow(), captureRegion()
+    m_screenshotMgr->captureRegion();
+}
+
+void MainWindow::onScreenshotReady(const QString& filePath) {
+    // 弹出预览对话框，用户确认后发送到当前聊天
+    PreviewDialog* dlg = new PreviewDialog(filePath, this);
+    connect(dlg, SIGNAL(sendRequested(const QString&)),
+            this, SLOT(onFileSendRequested(const QString&)));
+    connect(dlg, SIGNAL(cancelled()), dlg, SLOT(close()));
+    dlg->show();
+}
+
+void MainWindow::onScreenshotCancelled() {
+    // 截图取消 — 静默忽略
 }
 
 void MainWindow::onMenu1Stub() {

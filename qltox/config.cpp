@@ -59,7 +59,8 @@ bool Config::saveRoot(cJSON* root) {
 static const std::map<std::string, std::string>& defaultValues() {
     static const std::map<std::string, std::string> m = {
         {"uilang", "zh-CN"},
-        {"translate_tolang", "zh-CN"}
+        {"translate_tolang", "zh-CN"},
+        {"screenshot_hide_window", "true"}
     };
     return m;
 }
