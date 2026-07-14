@@ -3357,14 +3357,19 @@ void ChatView::paintEvent(QPaintEvent* event) {
 
             if (el.etype == ChatElement::Text
                 && !el.messageText.isEmpty()
-                && el.transState == TransState::None
-                && needsAutoTranslate(el.messageText, Config::value("translate_tolang")))
+                && el.transState == TransState::None)
             {
-                el.transState = TransState::Scheduled;
-                qWarning("ChatView: auto-trigger translate msgIndex=%d lang=%s text=[%.60s]",
-                         (int)i, qToUtf8(Config::value("translate_tolang")).data(),
-                         qToUtf8(el.messageText).data());
-                emit autoTranslateRequested((int)i, el.messageText, Config::value("translate_tolang"));
+                if (!el.needsTranslateComputed) {
+                    el.needsTranslateResult = needsAutoTranslate(el.messageText, Config::value("translate_tolang"));
+                    el.needsTranslateComputed = true;
+                }
+                if (el.needsTranslateResult) {
+                    el.transState = TransState::Scheduled;
+                    qWarning("ChatView: auto-trigger translate msgIndex=%d lang=%s text=[%.60s]",
+                             (int)i, qToUtf8(Config::value("translate_tolang")).data(),
+                             qToUtf8(el.messageText).data());
+                    emit autoTranslateRequested((int)i, el.messageText, Config::value("translate_tolang"));
+                }
             }
         }
         if (y > vpH) { break; }

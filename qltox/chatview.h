@@ -58,6 +58,8 @@ struct ChatElement {
     QString translateError;
     bool showTranslation;
     TransState transState;
+    bool needsTranslateComputed;
+    bool needsTranslateResult;
     QRect translateBtnRect;
     QRect sourceBtnRect;
 
@@ -97,7 +99,8 @@ struct ChatElement {
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)
-        , transState(TransState::None), downloadState(NotRequested)
+        , transState(TransState::None), needsTranslateComputed(false), needsTranslateResult(false)
+        , downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
         , fileSize(0), progress(0), durationSec(0), movie(nullptr)
         , cachedWidth(-1), height(0), firstInGroup(1), sendState(SendSending) {}
