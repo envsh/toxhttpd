@@ -128,9 +128,11 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
 #ifdef QT3_BUILD
         // TipLabel 是顶层 QLabel — 跳过，不跟踪
         if (tw->inherits("QLabel")) return false;
+        if (tw->inherits("DesktopLyrics")) return false;
 #else
         // Qt4 tooltips/popups 不跟踪
         if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return false;
+        if (tw->inherits("DesktopLyrics")) return false;
 #endif
 		// 窗口宽或高小于 350px 时不跟随
 		if (tw->width() < 350) {
