@@ -14,6 +14,7 @@
 QObject* ToxAPI::s_target = nullptr;
 std::string ToxAPI::s_baseUrl = "http://localhost:8181";
 uint64_t ToxAPI::s_lastEventId = 0;
+int ToxAPI::s_sendMsgSeq = 100;
 bool ToxAPI::s_pollRunning = false;
 bool ToxAPI::s_loadingAllData = false;
 bool ToxAPI::s_reloadPending = false;
@@ -232,34 +233,41 @@ void ToxAPI::getFriends() {
     request(ApiGetFriends, {"/api/friends", "GET"});
 }
 
-void ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
+int ToxAPI::sendFriendMessage(int friendId, const std::string& message) {
     auto* ctx = new ApiCtx(ApiSendFriendMessage, friendId, message);
+    ctx->sendmsgseq = ++s_sendMsgSeq;
     request({"/api/messages", "POST",
-            "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message)}, ctx);
+            "friend_id=" + std::to_string(friendId) + "&message=" + urlEncode(message), 90}, ctx);
+    return ctx->sendmsgseq;
 }
 
-void ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
+int ToxAPI::sendConferenceMessage(int conferenceId, const std::string& message) {
     auto* ctx = new ApiCtx(ApiSendConferenceMessage, conferenceId, message);
+    ctx->sendmsgseq = ++s_sendMsgSeq;
     request({"/api/conference_messages", "POST",
-            "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message)}, ctx);
+            "conference_id=" + std::to_string(conferenceId) + "&message=" + urlEncode(message), 90}, ctx);
+    return ctx->sendmsgseq;
 }
 
-void ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
+int ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
     auto* ctx = new ApiCtx(ApiSendGroupMessage, groupId, message);
+    ctx->sendmsgseq = ++s_sendMsgSeq;
     request({"/api/group_messages", "POST",
-            "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message)}, ctx);
+            "group_number=" + std::to_string(groupId) + "&message=" + urlEncode(message), 90}, ctx);
+    return ctx->sendmsgseq;
 }
 
-void ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message,
+int ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message,
                           const std::string& idOverride,
                           const std::string& fileData,
                           const std::string& filename) {
     auto* ctx = new ApiCtx(ApiSendMessage, chatId, message, type);
+    ctx->sendmsgseq = ++s_sendMsgSeq;
     std::string idStr = idOverride.empty() ? std::to_string(chatId) : idOverride;
 
     if (fileData.empty()) {
         request({"/api/messages/send", "POST",
-                "type=" + type + "&id=" + urlEncode(idStr) + "&message=" + urlEncode(message)}, ctx);
+                "type=" + type + "&id=" + urlEncode(idStr) + "&message=" + urlEncode(message), 90}, ctx);
     } else {
         std::string boundary = "----toxhttpd" + std::to_string(time(nullptr));
         std::string body;
@@ -276,9 +284,10 @@ void ToxAPI::sendMessage(int chatId, const std::string& type, const std::string&
                 "Content-Type: application/octet-stream\r\n\r\n";
         body += fileData;
         body += "\r\n--" + boundary + "--\r\n";
-        request({"/api/messages/send", "POST", body, 120,
+        request({"/api/messages/send", "POST", body, 90,
             {{"Content-Type", "multipart/form-data; boundary=" + boundary}}}, ctx);
     }
+    return ctx->sendmsgseq;
 }
 
 void ToxAPI::addFriend(const std::string& publicKey) {
@@ -880,6 +889,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         }
         ev->chatId = ctx->id;
         ev->message = ctx->str1;
+        ev->sendmsgseq = ctx->sendmsgseq;
         switch (ctx->type) {
             case ApiSendMessage: ev->chatType = ctx->str2; break;
             case ApiSendFriendMessage: ev->chatType = "friend"; break;

@@ -964,16 +964,32 @@ void MainWindow::customEvent(CustomEventBase* event) {
             if (targetName.isEmpty())
                 targetName = qFromUtf8(evt->chatType) + " " + QString::number(evt->chatId);
             {
+                bool found = false;
                 for (int i = chatWidget->messageCount() - 1; i >= 0; i--) {
                     ChatElement& el = chatWidget->mutableMessageAt(i);
-                    if (el.category == "self" && el.sendState == ChatElement::SendSending) {
+                    if (el.category == "self" && el.sendmsgseq == evt->sendmsgseq) {
                         if (evt->success) {
                             el.sendState = ChatElement::SendSent;
                         } else {
                             el.sendState = ChatElement::SendFailed;
                             el.sendErrorMsg = qFromUtf8(evt->errorMessage);
                         }
+                        found = true;
                         break;
+                    }
+                }
+                if (!found) {
+                    for (int i = chatWidget->messageCount() - 1; i >= 0; i--) {
+                        ChatElement& el = chatWidget->mutableMessageAt(i);
+                        if (el.category == "self" && el.sendState == ChatElement::SendSending) {
+                            if (evt->success) {
+                                el.sendState = ChatElement::SendSent;
+                            } else {
+                                el.sendState = ChatElement::SendFailed;
+                                el.sendErrorMsg = qFromUtf8(evt->errorMessage);
+                            }
+                            break;
+                        }
                     }
                 }
             }
@@ -1074,7 +1090,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                         }
                     }
                 }
-                ToxAPI::sendMessage(currentChatId, type, tev->translatedText, idOverride);
+                int sendmsgseq = ToxAPI::sendMessage(currentChatId, type, tev->translatedText, idOverride);
+                (void)sendmsgseq;
             } else {
                 chatWidget->loadingBar()->hideLoading(kLoadSendMsg);
                 ToastWidget::show(chatWidget, "翻译失败", 8000);
@@ -1259,6 +1276,7 @@ void MainWindow::onMessageSending(const QString& message) {
         return;
     }
 
+    int sendmsgseq = 0;
 #ifdef USE_UNIFIED_SEND_API
     std::string type = std::string(qToUtf8(currentChatType).data());
     if (type.empty()) {
@@ -1296,7 +1314,7 @@ void MainWindow::onMessageSending(const QString& message) {
 #else
         m_msgTimer->start(5000);
 #endif
-        ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
+        sendmsgseq = ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
     }
 #else
     // ✅ 改为异步请求
@@ -1314,11 +1332,11 @@ void MainWindow::onMessageSending(const QString& message) {
 
     chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
     if (reqType == ApiSendFriendMessage) {
-        ToxAPI::sendFriendMessage(currentChatId, std::string(qToUtf8(message)));
+        sendmsgseq = ToxAPI::sendFriendMessage(currentChatId, std::string(qToUtf8(message)));
     } else if (reqType == ApiSendConferenceMessage) {
-        ToxAPI::sendConferenceMessage(currentChatId, std::string(qToUtf8(message)));
+        sendmsgseq = ToxAPI::sendConferenceMessage(currentChatId, std::string(qToUtf8(message)));
     } else if (reqType == ApiSendGroupMessage) {
-        ToxAPI::sendGroupMessage(currentChatId, std::string(qToUtf8(message)));
+        sendmsgseq = ToxAPI::sendGroupMessage(currentChatId, std::string(qToUtf8(message)));
     }
 #endif
 
@@ -1336,6 +1354,7 @@ void MainWindow::onMessageSending(const QString& message) {
         ChatHistory& hist = m_chatbuf.getOrCreate(currentChatId, typeStr);
         ChatElement& backEl = hist.back();
         backEl.sendState = ChatElement::SendSending;
+        backEl.sendmsgseq = sendmsgseq;
         if (type == kBookmarkType || type == kAichatType
             || type == kPastebinType || type == kTranslateType) {
             backEl.sendState = ChatElement::SendSent;
@@ -2741,7 +2760,8 @@ void MainWindow::onResendMessage(int msgIndex) {
     } else if (type == kTranslateType) {
         handleTranslateMessage(msgText);
     } else {
-        ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(msgText)), idOverride);
+        int sendmsgseq = ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(msgText)), idOverride);
+        (void)sendmsgseq;
     }
 #else
     ToxAPI::sendMessage(currentChatId, "friend", std::string(qToUtf8(msgText)));
@@ -2829,15 +2849,21 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
     el.fileName = fn;
     el.fileSize = (int)sz;
     el.sendState = ChatElement::SendSending;
+    std::string typeStr = std::string(qToUtf8(currentChatType).data());
     {
-        std::string typeStr = std::string(qToUtf8(currentChatType).data());
         m_chatbuf.append(currentChatId, typeStr, el);
         db_writeMessage(currentChatId, typeStr, el);
     }
-    ToxAPI::sendMessage(currentChatId, fileType,
+    int sendmsgseq = ToxAPI::sendMessage(currentChatId, fileType,
                          std::string(), fileIdOverride,
                          std::string(data.data(), data.size()),
                          std::string(qToUtf8(fn)));
+    if (sendmsgseq > 0) {
+        ChatHistory& hist = m_chatbuf.getOrCreate(currentChatId, typeStr);
+        if (!hist.empty()) {
+            hist.back().sendmsgseq = sendmsgseq;
+        }
+    }
 }
 
 void MainWindow::onSourceClicked(int msgIndex) {

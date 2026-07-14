@@ -201,6 +201,7 @@ class MessageSentResultEvent : public ApiResultEvent {
 public:
     MessageSentResultEvent(ApiRequestType t) : ApiResultEvent(t), success(false) {}
     bool success;
+    int sendmsgseq = 0;
     std::string message;
     int chatId;
     std::string chatType;

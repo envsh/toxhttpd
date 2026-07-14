@@ -51,13 +51,13 @@ public:
 
     static void getSelf();
     static void getFriends();
-    static void sendMessage(int chatId, const std::string& type, const std::string& message,
+    static int  sendMessage(int chatId, const std::string& type, const std::string& message,
                              const std::string& idOverride = "",
                              const std::string& fileData = "",
                              const std::string& filename = "");
-    static void sendFriendMessage(int friendId, const std::string& message);
-    static void sendConferenceMessage(int conferenceId, const std::string& message);
-    static void sendGroupMessage(int groupId, const std::string& message);
+    static int  sendFriendMessage(int friendId, const std::string& message);
+    static int  sendConferenceMessage(int conferenceId, const std::string& message);
+    static int  sendGroupMessage(int groupId, const std::string& message);
     static void addFriend(const std::string& publicKey);
     static void deleteFriend(int friendId);
     static void getGroupMembers(int groupId);
@@ -117,6 +117,7 @@ private:
     struct ApiCtx {
         int type;
         int id = 0;
+        int sendmsgseq = 0;
         std::string str1;
         std::string str2;
         int n1 = 0;
@@ -144,6 +145,7 @@ private:
     static QObject* s_target;
     static std::string s_baseUrl;
     static uint64_t s_lastEventId;
+    static int s_sendMsgSeq;
     static bool s_pollRunning;
     static bool s_loadingAllData;
     static bool s_reloadPending;

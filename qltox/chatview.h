@@ -91,6 +91,7 @@ struct ChatElement {
     short height;
     uchar firstInGroup : 1;
     SendState sendState;
+    int sendmsgseq = -1;
     QString sendErrorMsg;
     QRect resendIconRect;
 
