@@ -387,6 +387,7 @@ void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& tr
         msg.translatedText = translatedText;
         msg.showTranslation = true;
         msg.translateError = QString();
+        msg.cachedWidth = -1;  // 强制 updateElement 重算高度，否则 cachedWidth==w 时不会展开气泡
     } else {
         msg.transState = TransState::Done;
         msg.translateError = errorMessage;

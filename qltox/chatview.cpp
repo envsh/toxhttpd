@@ -2950,9 +2950,18 @@ void ChatView::mouseMoveEvent(QMouseEvent* event) {
     if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
         // Check header action buttons first
         if ((*m_history)[msgIndex].translateBtnRect.contains(event->pos())) {
-            QString tip = (*m_history)[msgIndex].translateError.isEmpty()
+            const auto& el = (*m_history)[msgIndex];
+            QString stateStr;
+            switch (el.transState) {
+            case TransState::None:      stateStr = qFromUtf8("None"); break;
+            case TransState::Scheduled: stateStr = qFromUtf8("Scheduled"); break;
+            case TransState::InFlight:  stateStr = qFromUtf8("InFlight"); break;
+            case TransState::Done:      stateStr = qFromUtf8("Done"); break;
+            }
+            QString tip = el.translateError.isEmpty()
                 ? qFromUtf8("Translate")
-                : (*m_history)[msgIndex].translateError;
+                : el.translateError;
+            tip += qFromUtf8(" [") + stateStr + qFromUtf8("]");
             showTempTooltip(this, (*m_history)[msgIndex].translateBtnRect, tip);
             setCursor(QCursor(Qt::PointingHandCursor));
             QWidget::mouseMoveEvent(event);

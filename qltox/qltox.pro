@@ -133,6 +133,13 @@ isEmpty(QT_VERSION) {
     message("Linking with Qt4 libraries")
 }
 
+# 截图模块 (screenshotmanager.cpp) 直接调用 XGetInputFocus 等 X11 API，
+# 需要显式链接 -lX11。libQtGui.so 虽是共享库且有 DT_NEEDED 指向 libX11，
+# 但 GNU ld --as-needed 策略下，链接器不会自动搜索传递依赖来解析应用
+# 目标文件中的符号，因此必须显式 -lX11。
+# — 添加 screenshot 模块前无此需要，因为没有代码直接调用 X11 API。
+unix:!macx: LIBS += -lX11
+
 # 安装
 target.path = /usr/local/bin
 INSTALLS += target
