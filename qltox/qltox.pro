@@ -32,7 +32,9 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                  config.h \
                  msgdb_helper.h \
                  sticker_db.h stickerpicker.h stickermanager.h
-            
+
+# FORMS += MediumMsgEditor.ui — 已弃用。Qt3/Qt4 uic XML schema 不兼容，
+# Qt4 uic 拒绝 <vbox>/<hbox> 等 Qt3 标签，且 Qt4 环境无 Qt3Support 库。
 include(../qlcomp/qlite.pri)
 
 # 使 qltox/ 中的 #include "compat34.h" 能找到 qlcomp/
@@ -98,11 +100,11 @@ LIBS += $$system(pkg-config --libs openal 2>/dev/null)
 FREETYPE_LIBS = $$system(pkg-config --libs freetype2 2>/dev/null)
 !isEmpty(FREETYPE_LIBS) {
     QMAKE_CXXFLAGS += $$system(pkg-config --cflags freetype2 2>/dev/null)
-    LIBS += -lcurl -lopenal -ldl -lX11 $$FREETYPE_LIBS
+    LIBS += -lcurl -lopenal -ldl $$FREETYPE_LIBS
     message("FreeType2: detected via pkg-config")
 } else {
     INCLUDEPATH += /usr/include/freetype2
-    LIBS += -lcurl -lfreetype -lX11
+    LIBS += -lcurl -lfreetype
     message("FreeType2: pkg-config not found, using fallback paths")
 }
 
