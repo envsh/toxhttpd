@@ -18,7 +18,7 @@
 #include <QImage>
 #endif
 
-PreviewDialog::PreviewDialog(const QString& filePath, QWidget* parent)
+ScreenshotPreviewDialog::ScreenshotPreviewDialog(const QString& filePath, QWidget* parent)
 #ifdef QT3_BUILD
     : QDialog(parent, "screenshot_preview")
 #else
@@ -37,10 +37,10 @@ PreviewDialog::PreviewDialog(const QString& filePath, QWidget* parent)
     setupUi();
 }
 
-PreviewDialog::~PreviewDialog() {
+ScreenshotPreviewDialog::~ScreenshotPreviewDialog() {
 }
 
-void PreviewDialog::setupUi() {
+void ScreenshotPreviewDialog::setupUi() {
     setMinimumSize(400, 300);
     resize(640, 480);
 
@@ -102,14 +102,14 @@ void PreviewDialog::setupUi() {
     connect(m_cancelBtn, SIGNAL(clicked()), this, SLOT(onCancelClicked()));
 }
 
-void PreviewDialog::onSendClicked() {
+void ScreenshotPreviewDialog::onSendClicked() {
     if (!m_filePath.isEmpty()) {
         emit sendRequested(m_filePath);
     }
     close();
 }
 
-void PreviewDialog::onSaveClicked() {
+void ScreenshotPreviewDialog::onSaveClicked() {
     QString savePath;
 
 #ifdef QT3_BUILD
@@ -125,7 +125,7 @@ void PreviewDialog::onSaveClicked() {
     }
 }
 
-void PreviewDialog::onCancelClicked() {
+void ScreenshotPreviewDialog::onCancelClicked() {
     emit cancelled();
     close();
 }

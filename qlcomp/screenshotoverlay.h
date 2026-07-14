@@ -18,11 +18,11 @@
 #include <qregion.h>
 #include <qnamespace.h>
 
-class RegionSelector : public QWidget {
+class ScreenshotRegionSelector : public QWidget {
     Q_OBJECT
 public:
-    RegionSelector(const QPixmap& background);
-    ~RegionSelector();
+    ScreenshotRegionSelector(const QPixmap& background);
+    ~ScreenshotRegionSelector();
 
 signals:
     void regionSelected(const QRect& rect, const QPixmap& fullPixmap);

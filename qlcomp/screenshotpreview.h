@@ -12,11 +12,11 @@
 #include <qlabel.h>
 #include <qpushbutton.h>
 
-class PreviewDialog : public QDialog {
+class ScreenshotPreviewDialog : public QDialog {
     Q_OBJECT
 public:
-    PreviewDialog(const QString& filePath, QWidget* parent = nullptr);
-    ~PreviewDialog();
+    ScreenshotPreviewDialog(const QString& filePath, QWidget* parent = nullptr);
+    ~ScreenshotPreviewDialog();
 
 signals:
     void sendRequested(const QString& filePath);

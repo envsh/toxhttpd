@@ -134,8 +134,8 @@ void ScreenshotManager::doCaptureForRegion() {
         m_hideWindow->show();
     }
 
-    // 弹出 RegionSelector 全屏覆盖选区
-    RegionSelector* selector = new RegionSelector(fullPm);
+    // 弹出 ScreenshotRegionSelector 全屏覆盖选区
+    ScreenshotRegionSelector* selector = new ScreenshotRegionSelector(fullPm);
     connect(selector, SIGNAL(regionSelected(const QRect&, const QPixmap&)),
             this, SLOT(onRegionSelected(const QRect&, const QPixmap&)));
     connect(selector, SIGNAL(cancelled()), this, SIGNAL(cancelled()));

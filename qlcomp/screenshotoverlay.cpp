@@ -16,7 +16,7 @@
 
 #include <qkeysequence.h>
 
-RegionSelector::RegionSelector(const QPixmap& background)
+ScreenshotRegionSelector::ScreenshotRegionSelector(const QPixmap& background)
 #ifdef QT3_BUILD
     : QWidget(nullptr, "region_selector")
 #else
@@ -47,10 +47,10 @@ RegionSelector::RegionSelector(const QPixmap& background)
     grabKeyboard();
 }
 
-RegionSelector::~RegionSelector() {
+ScreenshotRegionSelector::~ScreenshotRegionSelector() {
 }
 
-void RegionSelector::mousePressEvent(QMouseEvent* e) {
+void ScreenshotRegionSelector::mousePressEvent(QMouseEvent* e) {
 #ifdef QT3_BUILD
     if (e->button() != LeftButton) { return; }
 #else
@@ -63,13 +63,13 @@ void RegionSelector::mousePressEvent(QMouseEvent* e) {
     update();
 }
 
-void RegionSelector::mouseMoveEvent(QMouseEvent* e) {
+void ScreenshotRegionSelector::mouseMoveEvent(QMouseEvent* e) {
     if (!m_selecting) { return; }
     m_selection = QRect(m_startPoint, e->pos());
     update();
 }
 
-void RegionSelector::mouseReleaseEvent(QMouseEvent* e) {
+void ScreenshotRegionSelector::mouseReleaseEvent(QMouseEvent* e) {
 #ifdef QT3_BUILD
     if (e->button() != LeftButton) { return; }
 #else
@@ -82,7 +82,7 @@ void RegionSelector::mouseReleaseEvent(QMouseEvent* e) {
     update();
 }
 
-void RegionSelector::mouseDoubleClickEvent(QMouseEvent*) {
+void ScreenshotRegionSelector::mouseDoubleClickEvent(QMouseEvent*) {
     if (m_hasSelection && m_selection.width() > 0 && m_selection.height() > 0) {
         releaseKeyboard();
         emit regionSelected(m_selection, m_background);
@@ -90,7 +90,7 @@ void RegionSelector::mouseDoubleClickEvent(QMouseEvent*) {
     }
 }
 
-void RegionSelector::keyPressEvent(QKeyEvent* e) {
+void ScreenshotRegionSelector::keyPressEvent(QKeyEvent* e) {
     int key = e->key();
 
     if (key == Qt::Key_Escape) {
@@ -106,7 +106,7 @@ void RegionSelector::keyPressEvent(QKeyEvent* e) {
     }
 }
 
-void RegionSelector::paintEvent(QPaintEvent*) {
+void ScreenshotRegionSelector::paintEvent(QPaintEvent*) {
     QPainter p(this);
 
     // 绘制截图背景

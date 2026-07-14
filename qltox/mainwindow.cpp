@@ -3048,7 +3048,7 @@ void MainWindow::onScreenshotRequested() {
 
 void MainWindow::onScreenshotReady(const QString& filePath) {
     // 弹出预览对话框，用户确认后发送到当前聊天
-    PreviewDialog* dlg = new PreviewDialog(filePath, this);
+    ScreenshotPreviewDialog* dlg = new ScreenshotPreviewDialog(filePath, this);
     connect(dlg, SIGNAL(sendRequested(const QString&)),
             this, SLOT(onFileSendRequested(const QString&)));
     connect(dlg, SIGNAL(cancelled()), dlg, SLOT(close()));

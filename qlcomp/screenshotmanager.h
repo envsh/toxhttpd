@@ -24,7 +24,7 @@
 #include <qwidget.h>
 #include <qrect.h>
 
-class RegionSelector;
+class ScreenshotRegionSelector;
 
 class ScreenshotManager : public QObject {
     Q_OBJECT
