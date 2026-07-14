@@ -64,7 +64,7 @@ DesktopLyrics::DesktopLyrics()
     , m_transparentBg(true)
     , m_dragging(false)
 {
-    m_font.setPixelSize(28);
+    m_font.setPointSize(48);
     m_font.setBold(true);
 #ifdef QT3_BUILD
     m_backing = new QPixmap(600, 80);
@@ -633,9 +633,9 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         drawTextWithStroke(p, nextText, nextX, nextY, m_unplayedColor);
     }
 
-    // Transparent bg rect behind text (Qt4 only)
+    // Background rect behind text (Qt4 only, opaque mode)
 #ifndef QT3_BUILD
-    if (m_transparentBg && hasText) {
+    if (!m_transparentBg && hasText) {
         QRect bgRect(minX - 8, minY - 4, maxX - minX + 16, maxY - minY + 8);
         bgRect = bgRect.intersected(r);
         QPainterPath path;

@@ -56,7 +56,7 @@ private:
     QColor m_unplayedColor = QColor(0xBB, 0xBB, 0xBB);
     QColor m_strokeColor   = QColor(0x00, 0x00, 0x00);
     QColor m_bgColor       = QColor(0x00, 0x00, 0x00);
-    int    m_fontSize      = 28;
+    int    m_fontSize      = 48;
     LineMode m_lineMode    = LineMode::Single;
     bool   m_transparentBg = true;
     bool   m_locked        = false;
