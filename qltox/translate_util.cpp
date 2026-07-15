@@ -96,8 +96,12 @@ struct NonTranslatableSpan {
 
 #ifdef QT3_BUILD
 typedef QValueVector<NonTranslatableSpan> SpanVector;
+#define SpanVector_append(vec, item) (vec).append(item)
+#define SpanVector_isEmpty(vec) (vec).isEmpty()
 #else
 typedef std::vector<NonTranslatableSpan> SpanVector;
+#define SpanVector_append(vec, item) (vec).push_back(item)
+#define SpanVector_isEmpty(vec) (vec).empty()
 #endif
 
 static SpanVector extractNonTranslatableSpans(const QString& text) {
@@ -131,7 +135,7 @@ static SpanVector extractNonTranslatableSpans(const QString& text) {
             len--;
         }
         NonTranslatableSpan span = {pos, pos + len};
-        spans.append(span);
+        SpanVector_append(spans, span);
         pos += len;
     }
 
@@ -145,7 +149,7 @@ static SpanVector extractNonTranslatableSpans(const QString& text) {
 #endif
         if (pos == -1) { break; }
         NonTranslatableSpan span = {pos, pos + mailRe.matchedLength()};
-        spans.append(span);
+        SpanVector_append(spans, span);
         pos += mailRe.matchedLength();
     }
 
@@ -159,11 +163,11 @@ static SpanVector extractNonTranslatableSpans(const QString& text) {
 #endif
         if (pos == -1) { break; }
         NonTranslatableSpan span = {pos, pos + idRe.matchedLength()};
-        spans.append(span);
+        SpanVector_append(spans, span);
         pos += idRe.matchedLength();
     }
 
-    if (spans.isEmpty()) { return spans; }
+    if (SpanVector_isEmpty(spans)) { return spans; }
 
     // 排序 + 合并重叠区间（冒泡排序，Qt3 无 qSort）
     for (int i = 0; i < spans.size(); ++i) {
@@ -176,13 +180,13 @@ static SpanVector extractNonTranslatableSpans(const QString& text) {
         }
     }
     SpanVector merged;
-    merged.append(spans[0]);
+    SpanVector_append(merged, spans[0]);
     for (int i = 1; i < spans.size(); ++i) {
         NonTranslatableSpan& last = merged[merged.size() - 1];
         if (spans[i].start < last.end) {
             if (spans[i].end > last.end) { last.end = spans[i].end; }
         } else {
-            merged.append(spans[i]);
+            SpanVector_append(merged, spans[i]);
         }
     }
     return merged;
