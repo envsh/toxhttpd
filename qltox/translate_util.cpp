@@ -95,6 +95,8 @@ bool isNeedTranslateToChinese(const QString& text) {
         CharResult r = classifyChar(cp);
         if (r.cls == CC_LATIN) {
             need += r.bytes;
+        } else if (r.cls == CC_SPACE || r.cls == CC_NUMBER) {
+            // 空格和数字不计入任何一组（英文特征但作为中性）
         } else if (r.cls == CC_JAPANESE || r.cls == CC_KOREAN) {
             need += r.bytes * 2;
         } else {

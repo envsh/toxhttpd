@@ -19,7 +19,7 @@ bool ToxAPI::s_pollRunning = false;
 bool ToxAPI::s_loadingAllData = false;
 bool ToxAPI::s_reloadPending = false;
 static bool s_useNdjson = true; // true=auto s/ Content-Type 分派; false=强制旧 JSON 数组
-static const char* kEventTopic = "topic=reddit,hacknews,twitter";
+static const char* kEventTopic = "topic=reddit,hacknews,twitter,universal-connectivity";
 static std::unordered_set<std::string> s_seenUnknownLines;
 
 // ── Helpers ──
