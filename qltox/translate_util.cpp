@@ -1,5 +1,11 @@
 #include "translate_util.h"
 #include "compat34.h"
+#ifdef QT3_BUILD
+#include <qregexp.h>
+#include <qvaluevector.h>
+#else
+#include <vector>
+#endif
 #include <stdint.h>
 
 enum CharClass {
@@ -83,9 +89,128 @@ static CharResult classifyChar(uint32_t cp) {
     return {CC_OTHER, bytes};
 }
 
+struct NonTranslatableSpan {
+    int start;
+    int end;
+};
+
+#ifdef QT3_BUILD
+typedef QValueVector<NonTranslatableSpan> SpanVector;
+#else
+typedef std::vector<NonTranslatableSpan> SpanVector;
+#endif
+
+static SpanVector extractNonTranslatableSpans(const QString& text) {
+    SpanVector spans;
+
+#ifdef QT3_BUILD
+    QRegExp urlRe("https?://[^\\s<>\"']+", false);
+    QRegExp mailRe("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", false);
+    QRegExp idRe("@[a-zA-Z0-9._=-]+:[a-zA-Z0-9._=-]+", false);
+#else
+    QRegExp urlRe("https?://[^\\s<>\"']+", Qt::CaseInsensitive);
+    QRegExp mailRe("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", Qt::CaseInsensitive);
+    QRegExp idRe("@[a-zA-Z0-9._=-]+:[a-zA-Z0-9._=-]+", Qt::CaseInsensitive);
+#endif
+
+    // URL（最高优先级，避免 URL 内嵌 Matrix ID 重复匹配）
+    int pos = 0;
+    while (true) {
+#ifdef QT3_BUILD
+        pos = urlRe.search(text, pos);
+#else
+        pos = urlRe.indexIn(text, pos);
+#endif
+        if (pos == -1) { break; }
+        int len = urlRe.matchedLength();
+        while (len > 0 && (text[pos+len-1] == '.' || text[pos+len-1] == ',' ||
+               text[pos+len-1] == ';' || text[pos+len-1] == ':' ||
+               text[pos+len-1] == '!' || text[pos+len-1] == '?' ||
+               text[pos+len-1] == ')' || text[pos+len-1] == ']' ||
+               text[pos+len-1] == '}' || text[pos+len-1] == '>')) {
+            len--;
+        }
+        NonTranslatableSpan span = {pos, pos + len};
+        spans.append(span);
+        pos += len;
+    }
+
+    // 邮件
+    pos = 0;
+    while (true) {
+#ifdef QT3_BUILD
+        pos = mailRe.search(text, pos);
+#else
+        pos = mailRe.indexIn(text, pos);
+#endif
+        if (pos == -1) { break; }
+        NonTranslatableSpan span = {pos, pos + mailRe.matchedLength()};
+        spans.append(span);
+        pos += mailRe.matchedLength();
+    }
+
+    // Matrix ID（@user:server）
+    pos = 0;
+    while (true) {
+#ifdef QT3_BUILD
+        pos = idRe.search(text, pos);
+#else
+        pos = idRe.indexIn(text, pos);
+#endif
+        if (pos == -1) { break; }
+        NonTranslatableSpan span = {pos, pos + idRe.matchedLength()};
+        spans.append(span);
+        pos += idRe.matchedLength();
+    }
+
+    if (spans.isEmpty()) { return spans; }
+
+    // 排序 + 合并重叠区间（冒泡排序，Qt3 无 qSort）
+    for (int i = 0; i < spans.size(); ++i) {
+        for (int j = i + 1; j < spans.size(); ++j) {
+            if (spans[j].start < spans[i].start) {
+                NonTranslatableSpan tmp = spans[i];
+                spans[i] = spans[j];
+                spans[j] = tmp;
+            }
+        }
+    }
+    SpanVector merged;
+    merged.append(spans[0]);
+    for (int i = 1; i < spans.size(); ++i) {
+        NonTranslatableSpan& last = merged[merged.size() - 1];
+        if (spans[i].start < last.end) {
+            if (spans[i].end > last.end) { last.end = spans[i].end; }
+        } else {
+            merged.append(spans[i]);
+        }
+    }
+    return merged;
+}
+
+static bool isInNonTranslatableSpan(int pos, const SpanVector& spans) {
+    for (int i = 0; i < spans.size(); ++i) {
+        if (pos < spans[i].start) { break; }
+        if (pos < spans[i].end) { return true; }
+    }
+    return false;
+}
+
 bool isNeedTranslateToChinese(const QString& text) {
+    SpanVector nonTransSpans = extractNonTranslatableSpans(text);
     int need = 0, noneed = 0;
+    int spanIdx = 0;
     for (int i = 0; i < text.length(); ++i) {
+        // 跳过不可翻译区间
+        if (spanIdx < nonTransSpans.size()) {
+            if (i >= nonTransSpans[spanIdx].end) { ++spanIdx; }
+            if (spanIdx < nonTransSpans.size() &&
+                i >= nonTransSpans[spanIdx].start && i < nonTransSpans[spanIdx].end) {
+                uint32_t skipCp = text[i].unicode();
+                if (skipCp >= 0xD800 && skipCp <= 0xDBFF && i + 1 < text.length()) { ++i; }
+                continue;
+            }
+        }
         uint32_t cp = text[i].unicode();
         if (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < text.length()) {
             uint32_t low = text[i + 1].unicode();
