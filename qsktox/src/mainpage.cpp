@@ -13,9 +13,9 @@
 #include <QSettings>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include "androidutils.h"
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
-#include "androidutils.h"
 #endif
 
 static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;

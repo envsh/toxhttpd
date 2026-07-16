@@ -66,7 +66,11 @@ static QNetworkInformation* s_netInfo = nullptr;
 void NetworkMonitor::start()
 {
     if (s_netInfo) return;
-    s_netInfo = new QNetworkInformation();
+    if (!QNetworkInformation::loadDefaultBackend()) {
+        qWarning() << "[NetworkMonitor] loadDefaultBackend failed (Linux)";
+        return;
+    }
+    s_netInfo = QNetworkInformation::instance();
     QObject::connect(s_netInfo, &QNetworkInformation::reachabilityChanged,
         [](QNetworkInformation::Reachability r) {
             QString msg;
@@ -85,7 +89,8 @@ void NetworkMonitor::start()
 
 void NetworkMonitor::stop()
 {
-    delete s_netInfo;
+    if (!s_netInfo) return;
+    QObject::disconnect(s_netInfo, &QNetworkInformation::reachabilityChanged, nullptr, nullptr);
     s_netInfo = nullptr;
     qDebug() << "[NetworkMonitor] stopped (Linux)";
 }
@@ -113,7 +118,11 @@ static QNetworkInformation* s_netInfo = nullptr;
 void NetworkMonitor::start()
 {
     if (s_netInfo) return;
-    s_netInfo = new QNetworkInformation();
+    if (!QNetworkInformation::loadDefaultBackend()) {
+        qWarning() << "[NetworkMonitor] loadDefaultBackend failed (Windows)";
+        return;
+    }
+    s_netInfo = QNetworkInformation::instance();
     QObject::connect(s_netInfo, &QNetworkInformation::reachabilityChanged,
         [](QNetworkInformation::Reachability r) {
             QString msg;
@@ -132,7 +141,8 @@ void NetworkMonitor::start()
 
 void NetworkMonitor::stop()
 {
-    delete s_netInfo;
+    if (!s_netInfo) return;
+    QObject::disconnect(s_netInfo, &QNetworkInformation::reachabilityChanged, nullptr, nullptr);
     s_netInfo = nullptr;
     qDebug() << "[NetworkMonitor] stopped (Windows)";
 }
@@ -153,7 +163,11 @@ static QNetworkInformation* s_netInfo = nullptr;
 void NetworkMonitor::start()
 {
     if (s_netInfo) return;
-    s_netInfo = new QNetworkInformation();
+    if (!QNetworkInformation::loadDefaultBackend()) {
+        qWarning() << "[NetworkMonitor] loadDefaultBackend failed (macOS)";
+        return;
+    }
+    s_netInfo = QNetworkInformation::instance();
     QObject::connect(s_netInfo, &QNetworkInformation::reachabilityChanged,
         [](QNetworkInformation::Reachability r) {
             QString msg;
@@ -172,7 +186,8 @@ void NetworkMonitor::start()
 
 void NetworkMonitor::stop()
 {
-    delete s_netInfo;
+    if (!s_netInfo) return;
+    QObject::disconnect(s_netInfo, &QNetworkInformation::reachabilityChanged, nullptr, nullptr);
     s_netInfo = nullptr;
     qDebug() << "[NetworkMonitor] stopped (macOS)";
 }

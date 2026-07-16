@@ -80,6 +80,15 @@ void PageManager::activatePage(Page* page)
 {
     if (!page) return;
 
+    // 取消待处理的延迟销毁（快速导航时旧页还在 stackbox）
+    if (m_destroyTimer.isActive()) {
+        m_destroyTimer.stop();
+        if (m_pendingDestroy) {
+            destroyPage(m_pendingDestroy);
+            m_pendingDestroy = nullptr;
+        }
+    }
+
     switch (page->state()) {
     case PageState::Created:
         // 新创建: onStart → onResume
@@ -324,38 +333,20 @@ void PageManager::back()
 
     Page* current = m_pages.value(currentId);
 
-    // 1. 停用当前页
+    // 1. 停用当前页（不销毁，保留 stackbox 中以保证索引正确）
     if (current) {
         current->setFinishing(policy == CachePolicy::Transient);
         deactivateCurrentPage();
     }
 
-    // 2. 根据缓存策略处理当前页
-    if (current) {
-        if (policy == CachePolicy::Transient) {
-            // onSaveInstanceState 不调用 — 符合 Android: isFinishing=true
-            destroyPage(current);
-        } else if (policy == CachePolicy::LRU) {
-            // 加入缓存，不调用 onSaveInstanceState（成员变量在内存中）
-            addToCache(current);
-        }
-        // Permanent: 保留在 m_pages（已在 deactivate 中 stopped）
-    }
-
-    // 3. 从历史中移除
-    m_history.pop_back();
-
-    // 4. 激活目标页
+    // 2. 查找或创建目标页
     Page* target = m_pages.value(targetId);
     if (!target) {
-        // 目标页已被销毁 — 重新创建
         QVariantMap savedState = QSettings().value("page_" + targetId + "_state").toMap();
         target = createPage(targetId, {}, savedState);
     } else {
-        // 检查是否有回调结果
         auto rit = m_pendingResults.find(targetId);
         if (rit != m_pendingResults.end()) {
-            // 当前页可能设置了结果
             if (current) {
                 rit.value().callback(current->resultCode(), current->resultData());
             } else {
@@ -365,9 +356,28 @@ void PageManager::back()
         }
     }
 
+    // 3. 激活目标页（此时两个页面都在 stackbox，索引正确，动画可触发）
     if (target) {
         activatePage(target);
     }
+
+    // 4. 延迟销毁当前页（等动画完成后 removeItem，避免 animator item 引用失效）
+    if (current) {
+        if (policy == CachePolicy::Transient) {
+            m_pendingDestroy = current;
+            m_destroyTimer.singleShot(250, this, [this]() {
+                if (m_pendingDestroy) {
+                    destroyPage(m_pendingDestroy);
+                    m_pendingDestroy = nullptr;
+                }
+            });
+        } else if (policy == CachePolicy::LRU) {
+            addToCache(current);
+        }
+    }
+
+    // 5. 从历史中移除
+    m_history.pop_back();
 
     m_busy = false;
 }
@@ -384,11 +394,17 @@ void PageManager::replace(const QString& id, const QVariantMap& args)
     QString currentId = m_history.isEmpty() ? QString() : m_history.last();
     Page* current = m_pages.value(currentId);
 
-    // 1. 停用并销毁当前页（replace 总是 full destroy）
+    // 1. 停用当前页，延迟销毁（等动画完成后 removeItem）
     if (current) {
         current->setFinishing(true);
         deactivateCurrentPage();
-        destroyPage(current);
+        m_pendingDestroy = current;
+        m_destroyTimer.singleShot(250, this, [this]() {
+            if (m_pendingDestroy) {
+                destroyPage(m_pendingDestroy);
+                m_pendingDestroy = nullptr;
+            }
+        });
     }
 
     // 2. 替换历史最后一项（或为空时新增）

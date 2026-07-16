@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QList>
 #include <QString>
+#include <QTimer>
 #include <QVariantMap>
 #include <functional>
 #include "page.h"
@@ -112,6 +113,10 @@ private:
 
     // 防止重入
     bool m_busy = false;
+
+    // 延迟销毁（等动画完成后 removeItem，避免 animator item 引用失效）
+    QTimer m_destroyTimer;
+    Page* m_pendingDestroy = nullptr;
 };
 
 #endif
