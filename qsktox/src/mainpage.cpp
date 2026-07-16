@@ -37,6 +37,26 @@ static void jniKeepScreenOn(bool on) {
 #endif
 }
 
+static void showAndroidToast(const QString& message) {
+#ifdef Q_OS_ANDROID
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([message]() {
+        QJniObject context = QNativeInterface::QAndroidApplication::context();
+        if (!context.isValid()) return;
+        QJniObject jmsg = QJniObject::fromString(message);
+        QJniObject toast = QJniObject::callStaticObjectMethod(
+            "android/widget/Toast",
+            "makeText",
+            "(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;",
+            context.object(), jmsg.object(), 1);
+        if (toast.isValid()) {
+            toast.callMethod<void>("show", "()V");
+        }
+    });
+#else
+    Q_UNUSED(message)
+#endif
+}
+
 MainPage::MainPage(QQuickItem* parent)
     : Page(parent)
 {
@@ -187,26 +207,26 @@ void MainPage::showToast(const QString& msg, int durationMs) {
 }
 
 void MainPage::handleShareIntent(const QString& action, const QString& mimeType,
-                                  const QString& text, const QString& urisJson)
+                                   const QString& text, const QString& urisJson)
 {
     qDebug() << "[MainPage] handleShareIntent:" << action << mimeType;
 
     if (action == "android.intent.action.SEND") {
         if (mimeType == "text/plain" && !text.isEmpty()) {
-            showToast("Shared text: " + text);
+            showAndroidToast("Shared text: " + text);
         } else {
             QJsonDocument doc = QJsonDocument::fromJson(urisJson.toUtf8());
             QJsonArray arr = doc.array();
             if (!arr.isEmpty()) {
-                showToast("Shared file: " + mimeType + "\n" + arr[0].toString());
+                showAndroidToast("Shared file: " + mimeType + "\n" + arr[0].toString());
             } else {
-                showToast("Shared: " + mimeType);
+                showAndroidToast("Shared: " + mimeType);
             }
         }
     } else if (action == "android.intent.action.SEND_MULTIPLE") {
         QJsonDocument doc = QJsonDocument::fromJson(urisJson.toUtf8());
         int count = doc.array().size();
-        showToast(QString("Shared %1 files").arg(count));
+        showAndroidToast(QString("Shared %1 files").arg(count));
     }
 }
 

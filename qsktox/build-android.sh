@@ -27,7 +27,7 @@ cmake --build "$BUILD_DIR" -j$(nproc) --target qsktox
 
 # 3. prepare android-build dir (copy .so + Qt deps, no Gradle)
 APK_DIR="$BUILD_DIR/android-build"
-rm -rf "$APK_DIR"
+# rm -rf "$APK_DIR"
 LIB_DIR="$APK_DIR/libs/arm64-v8a"
 mkdir -p "$LIB_DIR"
 cp "$BUILD_DIR/libqsktox_arm64-v8a.so" "$LIB_DIR/"
