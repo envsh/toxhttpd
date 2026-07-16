@@ -7,6 +7,7 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build-backend:
@@ -254,3 +255,276 @@ jobs:
         run: |
           gh release upload "${{ github.ref_name }}" \
             toxhttpd-*.tar.gz --clobber
+
+  build-qsktox-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install aqtinstall
+        run: pip install aqtinstall
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/aqtinstall
+          key: qt-linux-6.7.3-gcc_64
+      - name: Install Qt 6.7.3
+        run: |
+          aqt install-linux desktop 6.7.3 gcc_64 \
+            --outputdir /opt/qt
+          echo "QTDIR=/opt/qt/6.7.3/gcc_64" >> $GITHUB_ENV
+      - name: Cache QSkinny
+        uses: actions/cache@v4
+        id: cache-qskinny
+        with:
+          path: /opt/qt/qskinny
+          key: qskinny-linux-${{ hashFiles('qsktox/plan.md') }}
+      - name: Build and install QSkinny
+        if: steps.cache-qskinny.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/uwerat/qskinny.git /tmp/qskinny
+          cd /tmp/qskinny
+          cmake -B build \
+            -DCMAKE_PREFIX_PATH="$QTDIR" \
+            -DCMAKE_INSTALL_PREFIX=/opt/qt/qskinny \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
+          cmake --install build
+      - name: Build Go extras
+        run: cd qsktox/extras/go && go build -buildmode=c-shared -o libgoso.so .
+      - name: Configure
+        run: |
+          cd qsktox
+          mkdir -p build-x64
+          "$QTDIR/bin/qt-cmake" -S . -B build-x64 \
+            -DQt6_DIR="$QTDIR/lib/cmake/Qt6" \
+            -DCMAKE_PREFIX_PATH="$QTDIR;/opt/qt/qskinny" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_VERBOSE_MAKEFILE=on
+      - name: Hotfix link flags
+        run: |
+          sed -i 's/-lQt6Qml -lQt6Quick -lQt6OpenGL//g' \
+            qsktox/build-x64/CMakeFiles/qsktox.dir/link.txt
+      - name: Build
+        run: cmake --build qsktox/build-x64 -j$(nproc)
+      - name: Prepare artifact
+        run: |
+          mkdir -p bin
+          cp qsktox/build-x64/qsktox bin/
+          chmod +x bin/qsktox
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsktox-linux-x64
+          path: bin/
+          retention-days: 30
+
+  build-qsktox-android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: 'ndk;26.1.10909125 build-tools;34.0.0 platforms;android-33'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install aqtinstall
+        run: pip install aqtinstall
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/aqtinstall
+          key: qt-android-6.7.3-arm64+gcc_64
+      - name: Install Qt 6.7.3
+        run: |
+          aqt install-linux desktop 6.7.3 android_arm64_v8a gcc_64 \
+            --outputdir /opt/qt
+          echo "QT_ANDROID=/opt/qt/6.7.3/android_arm64_v8a" >> $GITHUB_ENV
+          echo "QT_HOST=/opt/qt/6.7.3/gcc_64" >> $GITHUB_ENV
+      - name: Cache QSkinny arm64
+        uses: actions/cache@v4
+        id: cache-qskinny-arm64
+        with:
+          path: /opt/qt/qskinny-arm64
+          key: qskinny-android-arm64-${{ hashFiles('qsktox/plan.md') }}
+      - name: Build and install QSkinny arm64
+        if: steps.cache-qskinny-arm64.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+        run: |
+          git clone --depth 1 https://github.com/uwerat/qskinny.git /tmp/qskinny-arm64
+          cd /tmp/qskinny-arm64
+          "$QT_HOST/bin/qt-cmake" -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_PREFIX_PATH="$QT_ANDROID" \
+            -DCMAKE_INSTALL_PREFIX=/opt/qt/qskinny-arm64 \
+            -DQT_HOST_PATH="$QT_HOST" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
+          cmake --install build
+      - name: Build Go extras (Android)
+        env:
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+        run: |
+          cd qsktox/extras/go
+          GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
+            CC="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang" \
+            go build -buildmode=c-shared -o libgoso.so .
+      - name: Configure
+        env:
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+        run: |
+          cd qsktox
+          "$QT_ANDROID/bin/qt-cmake" -S . -B build-android \
+            -DANDROID_SDK_ROOT="${{ env.ANDROID_HOME }}" \
+            -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_PREFIX_PATH="/opt/qt/qskinny-arm64" \
+            -DQSkinny_DIR="/opt/qt/qskinny-arm64/lib/cmake/QSkinny" \
+            -DQT_HOST_PATH="$QT_HOST" \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - name: Build native libs
+        run: cmake --build qsktox/build-android -j$(nproc) --target qsktox
+      - name: Prepare APK directory
+        run: |
+          cd qsktox
+          APK_DIR=build-android/android-build
+          LIB_DIR=$APK_DIR/libs/arm64-v8a
+          mkdir -p "$LIB_DIR"
+          cp build-android/libqsktox_arm64-v8a.so "$LIB_DIR/"
+          cp /opt/qt/qskinny-arm64/lib/qskinny/plugins/skins/*.so "$LIB_DIR/"
+          cp /opt/qt/qskinny-arm64/lib/qskinny/plugins/platforminputcontexts/*.so "$LIB_DIR/"
+          cp extras/go/libgoso.so "$LIB_DIR/"
+          cp build-android/libcso.so "$LIB_DIR/"
+      - name: androiddeployqt
+        run: |
+          cd qsktox
+          "$QT_HOST/bin/androiddeployqt" \
+            --input build-android/android-qsktox-deployment-settings.json \
+            --output build-android/android-build \
+            --deployment bundled \
+            --builddir build-android \
+            --aux-mode
+      - name: Copy custom Java sources and resources
+        run: |
+          cd qsktox
+          APK_DIR=build-android/android-build
+          mkdir -p "$APK_DIR/src/main/java"
+          cp -R android/src/java/* "$APK_DIR/src/main/java/"
+          mkdir -p "$APK_DIR/res/drawable"
+          cp app_icon.png "$APK_DIR/res/drawable/ic_launcher.png"
+          cp android/AndroidManifest.xml "$APK_DIR/AndroidManifest.xml"
+      - name: Patch Gradle
+        run: |
+          cd qsktox/build-android/android-build
+          sed -i '/renderscript\.srcDirs/d' build.gradle
+          cat >> gradle.properties <<'PROPS'
+          androidBuildToolsVersion=34.0.0
+          androidCompileSdkVersion=android-33
+          androidNdkVersion=26.1.10909125
+          androidPackageName=io.fedlet.qsktox
+          buildDir=build
+          qtMinSdkVersion=23
+          qtTargetAbiList=arm64-v8a
+          qtTargetSdkVersion=34
+          PROPS
+          sed -i 's/-Xmx[0-9]*m/-Xmx386m/' gradle.properties
+      - name: Build debug APK
+        run: |
+          cd qsktox/build-android/android-build
+          GRADLE_OPTS="-Xmx386m" ./gradlew --no-daemon --max-workers=2 assembleDebug
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsktox-android-arm64-debug
+          path: qsktox/build-android/android-build/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+  build-qsktox-osx:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install aqtinstall
+        run: pip install aqtinstall
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/aqtinstall
+          key: qt-macos-6.7.3-clang_64
+      - name: Install Qt 6.7.3
+        run: |
+          aqt install-mac desktop 6.7.3 clang_64 \
+            --outputdir /opt/qt
+          echo "QTDIR=/opt/qt/6.7.3/macos" >> $GITHUB_ENV
+      - name: Cache QSkinny
+        uses: actions/cache@v4
+        id: cache-qskinny
+        with:
+          path: /opt/qt/qskinny
+          key: qskinny-macos-${{ hashFiles('qsktox/plan.md') }}
+      - name: Build and install QSkinny
+        if: steps.cache-qskinny.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/uwerat/qskinny.git /tmp/qskinny
+          cd /tmp/qskinny
+          cmake -B build \
+            -DCMAKE_PREFIX_PATH="$QTDIR" \
+            -DCMAKE_INSTALL_PREFIX=/opt/qt/qskinny \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(sysctl -n hw.logicalcpu)
+          cmake --install build
+      - name: Build Go extras
+        run: cd qsktox/extras/go && go build -buildmode=c-shared -o libgoso.dylib .
+      - name: Configure
+        run: |
+          cd qsktox
+          mkdir -p build-osx
+          "$QTDIR/bin/qt-cmake" -S . -B build-osx \
+            -DQt6_DIR="$QTDIR/lib/cmake/Qt6" \
+            -DCMAKE_PREFIX_PATH="$QTDIR;/opt/qt/qskinny" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_VERBOSE_MAKEFILE=on
+      - name: Build
+        run: cmake --build qsktox/build-osx -j$(sysctl -n hw.logicalcpu)
+      - name: Prepare artifact
+        run: |
+          mkdir -p bin
+          cp qsktox/build-osx/qsktox bin/
+          chmod +x bin/qsktox
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsktox-macos-arm64
+          path: bin/
+          retention-days: 30
