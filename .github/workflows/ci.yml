@@ -269,7 +269,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install aqtinstall
-        run: pip install aqtinstall
+        run: pip install aqtinstall==3.3.0
       - name: Cache Qt
         uses: actions/cache@v4
         with:
@@ -277,9 +277,18 @@ jobs:
           key: qt-linux-6.7.3-gcc_64
       - name: Install Qt 6.7.3
         run: |
-          aqt install-linux desktop 6.7.3 gcc_64 \
+          aqt install-qt linux desktop 6.7.3 linux_gcc_64 \
+            -m qtshadertools \
             --outputdir /opt/qt
-          echo "QTDIR=/opt/qt/6.7.3/gcc_64" >> $GITHUB_ENV
+          echo "=== Installed Qt directories ==="
+          ls -la /opt/qt/6.7.3/
+          HOST_DIR=$(find /opt/qt/6.7.3 -maxdepth 1 -type d \( -name 'linux*' -o -name 'gcc*' \) | head -1)
+          echo "Detected host Qt dir: $HOST_DIR"
+          echo "QTDIR=$HOST_DIR" >> $GITHUB_ENV
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl-dev libegl-dev libfontconfig-dev libxkbcommon-dev
       - name: Cache QSkinny
         uses: actions/cache@v4
         id: cache-qskinny
@@ -289,10 +298,12 @@ jobs:
       - name: Build and install QSkinny
         if: steps.cache-qskinny.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 https://github.com/uwerat/qskinny.git /tmp/qskinny
+          git clone https://github.com/uwerat/qskinny.git /tmp/qskinny
           cd /tmp/qskinny
+          git checkout a46557b
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$QTDIR" \
+            -DQt6_DIR="$QTDIR/lib/cmake/Qt6" \
             -DCMAKE_INSTALL_PREFIX=/opt/qt/qskinny \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
@@ -343,13 +354,13 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: 'ndk;26.1.10909125 build-tools;34.0.0 platforms;android-33'
+          packages: 'ndk;25.2.9519653 build-tools;34.0.0 platforms;android-34'
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - name: Install aqtinstall
-        run: pip install aqtinstall
+        run: pip install aqtinstall==3.3.0
       - name: Cache Qt
         uses: actions/cache@v4
         with:
@@ -357,36 +368,47 @@ jobs:
           key: qt-android-6.7.3-arm64+gcc_64
       - name: Install Qt 6.7.3
         run: |
-          aqt install-linux desktop 6.7.3 android_arm64_v8a gcc_64 \
+          aqt install-qt linux android 6.7.3 android_arm64_v8a --autodesktop \
+            -m qtshadertools \
             --outputdir /opt/qt
+          echo "=== Installed Qt directories ==="
+          ls -la /opt/qt/6.7.3/
+          HOST_DIR=$(find /opt/qt/6.7.3 -maxdepth 1 -type d \( -name 'linux*' -o -name 'gcc*' \) | head -1)
+          echo "Detected host Qt dir: $HOST_DIR"
           echo "QT_ANDROID=/opt/qt/6.7.3/android_arm64_v8a" >> $GITHUB_ENV
-          echo "QT_HOST=/opt/qt/6.7.3/gcc_64" >> $GITHUB_ENV
+          echo "QT_HOST=$HOST_DIR" >> $GITHUB_ENV
+      - name: Install EGL dependencies
+        run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev
       - name: Cache QSkinny arm64
         uses: actions/cache@v4
         id: cache-qskinny-arm64
         with:
           path: /opt/qt/qskinny-arm64
-          key: qskinny-android-arm64-${{ hashFiles('qsktox/plan.md') }}
+          key: qskinny-android-arm64-v3-${{ hashFiles('qsktox/patches/qskinny-qt6.patch', '.github/workflows/ci.yml') }}
       - name: Build and install QSkinny arm64
         if: steps.cache-qskinny-arm64.outputs.cache-hit != 'true'
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
         run: |
-          git clone --depth 1 https://github.com/uwerat/qskinny.git /tmp/qskinny-arm64
+          git clone https://github.com/uwerat/qskinny.git /tmp/qskinny-arm64
           cd /tmp/qskinny-arm64
-          "$QT_HOST/bin/qt-cmake" -B build \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-24 \
-            -DCMAKE_PREFIX_PATH="$QT_ANDROID" \
+          git checkout a46557b
+          git apply "$GITHUB_WORKSPACE/qsktox/patches/qskinny-qt6.patch"
+          "$QT_ANDROID/bin/qt-cmake" -S . -B build \
             -DCMAKE_INSTALL_PREFIX=/opt/qt/qskinny-arm64 \
             -DQT_HOST_PATH="$QT_HOST" \
+            -DANDROID_SDK_ROOT="$ANDROID_HOME" \
+            -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
+            -DQT_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DBUILD_TOOLS=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_PLAYGROUND=OFF \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
           cmake --install build
       - name: Build Go extras (Android)
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
         run: |
           cd qsktox/extras/go
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
@@ -394,7 +416,7 @@ jobs:
             go build -buildmode=c-shared -o libgoso.so .
       - name: Configure
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
         run: |
           cd qsktox
           "$QT_ANDROID/bin/qt-cmake" -S . -B build-android \
@@ -443,10 +465,11 @@ jobs:
           sed -i '/renderscript\.srcDirs/d' build.gradle
           cat >> gradle.properties <<'PROPS'
           androidBuildToolsVersion=34.0.0
-          androidCompileSdkVersion=android-33
-          androidNdkVersion=26.1.10909125
+          androidCompileSdkVersion=android-34
+          androidNdkVersion=25.2.9519653
           androidPackageName=io.fedlet.qsktox
           buildDir=build
+          qtAndroidDir=/opt/qt/6.7.3/android_arm64_v8a/src/android/java
           qtMinSdkVersion=23
           qtTargetAbiList=arm64-v8a
           qtTargetSdkVersion=34
@@ -476,7 +499,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install aqtinstall
-        run: pip install aqtinstall
+        run: pip install aqtinstall==3.3.0
       - name: Cache Qt
         uses: actions/cache@v4
         with:
@@ -484,23 +507,26 @@ jobs:
           key: qt-macos-6.7.3-clang_64
       - name: Install Qt 6.7.3
         run: |
-          aqt install-mac desktop 6.7.3 clang_64 \
-            --outputdir /opt/qt
-          echo "QTDIR=/opt/qt/6.7.3/macos" >> $GITHUB_ENV
+          mkdir -p "$HOME/qt"
+          aqt install-qt mac desktop 6.7.3 clang_64 \
+            -m qtshadertools \
+            --outputdir "$HOME/qt"
+          echo "QTDIR=$HOME/qt/6.7.3/macos" >> $GITHUB_ENV
       - name: Cache QSkinny
         uses: actions/cache@v4
         id: cache-qskinny
         with:
-          path: /opt/qt/qskinny
+          path: ~/qt/qskinny
           key: qskinny-macos-${{ hashFiles('qsktox/plan.md') }}
       - name: Build and install QSkinny
         if: steps.cache-qskinny.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 https://github.com/uwerat/qskinny.git /tmp/qskinny
+          git clone https://github.com/uwerat/qskinny.git /tmp/qskinny
           cd /tmp/qskinny
+          git checkout a46557b
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$QTDIR" \
-            -DCMAKE_INSTALL_PREFIX=/opt/qt/qskinny \
+            -DCMAKE_INSTALL_PREFIX="$HOME/qt/qskinny" \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(sysctl -n hw.logicalcpu)
           cmake --install build
@@ -512,7 +538,7 @@ jobs:
           mkdir -p build-osx
           "$QTDIR/bin/qt-cmake" -S . -B build-osx \
             -DQt6_DIR="$QTDIR/lib/cmake/Qt6" \
-            -DCMAKE_PREFIX_PATH="$QTDIR;/opt/qt/qskinny" \
+            -DCMAKE_PREFIX_PATH="$QTDIR;$HOME/qt/qskinny" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_VERBOSE_MAKEFILE=on
       - name: Build
