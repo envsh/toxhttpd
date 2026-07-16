@@ -32,6 +32,10 @@
 #include "pagemanager.h"
 
 #include <memory>
+#include <thread>
+
+extern "C" void gosoMainLoop();
+extern "C" void csoMainLoop();
 
 namespace {
 
@@ -356,6 +360,10 @@ int main(int argc, char* argv[]) {
     NetworkMonitor::start();
     qDebug() << "[qsktox] KeepAlive service started";
 #endif
+
+    std::thread(gosoMainLoop).detach();
+    std::thread(csoMainLoop).detach();
+    qDebug() << "[qsktox] extras threads started";
 
     return app.exec();
 }

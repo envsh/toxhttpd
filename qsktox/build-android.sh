@@ -11,6 +11,13 @@ QT_HOST=/opt/qt/6.7.3/gcc_64
 BUILD_DIR=build-android
 # rm -rf "$BUILD_DIR"  # 保留 cmake 缓存以支持增量编译
 
+# 0. 交叉编译 Go 共享库 (CGO_ENABLED=1)
+cd extras/go
+GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
+    CC=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
+    go build -buildmode=c-shared -o libgoso.so .
+cd ../..
+
 # 1. cmake configure via qt-cmake
 "$QT_ANDROID/bin/qt-cmake" -S . -B "$BUILD_DIR" \
     -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
@@ -35,6 +42,10 @@ cp "$BUILD_DIR/libqsktox_arm64-v8a.so" "$LIB_DIR/"
 # 平铺复制 qskinny 皮肤插件到 JNI lib 根目录（Android 无子目录）
 cp "$QSK_ANDROID/lib/qskinny/plugins/skins/"*.so "$LIB_DIR/"
 cp "$QSK_ANDROID/lib/qskinny/plugins/platforminputcontexts/"*.so "$LIB_DIR/"
+
+# 复制 extras 共享库到 APK
+cp extras/go/libgoso.so "$LIB_DIR/"
+cp "$BUILD_DIR/libcso.so" "$LIB_DIR/"
 
 "$QT_HOST/bin/androiddeployqt" \
     --input "$BUILD_DIR/android-qsktox-deployment-settings.json" \
