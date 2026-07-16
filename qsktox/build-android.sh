@@ -9,7 +9,7 @@ QSK_ANDROID=/opt/qt/qskinny-arm64
 QT_HOST=/opt/qt/6.7.3/gcc_64
 
 BUILD_DIR=build-android
-rm -rf "$BUILD_DIR"
+# rm -rf "$BUILD_DIR"  # 保留 cmake 缓存以支持增量编译
 
 # 1. cmake configure via qt-cmake
 "$QT_ANDROID/bin/qt-cmake" -S . -B "$BUILD_DIR" \
@@ -27,6 +27,7 @@ cmake --build "$BUILD_DIR" -j$(nproc) --target qsktox
 
 # 3. prepare android-build dir (copy .so + Qt deps, no Gradle)
 APK_DIR="$BUILD_DIR/android-build"
+rm -rf "$APK_DIR"
 LIB_DIR="$APK_DIR/libs/arm64-v8a"
 mkdir -p "$LIB_DIR"
 cp "$BUILD_DIR/libqsktox_arm64-v8a.so" "$LIB_DIR/"
