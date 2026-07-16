@@ -43,6 +43,7 @@ qt_add_executable(qsktox
     src/settingspage.cpp
     src/aboutpage.h
     src/aboutpage.cpp
+    src/shareintentreceiver.cpp
 )
 
 target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick)

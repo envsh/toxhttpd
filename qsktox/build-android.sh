@@ -52,32 +52,8 @@ cp app_icon.png "$APK_DIR/res/drawable/ic_launcher.png"
 # 移除 renderscript.srcDirs 配置（build-tools 34+ 不再支持，且会干扰自定义 Java 源码）
 sed -i '/renderscript\.srcDirs/d' "$APK_DIR/build.gradle"
 
-# 设置应用图标
-sed -i '/android:fullBackupOnly/i\        android:icon="@drawable/ic_launcher"' \
-    "$APK_DIR/AndroidManifest.xml"
-
-# 替换包名为 qsktox.fedlet.io
-sed -i 's/package="org\.qtproject\.example\.qsktox"/package="io.fedlet.qsktox"/' \
-    "$APK_DIR/AndroidManifest.xml"
-
-# Android 13+ gesture back bypasses Qt key handling
-sed -i '/android:fullBackupOnly/a\        android:enableOnBackInvokedCallback="false"' \
-    "$APK_DIR/AndroidManifest.xml"
-
-# KeepAlive FG Service: permissions
-sed -i '/<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>/a\
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n\
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n\
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>\n\
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" \/>' \
-    "$APK_DIR/AndroidManifest.xml"
-
-# KeepAlive FG Service: service declaration (before </application>)
-sed -i '/<\/application>/ i\    <service\n\
-        android:name="io.fedlet.mobutil.KeepAliveService"\n\
-        android:foregroundServiceType="dataSync"\n\
-        android:exported="false"\/>' \
-    "$APK_DIR/AndroidManifest.xml"
+# 覆盖 manifest（包含所有自定义：activity、intent-filter、权限、service）
+cp android/AndroidManifest.xml "$APK_DIR/AndroidManifest.xml"
 
 # 4. append Qt-specific properties (missing from --aux-mode)
 cat >> "$APK_DIR/gradle.properties" <<PROPS

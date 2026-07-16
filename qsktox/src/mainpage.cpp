@@ -11,6 +11,8 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include <QSettings>
+#include <QJsonDocument>
+#include <QJsonArray>
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
 #endif
@@ -42,6 +44,8 @@ MainPage::MainPage(QQuickItem* parent)
 
 void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
 {
+    registerMainPage(this);
+
     QString url = launchArgs.value("url").toString();
     if (!url.isEmpty()) {
         qDebug() << "[MainPage] connecting to:" << url;
@@ -180,6 +184,30 @@ void MainPage::showToast(const QString& msg, int durationMs) {
     m_toastLabel->setText(msg);
     m_toastLabel->setVisible(true);
     m_toastTimer->start(durationMs);
+}
+
+void MainPage::handleShareIntent(const QString& action, const QString& mimeType,
+                                  const QString& text, const QString& urisJson)
+{
+    qDebug() << "[MainPage] handleShareIntent:" << action << mimeType;
+
+    if (action == "android.intent.action.SEND") {
+        if (mimeType == "text/plain" && !text.isEmpty()) {
+            showToast("Shared text: " + text);
+        } else {
+            QJsonDocument doc = QJsonDocument::fromJson(urisJson.toUtf8());
+            QJsonArray arr = doc.array();
+            if (!arr.isEmpty()) {
+                showToast("Shared file: " + mimeType + "\n" + arr[0].toString());
+            } else {
+                showToast("Shared: " + mimeType);
+            }
+        }
+    } else if (action == "android.intent.action.SEND_MULTIPLE") {
+        QJsonDocument doc = QJsonDocument::fromJson(urisJson.toUtf8());
+        int count = doc.array().size();
+        showToast(QString("Shared %1 files").arg(count));
+    }
 }
 
 void MainPage::setKeepScreenOn(bool on) {
