@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Network)
 find_package(QSkinny REQUIRED)
 
 if(ANDROID)
@@ -23,8 +23,12 @@ endif()
 
 qt_add_executable(qsktox
     src/main.cpp
+    src/androidutils.h
+    src/androidutils.cpp
     src/keepalive.h
     src/keepalive.cpp
+    src/networkmonitor.h
+    src/networkmonitor.cpp
     src/page.h
     src/page.cpp
     src/pagemanager.h
@@ -46,7 +50,7 @@ qt_add_executable(qsktox
     src/shareintentreceiver.cpp
 )
 
-target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick)
+target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick Qt6::Network)
 
 if(ANDROID)
     set_target_properties(qsktox PROPERTIES WIN32_EXECUTABLE TRUE)

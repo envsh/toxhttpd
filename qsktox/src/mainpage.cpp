@@ -15,6 +15,7 @@
 #include <QJsonArray>
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
+#include "androidutils.h"
 #endif
 
 static constexpr int FLAG_KEEP_SCREEN_ON = 0x80;
@@ -37,25 +38,7 @@ static void jniKeepScreenOn(bool on) {
 #endif
 }
 
-static void showAndroidToast(const QString& message) {
-#ifdef Q_OS_ANDROID
-    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([message]() {
-        QJniObject context = QNativeInterface::QAndroidApplication::context();
-        if (!context.isValid()) return;
-        QJniObject jmsg = QJniObject::fromString(message);
-        QJniObject toast = QJniObject::callStaticObjectMethod(
-            "android/widget/Toast",
-            "makeText",
-            "(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;",
-            context.object(), jmsg.object(), 1);
-        if (toast.isValid()) {
-            toast.callMethod<void>("show", "()V");
-        }
-    });
-#else
-    Q_UNUSED(message)
-#endif
-}
+
 
 MainPage::MainPage(QQuickItem* parent)
     : Page(parent)

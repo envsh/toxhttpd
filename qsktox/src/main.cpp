@@ -28,6 +28,7 @@
 #include "aboutpage.h"
 #include "logpage.h"
 #include "keepalive.h"
+#include "networkmonitor.h"
 #include "pagemanager.h"
 
 #include <memory>
@@ -352,6 +353,7 @@ int main(int argc, char* argv[]) {
 
 #ifdef Q_OS_ANDROID
     KeepAlive::start();
+    NetworkMonitor::start();
     qDebug() << "[qsktox] KeepAlive service started";
 #endif
 
