@@ -86,6 +86,7 @@ bool qOpenReadOnly(QFile& file);
 bool qOpenWriteOnly(QFile& file);
 QString qGetHomePath();
 QString qAppDir();
+QString qCurrDir();
 void qInsertHtml(QTextEdit* edit, const QString& html);
 void qClearTextEdit(QTextEdit* edit);
 QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border = 0, int autoresize = -1);

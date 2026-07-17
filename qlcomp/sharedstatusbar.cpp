@@ -14,10 +14,10 @@ static const int GRIP_SIZE = 16;
 SharedStatusBar::SharedStatusBar()
 #ifdef QT3_BUILD
     : QWidget(nullptr, "sharedstatusbar",
-              WStyle_Customize | WStyle_Tool | WStyle_NoBorder | WStyle_StaysOnTop)
+              WStyle_Customize | WStyle_Tool | WStyle_NoBorder)
 #else
     : QWidget(nullptr,
-              Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
+              Qt::Tool | Qt::FramelessWindowHint)
 #endif
     , m_bar(nullptr)
     , m_activeWindow(nullptr)
@@ -245,9 +245,8 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
 #ifdef QT3_BUILD
 void SharedStatusBar::onDebounceTimeout()
 {
-    // 100ms 内没有新的 WindowActivate → 真切换到外部应用 → 隐藏
+    // 100ms 内没有新的 WindowActivate → 真切换到外部应用
     m_pendingHide = false;
-    // hide();
 }
 #endif
 
@@ -325,6 +324,19 @@ void SharedStatusBar::handleGripRelease()
     m_dragging = false;
 }
 
+void SharedStatusBar::stackAboveWindow(WId)
+{
+#ifdef QT3_BUILD
+    Display *dpy = QPaintDevice::x11AppDisplay();
+#else
+    Display *dpy = QX11Info::display();
+#endif
+    XWindowChanges wc;
+    wc.stack_mode = Above;
+    XConfigureWindow(dpy, winId(), CWStackMode, &wc);
+    XFlush(dpy);
+}
+
 void SharedStatusBar::reposition()
 {
     if (m_repositioning || !m_activeWindow) return;
@@ -342,6 +354,7 @@ void SharedStatusBar::reposition()
     resize(m_activeWindow->width(), barH);
     if (!isVisible()) show();
     if (minimumWidth() > m_activeWindow->width()) { m_repositioning = false; return; }
+    stackAboveWindow(m_activeWindow->winId());
 
     m_repositioning = false;
 }

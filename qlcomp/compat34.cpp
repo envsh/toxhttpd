@@ -325,6 +325,14 @@ QString qAppDir() {
 #endif
 }
 
+QString qCurrDir() {
+#ifdef QT3_BUILD
+    return QDir::currentDirPath();
+#else
+    return QDir::currentPath();
+#endif
+}
+
 void qInsertHtml(QTextEdit* edit, const QString& html) {
 #ifdef QT3_BUILD
     edit->append(html);  // Qt3 的 append 支持 HTML
