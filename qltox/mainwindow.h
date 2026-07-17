@@ -21,6 +21,7 @@
 #include "screenshotpreview.h"
 #include "memberlistdialog.h"
 #include "ConfigDialog.h"
+#include "sleepblocker.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -108,6 +109,7 @@ private:
     QTimer* m_clockTimer;
     bool m_hintActive;
     QColor m_savedPlayedColor;
+    SleepBlocker* m_sleepBlocker;
 };
 
 #endif // MAINWINDOW_H

@@ -381,6 +381,7 @@ MainWindow::MainWindow(QWidget* parent)
     ), 
     currentChatId(-1), currentChatType("") {
     qWarning("MainWindow: constructor started");
+    m_sleepBlocker = nullptr;
     
     // 设置窗口
     qSetWindowTitle(this, _("app_title"));
@@ -2987,6 +2988,12 @@ void MainWindow::openSettings() {
         qFromUtf8("消息字体大小"), 8, 32, other);
     other->addLabeledControl(fontSize->label(), fontSize->spinBox());
 
+    // ── 系统行为 ──
+    BoolConfigItem* sleepBlocker = new BoolConfigItem(
+        "sleepblocker/enabled", true,
+        qFromUtf8("阻止屏保/锁屏"), other);
+    other->addWidget(sleepBlocker->checkBox());
+
     // ── 富媒体显示 ──
     BoolConfigItem* dispImg = new BoolConfigItem(
         "media/displayImage", true,
@@ -3038,6 +3045,7 @@ void MainWindow::openSettings() {
     dlg->registerConfigItem(dlFile);
     dlg->registerConfigItem(dlGif);
     dlg->registerConfigItem(dlVid);
+    dlg->registerConfigItem(sleepBlocker);
 
     connect(dlg, SIGNAL(settingsSaved(SettingsChangedMap)), this, SLOT(onSettingsSaved(SettingsChangedMap)));
     dlg->loadSettings();
@@ -3055,6 +3063,19 @@ void MainWindow::onSettingsSaved(const SettingsChangedMap& changed) {
         qWarning("  %s => %s", qPrintable(it.key()),
                  qPrintable(it.value().toString()));
 #endif
+    }
+    if (changed.contains("sleepblocker/enabled")) {
+#ifdef QT3_BUILD
+        bool enabled = (changed["sleepblocker/enabled"].toString() == "true");
+#else
+        bool enabled = (changed.value("sleepblocker/enabled").toString() == "true");
+#endif
+        if (enabled && !m_sleepBlocker) {
+            m_sleepBlocker = new SleepBlocker();
+        } else if (!enabled && m_sleepBlocker) {
+            delete m_sleepBlocker;
+            m_sleepBlocker = nullptr;
+        }
     }
 }
 
