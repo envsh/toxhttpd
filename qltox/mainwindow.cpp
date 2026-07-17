@@ -49,6 +49,10 @@
 #include "ConfigDialog.h"
 #include <qpushbutton.h>
 #include <qlineedit.h>
+#include "plugin_manager_dialog.h"
+#ifndef QT3_BUILD
+#include <QSignalMapper>
+#endif
 
 // 虚拟联系人 ID（使用 <-100 的负数避免与服务器 ID 及 "未选择" 哨兵值 -1 冲突）
 static const int VIRTUAL_UNKNOWN_ID = -100;
@@ -590,6 +594,34 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(tool, qFromUtf8("日志(&L)..."), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("贴纸管理器(&S)..."), this, SLOT(openStickerManager()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(openSettings()));
+
+    // ── Etapps 菜单 ──
+    PluginLoader::scanPlugins();
+    MenuWidget34* etappsMenu = mb->addMenu(qFromUtf8("Etapps(&E)"));
+    EmbeddedMenuBar::addItem(etappsMenu, qFromUtf8("插件管理..."), this, SLOT(openPluginManager()));
+    EmbeddedMenuBar::addItem(etappsMenu, qFromUtf8("关闭全部窗口(&C)"), this, SLOT(onEtappCloseAll()));
+    EmbeddedMenuBar::addSeparator(etappsMenu);
+#ifdef QT3_BUILD
+    for (int i = 0; i < PluginLoader::uiappCount(); i++) {
+        const PluginInfo& p = PluginLoader::uiappAt(i);
+        if (!p.enabled) continue;
+        int id = etappsMenu->insertItem(p.name);
+        m_etappItemToIndex[id] = i;
+    }
+    connect(etappsMenu, SIGNAL(activated(int)), this, SLOT(onEtappActivated(int)));
+#else
+    {
+        QSignalMapper* etappMapper = new QSignalMapper(this);
+        for (int i = 0; i < PluginLoader::uiappCount(); i++) {
+            const PluginInfo& p = PluginLoader::uiappAt(i);
+            if (!p.enabled) continue;
+            QAction* action = etappsMenu->addAction(p.name);
+            etappMapper->setMapping(action, i);
+            connect(action, SIGNAL(triggered()), etappMapper, SLOT(map()));
+        }
+        connect(etappMapper, SIGNAL(mapped(int)), this, SLOT(onEtappActivated(int)));
+    }
+#endif
 
     MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));
     EmbeddedMenuBar::addItem(help, _("menu.homepage"), this, SLOT(openHomePage()));
@@ -3122,4 +3154,26 @@ void MainWindow::onMenu2Stub() {
 
 void MainWindow::openHomePage() {
     qOpenUrl("https://github.com/envsh/toxhttpd");
+}
+
+void MainWindow::onEtappActivated(int index) {
+#ifdef QT3_BUILD
+    QMap<int, int>::const_iterator it = m_etappItemToIndex.find(index);
+    if (it == m_etappItemToIndex.end()) return;
+    int pluginIndex = it.data();
+#else
+    int pluginIndex = index;
+#endif
+    if (pluginIndex >= 0 && pluginIndex < PluginLoader::uiappCount()) {
+        PluginLoader::createUiApp(pluginIndex, 0);
+    }
+}
+
+void MainWindow::onEtappCloseAll() {
+    PluginLoader::closeAllUiApps();
+}
+
+void MainWindow::openPluginManager() {
+    PluginManagerDialog* dlg = new PluginManagerDialog(this);
+    dlg->show();
 }

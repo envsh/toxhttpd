@@ -11,7 +11,6 @@
 #include <qpoint.h>
 #include <qlayout.h>
 #include <qtimer.h>
-#include <X11/Xlib.h>
 #else
 #include <QWidget>
 #include <QStatusBar>
@@ -19,8 +18,6 @@
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QTimer>
-#include <QX11Info>
-#include <X11/Xlib.h>
 #endif
 
 class SharedStatusBar : public QWidget
@@ -52,7 +49,6 @@ private:
     void handleGripDrag(const QPoint &globalPos);
     void handleGripRelease();
     void reposition();
-    void stackAboveWindow(WId targetWin);
 
     void paintEvent(QPaintEvent *e) override;
     bool event(QEvent *e) override;

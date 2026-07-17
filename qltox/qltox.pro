@@ -17,7 +17,8 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
                 translate_util.cpp \
                  config.cpp \
                  msgdb_helper.cpp \
-                 sticker_db.cpp stickerpicker.cpp stickermanager.cpp
+                 sticker_db.cpp stickerpicker.cpp stickermanager.cpp \
+                 ../etapps/plugin_loader.cpp ../etapps/plugin_manager_dialog.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
              chatwidget.h chatview.h chatbuffer.h contactlist.h selfinfo.h \
@@ -31,7 +32,8 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                 translate_util.h \
                  config.h \
                  msgdb_helper.h \
-                 sticker_db.h stickerpicker.h stickermanager.h
+                 sticker_db.h stickerpicker.h stickermanager.h \
+                 ../etapps/plugin_loader.h ../etapps/plugin_manager_dialog.h
 
 # FORMS += MediumMsgEditor.ui — 已弃用。Qt3/Qt4 uic XML schema 不兼容，
 # Qt4 uic 拒绝 <vbox>/<hbox> 等 Qt3 标签，且 Qt4 环境无 Qt3Support 库。
@@ -39,6 +41,7 @@ include(../qlcomp/qlite.pri)
 
 # 使 qltox/ 中的 #include "compat34.h" 能找到 qlcomp/
 INCLUDEPATH += ../qlcomp
+INCLUDEPATH += ../etapps
 macx {
     INCLUDEPATH += /opt/vcpkg/installed/x64-osx-dynamic/include
     LIBS += -L/opt/vcpkg/installed/x64-osx-dynamic/lib -Wl,-rpath,/opt/vcpkg/installed/x64-osx-dynamic/lib -lhjson
@@ -139,6 +142,9 @@ isEmpty(QT_VERSION) {
 # 目标文件中的符号，因此必须显式 -lX11。
 # — 添加 screenshot 模块前无此需要，因为没有代码直接调用 X11 API。
 unix:!macx: LIBS += -lX11
+
+# dlopen/dlsym/dlclose/dlerror for plugin loading
+LIBS += -ldl
 
 # 安装
 target.path = /usr/local/bin

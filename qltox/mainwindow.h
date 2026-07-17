@@ -22,6 +22,12 @@
 #include "memberlistdialog.h"
 #include "ConfigDialog.h"
 #include "sleepblocker.h"
+#include "plugin_loader.h"
+#ifdef QT3_BUILD
+#include <qmap.h>
+#else
+#include <QMap>
+#endif
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -72,6 +78,9 @@ protected slots:
     void onScreenshotCancelled();
     void openHomePage();
     void onSettingsSaved(const SettingsChangedMap& changed);
+    void onEtappActivated(int index);
+    void onEtappCloseAll();
+    void openPluginManager();
     
 private:
     FramelessHelper* framelessHelper;
@@ -110,6 +119,10 @@ private:
     bool m_hintActive;
     QColor m_savedPlayedColor;
     SleepBlocker* m_sleepBlocker;
+
+#ifdef QT3_BUILD
+    QMap<int, int> m_etappItemToIndex;
+#endif
 };
 
 #endif // MAINWINDOW_H
