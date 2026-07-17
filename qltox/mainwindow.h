@@ -23,6 +23,7 @@
 #include "ConfigDialog.h"
 #include "sleepblocker.h"
 #include "plugin_loader.h"
+#include "EmbeddedMenuBar.h"
 #ifdef QT3_BUILD
 #include <qmap.h>
 #else
@@ -41,6 +42,7 @@ protected:
     bool event(QEvent* event) override;
 protected slots:
     void onFirstPaintComplete();
+    void initLoadPlugins();
     
     public slots:
     void onContactSelected(int id, const QString& type, const QString& name);
@@ -119,6 +121,7 @@ private:
     bool m_hintActive;
     QColor m_savedPlayedColor;
     SleepBlocker* m_sleepBlocker;
+    MenuWidget34* m_etappsMenu;
 
 #ifdef QT3_BUILD
     QMap<int, int> m_etappItemToIndex;

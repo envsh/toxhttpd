@@ -7,7 +7,7 @@
 #include <X11/Xatom.h>
 #else
 #include <QPainter>
-#include <QX11Info>
+#include <QtGui/QX11Info>
 #include <X11/Xlib.h>
 #endif
 

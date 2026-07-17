@@ -596,32 +596,10 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(openSettings()));
 
     // ── Etapps 菜单 ──
-    PluginLoader::scanPlugins();
-    MenuWidget34* etappsMenu = mb->addMenu(qFromUtf8("Etapps(&E)"));
-    EmbeddedMenuBar::addItem(etappsMenu, qFromUtf8("插件管理..."), this, SLOT(openPluginManager()));
-    EmbeddedMenuBar::addItem(etappsMenu, qFromUtf8("关闭全部窗口(&C)"), this, SLOT(onEtappCloseAll()));
-    EmbeddedMenuBar::addSeparator(etappsMenu);
-#ifdef QT3_BUILD
-    for (int i = 0; i < PluginLoader::uiappCount(); i++) {
-        const PluginInfo& p = PluginLoader::uiappAt(i);
-        if (!p.enabled) continue;
-        int id = etappsMenu->insertItem(p.name);
-        m_etappItemToIndex[id] = i;
-    }
-    connect(etappsMenu, SIGNAL(activated(int)), this, SLOT(onEtappActivated(int)));
-#else
-    {
-        QSignalMapper* etappMapper = new QSignalMapper(this);
-        for (int i = 0; i < PluginLoader::uiappCount(); i++) {
-            const PluginInfo& p = PluginLoader::uiappAt(i);
-            if (!p.enabled) continue;
-            QAction* action = etappsMenu->addAction(p.name);
-            etappMapper->setMapping(action, i);
-            connect(action, SIGNAL(triggered()), etappMapper, SLOT(map()));
-        }
-        connect(etappMapper, SIGNAL(mapped(int)), this, SLOT(onEtappActivated(int)));
-    }
-#endif
+    m_etappsMenu = mb->addMenu(qFromUtf8("Etapps(&E)"));
+    EmbeddedMenuBar::addItem(m_etappsMenu, qFromUtf8("插件管理..."), this, SLOT(openPluginManager()));
+    EmbeddedMenuBar::addItem(m_etappsMenu, qFromUtf8("关闭全部窗口(&C)"), this, SLOT(onEtappCloseAll()));
+    EmbeddedMenuBar::addSeparator(m_etappsMenu);
 
     MenuWidget34* help = mb->addMenu(qFromUtf8("帮助(&H)"));
     EmbeddedMenuBar::addItem(help, _("menu.homepage"), this, SLOT(openHomePage()));
@@ -1167,6 +1145,33 @@ void MainWindow::onFirstPaintComplete() {
     qWarning("%s", msg.utf8().data());
 #else
     qWarning("%s", msg.toUtf8().constData());
+#endif
+
+    initLoadPlugins();
+}
+
+void MainWindow::initLoadPlugins() {
+    PluginLoader::scanPlugins();
+#ifdef QT3_BUILD
+    for (int i = 0; i < PluginLoader::uiappCount(); i++) {
+        const PluginInfo& p = PluginLoader::uiappAt(i);
+        if (!p.enabled) continue;
+        int id = m_etappsMenu->insertItem(p.name);
+        m_etappItemToIndex[id] = i;
+    }
+    connect(m_etappsMenu, SIGNAL(activated(int)), this, SLOT(onEtappActivated(int)));
+#else
+    {
+        QSignalMapper* etappMapper = new QSignalMapper(this);
+        for (int i = 0; i < PluginLoader::uiappCount(); i++) {
+            const PluginInfo& p = PluginLoader::uiappAt(i);
+            if (!p.enabled) continue;
+            QAction* action = m_etappsMenu->addAction(p.name);
+            etappMapper->setMapping(action, i);
+            connect(action, SIGNAL(triggered()), etappMapper, SLOT(map()));
+        }
+        connect(etappMapper, SIGNAL(mapped(int)), this, SLOT(onEtappActivated(int)));
+    }
 #endif
 }
 
