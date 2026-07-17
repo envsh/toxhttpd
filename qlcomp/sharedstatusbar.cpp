@@ -114,6 +114,49 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
 {
     if (m_repositioning) return false;
 
+    // Show：widget 变为可见时触发（兜底，不受 Qt::Tool 限制）
+    if (event->type() == QEvent::Show) {
+        if (!watched->isWidgetType()) return false;
+        QWidget *tw = static_cast<QWidget*>(watched)->topLevelWidget();
+        if (!tw || tw == this) return false;
+#ifdef QT3_BUILD
+        if (tw->inherits("QLabel")) return false;
+        if (tw->inherits("DesktopLyrics")) return false;
+        if (tw->inherits("ScreenshotRegionSelector")) return false;
+        if (tw->inherits("ScreenshotPreviewDialog")) return false;
+#else
+        if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return false;
+        if (tw->inherits("DesktopLyrics")) return false;
+        if (tw->inherits("ScreenshotRegionSelector")) return false;
+        if (tw->inherits("ScreenshotPreviewDialog")) return false;
+#endif
+        if (tw->width() < 350) {
+            return false;
+        }
+        if (minimumWidth() > tw->width()) {
+            return false;
+        }
+        m_activeWindow = tw;
+        reposition();
+        return false;
+    }
+
+#ifndef QT3_BUILD
+    // ApplicationActivate：应用被激活时触发（watched 是 qApp，兜底）
+    if (event->type() == QEvent::ApplicationActivate) {
+        QWidget *aw = qApp->activeWindow();
+        if (!aw || aw == this) return false;
+        if (aw->inherits("DesktopLyrics")) return false;
+        if (aw->inherits("ScreenshotRegionSelector")) return false;
+        if (aw->inherits("ScreenshotPreviewDialog")) return false;
+        if (aw->width() < 350) return false;
+        if (minimumWidth() > aw->width()) return false;
+        m_activeWindow = aw;
+        reposition();
+        return false;
+    }
+#endif
+
     if (event->type() == QEvent::WindowActivate) {
         // 同应用内窗口切换：停止 Qt3 debounce 定时器，直接跟随
 #ifdef QT3_BUILD
@@ -294,7 +337,9 @@ void SharedStatusBar::reposition()
     QPoint bl = m_activeWindow->mapToGlobal(
         QPoint(0, m_activeWindow->height()));
     move(bl.x(), bl.y());
-    resize(m_activeWindow->width(), m_bar->sizeHint().height());
+    int barH = m_bar->sizeHint().height();
+    if (barH < 20) { barH = 20; }
+    resize(m_activeWindow->width(), barH);
     if (!isVisible()) show();
     if (minimumWidth() > m_activeWindow->width()) { m_repositioning = false; return; }
 
