@@ -3,8 +3,12 @@
 #include <qpainter.h>
 #include <qpen.h>
 #include <qcursor.h>
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #else
 #include <QPainter>
+#include <QX11Info>
+#include <X11/Xlib.h>
 #endif
 
 SharedStatusBar *SharedStatusBar::s_instance = nullptr;
@@ -14,10 +18,10 @@ static const int GRIP_SIZE = 16;
 SharedStatusBar::SharedStatusBar()
 #ifdef QT3_BUILD
     : QWidget(nullptr, "sharedstatusbar",
-              WStyle_Customize | WStyle_Tool | WStyle_NoBorder | WStyle_StaysOnTop)
+              WStyle_Customize | WStyle_Tool | WStyle_NoBorder)
 #else
     : QWidget(nullptr,
-              Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
+              Qt::Tool | Qt::FramelessWindowHint)
 #endif
     , m_bar(nullptr)
     , m_activeWindow(nullptr)
@@ -342,6 +346,16 @@ void SharedStatusBar::reposition()
     resize(m_activeWindow->width(), barH);
     if (!isVisible()) show();
     if (minimumWidth() > m_activeWindow->width()) { m_repositioning = false; return; }
+
+    {
+#ifdef QT3_BUILD
+        Display *dpy = QPaintDevice::x11Display();
+#else
+        Display *dpy = QX11Info::display();
+#endif
+        XSetTransientForHint(dpy, winId(), m_activeWindow->winId());
+        XFlush(dpy);
+    }
 
     m_repositioning = false;
 }
