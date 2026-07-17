@@ -130,6 +130,10 @@ private:
         ApiCtx(int t, int i, const std::string& s1, const std::string& s2, int n) : type(t), id(i), str1(s1), str2(s2), n1(n) {}
         int chatId = -1;
         std::string chatType;
+        // TODO: 以上两个 ad-hoc 字段应替换为通用机制：
+        // 在 ApiCtx 和 ApiResultEvent 基类各加 QVariant cbNum/cbStr，
+        // dispatchResult 自动复制，customEvent 用 cbNum.toInt()/cbStr.toString() 做过期检查。
+        // 适用场景：ApiTranslate、ApiLoadGroupMembers、ApiLoadMessageHistory、ApiMediaDownload。
         void* ptr = nullptr;
     };
     static void onHttpDone(const HttpResponse& resp, void* udata);
