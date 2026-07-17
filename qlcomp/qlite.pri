@@ -22,7 +22,8 @@ QTCOMP_CPP = $$PWD/limelog.cpp $$PWD/appsetup.cpp $$PWD/compat34.cpp $$PWD/trans
 			$$PWD/assertf.cpp \
 			$$PWD/screenshotmanager.cpp \
 			$$PWD/screenshotoverlay.cpp \
-			$$PWD/screenshotpreview.cpp
+			$$PWD/screenshotpreview.cpp \
+			$$PWD/sleepblocker.cpp
 
 QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translator.h $$PWD/compat34.h \
 			$$PWD/emojiutil.h $$PWD/emojiwidgets.h $$PWD/emojiitems.h \
@@ -39,8 +40,13 @@ QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translato
 			$$PWD/assertf.h \
 			$$PWD/screenshotmanager.h \
 			$$PWD/screenshotoverlay.h \
-			$$PWD/screenshotpreview.h
+			$$PWD/screenshotpreview.h \
+			$$PWD/sleepblocker.h
 
 HEADERS += $$LIME_STYLE_H $$QTCOMP_HDR
 SOURCES += $$LIME_STYLE_CPP $$QTCOMP_CPP
+
+# SleepBlocker 平台依赖
+unix:!macx: LIBS += -lXss -lX11
+macx: LIBS += -framework IOKit
 
