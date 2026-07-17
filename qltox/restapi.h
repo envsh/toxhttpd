@@ -80,7 +80,7 @@ public:
     static void setGroupSelfName(int groupId, const std::string& name);
     static void getRandomName();
     static void setSelfInfo(const std::string& name, const std::string& statusMessage);
-    static void translate(const std::string& text, const std::string& toLang, int msgIndex);
+    static void translate(const std::string& text, const std::string& toLang, int msgIndex, int chatId, const std::string& chatType);
     static void translateForSend(const std::string& text, const std::string& toLang);
     static void lazyLoadFriendDetail(int friendId);
     static std::string urlEncode(const std::string& str);
@@ -128,6 +128,8 @@ private:
         ApiCtx(int t, int i, const std::string& s) : type(t), id(i), str1(s) {}
         ApiCtx(int t, int i, const std::string& s1, const std::string& s2) : type(t), id(i), str1(s1), str2(s2) {}
         ApiCtx(int t, int i, const std::string& s1, const std::string& s2, int n) : type(t), id(i), str1(s1), str2(s2), n1(n) {}
+        int chatId = -1;
+        std::string chatType;
         void* ptr = nullptr;
     };
     static void onHttpDone(const HttpResponse& resp, void* udata);

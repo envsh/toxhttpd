@@ -229,6 +229,8 @@ public:
 class TranslateResultEvent : public ApiResultEvent {
 public:
     TranslateResultEvent() : ApiResultEvent(ApiTranslate) {}
+    int chatId = -1;
+    std::string chatType;
     int msgIndex = 0;
     bool success = false;
     std::string translatedText;

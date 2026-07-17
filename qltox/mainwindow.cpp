@@ -1068,6 +1068,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
         // 翻译结果
         if (e->type == ApiTranslate) {
             TranslateResultEvent* tev = static_cast<TranslateResultEvent*>(event);
+            if (tev->chatId != currentChatId
+                || tev->chatType != std::string(qToUtf8(currentChatType).data())) {
+                return;
+            }
             chatWidget->onTranslateResult(tev->msgIndex, tev->success,
                 qFromUtf8(tev->translatedText.data(), (int)tev->translatedText.size()),
                 qFromUtf8(tev->errorMessage.data(), (int)tev->errorMessage.size()));
@@ -2699,7 +2703,9 @@ void MainWindow::loadMessageHistory() {
 }
 
 void MainWindow::onTranslateRequested(int msgIndex, const QString& text, const QString& targetLang) {
-    ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)), msgIndex);
+    ToxAPI::translate(std::string(qToUtf8(text)), std::string(qToUtf8(targetLang)),
+                      msgIndex, currentChatId,
+                      std::string(qToUtf8(currentChatType)));
 }
 
 void MainWindow::onTranslateForSendRequested(const QString& text, const QString& targetLang) {

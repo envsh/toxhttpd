@@ -427,8 +427,10 @@ void ToxAPI::setSelfInfo(const std::string& name, const std::string& statusMessa
     request(ApiSetSelfInfo, {"/api/self", "POST", data});
 }
 
-void ToxAPI::translate(const std::string& text, const std::string& toLang, int msgIndex) {
+void ToxAPI::translate(const std::string& text, const std::string& toLang, int msgIndex, int chatId, const std::string& chatType) {
     auto* ctx = new ApiCtx(ApiTranslate, msgIndex, text, toLang);
+    ctx->chatId = chatId;
+    ctx->chatType = chatType;
     std::string postData = "{\"text\":\"" + jsonEscape(text) + "\",\"to\":\"" + toLang + "\"}";
     request({"/api/translate", "POST", postData}, ctx);
 }
@@ -1079,6 +1081,8 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
     case ApiTranslate: {
         auto* ev = new TranslateResultEvent();
         ev->elapsedMs = resp.elapsedMs;
+        ev->chatId = ctx->chatId;
+        ev->chatType = ctx->chatType;
         ev->msgIndex = ctx->id;
         if (resp.httpCode != 200 || resp.body.empty()) {
             ev->errorMessage = "NETWORK_ERROR: cannot connect to server";
