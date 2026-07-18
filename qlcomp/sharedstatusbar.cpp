@@ -138,7 +138,10 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
         if (tw->inherits("ScreenshotRegionSelector")) return false;
         if (tw->inherits("ScreenshotPreviewDialog")) return false;
 #else
-        if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return false;
+        // 注意：不能用 windowFlags() & (Qt::ToolTip | Qt::Popup) 判断，
+        // 因为 Qt::Popup(0x09)、Qt::ToolTip(0x0d)、Qt::Dialog(0x03) 都含
+        // Qt::Window(0x01) 位，位AND对所有窗口返回非零。须用 Mask 提取类型后比较。
+        if (((tw->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip) || ((tw->windowFlags() & Qt::WindowType_Mask) == Qt::Popup)) return false;
         if (tw->inherits("DesktopLyrics")) return false;
         if (tw->inherits("ScreenshotRegionSelector")) return false;
         if (tw->inherits("ScreenshotPreviewDialog")) return false;
@@ -150,6 +153,7 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
             return false;
         }
         m_activeWindow = tw;
+        installEventFiltersOnMyselfTopLevelWidgets();
         reposition();
         return false;
     }
@@ -190,7 +194,7 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
         if (tw->inherits("ScreenshotPreviewDialog")) return false;
 #else
         // Qt4 tooltips/popups 不跟踪
-        if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return false;
+        if (((tw->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip) || ((tw->windowFlags() & Qt::WindowType_Mask) == Qt::Popup)) return false;
         if (tw->inherits("DesktopLyrics")) return false;
         if (tw->inherits("ScreenshotRegionSelector")) return false;
         if (tw->inherits("ScreenshotPreviewDialog")) return false;
@@ -202,7 +206,7 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
         // 状态栏最小宽度大于活动窗口宽度时不跟随
         if (minimumWidth() > tw->width()) {
             return false;
-        }		
+        }
         // 状态栏可见且新窗口不遮挡当前位置时，不跟随
         if (isVisible() && !geometry().intersects(tw->frameGeometry())) {
             // return false;
@@ -274,7 +278,7 @@ void SharedStatusBar::installEventFiltersOnMyselfTopLevelWidgets()
         if (w->inherits("DesktopLyrics")) continue;
         if (w->inherits("ScreenshotRegionSelector")) continue;
         if (w->inherits("ScreenshotPreviewDialog")) continue;
-        if (w->windowFlags() & (Qt::ToolTip | Qt::Popup)) continue;
+        if (((w->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip) || ((w->windowFlags() & Qt::WindowType_Mask) == Qt::Popup)) continue;
         w->installEventFilter(this);
     }
 }
@@ -287,7 +291,7 @@ void SharedStatusBar::onFocusChanged(QWidget *, QWidget *now)
     if (tw->inherits("DesktopLyrics")) return;
     if (tw->inherits("ScreenshotRegionSelector")) return;
     if (tw->inherits("ScreenshotPreviewDialog")) return;
-    if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return;
+    if (((tw->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip) || ((tw->windowFlags() & Qt::WindowType_Mask) == Qt::Popup)) return;
     if (tw->width() < 350) return;
     if (minimumWidth() > tw->width()) return;
     tw->installEventFilter(this);
@@ -301,8 +305,8 @@ void SharedStatusBar::retrack()
     QWidget *aw = qApp->activeWindow();
     if (!aw || aw == this) {
         m_activeWindow = nullptr;
-        // 初始启动时 activeWindow() 可能为 NULL，延迟重试
-        if (!isVisible()) {
+        // activeWindow() 未就绪时持续重试，直到找到活动窗口
+        if (!m_activeWindow) {
             QTimer::singleShot(50, this, SLOT(retrack()));
         }
         return;
@@ -389,9 +393,13 @@ void SharedStatusBar::reposition()
     if (!isVisible()) { show(); raise(); }
     if (minimumWidth() > winW) { m_repositioning = false; return; }
 
-#ifdef QT3_BUILD
+#ifdef Q_OS_LINUX
     {
+#ifdef QT3_BUILD
         Display *dpy = QPaintDevice::x11Display();
+#else
+        Display *dpy = QX11Info::display();
+#endif
         XSetTransientForHint(dpy, winId(), m_activeWindow->winId());
         XFlush(dpy);
     }
