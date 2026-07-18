@@ -44,6 +44,8 @@ SharedStatusBar::SharedStatusBar()
 #else
     m_bar = new QStatusBar(this);
     m_bar->setObjectName("innerbar");
+    connect(qApp, SIGNAL(focusChanged(QWidget*,QWidget*)),
+            this, SLOT(onFocusChanged(QWidget*,QWidget*)));
 #endif
     m_bar->setSizeGripEnabled(false);
     setMouseTracking(true);
@@ -76,6 +78,9 @@ SharedStatusBar *SharedStatusBar::instance()
         if (aw) {
             s_instance->m_activeWindow = aw;
             s_instance->reposition();
+        } else {
+            // Qt4 构造期间 activeWindow() 为 NULL，延迟重试
+            QTimer::singleShot(0, s_instance, SLOT(retrack()));
         }
     }
     return s_instance;
@@ -152,6 +157,7 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
 #ifndef QT3_BUILD
     // ApplicationActivate：应用被激活时触发（watched 是 qApp，兜底）
     if (event->type() == QEvent::ApplicationActivate) {
+        installEventFiltersOnMyselfTopLevelWidgets();
         QWidget *aw = qApp->activeWindow();
         if (!aw || aw == this) return false;
         if (aw->inherits("DesktopLyrics")) return false;
@@ -218,9 +224,8 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
         return false;
     }
 #else
-    // Qt4 有 ApplicationDeactivate 事件 → 切到外部应用时隐藏
+    // Qt4 有 ApplicationDeactivate 事件（不隐藏，上层窗口覆盖时 bar 仍需显示）
     if (event->type() == QEvent::ApplicationDeactivate) {
-        hide();
         return false;
     }
 #endif
@@ -238,7 +243,6 @@ bool SharedStatusBar::eventFilter(QObject *watched, QEvent *event)
 
     if (event->type() == QEvent::Close && watched == m_activeWindow) {
         m_activeWindow = nullptr;
-        hide();
         return false;
     }
     if ((event->type() == QEvent::Move ||
@@ -257,25 +261,59 @@ void SharedStatusBar::onDebounceTimeout()
     m_pendingHide = false;
     // hide();
 }
+
+void SharedStatusBar::onFocusChanged(QWidget *, QWidget *) {}
+void SharedStatusBar::installEventFiltersOnMyselfTopLevelWidgets() {}
+#else
+void SharedStatusBar::installEventFiltersOnMyselfTopLevelWidgets()
+{
+    QWidgetList widgets = QApplication::topLevelWidgets();
+    for (int i = 0; i < widgets.size(); ++i) {
+        QWidget *w = widgets.at(i);
+        if (w == this) continue;
+        if (w->inherits("DesktopLyrics")) continue;
+        if (w->inherits("ScreenshotRegionSelector")) continue;
+        if (w->inherits("ScreenshotPreviewDialog")) continue;
+        if (w->windowFlags() & (Qt::ToolTip | Qt::Popup)) continue;
+        w->installEventFilter(this);
+    }
+}
+
+void SharedStatusBar::onFocusChanged(QWidget *, QWidget *now)
+{
+    if (!now) return;
+    QWidget *tw = now->topLevelWidget();
+    if (!tw || tw == this) return;
+    if (tw->inherits("DesktopLyrics")) return;
+    if (tw->inherits("ScreenshotRegionSelector")) return;
+    if (tw->inherits("ScreenshotPreviewDialog")) return;
+    if (tw->windowFlags() & (Qt::ToolTip | Qt::Popup)) return;
+    if (tw->width() < 350) return;
+    if (minimumWidth() > tw->width()) return;
+    tw->installEventFilter(this);
+    m_activeWindow = tw;
+    reposition();
+}
 #endif
 
 void SharedStatusBar::retrack()
 {
     QWidget *aw = qApp->activeWindow();
     if (!aw || aw == this) {
-        hide();
         m_activeWindow = nullptr;
+        // 初始启动时 activeWindow() 可能为 NULL，延迟重试
+        if (!isVisible()) {
+            QTimer::singleShot(50, this, SLOT(retrack()));
+        }
         return;
     }
+    if (aw->inherits("ScreenshotRegionSelector") || aw->inherits("ScreenshotPreviewDialog")) {
+        return;
+    }
+    if (minimumWidth() > aw->width()) { return; }
     if (aw != m_activeWindow) {
-        if (aw->inherits("ScreenshotRegionSelector") || aw->inherits("ScreenshotPreviewDialog")) {
-            return;
-        }
-		if (minimumWidth() > aw->width()) { return; }
-        if (isVisible() && !geometry().intersects(aw->frameGeometry())) {
-            // return;
-        }
         m_activeWindow = aw;
+        installEventFiltersOnMyselfTopLevelWidgets();
         reposition();
     }
 }
@@ -342,26 +380,22 @@ void SharedStatusBar::reposition()
         m_repositioning = false;
         return;
     }
-    QPoint bl = m_activeWindow->mapToGlobal(
-        QPoint(0, m_activeWindow->height()));
-    move(bl.x(), bl.y());
+    QPoint bottomLeft = m_activeWindow->mapToGlobal(QPoint(0, m_activeWindow->height()));
+    move(bottomLeft.x(), bottomLeft.y() + 1);
     int barH = m_bar->sizeHint().height();
     if (barH < 20) { barH = 20; }
-    resize(m_activeWindow->width(), barH);
-    if (!isVisible()) show();
-    if (minimumWidth() > m_activeWindow->width()) { m_repositioning = false; return; }
+    int winW = m_activeWindow->width();
+    resize(winW, barH);
+    if (!isVisible()) { show(); raise(); }
+    if (minimumWidth() > winW) { m_repositioning = false; return; }
 
-    {
-#ifdef Q_OS_LINUX
 #ifdef QT3_BUILD
+    {
         Display *dpy = QPaintDevice::x11Display();
-#else
-        Display *dpy = QX11Info::display();
-#endif
         XSetTransientForHint(dpy, winId(), m_activeWindow->winId());
         XFlush(dpy);
-#endif
     }
+#endif
 
     m_repositioning = false;
 }

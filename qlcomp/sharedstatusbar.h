@@ -18,6 +18,7 @@
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QTimer>
+#include <QPointer>
 #endif
 
 class SharedStatusBar : public QWidget
@@ -38,7 +39,11 @@ private:
     static SharedStatusBar *s_instance;
 
     QStatusBar *m_bar;
+#ifdef QT3_BUILD
     QWidget    *m_activeWindow;
+#else
+    QPointer<QWidget> m_activeWindow;
+#endif
     bool        m_dragging;
     bool        m_repositioning;
     QPoint      m_dragStartGlobal;
@@ -53,6 +58,12 @@ private:
     void paintEvent(QPaintEvent *e) override;
     bool event(QEvent *e) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+
+private slots:
+    void onFocusChanged(QWidget *old, QWidget *now);
+
+private:
+    void installEventFiltersOnMyselfTopLevelWidgets();
 
 #ifdef QT3_BUILD
 private slots:
