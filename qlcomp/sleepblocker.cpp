@@ -15,7 +15,8 @@
 #include <IOKit/pwr_mgt/IOPMLib.h>
 #include <CoreFoundation/CoreFoundation.h>
 // macOS: IOPMAssertionCreateWithName 是 IOKit 电源管理框架 API。
-// kIOPMAssertionTypeNoDisplaySleep — 阻止显示器休眠和屏保
+// kIOPMAssertionTypePreventUserIdleDisplaySleep — 阻止屏保激活和显示器关闭（默认）
+// kIOPMAssertionTypePreventUserIdleSystemSleep  — 阻止系统空闲休眠（preventSystemSleep=true 时启用）
 // kIOPMAssertionLevelOn (255) — 最高优先级
 // IOPMAssertionRelease(assertionID) 释放 assertion，系统恢复正常休眠策略。
 // IOKit framework 在 macOS 上始终可用，无需额外安装。
@@ -34,12 +35,14 @@
 // 参考: man XScreenSaver(3)
 #endif
 
-SleepBlocker::SleepBlocker()
+SleepBlocker::SleepBlocker(bool preventSystemSleep)
     : active_(false)
+    , preventSystemSleep_(preventSystemSleep)
 #ifdef _WIN32
     , prevState_(0)
 #elif defined(__APPLE__)
-    , assertionID_(0)
+    , displayAssertionID_(0)
+    , systemAssertionID_(0)
 #elif defined(__linux__)
     , display_(0)
 #endif
@@ -51,15 +54,23 @@ SleepBlocker::SleepBlocker()
     ALOG_INFO("SleepBlocker: activated (Windows), prevState=0x%lx", prevState_);
 
 #elif defined(__APPLE__)
-    CFStringRef reason = CFSTR("qlcomp: preventing display sleep");
+    CFStringRef reason = CFSTR("qlcomp: preventing screensaver and display sleep");
     IOReturn ret = IOPMAssertionCreateWithName(
-        kIOPMAssertionTypeNoDisplaySleep,
+        kIOPMAssertionTypePreventUserIdleDisplaySleep,
         kIOPMAssertionLevelOn,
         reason,
-        &assertionID_);
+        &displayAssertionID_);
+    if (preventSystemSleep_ && ret == kIOReturnSuccess) {
+        CFStringRef sysReason = CFSTR("qlcomp: preventing system idle sleep");
+        IOPMAssertionCreateWithName(
+            kIOPMAssertionTypePreventUserIdleSystemSleep,
+            kIOPMAssertionLevelOn,
+            sysReason,
+            &systemAssertionID_);
+    }
     active_ = (ret == kIOReturnSuccess);
-    ALOG_INFO("SleepBlocker: activated (macOS), assertionID=%u ret=%d",
-              assertionID_, ret);
+    ALOG_INFO("SleepBlocker: activated (macOS), displayID=%u systemID=%u ret=%d",
+              displayAssertionID_, systemAssertionID_, ret);
 
 #elif defined(__linux__)
     Display* dpy = XOpenDisplay(NULL);
@@ -89,8 +100,12 @@ void SleepBlocker::release() {
     ALOG_INFO("SleepBlocker: released (Windows), prevState=0x%lx", prevState_);
 
 #elif defined(__APPLE__)
-    IOPMAssertionRelease(assertionID_);
-    assertionID_ = 0;
+    IOPMAssertionRelease(displayAssertionID_);
+    displayAssertionID_ = 0;
+    if (systemAssertionID_) {
+        IOPMAssertionRelease(systemAssertionID_);
+        systemAssertionID_ = 0;
+    }
     ALOG_INFO("SleepBlocker: released (macOS)");
 
 #elif defined(__linux__)

@@ -15,10 +15,9 @@
 //   恢复: SetThreadExecutionState(prevState) 或传入 ES_CONTINUOUS 即可
 //   参考: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate
 //
-// macOS: IOPMAssertionCreateWithName / IOPMAssertionRelease  (IOKit framework)
-//   创建一个 Power Assertion，类型 kIOPMAssertionTypeNoDisplaySleep 即禁止显示器休眠。
-//   Assertion 在释放前一直有效；进程异常退出时系统自动回收。
-//   参考: https://developer.apple.com/library/archive/qa/qa1340/_index.html
+// macOS: 使用两个 Power Assertion:
+//   kIOPMAssertionTypePreventUserIdleDisplaySleep — 阻止屏保激活和显示器关闭（默认）
+//   kIOPMAssertionTypePreventUserIdleSystemSleep  — 阻止系统空闲休眠（可选，preventSystemSleep=true 时启用）
 //
 // Linux/X11: XScreenSaverSuspend()  (XScreenSaver 扩展, 需链接 libXss)
 //   X11 ScreenSaver 扩展 API，suspend=True 暂停屏保和 DPMS (显示器省电) 计时器。
@@ -37,7 +36,7 @@
 
 class SleepBlocker {
 public:
-    SleepBlocker();
+    explicit SleepBlocker(bool preventSystemSleep = false);
     ~SleepBlocker();
 
     // 手动提前释放，多次调用安全
@@ -50,10 +49,12 @@ private:
 #ifdef _WIN32
     unsigned long prevState_;
 #elif defined(__APPLE__)
-    unsigned int assertionID_;
+    unsigned int displayAssertionID_;
+    unsigned int systemAssertionID_;
 #elif defined(__linux__)
     void* display_;
 #endif
+    bool preventSystemSleep_;
     bool active_;
 };
 

@@ -32,21 +32,36 @@ static inline const PluginInfo& pluginRef(const QList<PluginInfo>& list, int i) 
 QStringList pluginBaseDirs() {
     QStringList dirs;
 
+#ifdef QT3_BUILD
     dirs.append(qCurrDir() + "/plugins");
     dirs.append(qAppDir() + "/plugins");
     dirs.append(qAppDir() + "/../plugins");
-
 #if defined(__APPLE__)
     dirs.append("/Library/Application Support/qltox/plugins");
 #else
     dirs.append("/usr/local/share/qltox/plugins");
     dirs.append("/usr/share/qltox/plugins");
 #endif
-
 #if defined(__APPLE__)
     dirs.append(qGetHomePath() + "/Library/Application Support/qltox/plugins");
 #else
     dirs.append(qGetHomePath() + "/.config/qltox/plugins");
+#endif
+#else
+    dirs.append(qCurrDir() + "/plugins4");
+    dirs.append(qAppDir() + "/plugins4");
+    dirs.append(qAppDir() + "/../plugins4");
+#if defined(__APPLE__)
+    dirs.append("/Library/Application Support/qltox/plugins4");
+#else
+    dirs.append("/usr/local/share/qltox/plugins4");
+    dirs.append("/usr/share/qltox/plugins4");
+#endif
+#if defined(__APPLE__)
+    dirs.append(qGetHomePath() + "/Library/Application Support/qltox/plugins4");
+#else
+    dirs.append(qGetHomePath() + "/.config/qltox/plugins4");
+#endif
 #endif
 
     return dirs;
@@ -59,9 +74,9 @@ static QString settingsFilePath() {
 static bool stateFromSettings(const QString& name, int type) {
     QString key;
     if (type == PLUGIN_TYPE_UIAPP) {
-        key = "plugins/enabled_uiapps";
+        key = "plugins/disabled_uiapps";
     } else {
-        key = "plugins/enabled_noui";
+        key = "plugins/disabled_noui";
     }
 
 #ifdef QT3_BUILD
@@ -75,7 +90,7 @@ static bool stateFromSettings(const QString& name, int type) {
     if (val.isEmpty()) {
         return true;
     }
-    return val.contains(name);
+    return !val.contains(name);
 }
 
 void PluginLoader::loadState() {
@@ -88,30 +103,30 @@ void PluginLoader::saveState() {
     QSettings s(settingsFilePath(), QSettings::IniFormat);
 #endif
 
-    QStringList enabledUiapps;
+    QStringList disabledUiapps;
     for (int i = 0; i < s_uiapps.count(); i++) {
         PluginInfo& info = pluginRef(s_uiapps, i);
-        if (info.enabled) {
-            enabledUiapps.append(info.name);
+        if (!info.enabled) {
+            disabledUiapps.append(info.name);
         }
     }
 #ifdef QT3_BUILD
-    s.writeEntry("plugins/enabled_uiapps", enabledUiapps.join(","));
+    s.writeEntry("plugins/disabled_uiapps", disabledUiapps.join(","));
 #else
-    s.setValue("plugins/enabled_uiapps", enabledUiapps.join(","));
+    s.setValue("plugins/disabled_uiapps", disabledUiapps.join(","));
 #endif
 
-    QStringList enabledNouis;
+    QStringList disabledNouis;
     for (int i = 0; i < s_nouis.count(); i++) {
         PluginInfo& info = pluginRef(s_nouis, i);
-        if (info.enabled) {
-            enabledNouis.append(info.name);
+        if (!info.enabled) {
+            disabledNouis.append(info.name);
         }
     }
 #ifdef QT3_BUILD
-    s.writeEntry("plugins/enabled_noui", enabledNouis.join(","));
+    s.writeEntry("plugins/disabled_noui", disabledNouis.join(","));
 #else
-    s.setValue("plugins/enabled_noui", enabledNouis.join(","));
+    s.setValue("plugins/disabled_noui", disabledNouis.join(","));
 #endif
 }
 
