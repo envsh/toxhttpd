@@ -9,6 +9,7 @@
 #include "LimeStyle.h"
 #include "chatwidget.h"
 #include "config.h"
+#include "version.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -42,6 +43,9 @@ int main(int argc, char* argv[]) {
     ChatWidget::s_autoTranslateArg = autoTranslateArg;
 
     QApplication app(argc, argv);
+#ifndef QT3_BUILD
+    app.setApplicationVersion(APP_VERSION);
+#endif
 
     QtappSetup::setup(app);
         

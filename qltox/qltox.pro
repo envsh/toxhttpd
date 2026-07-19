@@ -3,6 +3,9 @@ TARGET = qltox
 QT = core gui widgets
 CONFIG += moc
 CONFIG += sdk_no_version_check
+
+VERSION = 0.1.0
+
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.7
 
 SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
@@ -33,6 +36,7 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                  config.h \
                  msgdb_helper.h \
                  sticker_db.h stickerpicker.h stickermanager.h \
+                 version.h \
                  ../etapps/plugin_loader.h ../etapps/plugin_manager_dialog.h
 
 # FORMS += MediumMsgEditor.ui — 已弃用。Qt3/Qt4 uic XML schema 不兼容，

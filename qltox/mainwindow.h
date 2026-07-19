@@ -75,6 +75,7 @@ protected slots:
     void openStickerManager();
     void onMenu1Stub();
     void onMenu2Stub();
+    void onAboutApp();
     void onScreenshotRequested();
     void onScreenshotReady(const QString& filePath);
     void onScreenshotCancelled();
