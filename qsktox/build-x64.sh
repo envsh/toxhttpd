@@ -10,7 +10,6 @@ fi
 export LD_LIBRARY_PATH=$QTDIR/lib
 
 # ── 编译 Go 共享库 (CGO_ENABLED=1) ──
-cd extras/go && go build -buildmode=c-shared -o libgoso.so . && cd ../..
 
 mkdir -p build-x64 && cd build-x64
 $QTDIR/bin/qt-cmake .. \
@@ -26,4 +25,4 @@ if [ "$(uname)" != "Darwin" ]; then
 fi
 
 make -j$(nproc)
-echo "=== done: LD_LIBRARY_PATH=../extras/go:/opt/qt/qskinny/lib/qskinny:$QTDIR/lib ./build-x64/qsktox ==="
+echo "=== done: LD_LIBRARY_PATH=build-x64:/opt/qt/qskinny/lib/qskinny:$QTDIR/lib ./build-x64/qsktox ==="

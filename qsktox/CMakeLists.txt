@@ -48,31 +48,36 @@ qt_add_executable(qsktox
     src/aboutpage.h
     src/aboutpage.cpp
     src/shareintentreceiver.cpp
+    vendor/cJSON.c
 )
+
+# ── vendor: cJSON header ──
+target_include_directories(qsktox PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
 
 target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick Qt6::Network)
 
 # ── extras/go 共享库 (c-shared) ──
 set(GO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extras/go)
+set(GO_OUT_DIR ${CMAKE_BINARY_DIR})
 
 if(ANDROID)
     set(GO_ENV
         GOOS=android GOARCH=arm64 CGO_ENABLED=1
         CC=${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
     )
-    set(GO_LIB ${GO_SRC_DIR}/libgoso.so)
+    set(GO_LIB ${GO_OUT_DIR}/libgoso.so)
 elseif(APPLE)
     set(GO_ENV GOOS=darwin GOARCH=arm64 CGO_ENABLED=1)
-    set(GO_LIB ${GO_SRC_DIR}/libgoso.dylib)
+    set(GO_LIB ${GO_OUT_DIR}/libgoso.dylib)
 elseif(WIN32)
     set(GO_ENV GOOS=windows GOARCH=amd64 CGO_ENABLED=1)
-    set(GO_LIB ${GO_SRC_DIR}/libgoso.dll)
+    set(GO_LIB ${GO_OUT_DIR}/libgoso.dll)
 else()
     set(GO_ENV GOOS=linux GOARCH=amd64 CGO_ENABLED=1 CC=gcc)
-    set(GO_LIB ${GO_SRC_DIR}/libgoso.so)
+    set(GO_LIB ${GO_OUT_DIR}/libgoso.so)
 endif()
 
-set(GO_HEADER ${GO_SRC_DIR}/goso.h)
+set(GO_HEADER ${GO_OUT_DIR}/goso.h)
 
 add_custom_command(
     OUTPUT ${GO_LIB} ${GO_HEADER}
@@ -100,7 +105,17 @@ add_library(cso SHARED
 # ── 主程序链接 extras ──
 target_link_libraries(qsktox PRIVATE goso cso)
 
+# ── vendor: SQLite 预编译库 ──
 if(ANDROID)
+    add_library(sqlite3 SHARED IMPORTED GLOBAL)
+    set_target_properties(sqlite3 PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/vendor/lib/${ANDROID_ABI}/libsqlite3.so
+        IMPORTED_NO_SONAME TRUE
+    )
+    target_link_libraries(qsktox PRIVATE sqlite3)
     set_target_properties(qsktox PROPERTIES WIN32_EXECUTABLE TRUE)
     target_link_libraries(qsktox PRIVATE log android)
+elseif(UNIX AND NOT APPLE)
+    find_package(SQLite3 REQUIRED)
+    target_link_libraries(qsktox PRIVATE SQLite::SQLite3)
 endif()
