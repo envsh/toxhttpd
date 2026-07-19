@@ -980,9 +980,10 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 for (int i = chatWidget->messageCount() - 1; i >= 0; i--) {
                     ChatElement& el = chatWidget->mutableMessageAt(i);
                     if (el.category == "self" && el.sendmsgseq == evt->sendmsgseq) {
-                        if (evt->success) {
-                            el.sendState = ChatElement::SendSent;
-                        } else {
+                    if (evt->success) {
+                        el.sendState = ChatElement::SendSent;
+                        el.messageId = qFromUtf8(evt->messageId);
+                    } else {
                             el.sendState = ChatElement::SendFailed;
                             el.sendErrorMsg = qFromUtf8(evt->errorMessage);
                         }
@@ -1902,6 +1903,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     msg.senderNickname = senderLabel;
                     msg.peerNumber = (int)hm.sender_number;
                     msg.avatarUrl = avatarMxc;
+                    msg.messageId = qFromUtf8(hm.eventId);
 
                     int chatId = VIRTUAL_REDDIT_ID;
                     std::string chatType = kTopicType;
@@ -2705,6 +2707,7 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
         el.time           = timeStr;
         el.avatarUrl      = avatarUrl;
         el.ipAddress      = ipAddress;
+        el.messageId      = qFromUtf8(msg.eventId);
 
         if (!msg.mediaUrl.empty()) {
             el.mediaUrl    = qFromUtf8(msg.mediaUrl);

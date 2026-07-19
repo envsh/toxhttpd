@@ -94,6 +94,7 @@ struct ChatElement {
     uchar firstInGroup : 1;
     SendState sendState;
     int sendmsgseq = -1;
+    QString messageId;        // 服务端消息 ID（暂未填充）
     QString sendErrorMsg;
     QRect resendIconRect;
 

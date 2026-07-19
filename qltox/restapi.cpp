@@ -888,6 +888,17 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
             else
                 ev->errorMessage = "unknown error";
+        } else if (!resp.body.empty()) {
+            cJSON* root = cJSON_Parse(resp.body.c_str());
+            if (root) {
+                cJSON* mid = cJSON_GetObjectItem(root, "message_id");
+                if (mid && cJSON_IsNumber(mid)) {
+                    ev->messageId = std::to_string((uint64_t)mid->valuedouble);
+                } else if (mid && cJSON_IsString(mid)) {
+                    ev->messageId = jsonStr(mid);
+                }
+                cJSON_Delete(root);
+            }
         }
         ev->chatId = ctx->id;
         ev->message = ctx->str1;
@@ -1070,6 +1081,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
                 if (v) { hm.sender_number = (uint32_t)v->valuedouble; }
                 hm.direction = jsonStr(cJSON_GetObjectItem(msg, "direction"));
                 hm.created_at = jsonStr(cJSON_GetObjectItem(msg, "created_at"));
+                hm.eventId = jsonStr(cJSON_GetObjectItem(msg, "event_id"));
                 ev->messages.push_back(hm);
             }
         }

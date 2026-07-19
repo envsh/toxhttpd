@@ -107,6 +107,7 @@ struct HistoryMessage {
     std::string direction;
     std::string created_at;
     std::string roomId;
+    std::string eventId;
     // Media (e.g. Matrix image)
     std::string msgtype;       // "image"/"video"/"audio"/"file"/""(text)
     std::string mediaUrl;      // "mxc://..."
@@ -207,6 +208,7 @@ public:
     int chatId;
     std::string chatType;
     std::string errorMessage;
+    std::string messageId;
 };
 
 class MembersLoadedEvent : public ApiResultEvent {

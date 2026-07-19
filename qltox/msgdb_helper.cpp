@@ -24,6 +24,7 @@ ChatElement msgRowToElement(const MessageRow& row) {
     el.gifPath      = qFromUtf8(row.gif_path);
     el.durationSec  = row.duration_sec;
     el.sendState    = (ChatElement::SendState)row.send_state;
+    el.messageId    = qFromUtf8(row.event_id);
     return el;
 }
 
@@ -51,6 +52,7 @@ static MessageRow elementToRow(int id, const std::string& type,
     row.local_path  = std::string(qToUtf8(el.localPath).data());
     row.gif_path    = std::string(qToUtf8(el.gifPath).data());
     row.send_state  = (int)el.sendState;
+    row.event_id    = std::string(qToUtf8(el.messageId).data());
     if (row.event_id.empty()) {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);

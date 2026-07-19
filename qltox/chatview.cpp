@@ -2805,6 +2805,7 @@ void ChatView::showRawData(int msgIndex) {
     text += QString("durationSec:    %1\n").arg(el.durationSec);
     text += QString("sendState:      %1\n").arg(sendStr);
     text += QString("sendmsgseq:     %1\n").arg(el.sendmsgseq);
+    text += QString("messageId:      %1\n").arg(el.messageId);
     text += QString("sendErrorMsg:   %1\n").arg(el.sendErrorMsg);
     text += QString("translatedText: %1\n").arg(el.translatedText);
     text += QString("translateError: %1\n").arg(el.translateError);

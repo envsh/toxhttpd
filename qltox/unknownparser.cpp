@@ -173,6 +173,7 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
         hm.direction     = "received";
         hm.created_at    = std::to_string(jsonGetInt64(ev, "timestamp"));
         hm.roomId        = roomId;
+        hm.eventId       = jsonGetString(ev, "event_id");
         ret.messages.push_back(hm);
 
         bool found = false;
@@ -283,6 +284,7 @@ static bool tryParseToxMessage(const std::string& rawStr, ParseResult& ret) {
             hm.direction     = jsonGetString(inner, "direction");
             hm.created_at    = timestamp;
             hm.roomId        = cd.chatId;
+            hm.eventId       = std::to_string(jsonGetInt64(root, "event_id"));
 
             // 创建 peer 信息，供后续显示使用 nickname
             if (!hm.sender_pubkey.empty()) {
@@ -417,6 +419,7 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
     hm.direction     = "received";
     hm.created_at    = receivedAt;
     hm.roomId        = cd.chatId;
+    hm.eventId       = jsonGetString(root, "id");
     ret.messages.push_back(hm);
 
     // 加入 sender peer 供 ChatView 查找显示名称
@@ -547,6 +550,7 @@ static bool tryParseMisskeyNote(const std::string& rawStr, ParseResult& ret) {
     hm.direction     = "received";
     hm.created_at    = time;
     hm.roomId        = chatId;
+    hm.eventId       = jsonGetString(root, "id");
     if (!hm.message.empty())
         ret.messages.push_back(hm);
 
