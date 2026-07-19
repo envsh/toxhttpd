@@ -15,6 +15,7 @@ const char* const kBookmarkType       = "bookmark";
 const char* const kAichatType         = "aichat";
 const char* const kPastebinType       = "pastebin";
 const char* const kTranslateType      = "translate";
+const char* const kMisskeyType        = "misskey_note";
 #include <unistd.h>
 
 EventPoller* EventPoller::s_instance = nullptr;

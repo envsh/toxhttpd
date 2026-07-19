@@ -511,6 +511,59 @@ static bool tryParseClipboardEvent(const std::string& rawStr, ParseResult& ret) 
     return true;
 }
 
+// ── misskey_note 事件解析 ──
+
+static bool tryParseMisskeyNote(const std::string& rawStr, ParseResult& ret) {
+    cJSON* root = cJSON_Parse(rawStr.c_str());
+    if (!root) return false;
+
+    std::string type = jsonGetString(root, "type");
+    if (type != "misskey_note") {
+        cJSON_Delete(root);
+        return false;
+    }
+
+    std::string user   = jsonGetString(root, "user");
+    std::string userId = jsonGetString(root, "userId");
+    std::string text   = jsonGetString(root, "text");
+    std::string time   = jsonGetString(root, "time");
+    std::string name   = jsonGetString(root, "name");
+
+    std::string chatId = userId.empty() ? user : userId;
+
+    ContactData cd;
+    cd.id          = (int)(std::hash<std::string>{}(chatId + kMisskeyType) & 0x7fffffff);
+    cd.name        = name.empty() ? user : name;
+    cd.type        = kMisskeyType;
+    cd.chatId      = chatId;
+    cd.status      = "online";
+    cd.isConnected = true;
+    ret.contacts.push_back(cd);
+
+    HistoryMessage hm;
+    hm.message       = text;
+    hm.sender_pubkey = user;
+    hm.sender_number = 0;
+    hm.direction     = "received";
+    hm.created_at    = time;
+    hm.roomId        = chatId;
+    if (!hm.message.empty())
+        ret.messages.push_back(hm);
+
+    PeerInfo pi;
+    pi.publicKey  = user;
+    pi.name       = user;
+    pi.peerNumber = 0;
+    ret.peers.push_back(pi);
+
+    ret.senderName  = qFromUtf8(user);
+    ret.contactName = qFromUtf8(name.empty() ? user : name);
+    ret.handled = true;
+
+    cJSON_Delete(root);
+    return true;
+}
+
 // ── 旧逻辑：纯文本降级 ──
 
 static void extractSender(cJSON* valueItem, ParseResult& ret) {
@@ -614,6 +667,8 @@ ParseResult UnknownParser::parse(const std::string& eventType, const std::string
             if (tryParseFilesyncEvent(dataStr, ret))
                 goto done;
             if (tryParseClipboardEvent(dataStr, ret))
+                goto done;
+            if (tryParseMisskeyNote(dataStr, ret))
                 goto done;
         }
         fallbackAsPlainText(valueItem, ret);

@@ -51,11 +51,26 @@ private:
 #elif defined(__APPLE__)
     unsigned int displayAssertionID_;
     unsigned int systemAssertionID_;
+    void* helper_;
 #elif defined(__linux__)
     void* display_;
 #endif
     bool preventSystemSleep_;
     bool active_;
 };
+
+#ifdef __APPLE__
+class SleepBlockerTickHelper : public QObject {
+public:
+    explicit SleepBlockerTickHelper(QObject* parent = nullptr);
+    void activate();
+    void deactivate();
+protected:
+    void timerEvent(QTimerEvent* e);
+private:
+    int timerId_;
+    bool ticking_;
+};
+#endif
 
 #endif  // SLEEPBLOCKER_H

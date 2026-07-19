@@ -14,6 +14,7 @@
 #elif defined(__APPLE__)
 #include <IOKit/pwr_mgt/IOPMLib.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <ApplicationServices/ApplicationServices.h>
 // macOS: IOPMAssertionCreateWithName 是 IOKit 电源管理框架 API。
 // kIOPMAssertionTypePreventUserIdleDisplaySleep — 阻止屏保激活和显示器关闭（默认）
 // kIOPMAssertionTypePreventUserIdleSystemSleep  — 阻止系统空闲休眠（preventSystemSleep=true 时启用）
@@ -35,6 +36,56 @@
 // 参考: man XScreenSaver(3)
 #endif
 
+#ifdef __APPLE__
+// ── macOS: 屏保锁屏 tick 机制 ──
+// IOPMAssertion 只阻止显示器/系统休眠，不阻止屏保锁屏。
+// 屏保锁屏由 HIDIdleTime（距上次用户输入的时间）控制。
+// 通过定时发送 CGEvent 鼠标微移重置 HIDIdleTime。
+
+static bool s_sbActive = false;
+
+SleepBlockerTickHelper::SleepBlockerTickHelper(QObject* parent)
+    : QObject(parent), timerId_(0), ticking_(false)
+{
+}
+
+void SleepBlockerTickHelper::activate() {
+    s_sbActive = true;
+    ticking_ = false;
+    if (timerId_ == 0) {
+        timerId_ = startTimer(50000);
+    }
+}
+
+void SleepBlockerTickHelper::deactivate() {
+    s_sbActive = false;
+    if (timerId_ != 0) {
+        killTimer(timerId_);
+        timerId_ = 0;
+    }
+    ticking_ = false;
+}
+
+void SleepBlockerTickHelper::timerEvent(QTimerEvent* e) {
+    if (!s_sbActive || ticking_) return;
+    // 用户刚动过（空闲 < 45s），真实输入已重置 HIDIdleTime，跳过
+    CFTimeInterval idle = CGEventSourceSecondsSinceLastEventType(
+        kCGEventSourceStateHIDSystemState, kCGAnyInputEventType);
+    if (idle < 45.0) return;
+    ticking_ = true;
+    // 鼠标微移 0→1→0，重置 HIDIdleTime，视觉无感知
+    CGEventRef ev1 = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved,
+                                             CGPointMake(0, 0), kCGMouseButtonLeft);
+    CGEventPost(kCGHIDEventTap, ev1);
+    CFRelease(ev1);
+    CGEventRef ev2 = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved,
+                                             CGPointMake(1, 0), kCGMouseButtonLeft);
+    CGEventPost(kCGHIDEventTap, ev2);
+    CFRelease(ev2);
+    ticking_ = false;
+}
+#endif
+
 SleepBlocker::SleepBlocker(bool preventSystemSleep)
     : active_(false)
     , preventSystemSleep_(preventSystemSleep)
@@ -43,6 +94,7 @@ SleepBlocker::SleepBlocker(bool preventSystemSleep)
 #elif defined(__APPLE__)
     , displayAssertionID_(0)
     , systemAssertionID_(0)
+    , helper_(nullptr)
 #elif defined(__linux__)
     , display_(0)
 #endif
@@ -71,6 +123,10 @@ SleepBlocker::SleepBlocker(bool preventSystemSleep)
     active_ = (ret == kIOReturnSuccess);
     ALOG_INFO("SleepBlocker: activated (macOS), displayID=%u systemID=%u ret=%d",
               displayAssertionID_, systemAssertionID_, ret);
+    if (active_) {
+        helper_ = new SleepBlockerTickHelper();
+        static_cast<SleepBlockerTickHelper*>(helper_)->activate();
+    }
 
 #elif defined(__linux__)
     Display* dpy = XOpenDisplay(NULL);
@@ -102,6 +158,11 @@ void SleepBlocker::release() {
 #elif defined(__APPLE__)
     IOPMAssertionRelease(displayAssertionID_);
     displayAssertionID_ = 0;
+    if (helper_) {
+        static_cast<SleepBlockerTickHelper*>(helper_)->deactivate();
+        delete static_cast<SleepBlockerTickHelper*>(helper_);
+        helper_ = nullptr;
+    }
     if (systemAssertionID_) {
         IOPMAssertionRelease(systemAssertionID_);
         systemAssertionID_ = 0;
