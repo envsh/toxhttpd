@@ -60,6 +60,8 @@ private:
 };
 
 #ifdef __APPLE__
+#include <QObject>
+#include <QTimer>
 class SleepBlockerTickHelper : public QObject {
 public:
     explicit SleepBlockerTickHelper(QObject* parent = nullptr);
