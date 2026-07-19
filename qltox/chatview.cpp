@@ -65,6 +65,9 @@ QPixmap makeScaledThumb(const QPixmap& src, int mediaW, int mediaH, int maxConta
 #include <QClipboard>
 #include <QMenu>
 #include <QApplication>
+#include <QDialog>
+#include <QTextEdit>
+#include <QVBoxLayout>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QRegExp>
@@ -2764,6 +2767,74 @@ void ChatView::copyFullMessage(int msgIndex) {
     }
 }
 
+void ChatView::showRawData(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= (int)m_history->size()) return;
+    const ChatElement& el = (*m_history)[msgIndex];
+    QString etypeStr;
+    switch (el.etype) {
+        case ChatElement::Text:   etypeStr = "Text";   break;
+        case ChatElement::Image:  etypeStr = "Image";  break;
+        case ChatElement::File:   etypeStr = "File";   break;
+        case ChatElement::Video:  etypeStr = "Video";  break;
+        case ChatElement::Gif:    etypeStr = "Gif";    break;
+        case ChatElement::Audio:  etypeStr = "Audio";  break;
+        default:                  etypeStr = "Unknown"; break;
+    }
+    QString sendStr;
+    switch (el.sendState) {
+        case ChatElement::SendSending: sendStr = "SendSending"; break;
+        case ChatElement::SendSent:    sendStr = "SendSent";    break;
+        case ChatElement::SendFailed:  sendStr = "SendFailed";  break;
+        default:                       sendStr = "?";           break;
+    }
+    QString text;
+    text += QString("etype:          %1\n").arg(etypeStr);
+    text += QString("senderName:     %1\n").arg(el.senderName);
+    text += QString("senderNickname: %1\n").arg(el.senderNickname);
+    text += QString("peerNumber:     %1\n").arg(el.peerNumber);
+    text += QString("category:       %1\n").arg(el.category);
+    text += QString("time:           %1\n").arg(el.time);
+    text += QString("ipAddress:      %1\n").arg(el.ipAddress);
+    text += QString("messageText:    %1\n").arg(el.messageText);
+    text += QString("avatarUrl:      %1\n").arg(el.avatarUrl);
+    text += QString("mediaUrl:       %1\n").arg(el.mediaUrl);
+    text += QString("caption:        %1\n").arg(el.caption);
+    text += QString("fileName:       %1\n").arg(el.fileName);
+    text += QString("fileSize:       %1\n").arg(el.fileSize);
+    text += QString("localPath:      %1\n").arg(el.localPath);
+    text += QString("durationSec:    %1\n").arg(el.durationSec);
+    text += QString("sendState:      %1\n").arg(sendStr);
+    text += QString("sendmsgseq:     %1\n").arg(el.sendmsgseq);
+    text += QString("sendErrorMsg:   %1\n").arg(el.sendErrorMsg);
+    text += QString("translatedText: %1\n").arg(el.translatedText);
+    text += QString("translateError: %1\n").arg(el.translateError);
+    text += QString("showTranslation:%1\n").arg(el.showTranslation);
+    text += QString("firstInGroup:   %1\n").arg(el.firstInGroup);
+#ifdef QT3_BUILD
+    QDialog dlg(this, "rawdata", true);
+    dlg.setCaption(qFromUtf8("原始数据"));
+    QVBoxLayout* lay = new QVBoxLayout(&dlg);
+    lay->setMargin(0);
+    QTextEdit* te = new QTextEdit(&dlg);
+    te->setText(text);
+    te->setReadOnly(true);
+    lay->addWidget(te);
+    dlg.resize(600, 480);
+    dlg.exec();
+#else
+    QDialog dlg(this);
+    dlg.setWindowTitle(qFromUtf8("原始数据"));
+    QVBoxLayout* lay = new QVBoxLayout(&dlg);
+    lay->setMargin(0);
+    QTextEdit* te = new QTextEdit(&dlg);
+    te->setPlainText(text);
+    te->setReadOnly(true);
+    lay->addWidget(te);
+    dlg.resize(600, 480);
+    dlg.exec();
+#endif
+}
+
 void ChatView::wheelEvent(QWheelEvent* event) {
 #ifndef QT3_BUILD
     // Qt4 macOS sends separate events for horizontal/vertical; ignore horizontal
@@ -3187,21 +3258,31 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
                      && (*m_history)[msgIndex].category == "self");
     // Copy full message
 #ifdef QT3_BUILD
+    // Qt3 QMenuData::insertItem() 自动生成的 ID 是负数（-1, -2, ...），
+    // 不能用 >= 0 判断是否插入成功，所以用 bool 标志追踪，哨兵值用 0。
     int copyMsgId = menu.insertItem(_("context.copy_message"));
-    int retryMsgId = canRetry ? menu.insertItem(qFromUtf8("重发")) : -1;
+    bool hasShowRaw = (msgIndex >= 0);
+    int showRawId = hasShowRaw ? menu.insertItem(qFromUtf8("查看原始数据")) : 0;
+    bool hasRetry = canRetry;
+    int retryMsgId = hasRetry ? menu.insertItem(qFromUtf8("重发")) : 0;
     int selectAllId = menu.insertItem(_("context.select_all"));
-    int sourceMsgId = -1, translateMsgId = -1;
+    bool hasSource = false, hasTranslate = false;
+    int sourceMsgId = 0, translateMsgId = 0;
     if (msgIndex >= 0 && (*m_history)[msgIndex].etype != ChatElement::File) {
+        hasSource = true;
         sourceMsgId = menu.insertItem(qFromUtf8("查看原文"));
+        hasTranslate = true;
         translateMsgId = menu.insertItem(qFromUtf8("翻译"));
     }
-    int copyNickId = -1, mentionId = -1;
-    if (onName) {
+    bool hasNick = onName;
+    int copyNickId = 0, mentionId = 0;
+    if (hasNick) {
         copyNickId = menu.insertItem(qFromUtf8("复制昵称"));
         mentionId = menu.insertItem(qFromUtf8("@ TA"));
     }
 #else
     QAction* copyMsgAction = menu.addAction(_("context.copy_message"));
+    QAction* showRawAction = msgIndex >= 0 ? menu.addAction(qFromUtf8("查看原始数据")) : nullptr;
     QAction* retryMsgAction = canRetry ? menu.addAction("重发") : nullptr;
     QAction* selectAllAction = menu.addAction(_("context.select_all"));
     QAction* sourceMsgAction = nullptr;
@@ -3221,7 +3302,9 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     int choice = menu.exec(event->globalPos());
     if (choice == copyMsgId) {
         copyFullMessage(msgIndex);
-    } else if (canRetry && choice == retryMsgId) {
+    } else if (hasShowRaw && choice == showRawId) {
+        showRawData(msgIndex);
+    } else if (hasRetry && choice == retryMsgId) {
         (*m_history)[msgIndex].sendState = ChatElement::SendSending;
         updateRect((*m_history)[msgIndex].resendIconRect);
         emit resendMessage(msgIndex);
@@ -3231,19 +3314,21 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         m_selStart = 0;
         m_selEnd = m_history->empty() ? 0 : m_history->back().messageText.length();
         updateFull();
-    } else if (sourceMsgId >= 0 && choice == sourceMsgId) {
+    } else if (hasSource && choice == sourceMsgId) {
         emit sourceClicked(msgIndex);
-    } else if (translateMsgId >= 0 && choice == translateMsgId) {
+    } else if (hasTranslate && choice == translateMsgId) {
         emit translateClicked(msgIndex);
-    } else if (choice == copyNickId) {
+    } else if (hasNick && choice == copyNickId) {
         QApplication::clipboard()->setText(displayName);
-    } else if (choice == mentionId) {
+    } else if (hasNick && choice == mentionId) {
         emit mentionClicked((*m_history)[msgIndex].senderName);
     }
 #else
     QAction* chosen = menu.exec(event->globalPos());
     if (chosen == copyMsgAction) {
         copyFullMessage(msgIndex);
+    } else if (chosen == showRawAction) {
+        showRawData(msgIndex);
     } else if (canRetry && chosen == retryMsgAction) {
         (*m_history)[msgIndex].sendState = ChatElement::SendSending;
         updateRect((*m_history)[msgIndex].resendIconRect);

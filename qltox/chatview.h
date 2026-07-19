@@ -228,6 +228,7 @@ private:
     std::vector<LinkSpan> extractLinks(const QString& text);
     void copySelectedText();
     void copyFullMessage(int msgIndex);
+    void showRawData(int msgIndex);
 
     // Click tracking for double/triple click
     int m_clickCount;
