@@ -6,6 +6,13 @@ CONFIG += sdk_no_version_check
 
 VERSION = 0.1.0
 
+GIT_COMMIT = $$system(git -C $$PWD rev-parse --short=7 HEAD 2>/dev/null)
+isEmpty(GIT_COMMIT): GIT_COMMIT = unknown
+DEFINES += GIT_COMMIT=$$GIT_COMMIT
+
+GIT_DIRTY = $$system(git -C $$PWD status --porcelain 2>/dev/null)
+!isEmpty(GIT_DIRTY): DEFINES += GIT_DIRTY
+
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.7
 
 SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \

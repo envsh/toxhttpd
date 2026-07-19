@@ -3164,7 +3164,7 @@ void MainWindow::onAboutApp() {
         "<p>A lightweight Tox client based on toxhttpd.</p>"
         "<p>Qt: %2 | Build: %3</p>"
         "<p><a href='https://github.com/envsh/toxhttpd'>https://github.com/envsh/toxhttpd</a></p>"
-    ).arg(APP_VERSION).arg(qVersion()).arg(__DATE__);
+    ).arg(APP_VERSION_FULL).arg(qVersion()).arg(__DATE__);
     QMessageBox::about(this, "About qltox", text);
 }
 
