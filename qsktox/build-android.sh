@@ -40,6 +40,9 @@ cp "$QSK_ANDROID/lib/qskinny/plugins/platforminputcontexts/"*.so "$LIB_DIR/"
 cp "$BUILD_DIR/libgoso.so" "$LIB_DIR/"
 cp "$BUILD_DIR/libcso.so" "$LIB_DIR/"
 cp vendor/lib/${ANDROID_ABI:-arm64-v8a}/libsqlite3.so "$LIB_DIR/"
+cp vendor/lib/${ANDROID_ABI:-arm64-v8a}/libcurl.so "$LIB_DIR/"
+cp vendor/lib/${ANDROID_ABI:-arm64-v8a}/libssl.so "$LIB_DIR/"
+cp vendor/lib/${ANDROID_ABI:-arm64-v8a}/libcrypto.so "$LIB_DIR/"
 
 "$QT_HOST/bin/androiddeployqt" \
     --input "$BUILD_DIR/android-qsktox-deployment-settings.json" \
@@ -88,5 +91,6 @@ if [ -n "$APK" ]; then
 fi
 
 find build-android -name *qsktox*.so | xargs ls -lh
+objdump -x build-android/android-build/libs/arm64-v8a/libqsktox_arm64-v8a.so|grep NEEDED|grep -v libQt|grep -v libc|grep -v libm|grep -v libc 
 
 ### todo kill java of this process forked

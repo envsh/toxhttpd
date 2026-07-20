@@ -120,6 +120,26 @@ add_library(cso SHARED
 # ── 主程序链接 extras ──
 target_link_libraries(qsktox PRIVATE goso cso)
 
+# ── vendor: curl + openssl 动态库 (Android) ──
+if(ANDROID)
+    add_library(libcurl SHARED IMPORTED GLOBAL)
+    set_target_properties(libcurl PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/vendor/lib/${ANDROID_ABI}/libcurl.so
+        IMPORTED_NO_SONAME TRUE)
+
+    add_library(libssl SHARED IMPORTED GLOBAL)
+    set_target_properties(libssl PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/vendor/lib/${ANDROID_ABI}/libssl.so
+        IMPORTED_NO_SONAME TRUE)
+
+    add_library(libcrypto SHARED IMPORTED GLOBAL)
+    set_target_properties(libcrypto PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/vendor/lib/${ANDROID_ABI}/libcrypto.so
+        IMPORTED_NO_SONAME TRUE)
+
+    target_link_libraries(qsktox PRIVATE libcurl libssl libcrypto)
+endif()
+
 # ── vendor: SQLite 预编译库 ──
 if(ANDROID)
     add_library(sqlite3 SHARED IMPORTED GLOBAL)
