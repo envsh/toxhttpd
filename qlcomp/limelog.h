@@ -1,7 +1,7 @@
 #ifndef APILOG_H_
 #define APILOG_H_
 
-#include "compat34.h"
+#include "compatcore34.h"
 #include <qstring.h>
 #include <qobject.h>
 #include <vector>

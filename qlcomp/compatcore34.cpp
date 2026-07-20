@@ -323,3 +323,27 @@ bool qMkdir(const QString& path, bool recursive) {
     return QDir().mkdir(path);
 #endif
 }
+
+#if QT_VERSION >= 0x060000
+#include <qstringconverter.h>
+
+QString qToUnicode(const QByteArray& data, const char* codecName) {
+    QStringDecoder decoder(codecName);
+    if (decoder.isValid()) {
+        return decoder(data);
+    }
+    return QStringDecoder(QStringDecoder::Utf8)(data);
+}
+
+#else  // Qt3/Qt4/Qt5
+#include <qtextcodec.h>
+
+QString qToUnicode(const QByteArray& data, const char* codecName) {
+    QTextCodec* codec = QTextCodec::codecForName(codecName);
+    if (codec) {
+        return codec->toUnicode(data);
+    }
+    return QString::fromUtf8(data);
+}
+
+#endif

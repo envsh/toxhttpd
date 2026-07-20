@@ -1,7 +1,7 @@
 #ifndef EVENTPOLLER_H
 #define EVENTPOLLER_H
 
-#include "compat34.h"
+#include "compatcore34.h"
 #include <vector>
 #include <string>
 #include <map>

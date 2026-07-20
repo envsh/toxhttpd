@@ -59,14 +59,17 @@ qt_add_executable(qsktox
     ${qlapp_dir}/sticker_db.cpp
     ${qlapp_dir}/cache_db.cpp
     ${qlapp_dir}/cache_fs.cpp
-    # ${qlapp_dir}/eventpoller.cpp
-        ${qlcomp_dir}/compatcore34.cpp
+    ${qlapp_dir}/eventpoller.cpp
+    ${qlapp_dir}/unknownparser.cpp
+    ${qlcomp_dir}/compatcore34.cpp
+    ${qlcomp_dir}/limelog.cpp
     ${qlcomp_dir}/md5.c
 )
 
 # ── vendor: cJSON header ──
 target_include_directories(qsktox PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/include
     ${qlapp_dir}
     ${qlcomp_dir}
 )

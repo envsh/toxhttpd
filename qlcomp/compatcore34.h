@@ -76,6 +76,11 @@ void qSleepMs(unsigned long ms);
 
 QByteArray base64Decode(const std::string& b64);
 
+// Qt5/Qt6 编码转换兼容函数
+// Qt5: QTextCodec::codecForName + toUnicode
+// Qt6: QStringDecoder（需要 ICU 支持）
+QString qToUnicode(const QByteArray& data, const char* codecName);
+
 // ── 计时工具（类 Go time.Since）──
 using TimePoint = struct timespec;
 

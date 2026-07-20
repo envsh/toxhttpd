@@ -1,6 +1,6 @@
 #include "unknownparser.h"
 #include "cJSON.h"
-#include "compat34.h"
+#include "compatcore34.h"
 #include <dlfcn.h>
 
 // ── JSON 路径导航 ──
@@ -375,13 +375,10 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
         // uchardet 检测结果（如果有）
         std::string enc = detectEncoding(decoded);
         if (!enc.empty()) {
-            QTextCodec* codec = QTextCodec::codecForName(enc.c_str());
-            if (codec) {
-                QString t = codec->toUnicode(decoded);
-                if (!t.isEmpty()) {
-                    std::string s(qToUtf8(t).data());
-                    fullText += std::string("[uchardet] ") + enc + "(" + std::to_string(s.size()) + "): " + s + "\n";
-                }
+            QString t = qToUnicode(decoded, enc.c_str());
+            if (!t.isEmpty()) {
+                std::string s(qToUtf8(t).data());
+                fullText += std::string("[uchardet] ") + enc + "(" + std::to_string(s.size()) + "): " + s + "\n";
             }
         }
         // 所有候选编码依次解码
@@ -389,9 +386,7 @@ static bool tryParseImapMessage(const std::string& rawStr, ParseResult& ret) {
             "UTF-8", "GBK", "Shift-JIS", "Big5", "EUC-KR", "ISO-8859-1"
         };
         for (const char* name : kCodecs) {
-            QTextCodec* codec = QTextCodec::codecForName(name);
-            if (!codec) continue;
-            QString t = codec->toUnicode(decoded);
+            QString t = qToUnicode(decoded, name);
             if (t.isEmpty()) continue;
             std::string s(qToUtf8(t).data());
             fullText += std::string(name) + "(" + std::to_string(s.size()) + "): " + s + "\n";
@@ -606,11 +601,11 @@ static void fallbackAsPlainText(cJSON* valueItem, ParseResult& ret) {
     cJSON* dataItem = cJSON_GetObjectItem(valueItem, "data");
     if (dataItem && cJSON_IsString(dataItem)) {
         ret.messageText = qFromUtf8(cJSON_GetStringValue(dataItem));
-        qWarning("UnknownParser: extracted Value.data, len=%d", ret.messageText.length());
+        qWarning("UnknownParser: extracted Value.data, len=%ld", (int64_t)ret.messageText.length());
     } else {
         char* raw = cJSON_PrintUnformatted(valueItem);
         ret.messageText = qFromUtf8(raw);
-        qWarning("UnknownParser: no Value.data, fell back to Value JSON, len=%d", ret.messageText.length());
+        qWarning("UnknownParser: no Value.data, fell back to Value JSON, len=%ld", (int64_t)ret.messageText.length());
         free(raw);
     }
     extractSender(valueItem, ret);

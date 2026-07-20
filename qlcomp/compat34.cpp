@@ -447,4 +447,3 @@ void qActivateWindow(QWidget* w) {
 #endif
 }
 
-

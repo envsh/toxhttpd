@@ -10,6 +10,7 @@ if [ x"$1" == x"c" ]; then
 	make clean
 fi
 make
-if [ -f "qltox" ]; then
+ret=$?
+if [ x"$ret" == x"0" ] && [ -f "qltox" ]; then
 	cp -v qltox q4tox
 fi
