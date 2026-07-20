@@ -1,12 +1,7 @@
 #ifndef COMPAT34_H
 #define COMPAT34_H
 
-// ========== 跨 Qt3/Qt4 通用头文件 ==========
-#include <qstring.h>         // QString, QByteArray, QStringList
-#include <ctime>             // timespec, clock_gettime
-#include <qevent.h>          // QEvent (Qt4), QCustomEvent (Qt3)
-#include <qlayout.h>         // QBoxLayout, QBoxLayout::Direction
-#include <qlist.h>           // QList — for QPtrList
+#include "compatcore34.h"
 
 // ========== 平台特有头文件 ==========
 #ifdef QT3_BUILD
@@ -24,46 +19,21 @@
 #include <qstackedwidget.h>  // QStackedWidget
 #include <qstyleoption.h>    // QStyleOption* (Qt4 only)
 #include <QTextCodec>        // QTextCodec
+#include <qevent.h>          // QMouseEvent 等完整定义
 #endif
 
 // ========== 核心 Qt 头文件（被 qlite.pri 继承，无法前向声明） ==========
+#include <qlayout.h>         // QBoxLayout, QBoxLayout::Direction
 #include <qwidget.h>
 #include <qlabel.h>
 #include <qlineedit.h>
 #include <qtextedit.h>
 #include <qcheckbox.h>
-#include <qfile.h>
 
 // ========== 前向声明（仅用于指针/引用参数） ==========
 class QAbstractButton;
 
-// ========== 事件类型兼容 ==========
-#ifdef QT3_BUILD
-typedef int EventType34;
-#else
-typedef QEvent::Type EventType34;
-#endif
-
-EventType34 toEventType34(int raw);
-
-// ========== 事件基类 ==========
-#ifdef QT3_BUILD
-typedef QCustomEvent CustomEventBase;
-#else
-typedef QEvent CustomEventBase;
-#endif
-
-// ========== 兼容函数声明 ==========
-
-QString qTrim(const QString& s);
-QByteArray qToUtf8(const QString& s);
-QString qFromUtf8(const std::string& s);
-QString qFromUtf8(const char* s);
-QString qFromUtf8(const char* data, int size);
-QByteArray qToLocal8Bit(const QString& s);
-int qLastIndexOf(const QString& s, const QString& str);
-QString qToUpper(const QString& s);
-QStringList qSplit(const QString& str, const QString& sep);
+// ========== Widgets 兼容函数声明 ==========
 
 void qSetWindowTitle(QWidget* w, const QString& title);
 void qSetAppIcon(const char** xpm);
@@ -82,39 +52,9 @@ void qSetChecked(QAbstractButton* btn, bool checked);
 
 void qSetCheckable(QPushButton* btn, bool checkable);
 void qSetToolTip(QWidget* w, const QString& tip);
-bool qOpenReadOnly(QFile& file);
-bool qOpenWriteOnly(QFile& file);
-QString qGetHomePath();
-QString qAppDir();
-QString qCurrDir();
 void qInsertHtml(QTextEdit* edit, const QString& html);
 void qClearTextEdit(QTextEdit* edit);
 QBoxLayout* qNewBoxLayout(QWidget* parent, QBoxLayout::Direction dir, int border = 0, int autoresize = -1);
-
-enum ElidePos {
-    ElideRight,
-    ElideLeft,
-    ElideMiddle
-};
-QString qElideChars(const QString& text, int maxLen,
-                    ElidePos pos = ElideMiddle,
-                    const QString& ellipsis = "...");
-
-QString qFormatTime(const QString& createdAt);
-QString qFormatISO8601(const QString& iso8601Str);
-QString qFmtTime(uint timestamp);
-QString getCurrentTime();
-
-// ========== QPtrList 兼容（Qt4 模拟） ==========
-#ifndef QT3_BUILD
-template<typename T>
-class QPtrList : public QList<T*> {
-public:
-    void append(T* item) { QList<T*>::append(item); }
-    bool isEmpty() const { return QList<T*>::isEmpty(); }
-    int count() const { return QList<T*>::count(); }
-};
-#endif
 
 // ========== StackedWidget 兼容 ==========
 #ifdef QT3_BUILD
@@ -140,44 +80,8 @@ bool qIsAppActive(const QWidget* widget = 0);
 
 void qOpenUrl(const QString& url);
 
-void qSleepMs(unsigned long ms);
-
 void showTempTooltip(QWidget* parent, const QRect& btnRect, const QString& text, int timeoutMs = 3000);
 
-QByteArray base64Decode(const std::string& b64);
-
-// ── 计时工具（类 Go time.Since）──
-using TimePoint = struct timespec;
-
-inline TimePoint timeNow() {
-    TimePoint tp;
-    clock_gettime(CLOCK_MONOTONIC, &tp);
-    return tp;
-}
-
-inline long long elapsedMs(const TimePoint& start) {
-    TimePoint now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (now.tv_sec - start.tv_sec) * 1000LL
-         + (now.tv_nsec - start.tv_nsec) / 1000000LL;
-}
-
-inline std::string timeSince(const TimePoint& start) {
-    TimePoint now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    long long ns = (now.tv_sec - start.tv_sec) * 1000000000LL
-                 + (now.tv_nsec - start.tv_nsec);
-    if (ns < 1000)       return std::to_string(ns) + "ns";
-    if (ns < 1000000)    return std::to_string(ns / 1000) + "us";
-    auto ms = ns / 1000000;
-    if (ms < 1000)       return std::to_string(ms) + "ms";
-    auto sec = ms / 1000;
-    if (sec < 60)        return std::to_string(sec) + "." + std::to_string((ms % 1000) / 100) + "s";
-    return std::to_string(sec / 60) + "m" + std::to_string(sec % 60) + "s";
-}
-
 void qActivateWindow(QWidget* w);
-
-bool qMkdir(const QString& path, bool recursive = true);
 
 #endif  // COMPAT34_H

@@ -1,0 +1,109 @@
+#ifndef COMPATCORE34_H
+#define COMPATCORE34_H
+
+// ========== 跨 Qt3/Qt4 通用头文件 ==========
+#include <qstring.h>         // QString, QByteArray, QStringList
+#include <ctime>             // timespec, clock_gettime
+#ifdef QT3_BUILD
+#include <qevent.h>          // QCustomEvent (Qt3)
+#else
+#include <qcoreevent.h>      // QEvent::Type + QEvent (Qt4+, 纯 QtCore)
+#endif
+#include <qlist.h>           // QList — for QPtrList
+#include <qfile.h>           // QFile
+
+// ========== 事件类型兼容 ==========
+#ifdef QT3_BUILD
+typedef int EventType34;
+#else
+typedef QEvent::Type EventType34;
+#endif
+
+EventType34 toEventType34(int raw);
+
+// ========== 事件基类 ==========
+#ifdef QT3_BUILD
+typedef QCustomEvent CustomEventBase;
+#else
+typedef QEvent CustomEventBase;
+#endif
+
+// ========== 兼容函数声明 ==========
+
+QString qTrim(const QString& s);
+QByteArray qToUtf8(const QString& s);
+QString qFromUtf8(const std::string& s);
+QString qFromUtf8(const char* s);
+QString qFromUtf8(const char* data, int size);
+QByteArray qToLocal8Bit(const QString& s);
+int qLastIndexOf(const QString& s, const QString& str);
+QString qToUpper(const QString& s);
+QStringList qSplit(const QString& str, const QString& sep);
+
+bool qOpenReadOnly(QFile& file);
+bool qOpenWriteOnly(QFile& file);
+QString qGetHomePath();
+QString qAppDir();
+QString qCurrDir();
+bool qMkdir(const QString& path, bool recursive = true);
+
+enum ElidePos {
+    ElideRight,
+    ElideLeft,
+    ElideMiddle
+};
+QString qElideChars(const QString& text, int maxLen,
+                    ElidePos pos = ElideMiddle,
+                    const QString& ellipsis = "...");
+
+QString qFormatTime(const QString& createdAt);
+QString qFormatISO8601(const QString& iso8601Str);
+QString qFmtTime(uint timestamp);
+QString getCurrentTime();
+
+// ========== QPtrList 兼容（Qt4 模拟） ==========
+#ifndef QT3_BUILD
+template<typename T>
+class QPtrList : public QList<T*> {
+public:
+    void append(T* item) { QList<T*>::append(item); }
+    bool isEmpty() const { return QList<T*>::isEmpty(); }
+    int count() const { return QList<T*>::count(); }
+};
+#endif
+
+void qSleepMs(unsigned long ms);
+
+QByteArray base64Decode(const std::string& b64);
+
+// ── 计时工具（类 Go time.Since）──
+using TimePoint = struct timespec;
+
+inline TimePoint timeNow() {
+    TimePoint tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return tp;
+}
+
+inline long long elapsedMs(const TimePoint& start) {
+    TimePoint now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (now.tv_sec - start.tv_sec) * 1000LL
+         + (now.tv_nsec - start.tv_nsec) / 1000000LL;
+}
+
+inline std::string timeSince(const TimePoint& start) {
+    TimePoint now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long long ns = (now.tv_sec - start.tv_sec) * 1000000000LL
+                 + (now.tv_nsec - start.tv_nsec);
+    if (ns < 1000)       return std::to_string(ns) + "ns";
+    if (ns < 1000000)    return std::to_string(ns / 1000) + "us";
+    auto ms = ns / 1000000;
+    if (ms < 1000)       return std::to_string(ms) + "ms";
+    auto sec = ms / 1000;
+    if (sec < 60)        return std::to_string(sec) + "." + std::to_string((ms % 1000) / 100) + "s";
+    return std::to_string(sec / 60) + "m" + std::to_string(sec % 60) + "s";
+}
+
+#endif  // COMPATCORE34_H

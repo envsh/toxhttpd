@@ -59,6 +59,8 @@ qt_add_executable(qsktox
     ${qlapp_dir}/sticker_db.cpp
     ${qlapp_dir}/cache_db.cpp
     ${qlapp_dir}/cache_fs.cpp
+    # ${qlapp_dir}/eventpoller.cpp
+        ${qlcomp_dir}/compatcore34.cpp
     ${qlcomp_dir}/md5.c
 )
 
