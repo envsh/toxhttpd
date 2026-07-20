@@ -51,6 +51,8 @@ qt_add_executable(qsktox
     src/aboutpage.h
     src/aboutpage.cpp
     src/shareintentreceiver.cpp
+    src/pushhandler.h
+    src/pushhandler.cpp
     ${qlapp_dir}/cJSON.c
     ${qlapp_dir}/message_db.cpp
     ${qlapp_dir}/storage.cpp

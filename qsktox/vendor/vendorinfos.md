@@ -32,3 +32,101 @@
 - Headers:
   - `include/curl/` (curl 头文件)
   - `include/openssl/` (OpenSSL 头文件)
+
+## UnifiedPush android-connector
+
+- Version: 3.3.3
+- Source: Maven Central (`org.unifiedpush.android:connector:3.3.3`)
+- Upstream: https://github.com/UnifiedPush/android-connector
+- License: Apache 2.0
+- Min Android: 4.1 (API 16)，qsktox minSdkVersion 23 完全兼容
+- 依赖：`com.google.crypto.tink:tink-android:1.20.0`（需 resolutionStrategy 解决冲突）
+- 集成方式：Gradle 依赖（非预编译 .so）
+- Java 层：`PushServiceImpl extends PushService`（`android/src/java/io/fedlet/mobutil/PushServiceImpl.java`）
+- C++ 层：`pushhandler.h/cpp`，JNI 桥接
+- AndroidManifest.xml：声明 `PushServiceImpl`（action: `org.unifiedpush.android.connector.PUSH_EVENT`）
+- 注册流程：`UnifiedPush.tryUseCurrentOrDefaultDistributor()` → callback → `UnifiedPush.register(context, INSTANCE_DEFAULT, ...)`
+- Go 服务端需实现 Web Push 发送（`webpush-go` 库），但当前不在 qsktox 范围内
+- 推送测试（ntfy.sh）：
+  - 简单推送：
+    ```bash
+    curl -d "Hello from qsktox" https://ntfy.sh/mytopic
+    ```
+  - 带标题和优先级：
+    ```bash
+    curl -H "Title: qsktox Push" -H "Priority: high" -d "New message" https://ntfy.sh/mytopic
+    ```
+  - 带 action broadcast（触发 BroadcastReceiver）：
+    ```bash
+    curl -H "Title: New Message" \
+         -H "Actions: broadcast, Open qsktox, intent=io.fedlet.qsktox.PUSH_RECEIVED, extras.cmd=open" \
+         -d "You have a new message" \
+         https://ntfy.sh/mytopic
+    ```
+   - JSON 格式：
+    ```bash
+    curl -H "Content-Type: application/json" \
+         -d '{"topic":"mytopic","message":"New message","title":"qsktox","priority":4}' \
+         https://ntfy.sh
+    ```
+
+## UnifiedPush 字符串说明
+
+### 三个关键字符串
+
+| 字符串 | 代码位置 | 含义 | 示例 |
+|--------|----------|------|------|
+| **connection token** | `UnifiedPush.register(context, token)` 第二参数 | App 标识符，distributor 用它匹配回调到对应 app | `"qsktox"` 或 UUIDv4 |
+| **instance** | `PushServiceImpl.onNewEndpoint(endpoint, instance)` 的 instance 参数 | 同 connection token，回调中原样返回 | 同上 |
+| **topic** | ntfy 服务端生成，包含在 endpoint URL 路径中 | ntfy 上的频道名，推送方 POST 到此 topic | `upAbCdEfGh1234` |
+
+### 双注册模式
+
+qsktox 注册两次，每次传不同 instance：
+
+| instance | topic | 用途 | 谁推送 |
+|----------|-------|------|--------|
+| `"qsktox"` | `upAbCdEfGh1234`（随机） | 共享广播，所有设备收到 | Go 服务端或任何人 |
+| UUIDv4 | `upXyZaBcDeF5678`（随机） | per-device 定向推送 | Go 服务端知道此 endpoint |
+
+### 调用链路
+
+```
+启动 → 读取/生成 UUID → 保存到 QSettings("pushDeviceToken")
+      ↓
+register(context, "qsktox")           → 分配 topic A → 回调 onNewEndpoint(endpointA, "qsktox")
+register(context, UUID)               → 分配 topic B → 回调 onNewEndpoint(endpointB, UUID)
+      ↓
+onNewEndpoint: 保存 pushDeviceEndpoint = endpointB（只保存 per-device）
+      ↓
+推送方 POST 到 endpoint URL:
+  curl -d "broadcast" https://ntfy.sh/upAbCdEfGh1234?up=1
+  curl -d "targeted"  https://ntfy.sh/upXyZaBcDeF5678?up=1
+```
+
+### QSettings 存储
+
+| key | 值 | 说明 |
+|-----|-----|------|
+| `pushDeviceToken` | UUID 如 `a1b2c3d4-e5f6-...` | per-device 注册 token，重启复用 |
+| `pushDeviceEndpoint` | `https://ntfy.sh/upXyZaBcDeF5678?up=1` | per-device 的 endpoint URL |
+
+### ntfy 服务端对 UnifiedPush topic 的硬编码约束
+
+```go
+// ntfy/server/server.go
+unifiedPushTopicPrefix = "up"   // 必须以 "up" 开头
+unifiedPushTopicLength = 14     // 总长度必须 14 字符（含 "up"）
+```
+
+- topic 格式：`up` + 12字符随机串（如 `upAbCdEfGh1234`）
+- **不可自定义** topic 名称（如 `io.fedlet.pushto.user9` 不满足约束）
+- 此限制来自 ntfy 公共服务器，自建 ntfy 也可能继承
+
+### 总结
+
+| 概念 | 谁控制 | 可自定义？ |
+|------|--------|-----------|
+| connection token / instance | App 端 | **是**，共享 `"qsktox"` + per-device UUID |
+| topic | ntfy 服务端 | **否**，随机生成 |
+| endpoint URL | ntfy 服务端 | **否**，格式为 `{server}/{topic}?up=1` |
