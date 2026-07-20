@@ -52,12 +52,12 @@ qt_add_executable(qsktox
     src/aboutpage.cpp
     src/shareintentreceiver.cpp
     ${qlapp_dir}/cJSON.c
-    #${qlapp_dir}/message_db.cpp
-    #${qlapp_dir}/storage.cpp
-    #${qlapp_dir}/channel_db.cpp
-    #${qlapp_dir}/pending_db.cpp
-    #${qlapp_dir}/sticker_db.cpp
-    #${qlapp_dir}/cache_db.cpp
+    ${qlapp_dir}/message_db.cpp
+    ${qlapp_dir}/storage.cpp
+    ${qlapp_dir}/channel_db.cpp
+    ${qlapp_dir}/pending_db.cpp
+    ${qlapp_dir}/sticker_db.cpp
+    ${qlapp_dir}/cache_db.cpp
     ${qlapp_dir}/cache_fs.cpp
     ${qlcomp_dir}/md5.c
 )

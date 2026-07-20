@@ -506,9 +506,11 @@ TimedReadGuard::TimedReadGuard(sqlite3* db, int timeoutMs)
     : m_db(db), m_start(std::chrono::steady_clock::now())
     , m_timeoutMs(timeoutMs)
 {
-    sqlite3_progress_handler(m_db, 10, onProgress, this);
+	// TODO 版本相关
+    // sqlite3_progress_handler(m_db, 10, onProgress, this);
 }
 
 TimedReadGuard::~TimedReadGuard() {
-    sqlite3_progress_handler(m_db, 0, nullptr, nullptr);
+	// TODO 版本相关
+    // sqlite3_progress_handler(m_db, 0, nullptr, nullptr);
 }
