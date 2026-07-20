@@ -143,6 +143,10 @@ if(ANDROID)
         IMPORTED_NO_SONAME TRUE)
 
     target_link_libraries(qsktox PRIVATE libcurl libssl libcrypto)
+else()
+    find_package(CURL REQUIRED)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(qsktox PRIVATE curl ssl crypto)
 endif()
 
 # ── vendor: SQLite 预编译库 ──
