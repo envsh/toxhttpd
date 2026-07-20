@@ -27,15 +27,6 @@ void PushHandler::start()
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([deviceToken]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
 
-        // 共享 topic（所有设备）
-        QJniObject::callStaticMethod<void>(
-            "org/unifiedpush/android/connector/UnifiedPush",
-            "register",
-            "(Landroid/content/Context;Ljava/lang/String;)V",
-            ctx.object(),
-            QJniObject::fromString("qsktox").object());
-
-        // per-device topic
         QJniObject::callStaticMethod<void>(
             "org/unifiedpush/android/connector/UnifiedPush",
             "register",
@@ -43,7 +34,7 @@ void PushHandler::start()
             ctx.object(),
             QJniObject::fromString(deviceToken).object());
 
-        qDebug() << "[PushHandler] registered: shared=qsktox device=" << deviceToken;
+        qDebug() << "[PushHandler] registered, device=" << deviceToken;
     });
 }
 
@@ -57,15 +48,6 @@ void PushHandler::stop()
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([deviceToken]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
 
-        // unregister 共享
-        QJniObject::callStaticMethod<void>(
-            "org/unifiedpush/android/connector/UnifiedPush",
-            "unregister",
-            "(Landroid/content/Context;Ljava/lang/String;)V",
-            ctx.object(),
-            QJniObject::fromString("qsktox").object());
-
-        // unregister per-device
         if (!deviceToken.isEmpty()) {
             QJniObject::callStaticMethod<void>(
                 "org/unifiedpush/android/connector/UnifiedPush",
@@ -75,7 +57,7 @@ void PushHandler::stop()
                 QJniObject::fromString(deviceToken).object());
         }
 
-        qDebug() << "[PushHandler] unregistered both";
+        qDebug() << "[PushHandler] unregistered";
     });
 
     delete s_instance;
@@ -99,12 +81,9 @@ Java_io_fedlet_mobutil_PushServiceImpl_onNewEndpointNative(
     QString instance = jstringToQString(env, jInstance);
     qDebug() << "[PushHandler] new endpoint:" << endpoint << "instance:" << instance;
 
-    // 只保存 per-device endpoint（共享 "qsktox" 的不保存）
-    if (instance != "qsktox") {
-        QSettings s;
-        s.setValue("pushDeviceEndpoint", endpoint);
-        s.sync();
-    }
+    QSettings s;
+    s.setValue("pushDeviceEndpoint", endpoint);
+    s.sync();
 
     if (s_instance) {
         QMetaObject::invokeMethod(s_instance, [endpoint, instance]() {

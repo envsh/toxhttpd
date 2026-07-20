@@ -76,32 +76,34 @@
 
 | 字符串 | 代码位置 | 含义 | 示例 |
 |--------|----------|------|------|
-| **connection token** | `UnifiedPush.register(context, token)` 第二参数 | App 标识符，distributor 用它匹配回调到对应 app | `"qsktox"` 或 UUIDv4 |
+| **connection token** | `UnifiedPush.register(context, token)` 第二参数 | App 标识符，distributor 用它匹配回调到对应 app | UUIDv4（如 `a1b2c3d4-e5f6-...`） |
 | **instance** | `PushServiceImpl.onNewEndpoint(endpoint, instance)` 的 instance 参数 | 同 connection token，回调中原样返回 | 同上 |
 | **topic** | ntfy 服务端生成，包含在 endpoint URL 路径中 | ntfy 上的频道名，推送方 POST 到此 topic | `upAbCdEfGh1234` |
 
-### 双注册模式
+### 单注册模式（per-device UUID）
 
-qsktox 注册两次，每次传不同 instance：
+每个设备注册一次，使用随机生成的 UUIDv4 作为 token：
 
 | instance | topic | 用途 | 谁推送 |
 |----------|-------|------|--------|
-| `"qsktox"` | `upAbCdEfGh1234`（随机） | 共享广播，所有设备收到 | Go 服务端或任何人 |
 | UUIDv4 | `upXyZaBcDeF5678`（随机） | per-device 定向推送 | Go 服务端知道此 endpoint |
+
+**安全设计**：
+- Token 由 `QUuid::createUuid()` 生成，符合 UnifiedPush spec 推荐的 UUIDv4 格式
+- 每设备独立 topic，endpoint URL 不可猜测（capability URL 模型）
+- 开源代码中不暴露任何硬编码 token，避免 DDoS/消息伪造风险
 
 ### 调用链路
 
 ```
 启动 → 读取/生成 UUID → 保存到 QSettings("pushDeviceToken")
       ↓
-register(context, "qsktox")           → 分配 topic A → 回调 onNewEndpoint(endpointA, "qsktox")
-register(context, UUID)               → 分配 topic B → 回调 onNewEndpoint(endpointB, UUID)
+register(context, UUID)               → 分配 topic → 回调 onNewEndpoint(endpoint, UUID)
       ↓
-onNewEndpoint: 保存 pushDeviceEndpoint = endpointB（只保存 per-device）
+onNewEndpoint: 保存 pushDeviceEndpoint = endpoint
       ↓
 推送方 POST 到 endpoint URL:
-  curl -d "broadcast" https://ntfy.sh/upAbCdEfGh1234?up=1
-  curl -d "targeted"  https://ntfy.sh/upXyZaBcDeF5678?up=1
+  curl -d "targeted" https://ntfy.sh/upXyZaBcDeF5678?up=1
 ```
 
 ### QSettings 存储
@@ -127,6 +129,6 @@ unifiedPushTopicLength = 14     // 总长度必须 14 字符（含 "up"）
 
 | 概念 | 谁控制 | 可自定义？ |
 |------|--------|-----------|
-| connection token / instance | App 端 | **是**，共享 `"qsktox"` + per-device UUID |
+| connection token / instance | App 端 | **是**，per-device UUIDv4（随机生成） |
 | topic | ntfy 服务端 | **否**，随机生成 |
 | endpoint URL | ntfy 服务端 | **否**，格式为 `{server}/{topic}?up=1` |
