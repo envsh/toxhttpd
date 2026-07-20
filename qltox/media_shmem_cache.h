@@ -10,6 +10,8 @@
 #include <QCache>
 #endif
 
+#define QLAPP_MAX_MEMDIA_SHMEM_CACHE_SIZE (16 * 1024 * 1024) // default 64m
+
 class MediaShmemCache {
 public:
     static MediaShmemCache& inst();
@@ -17,7 +19,7 @@ public:
     void putThumb(const QString& mxcUrl, const char* data, int len);
     void clear();
 private:
-    MediaShmemCache() : m_rawCache(64 * 1024 * 1024) {}
+    MediaShmemCache() : m_rawCache(QLAPP_MAX_MEMDIA_SHMEM_CACHE_SIZE) {}
 #ifdef QT3_BUILD
     QCache<QByteArray> m_rawCache;
 #else

@@ -338,7 +338,7 @@ bool Storage::openDb(const char *path) {
     execPragma("PRAGMA temp_store=MEMORY");
     execPragma("PRAGMA mmap_size=0");
     execPragma("PRAGMA wal_autocheckpoint=200");
-    execPragma("PRAGMA journal_size_limit=16777216");
+    execPragma("PRAGMA journal_size_limit=4194304"); // default 4194304*4
     execPragma("PRAGMA busy_timeout=5000");
     execPragma("PRAGMA foreign_keys=ON");
 
