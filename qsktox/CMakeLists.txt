@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(qsktox LANGUAGES CXX)
+project(qsktox LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +20,9 @@ if(ANDROID)
     _fix_qskinny_abi_target(Qt6Quick_arm64-v8a Qt6::Quick)
     _fix_qskinny_abi_target(Qt6OpenGL_arm64-v8a Qt6::OpenGL)
 endif()
+
+set(qlapp_dir ${CMAKE_CURRENT_SOURCE_DIR}/../qltox)
+set(qlcomp_dir ${CMAKE_CURRENT_SOURCE_DIR}/../qlcomp)
 
 qt_add_executable(qsktox
     src/main.cpp
@@ -48,13 +51,25 @@ qt_add_executable(qsktox
     src/aboutpage.h
     src/aboutpage.cpp
     src/shareintentreceiver.cpp
-    vendor/cJSON.c
+    ${qlapp_dir}/cJSON.c
+    #${qlapp_dir}/message_db.cpp
+    #${qlapp_dir}/storage.cpp
+    #${qlapp_dir}/channel_db.cpp
+    #${qlapp_dir}/pending_db.cpp
+    #${qlapp_dir}/sticker_db.cpp
+    #${qlapp_dir}/cache_db.cpp
+    ${qlapp_dir}/cache_fs.cpp
+    ${qlcomp_dir}/md5.c
 )
 
 # ── vendor: cJSON header ──
-target_include_directories(qsktox PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
+target_include_directories(qsktox PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor
+    ${qlapp_dir}
+    ${qlcomp_dir}
+)
 
-target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick Qt6::Network)
+target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick Qt6::Network Qt6::Core)
 
 # ── extras/go 共享库 (c-shared) ──
 set(GO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extras/go)
@@ -117,5 +132,5 @@ if(ANDROID)
     target_link_libraries(qsktox PRIVATE log android)
 elseif(UNIX AND NOT APPLE)
     find_package(SQLite3 REQUIRED)
-    target_link_libraries(qsktox PRIVATE SQLite::SQLite3)
+    target_link_libraries(qsktox PRIVATE SQLite3::SQLite3)
 endif()
