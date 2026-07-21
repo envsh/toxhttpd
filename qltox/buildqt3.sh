@@ -6,7 +6,11 @@ if [ x"$QTDIR" == x"" ]; then
     export QTDIR
 fi
 mkdir -p build-qt3 && cd build-qt3
-/opt/qt338sh/bin/qmake -makefile ../qltox.pro
+QMAKE_EXTRA=""
+if [ x"$1" == x"asan" ]; then
+    QMAKE_EXTRA="CONFIG+=asan"
+fi
+/opt/qt338sh/bin/qmake -makefile $QMAKE_EXTRA ../qltox.pro
 if [ x"$1" == x"c" ]; then
 	make clean
 fi

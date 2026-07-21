@@ -72,8 +72,17 @@ MOC_DIR = .
 OBJECTS_DIR = .
 
 # C++11 标准
-QMAKE_CXXFLAGS += -std=c++11 -O0 -fstack-protector-strong
+QMAKE_CXXFLAGS += -O0 -std=c++11
+QMAKE_CFLAGS += -O0 -std=c11
+QMAKE_CXXFLAGS += -fstack-protector-strong
 QMAKE_CFLAGS += -fstack-protector-strong
+
+# asan double memory usage!!!
+contains(CONFIG, asan) {
+    QMAKE_CXXFLAGS += -fsanitize=address
+    QMAKE_CFLAGS += -fsanitize=address
+    QMAKE_LFLAGS += -fsanitize=address
+}
 
 !win32: QMAKE_LFLAGS += -rdynamic
 
