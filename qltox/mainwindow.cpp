@@ -1099,7 +1099,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 std::string type = std::string(qToUtf8(currentChatType).data());
                 std::string idOverride;
                 if (type == kGomuksRoomType || type == kUnktoxConferenceType
-                    || type == kUnktoxFriendType || type == kUnktoxGroupType) {
+                    || type == kUnktoxFriendType || type == kUnktoxGroupType
+                    || type == kMisskeyType || type == kImapMailType) {
                     for (const auto& cd : m_accumulatedContactData) {
                         if (cd.id == currentChatId && cd.type == type) {
                             idOverride = cd.chatId;
@@ -1337,7 +1338,8 @@ void MainWindow::onMessageSending(const QString& message) {
     // 虚拟类型使用 chatId 字符串（如 gomuks room ID）而非 numeric contactId
     std::string idOverride;
     if (type == kGomuksRoomType || type == kUnktoxConferenceType
-        || type == kUnktoxFriendType || type == kUnktoxGroupType) {
+        || type == kUnktoxFriendType || type == kUnktoxGroupType
+        || type == kMisskeyType || type == kImapMailType) {
         for (const auto& cd : m_accumulatedContactData) {
             if (cd.id == currentChatId && cd.type == type) {
                 idOverride = cd.chatId;
@@ -2803,7 +2805,8 @@ void MainWindow::onResendMessage(int msgIndex) {
     std::string type = std::string(qToUtf8(currentChatType).data());
     std::string idOverride;
     if (type == kGomuksRoomType || type == kUnktoxConferenceType
-        || type == kUnktoxFriendType || type == kUnktoxGroupType) {
+        || type == kUnktoxFriendType || type == kUnktoxGroupType
+        || type == kMisskeyType || type == kImapMailType) {
         for (const auto& cd : m_accumulatedContactData) {
             if (cd.id == currentChatId && cd.type == type) {
                 idOverride = cd.chatId; break;
@@ -2853,7 +2856,8 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
     std::string fileType = std::string(qToUtf8(currentChatType).data());
     std::string fileIdOverride;
     if (fileType == kGomuksRoomType || fileType == kUnktoxConferenceType
-        || fileType == kUnktoxFriendType || fileType == kUnktoxGroupType) {
+        || fileType == kUnktoxFriendType || fileType == kUnktoxGroupType
+        || fileType == kMisskeyType || fileType == kImapMailType) {
         for (const auto& cd : m_accumulatedContactData) {
             if (cd.id == currentChatId && cd.type == fileType) {
                 fileIdOverride = cd.chatId;
