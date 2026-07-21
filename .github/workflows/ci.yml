@@ -82,7 +82,7 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential pkg-config \
             libcurl4-openssl-dev libfreetype-dev libopenal-dev \
-            libx11-dev libxext-dev uuid-dev
+            libx11-dev libxext-dev uuid-dev libxss-dev
       - name: Download and extract precompiled Qt3
         run: |
           sudo ln -sv /opt /opu
@@ -289,6 +289,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgl-dev libegl-dev libfontconfig-dev libxkbcommon-dev
+          sudo apt-get install -y libcurl4-openssl-dev libsqlite3-dev
       - name: Cache QSkinny
         uses: actions/cache@v4
         id: cache-qskinny
