@@ -22,6 +22,11 @@ MdPreview::MdPreview(QWidget* parent)
 void MdPreview::setMarkdown(const QString& markdown) {
 #ifdef QT3_BUILD
     QByteArray utf8 = markdown.utf8();
+    // Qt3 QString::utf8() 末尾可能带 NUL 字节，md4c 会将其当 MD_TEXT_NULLCHAR
+    // 输出 U+FFFD (�)，去掉避免预览尾部出现乱码替换字符
+    while (!utf8.isEmpty() && utf8.at(utf8.size() - 1) == '\0') {
+        utf8.truncate(utf8.size() - 1);
+    }
 #else
     QByteArray utf8 = markdown.toUtf8();
 #endif
