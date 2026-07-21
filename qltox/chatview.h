@@ -97,6 +97,8 @@ struct ChatElement {
     QString messageId;        // 服务端消息 ID（暂未填充）
     QString sendErrorMsg;
     QRect resendIconRect;
+    QStringList replyTos;
+    QStringList mentions;
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)

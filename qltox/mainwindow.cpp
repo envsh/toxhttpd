@@ -2715,6 +2715,11 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
         el.ipAddress      = ipAddress;
         el.messageId      = qFromUtf8(msg.eventId);
 
+        for (const auto& s : msg.replyTos)
+            el.replyTos.append(qFromUtf8(s));
+        for (const auto& s : msg.mentions)
+            el.mentions.append(qFromUtf8(s));
+
         if (!msg.mediaUrl.empty()) {
             el.mediaUrl    = qFromUtf8(msg.mediaUrl);
             el.mediaWidth  = msg.mediaWidth;

@@ -37,6 +37,8 @@ struct MessageRow {
     int edited = 0;
     std::string forwarded_from;
     int mention = 0;
+    std::string reply_to_ids;    // "eventId1,eventId2"
+    std::string mentions_text;   // "@user1,@user2"
 };
 
 struct MessageUpdate {
@@ -59,6 +61,8 @@ struct MessageUpdate {
     bool hasEdited = false;         int edited;
     bool hasForwardedFrom = false;  std::string forwarded_from;
     bool hasMention = false;        int mention;
+    bool hasReplyToIds = false;     std::string reply_to_ids;
+    bool hasMentionsText = false;   std::string mentions_text;
 };
 
 struct ReactionRow {

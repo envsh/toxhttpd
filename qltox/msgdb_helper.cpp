@@ -25,6 +25,10 @@ ChatElement msgRowToElement(const MessageRow& row) {
     el.durationSec  = row.duration_sec;
     el.sendState    = (ChatElement::SendState)row.send_state;
     el.messageId    = qFromUtf8(row.event_id);
+    if (!row.reply_to_ids.empty())
+        el.replyTos = qSplit(qFromUtf8(row.reply_to_ids), QString(","));
+    if (!row.mentions_text.empty())
+        el.mentions = qSplit(qFromUtf8(row.mentions_text), QString(","));
     return el;
 }
 
@@ -53,6 +57,16 @@ static MessageRow elementToRow(int id, const std::string& type,
     row.gif_path    = std::string(qToUtf8(el.gifPath).data());
     row.send_state  = (int)el.sendState;
     row.event_id    = std::string(qToUtf8(el.messageId).data());
+    {
+        QStringList sl;
+        for (const auto& s : el.replyTos) sl.append(s);
+        row.reply_to_ids = std::string(qToUtf8(sl.join(QString(","))).data());
+    }
+    {
+        QStringList sl;
+        for (const auto& s : el.mentions) sl.append(s);
+        row.mentions_text = std::string(qToUtf8(sl.join(QString(","))).data());
+    }
     if (row.event_id.empty()) {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
