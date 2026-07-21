@@ -275,7 +275,7 @@ bool Storage::init(const char *dataDir) {
     checkFeatures();
 
     // SQLite 堆软限额 — 超额时自动 release_memory
-    sqlite3_soft_heap_limit64(32LL * 1024 * 1024);
+    sqlite3_soft_heap_limit64(16LL * 1024 * 1024);
 
     qDebug("Storage init complete in %lldms", elapsedMs(totalStart));
     return true;
@@ -334,7 +334,7 @@ bool Storage::openDb(const char *path) {
     execPragma("PRAGMA journal_mode=WAL");
     execPragma("PRAGMA synchronous=NORMAL");
     execPragma("PRAGMA page_size=4096");
-    execPragma("PRAGMA cache_size=-2000");
+    execPragma("PRAGMA cache_size=-500");
     execPragma("PRAGMA temp_store=MEMORY");
     execPragma("PRAGMA mmap_size=0");
     execPragma("PRAGMA wal_autocheckpoint=200");

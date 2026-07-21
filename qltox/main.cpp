@@ -12,6 +12,9 @@
 #include "version.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef __linux__
+#include <malloc.h>
+#endif
 
 // 读取保存的语言设置（从 config.json）
 static QString loadSavedLanguage() {
@@ -24,6 +27,10 @@ static QString loadSavedLanguage() {
 int main(int argc, char* argv[]) {
 	// os.setenv('QT_IM_MODULE', "xim", true)
     // os.setenv('XMODIFIERS', '@im=fcitx', true)
+#ifdef __linux__
+    mallopt(M_MMAP_THRESHOLD, 32768);
+    mallopt(M_ARENA_MAX, 2);
+#endif
     setenv("QT_IM_MODULE", "xim", true);
     setenv("XMODIFIERS", "@im=fcitx", true);
 

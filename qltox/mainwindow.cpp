@@ -54,6 +54,9 @@
 #ifndef QT3_BUILD
 #include <QSignalMapper>
 #endif
+#ifdef __linux__
+#include <malloc.h>
+#endif
 
 // 虚拟联系人 ID（使用 <-100 的负数避免与服务器 ID 及 "未选择" 哨兵值 -1 冲突）
 static const int VIRTUAL_UNKNOWN_ID = -100;
@@ -2616,6 +2619,9 @@ void MainWindow::onSwitchAccount() {
     selfPubkey.clear();
     contactListWidget->clear();
     m_chatbuf = ChatBuffer();
+#ifdef __linux__
+    malloc_trim(0);
+#endif
     chatWidget->setBuffer(nullptr);
     chatWidget->setHeaderText("");
 
