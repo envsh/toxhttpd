@@ -1,0 +1,63 @@
+#ifndef MDTOOLBAR_H
+#define MDTOOLBAR_H
+
+#include "compat34.h"
+
+#ifdef QT3_BUILD
+#include <qwidget.h>
+#include <qpopupmenu.h>
+#include <qpushbt.h>
+#include <qmap.h>
+#else
+#include <QWidget>
+#include <QMenu>
+#include <QPushButton>
+#endif
+
+class QTextEdit;
+
+class MdToolbar : public QWidget {
+    Q_OBJECT
+public:
+    MdToolbar(QWidget* parent = 0);
+    void setEditor(QTextEdit* editor);
+
+signals:
+    void undoRequested();
+    void redoRequested();
+    void insertHeading(int level);
+    void insertBold();
+    void insertItalic();
+    void insertUnderline();
+    void insertStrikethrough();
+    void insertInlineCode();
+    void insertCodeBlock();
+    void insertQuote();
+    void insertUl();
+    void insertOl();
+    void insertTodo();
+    void insertLink();
+    void insertImage();
+    void insertTable();
+    void insertHr();
+    void insertDate();
+    void insertFootnote();
+    void insertToc();
+    void togglePreview();
+
+private slots:
+    void onHeadingClicked();
+    void onDateClicked();
+    void onButtonClicked();
+
+private:
+    QPushButton* makeBtn(const QString& text);
+    QTextEdit* m_editor;
+#ifdef QT3_BUILD
+    QPopupMenu* m_headingMenu;
+#else
+    QMenu* m_headingMenu;
+#endif
+};
+
+#endif
