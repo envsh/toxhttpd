@@ -58,6 +58,7 @@ private slots:
     void onTextChanged();
     void onAutoSaveIntervalChanged(int minutes);
     void onAutoSaveTimeout();
+    void onEditorScrollChanged();
 
 private:
     QTextEdit* m_editor;

@@ -8,6 +8,7 @@
 #include <qmessagebox.h>
 #ifndef QT3_BUILD
 #include <QTextCursor>
+#include <QScrollBar>
 #endif
 
 MdEditor::MdEditor(QWidget* parent)
@@ -75,6 +76,14 @@ MdEditor::MdEditor(QWidget* parent)
     connect(m_toolbar, SIGNAL(togglePreview()), this, SLOT(onTogglePreview()));
     connect(m_editor, SIGNAL(textChanged()), this, SLOT(onTextChanged()));
     m_editor->installEventFilter(this);
+
+#ifdef QT3_BUILD
+    connect(m_editor, SIGNAL(contentsMoving(int, int)),
+            this, SLOT(onEditorScrollChanged()));
+#else
+    connect(m_editor->verticalScrollBar(), SIGNAL(valueChanged(int)),
+            this, SLOT(onEditorScrollChanged()));
+#endif
 
     m_autoSaveTimer = new QTimer(this);
     connect(m_autoSaveTimer, SIGNAL(timeout()), this, SLOT(onAutoSaveTimeout()));
@@ -331,6 +340,7 @@ void MdEditor::onTextChanged() {
 #else
     m_preview->setMarkdown(m_editor->toPlainText());
 #endif
+    QTimer::singleShot(0, this, SLOT(onEditorScrollChanged()));
 }
 
 void MdEditor::onAutoSaveIntervalChanged(int minutes) {
@@ -386,5 +396,38 @@ bool MdEditor::eventFilter(QObject* obj, QEvent* e) {
 void MdEditor::onAutoSaveTimeout() {
     if (m_modified) {
         emit saveRequested();
+    }
+}
+
+void MdEditor::onEditorScrollChanged() {
+    QScrollBar* esb = m_editor->verticalScrollBar();
+    QScrollBar* psb = m_preview->verticalScrollBar();
+
+#ifdef QT3_BUILD
+    int editorMax = esb->maxValue();
+    int previewMax = psb->maxValue();
+#else
+    int editorMax = esb->maximum();
+    int previewMax = psb->maximum();
+#endif
+
+    if (editorMax <= 0 || previewMax <= 0) {
+        return;
+    }
+
+    int editorVal = esb->value();
+    double frac;
+
+    if (editorVal <= 0) {
+        frac = 0.0;
+    } else if (editorVal >= editorMax) {
+        frac = 1.0;
+    } else {
+        frac = (double)editorVal / (double)editorMax;
+    }
+
+    int target = (int)(frac * previewMax + 0.5);
+    if (target != psb->value()) {
+        psb->setValue(target);
     }
 }
