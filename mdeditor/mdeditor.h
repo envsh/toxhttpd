@@ -30,6 +30,7 @@ class MdEditor : public QWidget {
     Q_OBJECT
 public:
     MdEditor(QWidget* parent = 0);
+    ~MdEditor();
     void setMarkdown(const QString& markdown);
     QString toMarkdown() const;
     void loadSampleContent();

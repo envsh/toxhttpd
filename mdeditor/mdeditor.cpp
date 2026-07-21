@@ -17,8 +17,15 @@
 #endif
 
 MdEditor::MdEditor(QWidget* parent)
-    : QWidget(parent), m_previewVisible(true), m_modified(false),
+    : QWidget(parent
+#ifdef QT3_BUILD
+      , 0, WDestructiveClose
+#endif
+      ), m_previewVisible(true), m_modified(false),
       m_syncing(false) {
+#ifndef QT3_BUILD
+    setAttribute(Qt::WA_DeleteOnClose);
+#endif
     qSetWindowTitle(this, qFromUtf8("Markdown 编辑器"));
     resize(1080, 630);
 
@@ -113,6 +120,11 @@ MdEditor::MdEditor(QWidget* parent)
     connect(m_toolbar, SIGNAL(autoSaveIntervalChanged(int)), this, SLOT(onAutoSaveIntervalChanged(int)));
 }
 
+MdEditor::~MdEditor() {
+    delete m_highlighter;
+    m_highlighter = 0;
+}
+
 static QString mdRepeatChar(int count, char ch) {
     QString s;
     for (int i = 0; i < count; ++i) {
@@ -181,7 +193,11 @@ void MdEditor::closeEvent(QCloseEvent* e) {
         return;
     }
     // emit closed();
+    m_editor->removeEventFilter(this);
+    m_autoSaveTimer->stop();
+    m_scrollSyncGuard->stop();
     QWidget::closeEvent(e);
+    deleteLater(); // 不适用于close隐藏的情况!!!
 }
 
 void MdEditor::keyPressEvent(QKeyEvent* e) {
