@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <qapplication.h>
 #include <sstream>
-#include <unordered_set>
+#include "seen_unknown.h"
 
 // ── Static members ──
 QObject* ToxAPI::s_target = nullptr;
@@ -20,7 +20,7 @@ bool ToxAPI::s_loadingAllData = false;
 bool ToxAPI::s_reloadPending = false;
 static bool s_useNdjson = true; // true=auto s/ Content-Type 分派; false=强制旧 JSON 数组
 static const char* kEventTopic = "topic=reddit,hacknews,twitter,universal-connectivity";
-static std::unordered_set<std::string> s_seenUnknownLines;
+static SeenUnknown s_seenUnknown;
 
 // ── Helpers ──
 
@@ -102,8 +102,8 @@ static bool parseEventsJson(const std::string& body, uint64_t& lastId, std::vect
             char* raw = cJSON_PrintUnformatted(item);
             std::string lineStr = raw ? std::string(raw) : "{}";
             free(raw);
-            static std::unordered_set<std::string> seen;
-            if (seen.insert(lineStr).second) {
+            static SeenUnknown s_seenUnknownJson;
+            if (s_seenUnknownJson.insert(lineStr)) {
                 Event synth;
                 synth.id = 0;
                 synth.type = "unknown";
@@ -145,7 +145,7 @@ static int parseEventsNdjson(const std::string& body, uint64_t& lastId, std::vec
         e.data = jsonStr(cJSON_GetObjectItem(item, "data"));
         e.timestamp = jsonStr(cJSON_GetObjectItem(item, "timestamp"));
         if (e.id == 0 || e.type.empty()) {
-            if (s_seenUnknownLines.insert(line).second) {
+            if (s_seenUnknown.insert(line)) {
                 Event synth;
                 synth.id = 0;
                 synth.type = "unknown";

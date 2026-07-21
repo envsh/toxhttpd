@@ -28,6 +28,8 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
                  config.cpp \
                  msgdb_helper.cpp \
                  sticker_db.cpp stickerpicker.cpp stickermanager.cpp \
+                 seen_unknown.cpp \
+                 ../vendor/barrust_bloom/bloom.c \
                  ../etapps/plugin_loader.cpp ../etapps/plugin_manager_dialog.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
@@ -43,6 +45,9 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                  config.h \
                  msgdb_helper.h \
                  sticker_db.h stickerpicker.h stickermanager.h \
+                 seen_unknown.h \
+                 ../vendor/bloom/bloom_filter.hpp \
+                 ../vendor/barrust_bloom/bloom.h \
                  version.h \
                  ../etapps/plugin_loader.h ../etapps/plugin_manager_dialog.h
 
@@ -53,6 +58,7 @@ include(../qlcomp/qlite.pri)
 # 使 qltox/ 中的 #include "compat34.h" 能找到 qlcomp/
 INCLUDEPATH += ../qlcomp
 INCLUDEPATH += ../etapps
+INCLUDEPATH += ../vendor/bloom ../vendor/barrust_bloom
 macx {
     INCLUDEPATH += /opt/vcpkg/installed/x64-osx-dynamic/include
     LIBS += -L/opt/vcpkg/installed/x64-osx-dynamic/lib -Wl,-rpath,/opt/vcpkg/installed/x64-osx-dynamic/lib -lhjson
