@@ -336,6 +336,11 @@ int main(int argc, char* argv[]) {
                          << "-> syncing QSettings";
                 QSettings().sync();
             }
+#ifdef Q_OS_ANDROID
+            if (state == Qt::ApplicationActive) {
+                NetworkMonitor::checkNetwork();
+            }
+#endif
         });
 
 #ifndef Q_OS_ANDROID

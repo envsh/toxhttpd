@@ -26,6 +26,18 @@ Java_io_fedlet_mobutil_NetworkMonitor_onNetworkChanged(
     showAndroidToast(msg);
 }
 
+void NetworkMonitor::checkNetwork()
+{
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
+        auto ctx = QNativeInterface::QAndroidApplication::context();
+        QJniObject::callStaticMethod<void>(
+            "io/fedlet/mobutil/NetworkMonitor",
+            "checkCurrentNetwork",
+            "(Landroid/content/Context;)V",
+            ctx.object());
+    });
+}
+
 void NetworkMonitor::start()
 {
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {

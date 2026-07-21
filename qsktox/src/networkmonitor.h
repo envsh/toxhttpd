@@ -9,6 +9,7 @@ class NetworkMonitor : public QObject
 public:
     static void start();
     static void stop();
+    static void checkNetwork();
 };
 
 #endif
