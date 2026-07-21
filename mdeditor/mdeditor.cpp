@@ -9,8 +9,8 @@
 
 MdEditor::MdEditor(QWidget* parent)
     : QWidget(parent), m_previewVisible(true) {
-    qSetWindowTitle(this, "Markdown Editor");
-    resize(900, 600);
+    qSetWindowTitle(this, qFromUtf8("Markdown 编辑器"));
+    resize(1080, 630);
 
     QVBoxLayout* mainLay = new QVBoxLayout(this);
     mainLay->setMargin(4);
@@ -90,36 +90,37 @@ QString MdEditor::toMarkdown() const {
 }
 
 void MdEditor::loadSampleContent() {
-    QString sample = "# Welcome to Markdown Editor\n\n"
-        "This is a **bold** text and this is *italic*.\n\n"
-        "## Features\n\n"
-        "- Live preview\n"
-        "- Syntax highlighting\n"
-        "- Toolbar support\n"
-        "- Task lists:\n"
-        "  - [x] Bold\n"
-        "  - [x] Italic\n"
-        "  - [ ] Strikethrough\n\n"
-        "## Code Example\n\n"
+    QString sample = qFromUtf8(
+        "# Markdown 编辑器示例\n\n"
+        "这是一段 **粗体** 文本，这是 *斜体*，这是 ~~删除线~~。\n\n"
+        "## 功能列表\n\n"
+        "- 实时预览\n"
+        "- 语法高亮\n"
+        "- 工具栏操作\n"
+        "- 任务列表：\n"
+        "  - [x] 粗体\n"
+        "  - [x] 斜体\n"
+        "  - [ ] 删除线\n\n"
+        "## 代码示例\n\n"
         "```cpp\n"
         "int main() {\n"
         "    return 0;\n"
         "}\n"
         "```\n\n"
-        "## Table\n\n"
-        "| Name | Version |\n"
-        "|------|---------|\n"
-        "| Qt3  | 3.3.8   |\n"
-        "| Qt4  | 4.8.7   |\n\n"
-        "> This is a blockquote.\n\n"
+        "## 表格\n\n"
+        "| 名称 | 版本 |\n"
+        "|------|------|\n"
+        "| Qt3  | 3.3.8 |\n"
+        "| Qt4  | 4.8.7 |\n\n"
+        "> 这是一段引用文本。\n\n"
         "---\n\n"
-        "## Links\n\n"
-        "[Qt Project](https://www.qt.io)\n\n"
-        "![Image](https://via.placeholder.com/150)\n\n"
-        "## Footnotes\n\n"
-        "This has a footnote[^1].\n\n"
-        "[^1]: This is the footnote content.\n\n"
-        "End of sample.\n";
+        "## 链接与图片\n\n"
+        "[Qt 官网](https://www.qt.io)\n\n"
+        "![图片](https://via.placeholder.com/150)\n\n"
+        "## 脚注\n\n"
+        "这是一段带有脚注的文本[^1]。\n\n"
+        "[^1]: 这是脚注内容。\n\n"
+        "示例结束。\n");
     setMarkdown(sample);
 }
 

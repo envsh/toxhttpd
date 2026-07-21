@@ -2,6 +2,7 @@
 #define MDTOOLBAR_H
 
 #include "compat34.h"
+#include "emojiwidgets.h"
 
 #ifdef QT3_BUILD
 #include <qwidget.h>
@@ -12,6 +13,7 @@
 #include <QWidget>
 #include <QMenu>
 #include <QPushButton>
+#include <QMap>
 #endif
 
 class QTextEdit;
@@ -51,8 +53,9 @@ private slots:
     void onButtonClicked();
 
 private:
-    QPushButton* makeBtn(const QString& text);
+    EmojiPushButton* makeBtn(const QString& id, const QString& display, const QString& tip);
     QTextEdit* m_editor;
+    QMap<QPushButton*, QString> m_btnIds;
 #ifdef QT3_BUILD
     QPopupMenu* m_headingMenu;
 #else

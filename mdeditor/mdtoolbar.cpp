@@ -5,6 +5,7 @@
 
 #ifdef QT3_BUILD
 #include <qtextedit.h>
+#include <qtooltip.h>
 #else
 #include <QTextEdit>
 #endif
@@ -15,11 +16,11 @@ MdToolbar::MdToolbar(QWidget* parent)
     lay->setMargin(2);
     lay->setSpacing(2);
 
-    lay->addWidget(makeBtn("R"));
-    lay->addWidget(makeBtn("Y"));
+    lay->addWidget(makeBtn("undo", qFromUtf8("↩"), qFromUtf8("撤销")));
+    lay->addWidget(makeBtn("redo", qFromUtf8("↪"), qFromUtf8("重做")));
     lay->addSpacing(8);
 
-    QPushButton* hBtn = makeBtn("H");
+    EmojiPushButton* hBtn = makeBtn("heading", qFromUtf8("H▾"), qFromUtf8("标题"));
     lay->addWidget(hBtn);
 
 #ifdef QT3_BUILD
@@ -35,39 +36,45 @@ MdToolbar::MdToolbar(QWidget* parent)
 #endif
     connect(hBtn, SIGNAL(clicked()), this, SLOT(onHeadingClicked()));
 
-    lay->addWidget(makeBtn("B"));
-    lay->addWidget(makeBtn("I"));
-    lay->addWidget(makeBtn("U"));
-    lay->addWidget(makeBtn("S"));
-    lay->addWidget(makeBtn("C"));
-    lay->addWidget(makeBtn("CB"));
+    lay->addWidget(makeBtn("bold", qFromUtf8("B"), qFromUtf8("粗体")));
+    lay->addWidget(makeBtn("italic", qFromUtf8("I"), qFromUtf8("斜体")));
+    lay->addWidget(makeBtn("underline", qFromUtf8("U"), qFromUtf8("下划线")));
+    lay->addWidget(makeBtn("strike", qFromUtf8("S"), qFromUtf8("删除线")));
+    lay->addWidget(makeBtn("code", qFromUtf8("⟨⟩"), qFromUtf8("行内代码")));
+    lay->addWidget(makeBtn("codeblock", qFromUtf8("⌨"), qFromUtf8("代码块")));
     lay->addSpacing(8);
 
-    lay->addWidget(makeBtn("Q"));
-    lay->addWidget(makeBtn("UL"));
-    lay->addWidget(makeBtn("OL"));
-    lay->addWidget(makeBtn("TL"));
-    lay->addWidget(makeBtn("---"));
+    lay->addWidget(makeBtn("quote", qFromUtf8("❝"), qFromUtf8("引用")));
+    lay->addWidget(makeBtn("ul", qFromUtf8("•"), qFromUtf8("无序列表")));
+    lay->addWidget(makeBtn("ol", qFromUtf8("1."), qFromUtf8("有序列表")));
+    lay->addWidget(makeBtn("todo", qFromUtf8("☑"), qFromUtf8("任务列表")));
+    lay->addWidget(makeBtn("hr", qFromUtf8("—"), qFromUtf8("水平线")));
     lay->addSpacing(8);
 
-    lay->addWidget(makeBtn("L"));
-    lay->addWidget(makeBtn("IM"));
-    lay->addWidget(makeBtn("T"));
-    lay->addWidget(makeBtn("D"));
-    lay->addWidget(makeBtn("FN"));
-    lay->addWidget(makeBtn("TOC"));
+    lay->addWidget(makeBtn("link", qFromUtf8("🔗"), qFromUtf8("链接")));
+    lay->addWidget(makeBtn("image", qFromUtf8("🖼"), qFromUtf8("图片")));
+    lay->addWidget(makeBtn("table", qFromUtf8("⊞"), qFromUtf8("表格")));
+    lay->addWidget(makeBtn("date", qFromUtf8("📅"), qFromUtf8("日期")));
+    lay->addWidget(makeBtn("footnote", qFromUtf8("⌃"), qFromUtf8("脚注")));
+    lay->addWidget(makeBtn("toc", qFromUtf8("≡"), qFromUtf8("目录")));
     lay->addSpacing(8);
 
-    QPushButton* previewBtn = makeBtn("P");
+    EmojiPushButton* previewBtn = makeBtn("preview", qFromUtf8("👁"), qFromUtf8("预览"));
     lay->addWidget(previewBtn);
     connect(previewBtn, SIGNAL(clicked()), this, SIGNAL(togglePreview()));
 
     lay->addStretch();
 }
 
-QPushButton* MdToolbar::makeBtn(const QString& text) {
-    QPushButton* btn = new QPushButton(text, this);
-    btn->setFixedSize(32, 24);
+EmojiPushButton* MdToolbar::makeBtn(const QString& id, const QString& display, const QString& tip) {
+    EmojiPushButton* btn = new EmojiPushButton(display, this);
+    m_btnIds.insert(btn, id);
+#ifdef QT3_BUILD
+    QToolTip::add(btn, tip);
+#else
+    btn->setToolTip(tip);
+#endif
+    btn->setFixedSize(28, 26);
     btn->setFlat(true);
     connect(btn, SIGNAL(clicked()), this, SLOT(onButtonClicked()));
     return btn;
@@ -78,49 +85,55 @@ void MdToolbar::setEditor(QTextEdit* editor) {
 }
 
 void MdToolbar::onButtonClicked() {
-    QPushButton* btn = (QPushButton*)sender();
-    if (!btn) {
+    const QObject* obj = sender();
+    if (!obj) {
         return;
     }
-    QString id = btn->text();
+    QPushButton* btn = (QPushButton*)obj;
+#ifdef QT3_BUILD
+    QMap<QPushButton*, QString>::iterator it = m_btnIds.find(btn);
+    QString id = (it != m_btnIds.end()) ? it.data() : QString();
+#else
+    QString id = m_btnIds.value(btn);
+#endif
 
-    if (id == "R") {
+    if (id == "undo") {
         emit undoRequested();
-    } else if (id == "Y") {
+    } else if (id == "redo") {
         emit redoRequested();
-    } else if (id == "B") {
+    } else if (id == "bold") {
         emit insertBold();
-    } else if (id == "I") {
+    } else if (id == "italic") {
         emit insertItalic();
-    } else if (id == "U") {
+    } else if (id == "underline") {
         emit insertUnderline();
-    } else if (id == "S") {
+    } else if (id == "strike") {
         emit insertStrikethrough();
-    } else if (id == "C") {
+    } else if (id == "code") {
         emit insertInlineCode();
-    } else if (id == "CB") {
+    } else if (id == "codeblock") {
         emit insertCodeBlock();
-    } else if (id == "Q") {
+    } else if (id == "quote") {
         emit insertQuote();
-    } else if (id == "UL") {
+    } else if (id == "ul") {
         emit insertUl();
-    } else if (id == "OL") {
+    } else if (id == "ol") {
         emit insertOl();
-    } else if (id == "TL") {
+    } else if (id == "todo") {
         emit insertTodo();
-    } else if (id == "---") {
+    } else if (id == "hr") {
         emit insertHr();
-    } else if (id == "L") {
+    } else if (id == "link") {
         emit insertLink();
-    } else if (id == "IM") {
+    } else if (id == "image") {
         emit insertImage();
-    } else if (id == "T") {
+    } else if (id == "table") {
         emit insertTable();
-    } else if (id == "D") {
+    } else if (id == "date") {
         onDateClicked();
-    } else if (id == "FN") {
+    } else if (id == "footnote") {
         emit insertFootnote();
-    } else if (id == "TOC") {
+    } else if (id == "toc") {
         emit insertToc();
     }
 }
