@@ -29,7 +29,7 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
                  msgdb_helper.cpp \
                  sticker_db.cpp stickerpicker.cpp stickermanager.cpp \
                  seen_unknown.cpp \
-                 ../vendor/barrust_bloom/bloom.c \
+                 ./vendor/barrust_bloom/bloom.c \
                  ../etapps/plugin_loader.cpp ../etapps/plugin_manager_dialog.cpp
 
 HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
@@ -42,23 +42,23 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                channel_db.h message_db.h \
                 pending_db.h cache_db.h cache_fs.h \
                 translate_util.h \
-                 config.h \
+                 config.h version.h \
                  msgdb_helper.h \
                  sticker_db.h stickerpicker.h stickermanager.h \
                  seen_unknown.h \
-                 ../vendor/bloom/bloom_filter.hpp \
-                 ../vendor/barrust_bloom/bloom.h \
-                 version.h \
+                 ./vendor/bloom/bloom_filter.hpp \
+                 ./vendor/barrust_bloom/bloom.h \
                  ../etapps/plugin_loader.h ../etapps/plugin_manager_dialog.h
 
 # FORMS += MediumMsgEditor.ui — 已弃用。Qt3/Qt4 uic XML schema 不兼容，
 # Qt4 uic 拒绝 <vbox>/<hbox> 等 Qt3 标签，且 Qt4 环境无 Qt3Support 库。
 include(../qlcomp/qlite.pri)
+include(../mdeditor/mdeditor.pri)
 
 # 使 qltox/ 中的 #include "compat34.h" 能找到 qlcomp/
 INCLUDEPATH += ../qlcomp
 INCLUDEPATH += ../etapps
-INCLUDEPATH += ../vendor/bloom ../vendor/barrust_bloom
+INCLUDEPATH += ./vendor/bloom ./vendor/barrust_bloom
 macx {
     INCLUDEPATH += /opt/vcpkg/installed/x64-osx-dynamic/include
     LIBS += -L/opt/vcpkg/installed/x64-osx-dynamic/lib -Wl,-rpath,/opt/vcpkg/installed/x64-osx-dynamic/lib -lhjson
@@ -72,7 +72,8 @@ MOC_DIR = .
 OBJECTS_DIR = .
 
 # C++11 标准
-QMAKE_CXXFLAGS += -std=c++11 -O0
+QMAKE_CXXFLAGS += -std=c++11 -O0 -fstack-protector-strong
+QMAKE_CFLAGS += -fstack-protector-strong
 
 !win32: QMAKE_LFLAGS += -rdynamic
 

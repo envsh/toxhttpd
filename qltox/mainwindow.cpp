@@ -598,6 +598,7 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(tool, qFromUtf8("日志(&L)..."), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("贴纸管理器(&S)..."), this, SLOT(openStickerManager()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(openSettings()));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("Markdown编辑器(&M)...\tCtrl+M"), this, SLOT(openMdEditor()));
 
     // ── Etapps 菜单 ──
     m_etappsMenu = mb->addMenu(qFromUtf8("Etapps(&E)"));
@@ -3216,4 +3217,10 @@ void MainWindow::onEtappCloseAll() {
 void MainWindow::openPluginManager() {
     PluginManagerDialog* dlg = new PluginManagerDialog(this);
     dlg->show();
+}
+
+void MainWindow::openMdEditor() {
+    MdEditor* editor = new MdEditor(0);
+    editor->loadSampleContent();
+    editor->show();
 }

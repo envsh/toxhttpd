@@ -10,11 +10,21 @@
 #include <qwidget.h>
 #include <qtextedit.h>
 #include <qsplitter.h>
+#include <qvaluelist.h>
+#include <vector>
+typedef double qreal;
 #else
 #include <QWidget>
 #include <QTextEdit>
 #include <QSplitter>
+#include <QVector>
 #endif
+
+struct ScrollEntry {
+    int editorLine;
+    qreal editorY;
+    qreal previewY;
+};
 
 class MdEditor : public QWidget {
     Q_OBJECT
@@ -59,6 +69,7 @@ private slots:
     void onAutoSaveIntervalChanged(int minutes);
     void onAutoSaveTimeout();
     void onEditorScrollChanged();
+    void onPreviewScrollChanged();
 
 private:
     QTextEdit* m_editor;
@@ -69,11 +80,21 @@ private:
     bool m_previewVisible;
     bool m_modified;
     QTimer* m_autoSaveTimer;
+#ifdef QT3_BUILD
+    std::vector<ScrollEntry> m_scrollMap;
+#else
+    QVector<ScrollEntry> m_scrollMap;
+#endif
+    bool m_syncing;
+    QTimer* m_scrollSyncGuard;
 
     void wrapSelection(const QString& prefix, const QString& suffix);
     void insertAtCursor(const QString& text);
     void insertBlockPrefix(const QString& prefix);
     bool promptIfModified();
+    void buildScrollMap();
+    int findEntryByEditorY(qreal y) const;
+    int findEntryByPreviewY(qreal y) const;
 };
 
 #endif

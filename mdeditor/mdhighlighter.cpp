@@ -31,17 +31,16 @@ MdHighlighter::MdHighlighter(QTextEdit* parent)
 
 int MdHighlighter::highlightParagraph(const QString& text, int) {
     for (size_t i = 0; i < m_rules.size(); ++i) {
-        const Rule& rule = m_rules[i];
-        QRegExp expr(rule.pattern);
-        int index = expr.search(text);
+        Rule& rule = m_rules[i];
+        int index = rule.pattern.search(text);
         while (index >= 0) {
-            int length = expr.matchedLength();
+            int length = rule.pattern.matchedLength();
             if (rule.useFont) {
                 setFormat(index, length, rule.font, rule.color);
             } else if (rule.color.isValid()) {
                 setFormat(index, length, rule.color);
             }
-            index = expr.search(text, index + length);
+            index = rule.pattern.search(text, index + length);
         }
     }
     return 0;
@@ -104,13 +103,12 @@ MdHighlighter::MdHighlighter(QTextEdit* parent)
 
 void MdHighlighter::highlightBlock(const QString& text) {
     for (size_t i = 0; i < m_rules.size(); ++i) {
-        const Rule& rule = m_rules[i];
-        QRegExp expr(rule.pattern);
-        int index = expr.indexIn(text);
+        Rule& rule = m_rules[i];
+        int index = rule.pattern.indexIn(text);
         while (index >= 0) {
-            int length = expr.matchedLength();
+            int length = rule.pattern.matchedLength();
             setFormat(index, length, rule.format);
-            index = expr.indexIn(text, index + length);
+            index = rule.pattern.indexIn(text, index + length);
         }
     }
 }

@@ -24,6 +24,7 @@
 #include "sleepblocker.h"
 #include "plugin_loader.h"
 #include "EmbeddedMenuBar.h"
+#include "mdeditor.h"
 #ifdef QT3_BUILD
 #include <qmap.h>
 #else
@@ -84,6 +85,7 @@ protected slots:
     void onEtappActivated(int index);
     void onEtappCloseAll();
     void openPluginManager();
+    void openMdEditor();
     
 private:
     FramelessHelper* framelessHelper;

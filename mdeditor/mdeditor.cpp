@@ -6,13 +6,19 @@
 #include <qdatetime.h>
 #include <qtimer.h>
 #include <qmessagebox.h>
-#ifndef QT3_BUILD
+#ifdef QT3_BUILD
+#include <qtextedit.h>
+#else
+#include <qtextdocument.h>
+#include <qabstracttextdocumentlayout.h>
 #include <QTextCursor>
 #include <QScrollBar>
+#include <QTextBlock>
 #endif
 
 MdEditor::MdEditor(QWidget* parent)
-    : QWidget(parent), m_previewVisible(true), m_modified(false) {
+    : QWidget(parent), m_previewVisible(true), m_modified(false),
+      m_syncing(false) {
     qSetWindowTitle(this, qFromUtf8("Markdown 编辑器"));
     resize(1080, 630);
 
@@ -47,7 +53,11 @@ MdEditor::MdEditor(QWidget* parent)
 #endif
     m_preview = new MdPreview(m_splitter);
 
+#if 1  // 设为 0 关闭高亮，排查 crash
     m_highlighter = new MdHighlighter(m_editor);
+#else
+    m_highlighter = 0;
+#endif
     m_toolbar->setEditor(m_editor);
 
     m_splitter->addWidget(m_editor);
@@ -83,6 +93,19 @@ MdEditor::MdEditor(QWidget* parent)
 #else
     connect(m_editor->verticalScrollBar(), SIGNAL(valueChanged(int)),
             this, SLOT(onEditorScrollChanged()));
+#endif
+
+    // 预览滚动条信号（双向同步）
+    connect(m_preview->verticalScrollBar(), SIGNAL(valueChanged(int)),
+            this, SLOT(onPreviewScrollChanged()));
+
+    m_scrollSyncGuard = new QTimer(this);
+#ifdef QT3_BUILD
+    m_scrollSyncGuard->start(50, true);
+    m_scrollSyncGuard->stop();
+#else
+    m_scrollSyncGuard->setSingleShot(true);
+    m_scrollSyncGuard->setInterval(50);
 #endif
 
     m_autoSaveTimer = new QTimer(this);
@@ -157,7 +180,7 @@ void MdEditor::closeEvent(QCloseEvent* e) {
         e->ignore();
         return;
     }
-    emit closed();
+    // emit closed();
     QWidget::closeEvent(e);
 }
 
@@ -340,6 +363,7 @@ void MdEditor::onTextChanged() {
 #else
     m_preview->setMarkdown(m_editor->toPlainText());
 #endif
+    m_scrollMap.clear();
     QTimer::singleShot(0, this, SLOT(onEditorScrollChanged()));
 }
 
@@ -400,6 +424,16 @@ void MdEditor::onAutoSaveTimeout() {
 }
 
 void MdEditor::onEditorScrollChanged() {
+    if (m_syncing || m_scrollSyncGuard->isActive()) {
+        return;
+    }
+    m_syncing = true;
+
+    // 重建 scrollmap（如果需要）
+    if (m_scrollMap.size() == 0) {
+        buildScrollMap();
+    }
+
     QScrollBar* esb = m_editor->verticalScrollBar();
     QScrollBar* psb = m_preview->verticalScrollBar();
 
@@ -411,23 +445,246 @@ void MdEditor::onEditorScrollChanged() {
     int previewMax = psb->maximum();
 #endif
 
-    if (editorMax <= 0 || previewMax <= 0) {
+    if (editorMax <= 0 || previewMax <= 0 || m_scrollMap.size() == 0) {
+        m_syncing = false;
         return;
     }
 
-    int editorVal = esb->value();
-    double frac;
+    qreal editorVal = esb->value();
+    qreal frac = 0.0;
 
     if (editorVal <= 0) {
         frac = 0.0;
     } else if (editorVal >= editorMax) {
         frac = 1.0;
     } else {
-        frac = (double)editorVal / (double)editorMax;
+        int idx = findEntryByEditorY(editorVal);
+        if (idx >= 0 && idx < (int)m_scrollMap.size() - 1) {
+            const ScrollEntry& a = m_scrollMap[idx];
+            const ScrollEntry& b = m_scrollMap[idx + 1];
+            qreal editorSpan = b.editorY - a.editorY;
+            if (editorSpan > 0) {
+                qreal lineFrac = (editorVal - a.editorY) / editorSpan;
+                if (lineFrac < 0.0) lineFrac = 0.0;
+                if (lineFrac > 1.0) lineFrac = 1.0;
+                qreal previewY = a.previewY + lineFrac * (b.previewY - a.previewY);
+                if (previewMax > 0) {
+                    frac = previewY / previewMax;
+                }
+            }
+        } else {
+            // 回退到简单百分比
+            frac = (qreal)editorVal / (qreal)editorMax;
+        }
     }
+
+    if (frac < 0.0) frac = 0.0;
+    if (frac > 1.0) frac = 1.0;
 
     int target = (int)(frac * previewMax + 0.5);
     if (target != psb->value()) {
         psb->setValue(target);
     }
+
+    m_syncing = false;
+#ifdef QT3_BUILD
+    m_scrollSyncGuard->start(50, true);
+#else
+    m_scrollSyncGuard->start();
+#endif
+}
+
+void MdEditor::onPreviewScrollChanged() {
+    if (m_syncing || m_scrollSyncGuard->isActive()) {
+        return;
+    }
+    m_syncing = true;
+
+    // 重建 scrollmap（如果需要）
+    if (m_scrollMap.size() == 0) {
+        buildScrollMap();
+    }
+
+    QScrollBar* esb = m_editor->verticalScrollBar();
+    QScrollBar* psb = m_preview->verticalScrollBar();
+
+#ifdef QT3_BUILD
+    int editorMax = esb->maxValue();
+    int previewMax = psb->maxValue();
+#else
+    int editorMax = esb->maximum();
+    int previewMax = psb->maximum();
+#endif
+
+    if (editorMax <= 0 || previewMax <= 0 || m_scrollMap.size() == 0) {
+        m_syncing = false;
+        return;
+    }
+
+    // 预览滚动 → 编辑器滚动（反向同步）
+    qreal previewVal = psb->value();
+
+    int bestIdx = findEntryByPreviewY(previewVal);
+    if (bestIdx < 0) {
+        m_syncing = false;
+        return;
+    }
+
+    // 线性插值计算 editorY
+    qreal targetEditorY = m_scrollMap[bestIdx].editorY;
+    if (bestIdx < (int)m_scrollMap.size() - 1) {
+        const ScrollEntry& a = m_scrollMap[bestIdx];
+        const ScrollEntry& b = m_scrollMap[bestIdx + 1];
+        qreal previewSpan = b.previewY - a.previewY;
+        if (previewSpan > 0) {
+            qreal lineFrac = (previewVal - a.previewY) / previewSpan;
+            if (lineFrac < 0.0) lineFrac = 0.0;
+            if (lineFrac > 1.0) lineFrac = 1.0;
+            targetEditorY = a.editorY + lineFrac * (b.editorY - a.editorY);
+        }
+    }
+
+    // 映射到编辑器滚动条
+    qreal editorFrac = 0.0;
+    if (editorMax > 0) {
+        editorFrac = targetEditorY / editorMax;
+    }
+    if (editorFrac < 0.0) editorFrac = 0.0;
+    if (editorFrac > 1.0) editorFrac = 1.0;
+
+    int target = (int)(editorFrac * editorMax + 0.5);
+    if (target != esb->value()) {
+        esb->setValue(target);
+    }
+
+    m_syncing = false;
+#ifdef QT3_BUILD
+    m_scrollSyncGuard->start(50, true);
+#else
+    m_scrollSyncGuard->start();
+#endif
+}
+
+void MdEditor::buildScrollMap() {
+    m_scrollMap.clear();
+
+#ifdef QT3_BUILD
+    int editorCount = m_editor->paragraphs();
+    int previewCount = m_preview->paragraphs();
+    int maxCount = editorCount;
+    if (previewCount > maxCount) {
+        maxCount = previewCount;
+    }
+
+    for (int i = 0; i < maxCount; ++i) {
+        ScrollEntry entry;
+        entry.editorLine = i;
+        entry.editorY = 0;
+        entry.previewY = 0;
+
+        if (i < editorCount) {
+            QRect r = m_editor->paragraphRect(i);
+            entry.editorY = r.y();
+        } else {
+            QRect r = m_editor->paragraphRect(editorCount - 1);
+            entry.editorY = r.y() + r.height();
+        }
+
+        if (i < previewCount) {
+            QRect r = m_preview->paragraphRect(i);
+            entry.previewY = r.y();
+        } else {
+            QRect r = m_preview->paragraphRect(previewCount - 1);
+            entry.previewY = r.y() + r.height();
+        }
+
+        m_scrollMap.push_back(entry);
+    }
+#else
+    QTextDocument* editorDoc = m_editor->document();
+    QTextDocument* previewDoc = m_preview->document();
+
+    if (!editorDoc || !previewDoc) {
+        return;
+    }
+
+    QAbstractTextDocumentLayout* editorLayout =
+        qobject_cast<QAbstractTextDocumentLayout*>(editorDoc->documentLayout());
+    QAbstractTextDocumentLayout* previewLayout =
+        qobject_cast<QAbstractTextDocumentLayout*>(previewDoc->documentLayout());
+
+    if (!editorLayout || !previewLayout) {
+        return;
+    }
+
+    QTextBlock editorBlock = editorDoc->firstBlock();
+    QTextBlock previewBlock = previewDoc->firstBlock();
+
+    qreal editorY = 0;
+    qreal previewY = 0;
+
+    while (editorBlock.isValid() && previewBlock.isValid()) {
+        qreal editorHeight = editorLayout->blockBoundingRect(editorBlock).height();
+        qreal previewHeight = previewLayout->blockBoundingRect(previewBlock).height();
+
+        ScrollEntry entry;
+        entry.editorLine = editorBlock.blockNumber();
+        entry.editorY = editorY;
+        entry.previewY = previewY;
+        m_scrollMap.append(entry);
+
+        editorY += editorHeight;
+        previewY += previewHeight;
+        editorBlock = editorBlock.next();
+        previewBlock = previewBlock.next();
+    }
+
+    if (previewBlock.isValid()) {
+        ScrollEntry entry;
+        entry.editorLine = editorDoc->blockCount() - 1;
+        entry.editorY = editorY;
+        entry.previewY = previewY;
+        m_scrollMap.append(entry);
+    }
+#endif
+}
+
+int MdEditor::findEntryByEditorY(qreal y) const {
+    if (m_scrollMap.empty()) {
+        return -1;
+    }
+
+    int lo = 0;
+    int hi = (int)m_scrollMap.size() - 1;
+
+    while (lo < hi) {
+        int mid = (lo + hi + 1) / 2;
+        if (m_scrollMap[mid].editorY <= y) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+
+    return lo;
+}
+
+int MdEditor::findEntryByPreviewY(qreal y) const {
+    if (m_scrollMap.empty()) {
+        return -1;
+    }
+
+    int lo = 0;
+    int hi = (int)m_scrollMap.size() - 1;
+
+    while (lo < hi) {
+        int mid = (lo + hi + 1) / 2;
+        if (m_scrollMap[mid].previewY <= y) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+
+    return lo;
 }
