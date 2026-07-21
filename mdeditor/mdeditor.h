@@ -26,10 +26,12 @@ public:
 
 signals:
     void closed();
+    void saveRequested();
 
 protected:
     void closeEvent(QCloseEvent* e);
     void keyPressEvent(QKeyEvent* e);
+    bool eventFilter(QObject* obj, QEvent* e);
 
 private slots:
     void onUndo();
@@ -54,6 +56,8 @@ private slots:
     void onInsertToc();
     void onTogglePreview();
     void onTextChanged();
+    void onAutoSaveIntervalChanged(int minutes);
+    void onAutoSaveTimeout();
 
 private:
     QTextEdit* m_editor;
@@ -62,10 +66,13 @@ private:
     MdToolbar* m_toolbar;
     QSplitter* m_splitter;
     bool m_previewVisible;
+    bool m_modified;
+    QTimer* m_autoSaveTimer;
 
     void wrapSelection(const QString& prefix, const QString& suffix);
     void insertAtCursor(const QString& text);
     void insertBlockPrefix(const QString& prefix);
+    bool promptIfModified();
 };
 
 #endif

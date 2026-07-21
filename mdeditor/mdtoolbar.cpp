@@ -10,6 +10,30 @@
 #include <QTextEdit>
 #endif
 
+static void qComboAddItem(QComboBox* combo, const QString& text) {
+#ifdef QT3_BUILD
+    combo->insertItem(text);
+#else
+    combo->addItem(text);
+#endif
+}
+
+static int qComboCurrentIndex(QComboBox* combo) {
+#ifdef QT3_BUILD
+    return combo->currentItem();
+#else
+    return combo->currentIndex();
+#endif
+}
+
+static void qComboSetCurrentIndex(QComboBox* combo, int index) {
+#ifdef QT3_BUILD
+    combo->setCurrentItem(index);
+#else
+    combo->setCurrentIndex(index);
+#endif
+}
+
 MdToolbar::MdToolbar(QWidget* parent)
     : QWidget(parent), m_editor(0) {
     QHBoxLayout* lay = new QHBoxLayout(this);
@@ -64,6 +88,19 @@ MdToolbar::MdToolbar(QWidget* parent)
     connect(previewBtn, SIGNAL(clicked()), this, SIGNAL(togglePreview()));
 
     lay->addStretch();
+
+    QLabel* autoSaveLabel = new QLabel(qFromUtf8("⏱"), this);
+    lay->addWidget(autoSaveLabel);
+
+    m_autoSaveCombo = new QComboBox(this);
+    qComboAddItem(m_autoSaveCombo, qFromUtf8("关闭"));
+    for (int i = 1; i <= 10; ++i) {
+        qComboAddItem(m_autoSaveCombo, qFromUtf8("%1 分钟").arg(i));
+    }
+    qComboSetCurrentIndex(m_autoSaveCombo, 0);
+    m_autoSaveCombo->setFixedWidth(80);
+    lay->addWidget(m_autoSaveCombo);
+    connect(m_autoSaveCombo, SIGNAL(activated(int)), this, SLOT(onAutoSaveComboChanged(int)));
 }
 
 EmojiPushButton* MdToolbar::makeBtn(const QString& id, const QString& display, const QString& tip) {
@@ -158,4 +195,8 @@ void MdToolbar::onHeadingClicked() {
 
 void MdToolbar::onDateClicked() {
     emit insertDate();
+}
+
+void MdToolbar::onAutoSaveComboChanged(int index) {
+    emit autoSaveIntervalChanged(index);
 }

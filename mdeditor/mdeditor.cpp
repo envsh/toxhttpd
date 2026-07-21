@@ -1,16 +1,28 @@
 #include "mdeditor.h"
+#include "md_editor_icon.xpm"
 #include <qlayout.h>
 #include <qapplication.h>
 #include <qclipboard.h>
 #include <qdatetime.h>
+#include <qtimer.h>
+#include <qmessagebox.h>
 #ifndef QT3_BUILD
 #include <QTextCursor>
 #endif
 
 MdEditor::MdEditor(QWidget* parent)
-    : QWidget(parent), m_previewVisible(true) {
+    : QWidget(parent), m_previewVisible(true), m_modified(false) {
     qSetWindowTitle(this, qFromUtf8("Markdown 编辑器"));
     resize(1080, 630);
+
+    {
+        QPixmap pm(md_editor_icon);
+#ifdef QT3_BUILD
+        setIcon(pm);
+#else
+        setWindowIcon(QIcon(pm));
+#endif
+    }
 
     QVBoxLayout* mainLay = new QVBoxLayout(this);
     mainLay->setMargin(4);
@@ -62,6 +74,11 @@ MdEditor::MdEditor(QWidget* parent)
     connect(m_toolbar, SIGNAL(insertToc()), this, SLOT(onInsertToc()));
     connect(m_toolbar, SIGNAL(togglePreview()), this, SLOT(onTogglePreview()));
     connect(m_editor, SIGNAL(textChanged()), this, SLOT(onTextChanged()));
+    m_editor->installEventFilter(this);
+
+    m_autoSaveTimer = new QTimer(this);
+    connect(m_autoSaveTimer, SIGNAL(timeout()), this, SLOT(onAutoSaveTimeout()));
+    connect(m_toolbar, SIGNAL(autoSaveIntervalChanged(int)), this, SLOT(onAutoSaveIntervalChanged(int)));
 }
 
 static QString mdRepeatChar(int count, char ch) {
@@ -73,11 +90,13 @@ static QString mdRepeatChar(int count, char ch) {
 }
 
 void MdEditor::setMarkdown(const QString& markdown) {
+    m_editor->blockSignals(true);
 #ifdef QT3_BUILD
     m_editor->setText(markdown);
 #else
     m_editor->setPlainText(markdown);
 #endif
+    m_editor->blockSignals(false);
     m_preview->setMarkdown(markdown);
 }
 
@@ -125,13 +144,37 @@ void MdEditor::loadSampleContent() {
 }
 
 void MdEditor::closeEvent(QCloseEvent* e) {
+    if (!promptIfModified()) {
+        e->ignore();
+        return;
+    }
     emit closed();
     QWidget::closeEvent(e);
 }
 
 void MdEditor::keyPressEvent(QKeyEvent* e) {
     if (e->key() == Qt::Key_Escape) {
-        close();
+        if (promptIfModified()) {
+            m_modified = false;
+            close();
+        }
+        return;
+    }
+#ifdef QT3_BUILD
+    bool ctrl = (e->state() & Qt::ControlButton) != 0;
+#else
+    bool ctrl = (e->modifiers() & Qt::ControlModifier) != 0;
+#endif
+    if (ctrl && e->key() == Qt::Key_A) {
+        m_editor->selectAll();
+        return;
+    }
+    if (ctrl && e->key() == Qt::Key_S) {
+        if (m_modified) {
+            emit saveRequested();
+            m_modified = false;
+            qSetWindowTitle(this, qFromUtf8("Markdown 编辑器"));
+        }
         return;
     }
     QWidget::keyPressEvent(e);
@@ -279,9 +322,69 @@ void MdEditor::onTogglePreview() {
 }
 
 void MdEditor::onTextChanged() {
+    if (!m_modified) {
+        m_modified = true;
+        qSetWindowTitle(this, qFromUtf8("* Markdown 编辑器"));
+    }
 #ifdef QT3_BUILD
     m_preview->setMarkdown(m_editor->text());
 #else
     m_preview->setMarkdown(m_editor->toPlainText());
 #endif
+}
+
+void MdEditor::onAutoSaveIntervalChanged(int minutes) {
+    if (minutes <= 0) {
+        m_autoSaveTimer->stop();
+    } else {
+        m_autoSaveTimer->start(minutes * 60 * 1000);
+    }
+}
+
+bool MdEditor::promptIfModified() {
+    if (!m_modified) {
+        return true;
+    }
+    int ret = QMessageBox::question(
+        this, qFromUtf8("确认关闭"),
+        qFromUtf8("文档已修改，是否放弃更改？"),
+        QMessageBox::Yes, QMessageBox::No);
+    return (ret == QMessageBox::Yes);
+}
+
+bool MdEditor::eventFilter(QObject* obj, QEvent* e) {
+    if (obj == m_editor && e->type() == QEvent::KeyPress) {
+        QKeyEvent* ke = (QKeyEvent*)e;
+#ifdef QT3_BUILD
+        bool ctrl = (ke->state() & Qt::ControlButton) != 0;
+#else
+        bool ctrl = (ke->modifiers() & Qt::ControlModifier) != 0;
+#endif
+        if (ke->key() == Qt::Key_Escape) {
+            if (promptIfModified()) {
+                m_modified = false;
+                close();
+            }
+            return true;
+        }
+        if (ctrl && ke->key() == Qt::Key_A) {
+            m_editor->selectAll();
+            return true;
+        }
+        if (ctrl && ke->key() == Qt::Key_S) {
+            if (m_modified) {
+                emit saveRequested();
+                m_modified = false;
+                qSetWindowTitle(this, qFromUtf8("Markdown 编辑器"));
+            }
+            return true;
+        }
+    }
+    return QWidget::eventFilter(obj, e);
+}
+
+void MdEditor::onAutoSaveTimeout() {
+    if (m_modified) {
+        emit saveRequested();
+    }
 }
