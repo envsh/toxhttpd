@@ -1,5 +1,8 @@
 #include "chatbuffer.h"
 #include "assertf.h"
+#ifdef __linux__
+#include <malloc.h>
+#endif
 
 int ChatHistory::m_capacity = 200;
 
@@ -20,6 +23,17 @@ void ChatBuffer::prepend(int chatId, const std::string& chatType, const std::vec
 ChatHistory* ChatBuffer::ptr(int chatId, const std::string& chatType) {
     auto it = m_map.find(std::make_pair(chatId, chatType));
     return (it != m_map.end()) ? &it->second : nullptr;
+}
+
+void ChatBuffer::clearDisplayCacheFor(int chatId, const std::string& chatType) {
+    auto it = m_map.find(std::make_pair(chatId, chatType));
+    if (it == m_map.end()) { return; }
+    for (auto& el : it->second.m_items) {
+        el.scaledDisplay = QPixmap();
+    }
+#ifdef __linux__
+    malloc_trim(0);
+#endif
 }
 
 void ChatHistory::append(const ChatElement& el) {

@@ -149,3 +149,67 @@ setAttribute(Qt::WA_OpaquePaintEvent);
 - GIF timer 分离（P2）：`manageAnimations` 移出 `paintEvent`，改为每 200ms 的 `QTimer` 驱动
 - Phase 3: `QTextLayout` 富文本渲染
 - Phase 4: 嵌入媒体（MediaItem）
+
+---
+
+## 内存分析
+
+### 场景
+
+70 contacts × 200 messages = 14,000 条消息。
+预期 ~14 MB，实际从启动 70M 涨到 200M（+130 MB）。
+
+### ChatElement 结构体（14-17 MB）
+
+每个 ChatElement 包含 16 个 QString 字段 + 8 个 QRect + QPixmap + 枚举/整数。
+
+| 字段类型 | 数量 | 每个大小（Qt3 64-bit） |
+|----------|------|----------------------|
+| QString 对象 | 16 | 8 bytes（对象本身） |
+| QRect | 8 | 16 bytes |
+| QPixmap (scaledDisplay) | 1 | ~32 bytes |
+| int/short/bool/enum | ~12 | 4 bytes each |
+| QMovie* | 1 | 8 bytes |
+
+每条消息约 16 个堆分配（每个 QString 独立堆分配），平均 ~1.2 KB/消息。
+14,000 × 1.2 KB = ~17 MB。
+
+### 真正的大头（+113 MB）
+
+| 组件 | 大小 | 说明 |
+|------|------|------|
+| MediaShmemCache | 0-64 MB | QCache 硬限 64MB，存看过的图片/视频缩略图 |
+| SQLite WAL + 缓存 | 20-36 MB | 两个 DB 各 16MB WAL + 2MB page cache |
+| FreeType + emoji 字体 | 5-15 MB | NotoColorEmoji.ttf ~16MB，FreeType 加载后常驻 |
+| ContactList 行 pixmap | 4-7 MB | 70 行 × 400×60 像素 × 4 字节 ≈ 6.7MB |
+| Qt/X11 运行时 | 5-10 MB | Qt 库、X11 连接、字体缓存 |
+| ChatView back buffer | 2.5-3 MB | 800×600 双缓冲 |
+| libcurl + SSL | 1-3 MB | TLS 会话缓存、DNS 缓存 |
+| Emoji + Avatar 缓存 | 1-3 MB | 各自的 QPixmap 缓存 |
+| 总计 | 53-160 MB | |
+
+### 缓存无限增长问题（泄漏）
+
+| 问题 | 位置 | 严重度 |
+|------|------|--------|
+| peerInfoMap 切换账户不清除 | mainwindow.h:91 | 高 |
+| AvatarManager::m_cache 永不清除 | avatar_manager.h:26 | 高 |
+| scaledDisplay pixmap 从不清理 | chatview.h:67 | 高 |
+| s_seenUnknownLines static set | restapi.cpp:23 | 低 |
+| m_gifFrameUpdated 条目不删除 | chatview.h:246 | 低 |
+
+### 关键架构观察
+
+ChatBuffer 同时持有 70 个 ChatHistory，每个最多 200 个 ChatElement。
+切换聊天时，旧聊天的 ChatElement 里缓存的 scaledDisplay pixmap 永远不释放。
+trimmedOverflow() 只限制元素数量，不限制 pixmap 缓存。
+
+### 优化方向
+
+| 方向 | 预期收益 | 难度 |
+|------|---------|------|
+| 切换聊天时清空 inactive chat 的 scaledDisplay | 高（释放缩略图内存） | 低 |
+| 降低 MediaShmemCache 上限（64→16 MB） | 高 | 低 |
+| peerInfoMap 切换时 clear() | 中 | 极低 |
+| ContactList 去掉行 pixmap 缓存 | 中 | 中 |
+| SQLite WAL 限制（16→4 MB） | 中 | 低 |

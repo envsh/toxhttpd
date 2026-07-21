@@ -1185,6 +1185,12 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
         return;
     }
     
+    // 清理当前聊天的 scaledDisplay（即将离开的）
+    if (currentChatId >= 0) {
+        m_chatbuf.clearDisplayCacheFor(currentChatId,
+            std::string(qToUtf8(currentChatType).data()));
+    }
+    
     // 好友未加载详情 → 懒加载
     if (type == "friend" && !contactListWidget->isFriendLoaded(id)) {
         qWarning("onContactSelected: friend %d not loaded, lazy loading", id);

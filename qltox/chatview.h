@@ -199,6 +199,7 @@ private:
     bool m_scrollUpdatePending = false;
     void scheduleScrollUpdate();
     void rebuildBlocks();
+    void flushEviction();
     void _appendToBlocks(int elementHeight);
     void _prependToBlocks(int count);
     void _updateBlockFor(int idx, int oldHeight);
@@ -257,6 +258,8 @@ private:
     uint8_t m_ascW[128];
     uint8_t* m_bmpW;
     int m_scrollDelta;
+    int m_evictLow = 0;
+    int m_evictHigh = 0;
 
 };
 

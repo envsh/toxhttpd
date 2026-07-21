@@ -2188,6 +2188,8 @@ void ChatView::resetCanvas() {
     m_selMsgIndex = -1;
     m_selStart = m_selEnd = 0;
     m_scrollDownPill.setCount(0);
+    m_evictLow = 0;
+    m_evictHigh = 0;
     updateFull();
 }
 
@@ -2290,6 +2292,8 @@ void ChatView::onInsertRange(size_t start, size_t cnt) {
     }
     m_totalHeight += addedH;
     _prependToBlocks((int)cnt);
+    m_evictLow += (int)cnt;
+    m_evictHigh += (int)cnt;
     int vpH = height();
     int maxScroll = std::max(0, m_totalHeight - vpH);
     m_scrollPos += addedH;
@@ -2352,6 +2356,10 @@ void ChatView::onRemoveOne(size_t idx) {
 void ChatView::onRemoveRange(size_t start, size_t cnt) {
     if (!m_history || cnt == 0) { return; }
     _removeFromBlocks((int)start);
+    if (start == 0) {
+        m_evictLow = std::max(0, m_evictLow - (int)cnt);
+        m_evictHigh = std::max(0, m_evictHigh - (int)cnt);
+    }
     int vpH = height();
     int maxScroll = std::max(0, m_totalHeight - vpH);
     m_vScrollBar->setRange(0, maxScroll);
@@ -3491,4 +3499,28 @@ void ChatView::onScrollChanged(int value) {
         updateRect(m_scrollDownPill.rect());
     }
     m_vScrollBar->showTemporarily();
+    flushEviction();
+}
+
+void ChatView::flushEviction() {
+    if (!m_history || m_history->empty()) { return; }
+    int sz = (int)m_history->size();
+    if (m_evictLow < 0) { m_evictLow = 0; }
+    if (m_evictLow >= sz) { m_evictLow = sz - 1; }
+    if (m_evictHigh < 0) { m_evictHigh = 0; }
+    if (m_evictHigh >= sz) { m_evictHigh = sz - 1; }
+    auto [first, last] = visibleMessageRange();
+    if (first < 0) { return; }
+    int nearLow = std::max(0, first - 30);
+    int nearHigh = std::min(sz - 1, last + 30);
+    while (m_evictLow < nearLow) {
+        (*m_history)[m_evictLow].scaledDisplay = QPixmap();
+        m_evictLow++;
+    }
+    while (m_evictHigh > nearHigh) {
+        (*m_history)[m_evictHigh].scaledDisplay = QPixmap();
+        m_evictHigh--;
+    }
+    m_evictLow = nearLow;
+    m_evictHigh = nearHigh;
 }
