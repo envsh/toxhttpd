@@ -509,54 +509,132 @@ static bool tryParseClipboardEvent(const std::string& rawStr, ParseResult& ret) 
     return true;
 }
 
-// ── misskey_note 事件解析 ──
+// ── Misskey Note 事件解析 ──
+// 检测: user 为 object + createdAt 存在
+
+static std::string misskeyMimeToMsgtype(const std::string& mime) {
+    if (mime.find("image/") == 0) return "image";
+    if (mime.find("video/") == 0) return "video";
+    if (mime.find("audio/") == 0) return "audio";
+    return "file";
+}
 
 static bool tryParseMisskeyNote(const std::string& rawStr, ParseResult& ret) {
     cJSON* root = cJSON_Parse(rawStr.c_str());
     if (!root) return false;
 
-    std::string type = jsonGetString(root, "type");
-    if (type != "misskey_note") {
+    cJSON* userIdItem = cJSON_GetObjectItem(root, "userId");
+    cJSON* userItem   = cJSON_GetObjectItem(root, "user");
+    cJSON* createdItem = cJSON_GetObjectItem(root, "createdAt");
+    cJSON* visibItem = cJSON_GetObjectItem(root, "visibility");
+    if (!userIdItem || !cJSON_IsString(userIdItem) ||
+        !userItem || !cJSON_IsObject(userItem) ||
+        !createdItem || !cJSON_IsString(createdItem) ||
+        !visibItem || !cJSON_IsString(visibItem)) {
         cJSON_Delete(root);
         return false;
     }
 
-    std::string user   = jsonGetString(root, "user");
-    std::string userId = jsonGetString(root, "userId");
-    std::string text   = jsonGetString(root, "text");
-    std::string time   = jsonGetString(root, "time");
-    std::string name   = jsonGetString(root, "name");
+    std::string userId    = cJSON_GetStringValue(userIdItem);
+    std::string createdAt = cJSON_GetStringValue(createdItem);
+    std::string userName  = jsonGetString(userItem, "name");
+    std::string userAlias = jsonGetString(userItem, "username");
+    std::string userHost  = jsonGetString(userItem, "host");
+    std::string avatarUrl = jsonGetString(userItem, "avatarUrl");
+    std::string noteId    = jsonGetString(root, "id");
+    std::string text      = jsonGetString(root, "text");
+    std::string cw        = jsonGetString(root, "cw");
 
-    std::string chatId = userId.empty() ? user : userId;
+    std::string displayName = userName.empty() ? userAlias : userName;
+    if (displayName.empty()) displayName = userId;
+    std::string peerId = userHost.empty() ? userId : userId + "@" + userHost;
+
+    std::string chatId = userId;
 
     ContactData cd;
     cd.id          = (int)(std::hash<std::string>{}(chatId + kMisskeyType) & 0x7fffffff);
-    cd.name        = name.empty() ? user : name;
+    cd.name        = displayName;
     cd.type        = kMisskeyType;
     cd.chatId      = chatId;
     cd.status      = "online";
     cd.isConnected = true;
+    if (!avatarUrl.empty()) cd.iconUrl = avatarUrl;
     ret.contacts.push_back(cd);
 
     HistoryMessage hm;
-    hm.message       = text;
-    hm.sender_pubkey = user;
+    hm.sender_pubkey = peerId;
     hm.sender_number = 0;
     hm.direction     = "received";
-    hm.created_at    = time;
+    hm.created_at    = createdAt;
     hm.roomId        = chatId;
-    hm.eventId       = jsonGetString(root, "id");
-    if (!hm.message.empty())
-        ret.messages.push_back(hm);
+    hm.eventId       = noteId;
+
+    std::string fullText;
+    if (!cw.empty()) {
+        fullText += "CW: " + cw + "\n---\n";
+    }
+    if (!text.empty()) {
+        fullText += text;
+    }
+    hm.message = fullText;
+
+    cJSON* files = cJSON_GetObjectItem(root, "files");
+    if (files && cJSON_IsArray(files) && cJSON_GetArraySize(files) > 0) {
+        cJSON* f0 = cJSON_GetArrayItem(files, 0);
+        hm.msgtype  = misskeyMimeToMsgtype(jsonGetString(f0, "type"));
+        hm.mediaUrl = jsonGetString(f0, "url");
+        hm.thumbnailUrl = jsonGetString(f0, "thumbnailUrl");
+        hm.mediaMime = jsonGetString(f0, "type");
+        cJSON* props = cJSON_GetObjectItem(f0, "properties");
+        if (props) {
+            hm.mediaWidth  = (int)jsonGetInt64(props, "width");
+            hm.mediaHeight = (int)jsonGetInt64(props, "height");
+        }
+        hm.fileSize = (int)jsonGetInt64(f0, "size");
+    }
+
+    cJSON* replyIdItem = cJSON_GetObjectItem(root, "replyId");
+    if (replyIdItem && cJSON_IsString(replyIdItem)) {
+        cJSON* replyObj = cJSON_GetObjectItem(root, "reply");
+        if (replyObj && cJSON_IsObject(replyObj)) {
+            std::string replyText = jsonGetString(replyObj, "text");
+            if (!replyText.empty()) {
+                hm.message += " -- Re: " + replyText;
+            }
+        }
+    }
+
+    cJSON* renoteIdItem = cJSON_GetObjectItem(root, "renoteId");
+    if (renoteIdItem && cJSON_IsString(renoteIdItem)) {
+        cJSON* renoteObj = cJSON_GetObjectItem(root, "renote");
+        if (renoteObj && cJSON_IsObject(renoteObj)) {
+            std::string renoteText = jsonGetString(renoteObj, "text");
+            if (!renoteText.empty()) {
+                if (hm.message.empty()) {
+                    hm.message = "RT: " + renoteText;
+                } else {
+                    hm.message += "\nRT: " + renoteText;
+                }
+            }
+        }
+    }
+
+    if (hm.message.empty() && hm.mediaUrl.empty()) {
+        cJSON_Delete(root);
+        return false;
+    }
+
+    ret.messages.push_back(hm);
 
     PeerInfo pi;
-    pi.publicKey  = user;
-    pi.name       = user;
+    pi.publicKey  = peerId;
+    pi.name       = displayName;
     pi.peerNumber = 0;
+    if (!avatarUrl.empty()) pi.iconUrl = avatarUrl;
     ret.peers.push_back(pi);
 
-    ret.senderName  = qFromUtf8(user);
-    ret.contactName = qFromUtf8(name.empty() ? user : name);
+    ret.senderName  = qFromUtf8(displayName);
+    ret.contactName = qFromUtf8(displayName);
     ret.handled = true;
 
     cJSON_Delete(root);
