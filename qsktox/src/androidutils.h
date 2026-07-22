@@ -4,5 +4,6 @@
 #include <QString>
 
 void showAndroidToast(const QString& message);
+void installLogHandler();
 
 #endif

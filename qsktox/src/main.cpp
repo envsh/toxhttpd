@@ -138,6 +138,8 @@ static void toggleStatsTimer(QskWindow* win)
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
 
+    installLogHandler();
+
     QCoreApplication::setOrganizationName("fedlet");
     QCoreApplication::setApplicationName("qsktox");
 
