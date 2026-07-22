@@ -400,7 +400,8 @@ int main(int argc, char* argv[]) {
     // 收到推送消息
     QObject::connect(PushHandler::instance(), &PushHandler::pushMessage,
         [](const QByteArray& message, const QString& instance) {
-            qDebug() << "[PushHandler] push received, size:" << message.size();
+            qDebug() << "[PushHandler] push received, size:" << message.size()
+                     << "content:" << QString::fromUtf8(message).left(300);
         });
 
     // 触发注册流程

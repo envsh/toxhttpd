@@ -3,6 +3,7 @@ package io.fedlet.mobutil;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -21,11 +22,19 @@ public class KeepAliveService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Intent launchIntent = getPackageManager()
+            .getLaunchIntentForPackage(getPackageName());
+        launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        PendingIntent pi = PendingIntent.getActivity(
+            this, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
         Notification notif = new Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("qsktox")
             .setContentText("Running in background")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
+            .setContentIntent(pi)
             .build();
         startForeground(NOTIF_ID, notif);
         return START_NOT_STICKY;
