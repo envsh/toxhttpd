@@ -13,6 +13,7 @@
 #include <QTimer>
 #include <QShortcut>
 #include <QQuickItem>
+#include <QskDialog.h>
 #include <QskSkinManager.h>
 #include <QskFontRole.h>
 #include <QskWindow.h>
@@ -30,6 +31,7 @@
 #include "keepalive.h"
 #include "networkmonitor.h"
 #include "pushhandler.h"
+#include "androidutils.h"
 #include "pagemanager.h"
 
 #include <memory>
@@ -365,6 +367,45 @@ int main(int argc, char* argv[]) {
     KeepAlive::start();
     NetworkMonitor::start();
     PushHandler::start();
+
+    // distributor 选择对话框
+    QObject::connect(PushHandler::instance(), &PushHandler::distributorsFound,
+        [&window](const QStringList& distributors) {
+            QStringList displayNames;
+            for (const auto& d : distributors) {
+                displayNames.append(d);
+            }
+            QskDialog* dialog = qskDialog;
+            QString selected = dialog->select("选择推送服务", displayNames);
+            if (!selected.isEmpty()) {
+                int idx = displayNames.indexOf(selected);
+                if (idx >= 0) {
+                    PushHandler::instance()->selectDistributor(distributors[idx]);
+                }
+            }
+        });
+
+    // 注册失败
+    QObject::connect(PushHandler::instance(), &PushHandler::registrationFailed,
+        [](const QString& reason) {
+            showAndroidToast("Push 注册失败: " + reason);
+        });
+
+    // endpoint 注册成功
+    QObject::connect(PushHandler::instance(), &PushHandler::pushReceived,
+        [](const QString& endpoint, const QString& instance) {
+            qDebug() << "[PushHandler] endpoint:" << endpoint;
+        });
+
+    // 收到推送消息
+    QObject::connect(PushHandler::instance(), &PushHandler::pushMessage,
+        [](const QByteArray& message, const QString& instance) {
+            qDebug() << "[PushHandler] push received, size:" << message.size();
+        });
+
+    // 触发注册流程
+    PushHandler::instance()->registerDevice();
+
     qDebug() << "[qsktox] KeepAlive service started";
 #endif
 
