@@ -410,7 +410,7 @@ MessageListWidget::MessageListWidget(QQuickItem* parent)
         QPointF local = m_tapHandler->point().pressPosition();
         int row = rowFromPosition(local);
         if (row >= 0 && row < m_items.size()) {
-            QPointF scenePos = mapToScene(QPointF(width() / 2, height() / 2));
+            QPointF scenePos = mapToScene(local);
             Q_EMIT rowLongPressed(row, scenePos);
         }
     });
