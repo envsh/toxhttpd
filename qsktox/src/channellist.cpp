@@ -1,0 +1,454 @@
+#include "channellist.h"
+#include <QPainter>
+#include <QPainterPath>
+#include <QFontMetrics>
+#include <QTimer>
+#include <QEasingCurve>
+#include <QQuickWindow>
+#include <QtMath>
+#include <QskEvent.h>
+
+static constexpr qreal ROW_HEIGHT = 68;
+
+// ═══════════════════════════════════════════════════════════════════
+// 50 条模拟频道数据
+// ═══════════════════════════════════════════════════════════════════
+
+static const ChannelItem s_mockData[] = {
+    {"G", QColor("#4CAF50"), "Go开发者群",
+     "今天gopher大会有人去吗？🎤", "09:12", 5},
+    {"R", QColor("#2196F3"), "Rust中文社区",
+     "Rust 1.78 发布了！新特性：async drop 🦀", "09:15", 12},
+    {"C", QColor("#FF9800"), "C++讨论组",
+     "std::format 在 GCC 14 终于支持了", "09:23", 0},
+    {"Py", QColor("#3776AB"), "Python学习交流",
+     "有没有人遇到过 pip install 之后 import 报错的情况？", "09:30", 8},
+    {"Q", QColor("#41CD52"), "Qt开发者",
+     "QSkinny 0.8 released 🎉", "09:45", 3},
+    {"安", QColor("#E91E63"), "安全公告",
+     "⚠️ OpenSSL 3.2.1 紧急安全更新，请尽快升级", "10:01", 99},
+    {"D", QColor("#9C27B0"), "Docker实践",
+     "docker compose up -d 之后容器一直 restart 怎么办", "10:15", 2},
+    {"K", QColor("#00BCD4"), "Kubernetes运维",
+     "kubectl top nodes 显示 CPU 1200% 是不是有什么问题？", "10:22", 15},
+    {"N", QColor("#FF5722"), "Node.js全栈",
+     "Next.js 15 app router 终于稳定了", "10:30", 0},
+    {"V", QColor("#009688"), "V语言讨论",
+     "V lang 真的能取代 Go 吗？🤔", "10:35", 42},
+    {"L", QColor("#795548"), "Linux内核",
+     "Linux 6.9 合并了 Rust 驱动支持", "10:40", 7},
+    {"A", QColor("#607D8B"), "Android开发",
+     "Jetpack Compose 1.7 的 rememberScrollState 有 bug", "10:55", 3},
+    {"S", QColor("#F44336"), "Swift iOS",
+     "SwiftUI 的 NavigationStack 在 iOS 17 上有内存泄漏！", "11:00", 18},
+    {"网", QColor("#3F51B5"), "网络工程",
+     "有人用过 Cloudflare Tunnel 吗？WebSocket 连接总是断开", "11:10", 1},
+    {"字", QColor("#009688"), "字体设计",
+     "推荐几个好看的等宽编程字体？支持 CJK 的 🖋️", "11:15", 6},
+    {"E", QColor("#FFC107"), "Electron桌面",
+     "electron-builder 打包 ARM64 macOS 失败了 😤", "11:20", 0},
+    {"微", QColor("#2196F3"), "微信小程序",
+     "小程序审核又被拒了，说涉及虚拟支付…", "11:30", 23},
+    {"B", QColor("#00BCD4"), "区块链技术",
+     "以太坊 Dencun 升级后 L2 gas 降了 90%！🎉🔥", "11:35", 31},
+    {"M", QColor("#9C27B0"), "ML/AI讨论",
+     "GPT-5 要来了吗？OpenAI 最近招聘了多模态工程师", "11:40", 47},
+    {"F", QColor("#E91E63"), "前端工程化",
+     "Vite 6.0 发布！性能提升 40% ⚡", "11:45", 9},
+    {"日", QColor("#FF5722"), "日语学习",
+     "今日の単語：お疲れ様です 🇯🇵", "12:00", 4},
+    {"H", QColor("#795548"), "Haskell函数式",
+     "用 Monad Transformer 实现一个简易 State 管理器", "12:10", 0},
+    {"T", QColor("#4CAF50"), "TypeScript进阶",
+     "TypeScript 5.4 的 NoInfer 类型太有用了 👏", "12:15", 11},
+    {"测", QColor("#FF9800"), "软件测试",
+     "单元测试覆盖率从 30% 提到 80% 的经验分享", "12:30", 5},
+    {"P", QColor("#3F51B5"), "PostgreSQL",
+     "pg_stat_activity 查到大量 idle in transaction", "12:35", 2},
+    {"W", QColor("#00BCD4"), "WebAssembly",
+     "WASI Preview 2 来了！🚀", "12:40", 14},
+    {"韩", QColor("#F44336"), "韩语入门",
+     "오늘의 한국어 🇰🇷 안녕하세요!", "12:45", 0},
+    {"O", QColor("#607D8B"), "开源项目推荐",
+     "终端文件管理器，支持预览、git 集成", "13:00", 7},
+    {"运", QColor("#2196F3"), "运维自动化",
+     "Ansible playbook 执行到一半超时了", "13:10", 3},
+    {"U", QColor("#9C27B0"), "Ubuntu桌面",
+     "Ubuntu 24.04 LTS 要来了！🐧", "13:15", 0},
+    {"R2", QColor("#E91E63"), "Redis技术",
+     "Redis 8.0 路线图出来了，要内置向量搜索！", "13:20", 8},
+    {"嵌", QColor("#009688"), "嵌入式开发",
+     "ESP32-S3 编译报错 Killed，内存不够？", "13:30", 1},
+    {"J", QColor("#FF5722"), "Java企业级",
+     "Spring Boot 3.3 要求 Java 17+ 😭", "13:35", 19},
+    {"I", QColor("#4CAF50"), "物联网IoT",
+     "MQTT vs gRPC 在 IoT 场景下哪个更合适？", "13:40", 6},
+    {"云", QColor("#FFC107"), "云原生架构",
+     "从自建 K8s 迁移到阿里云 ACK 全过程", "13:50", 13},
+    {"D2", QColor("#3776AB"), "DevOps实践",
+     "CI/CD 从 Jenkins 迁到 GitHub Actions 踩坑记录", "14:00", 4},
+    {"数", QColor("#795548"), "数据分析",
+     "Pandas 处理 50GB CSV 内存爆了 💥", "14:10", 22},
+    {"Z", QColor("#00BCD4"), "Zig语言",
+     "Zig 的 comptime 太强了！😎", "14:15", 0},
+    {"机", QColor("#F44336"), "机器学习",
+     "Llama 3 微调实战：4×A100 fine-tune 70B", "14:20", 36},
+    {"C2", QColor("#2196F3"), "Clojure函数式",
+     "Clojure 的持久化数据结构真优雅", "14:25", 0},
+    {"安2", QColor("#4CAF50"), "网络安全",
+     "🛡️ WebSocket 注入恶意 JS 攻击手法", "14:30", 55},
+    {"设", QColor("#FF9800"), "UI/UX设计",
+     "Figma 变量系统 (Variables) 终于原生支持了", "14:40", 10},
+    {"G2", QColor("#607D8B"), "GIS地理信息",
+     "MapLibre GL JS 画自定义热力图", "14:45", 2},
+    {"音", QColor("#9C27B0"), "音频处理",
+     "Web Audio API 在线变声器 🎵", "14:50", 8},
+    {"D3", QColor("#E91E63"), "DartFlutter",
+     "Flutter 3.22 Impeller 正式稳定 🎯", "14:55", 16},
+    {"图", QColor("#009688"), "图形学",
+     "Radiance Cascades 实现全局光照", "15:00", 27},
+    {"B2", QColor("#FF5722"), "Bash脚本",
+     "find + xargs -P 8 并行处理技巧 ⚡", "15:10", 3},
+    {"策", QColor("#3F51B5"), "技术管理",
+     "CTO 说下季度迁 K8s，但团队只有5人…", "15:20", 44},
+    {"P2", QColor("#FFC107"), "性能优化",
+     "SQL 从30秒优化到50毫秒全过程", "15:30", 17},
+    {"春", QColor("#4CAF50"), "春节红包群🧧",
+     "恭喜发财！🧧🧧🧧 手慢无！💰", "15:35", 99},
+};
+
+static constexpr int s_mockCount = sizeof(s_mockData) / sizeof(s_mockData[0]);
+
+// ═══════════════════════════════════════════════════════════════════
+// ChannelRowNode — QskPaintedNode 子类，绘制单行
+// ═══════════════════════════════════════════════════════════════════
+
+void ChannelRowNode::setItem(const ChannelItem& item)
+{
+    m_item = item;
+}
+
+void ChannelRowNode::triggerUpdate(QQuickWindow* window, const QRectF& rect, const QSizeF& size)
+{
+    update(window, rect, size, nullptr);
+}
+
+void ChannelRowNode::paint(QPainter* painter, const QSize& size, const void*)
+{
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    const int w = size.width();
+    const int h = size.height();
+
+    // ── 背景 ──
+    painter->fillRect(0, 0, w, h, QColor("#1a1a2e"));
+
+    // ── 头像圆形 ──
+    const int avatarSize = 40;
+    const int avatarX = 12;
+    const int avatarY = (h - avatarSize) / 2;
+
+    painter->setBrush(m_item.avatarColor);
+    painter->setPen(Qt::NoPen);
+    painter->drawEllipse(avatarX, avatarY, avatarSize, avatarSize);
+
+    painter->setPen(Qt::white);
+    QFont avatarFont;
+    avatarFont.setPixelSize(16);
+    avatarFont.setBold(true);
+    painter->setFont(avatarFont);
+    painter->drawText(QRect(avatarX, avatarY, avatarSize, avatarSize),
+        Qt::AlignCenter, m_item.avatarLetter);
+
+    // ── 右侧时间 ──
+    const int rightMargin = 12;
+    const int textLeft = avatarX + avatarSize + 12;
+    const int textRight = w - rightMargin;
+    const int textWidth = textRight - textLeft;
+
+    QFont timeFont;
+    timeFont.setPixelSize(11);
+    painter->setFont(timeFont);
+    painter->setPen(QColor("#666"));
+    painter->drawText(QRect(textRight - 60, 10, 60, 16),
+        Qt::AlignRight | Qt::AlignVCenter, m_item.time);
+
+    // ── 第1行：标题（bold，白色）──
+    QFont titleFont;
+    titleFont.setPixelSize(15);
+    titleFont.setBold(true);
+    painter->setFont(titleFont);
+    painter->setPen(Qt::white);
+
+    QFontMetrics titleFm(titleFont);
+    int titleMaxWidth = textWidth;
+    if (m_item.unreadCount > 0) {
+        titleMaxWidth -= 40;
+    }
+    QString elidedTitle = titleFm.elidedText(m_item.title,
+        Qt::ElideRight, qMax(titleMaxWidth, 20));
+    painter->drawText(QRect(textLeft, 8, titleMaxWidth, 22),
+        Qt::AlignLeft | Qt::AlignVCenter, elidedTitle);
+
+    // ── 第2行：消息（灰色，截断）──
+    QFont msgFont;
+    msgFont.setPixelSize(13);
+    painter->setFont(msgFont);
+    painter->setPen(QColor("#999"));
+
+    QFontMetrics msgFm(msgFont);
+    int msgMaxWidth = textWidth;
+    if (m_item.unreadCount > 0) {
+        msgMaxWidth -= 40;
+    }
+    QString elidedMsg = msgFm.elidedText(m_item.lastMessage,
+        Qt::ElideRight, qMax(msgMaxWidth, 20));
+    painter->drawText(QRect(textLeft, 36, msgMaxWidth, 22),
+        Qt::AlignLeft | Qt::AlignVCenter, elidedMsg);
+
+    // ── 未读徽章 ──
+    if (m_item.unreadCount > 0) {
+        QFont badgeFont;
+        badgeFont.setPixelSize(10);
+        painter->setFont(badgeFont);
+
+        QString badgeText = QString::number(m_item.unreadCount);
+        QFontMetrics bfm(badgeFont);
+        int tw = bfm.horizontalAdvance(badgeText);
+        int bw = tw + 10;
+        int bh = 16;
+        int bx = textRight - bw;
+        int by = h / 2 - bh / 2 + 4;
+
+        painter->setBrush(QColor("#E91E63"));
+        painter->setPen(Qt::NoPen);
+        painter->drawRoundedRect(bx, by, bw, bh, bh / 2.0, bh / 2.0);
+
+        painter->setPen(Qt::white);
+        painter->drawText(QRect(bx, by, bw, bh), Qt::AlignCenter, badgeText);
+    }
+
+    // ── 底部分隔线 ──
+    painter->setPen(QColor("#2a2a3e"));
+    painter->drawLine(0, h - 1, w, h - 1);
+}
+
+QskHashValue ChannelRowNode::hash(const void*) const
+{
+    return qHash(m_item.title) ^ qHash(m_item.lastMessage)
+        ^ qHash(m_item.time) ^ qHash(m_item.unreadCount);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ChannelRowItem — QQuickItem 子类
+// ═══════════════════════════════════════════════════════════════════
+
+ChannelRowItem::ChannelRowItem(QQuickItem* parent)
+    : QQuickItem(parent)
+{
+    setFlag(ItemHasContents, true);
+    setHeight(ROW_HEIGHT);
+}
+
+void ChannelRowItem::setChannelData(const ChannelItem& item)
+{
+    m_item = item;
+    m_dirty = true;
+    update();
+}
+
+QSGNode* ChannelRowItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
+{
+    auto* node = static_cast<ChannelRowNode*>(oldNode);
+    if (!node) {
+        node = new ChannelRowNode();
+    }
+    if (m_dirty) {
+        node->setItem(m_item);
+        m_dirty = false;
+    }
+    node->triggerUpdate(window(), QRectF(QPointF(0, 0), QSizeF(width(), height())),
+        QSizeF(width(), height()));
+    return node;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ChannelListWidget — QskScrollArea 子类，虚拟渲染
+// ═══════════════════════════════════════════════════════════════════
+
+ChannelListWidget::ChannelListWidget(QQuickItem* parent)
+    : QskScrollArea(parent)
+{
+    setFlickableOrientations(Qt::Vertical);
+    setItemResizable(false);
+
+    m_contentView = new QQuickItem(this);
+    setScrolledItem(m_contentView);
+
+    m_tapHandler = new QQuickTapHandler(this);
+    m_tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
+
+    connect(m_tapHandler, &QQuickTapHandler::singleTapped, this,
+        [this](QEventPoint pt, Qt::MouseButton) {
+            if (m_longPressFired) {
+                m_longPressFired = false;
+                return;
+            }
+            int row = rowFromPosition(pt.position());
+            if (row >= 0 && row < m_items.size()) {
+                Q_EMIT rowClicked(row, m_items[row].title);
+                if (auto* rowItem = m_visibleRows.value(row)) {
+                    rowItem->setOpacity(0.5);
+                    QTimer::singleShot(150, rowItem, [rowItem]() {
+                        rowItem->setOpacity(1.0);
+                    });
+                }
+            }
+        });
+
+    connect(m_tapHandler, &QQuickTapHandler::longPressed, this, [this]() {
+        m_longPressFired = true;
+        QPointF local = m_tapHandler->point().pressPosition();
+        int row = rowFromPosition(local);
+        if (row >= 0 && row < m_items.size()) {
+            QPointF scenePos = mapToScene(QPointF(width() / 2, height() / 2));
+            Q_EMIT rowLongPressed(row, scenePos);
+        }
+    });
+
+    connect(this, &QskScrollBox::scrollPosChanged,
+        this, &ChannelListWidget::updateVisibleRows);
+}
+
+ChannelListWidget::~ChannelListWidget()
+{
+    for (auto* row : std::as_const(m_visibleRows)) {
+        delete row;
+    }
+    m_visibleRows.clear();
+}
+
+void ChannelListWidget::populateData()
+{
+    m_items.clear();
+    for (int i = 0; i < s_mockCount; ++i) {
+        m_items.append(s_mockData[i]);
+    }
+
+    qreal viewW = viewContentsRect().width();
+    if (viewW <= 0) viewW = width();
+    m_contentView->setSize(QSizeF(viewW, m_items.size() * ROW_HEIGHT));
+    update();
+    updateVisibleRows();
+
+    QTimer::singleShot(100, this, [this]() {
+        if (window()) {
+            auto* anim = new StaggerFadeAnimator(this, this);
+            anim->setWindow(window());
+            anim->start();
+        }
+    });
+}
+
+void ChannelListWidget::updateVisibleRows()
+{
+    if (!m_contentView || m_items.isEmpty()) {
+        return;
+    }
+
+    const qreal scrollY = scrollPos().y();
+    const qreal viewH = viewContentsRect().height();
+
+    int rowMin = qMax(0, qFloor(scrollY / ROW_HEIGHT) - 2);
+    int rowMax = qMin(m_items.size() - 1,
+        qCeil((scrollY + viewH) / ROW_HEIGHT) + 2);
+
+    // 回收超出范围的行
+    auto it = m_visibleRows.begin();
+    while (it != m_visibleRows.end()) {
+        if (it.key() < rowMin || it.key() > rowMax) {
+            it.value()->deleteLater();
+            it = m_visibleRows.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // 创建新进入可见范围的行
+    for (int i = rowMin; i <= rowMax; ++i) {
+        if (!m_visibleRows.contains(i)) {
+            auto* row = new ChannelRowItem(m_contentView);
+            row->setX(0);
+            row->setY(i * ROW_HEIGHT);
+            row->setWidth(m_contentView->width());
+            row->setChannelData(m_items[i]);
+            m_visibleRows[i] = row;
+        }
+    }
+}
+
+void ChannelListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
+{
+    QskScrollArea::geometryChangeEvent(event);
+    if (event->isResized() && m_contentView) {
+        qreal viewW = viewContentsRect().width();
+        if (viewW <= 0) viewW = width();
+        m_contentView->setSize(QSizeF(viewW, m_items.size() * ROW_HEIGHT));
+        for (auto* row : std::as_const(m_visibleRows)) {
+            row->setWidth(m_contentView->width());
+        }
+        updateVisibleRows();
+    }
+}
+
+int ChannelListWidget::rowAtPos(const QPointF& pos) const
+{
+    const auto vr = viewContentsRect();
+    if (!vr.contains(pos)) {
+        return -1;
+    }
+    const qreal contentY = pos.y() - vr.top() + scrollPos().y();
+    const int row = qFloor(contentY / ROW_HEIGHT);
+    if (row >= 0 && row < m_items.size()) {
+        return row;
+    }
+    return -1;
+}
+
+int ChannelListWidget::rowFromPosition(const QPointF& localPos) const
+{
+    const auto vr = viewContentsRect();
+    qreal contentY = localPos.y() - vr.top() + scrollPos().y();
+    int row = qFloor(contentY / ROW_HEIGHT);
+    if (row >= 0 && row < m_items.size()) {
+        return row;
+    }
+    return -1;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// StaggerFadeAnimator — 整体淡入动画
+// ═══════════════════════════════════════════════════════════════════
+
+StaggerFadeAnimator::StaggerFadeAnimator(QQuickItem* target, QObject* parent)
+    : QskAnimator()
+    , m_target(target)
+{
+    Q_UNUSED(parent)
+    setDuration(800);
+    setEasingCurve(QEasingCurve::OutCubic);
+
+    if (m_target) {
+        m_target->setOpacity(0.0);
+    }
+}
+
+void StaggerFadeAnimator::advance(qreal value)
+{
+    if (!m_target) {
+        return;
+    }
+    m_target->setOpacity(value);
+}
+
+#include "moc_channellist.cpp"

@@ -1,9 +1,9 @@
 #include "mainpage.h"
 #include "pagemanager.h"
 #include "menuoverlay.h"
+#include "channellist.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
-#include <QskTextField.h>
 #include <QskPushButton.h>
 #include <QskMenu.h>
 #include <QskBoxShapeMetrics.h>
@@ -138,41 +138,74 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
         menu->open();
     });
 
-    // ── ChatArea ──
-    auto* chatArea = new QskLinearBox(Qt::Vertical, layout);
-    chatArea->setPanel(true);
-    chatArea->setSizePolicy(QskSizePolicy::Preferred, QskSizePolicy::Expanding);
+    // ── ChannelList (频道列表) ──
+    m_channelList = new ChannelListWidget(layout);
+    m_channelList->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Expanding);
+    m_channelList->populateData();
 
-    chatArea->addStretch(1);
-    auto* welcome = new QskTextLabel("Welcome to qsktox", chatArea);
-    welcome->setAlignment(Qt::AlignCenter);
-    chatArea->addStretch(1);
+    connect(m_channelList, &ChannelListWidget::rowClicked,
+        this, [this](int row, const QString& chatName) {
+            Q_UNUSED(row)
+            showToast(QString::fromUtf8("已选择: ") + chatName);
+        });
 
-    // ── Toast label (initially hidden) ──
-    m_toastLabel = new QskTextLabel("", chatArea);
+    connect(m_channelList, &ChannelListWidget::rowLongPressed,
+        this, [this](int row, const QPointF& pos) {
+            showChannelMenu(row, pos);
+        });
+
+    // ── Toast label (initially hidden, overlaid on top) ──
+    m_toastLabel = new QskTextLabel("", this);
     m_toastLabel->setAlignment(Qt::AlignCenter);
     m_toastLabel->setVisible(false);
+    m_toastLabel->setZ(1000);
     m_toastTimer = new QTimer(this);
     m_toastTimer->setSingleShot(true);
     connect(m_toastTimer, &QTimer::timeout, this, [this]() {
         m_toastLabel->setVisible(false);
     });
 
-    // ── InputBar ──
-    auto* inputBar = new QskLinearBox(Qt::Horizontal, layout);
-    inputBar->setPanel(true);
-    inputBar->setPreferredHeight(56);
+    // ── BottomNav ──
+    auto* navBar = new QskLinearBox(Qt::Horizontal, layout);
+    navBar->setPanel(true);
+    navBar->setFixedHeight(56); // 不能用preferedSize,会导致下半部分被裁切掉看不见
+    navBar->setSpacing(0);
 
-    inputBar->addSpacer(8, 0);
-    auto* input = new QskTextField(inputBar);
-    input->setPlaceholderText("Type a message");
-    input->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
-    input->setPreferredHeight(40);
+    struct TabDef { const char* icon; const char* label; };
+    static const TabDef tabDefs[4] = {
+        { "💬", "聊天" },
+        { "👤", "联系人" },
+        { "⚙", "设置" },
+        { "🔔", "通知" },
+    };
 
-    auto* sendBtn = new QskPushButton(QString::fromUtf8("→"), inputBar);
-    sendBtn->setPreferredWidth(48);
-    sendBtn->setPreferredHeight(40);
-    inputBar->addSpacer(8, 0);
+    for (int i = 0; i < 4; ++i) {
+        auto* cell = new QskLinearBox(Qt::Vertical, navBar);
+        cell->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+        cell->setSpacing(2);
+
+        auto* icon = new QskPushButton(QString::fromUtf8(tabDefs[i].icon), cell);
+        icon->setPreferredHeight(28);
+        icon->setSizePolicy(QskSizePolicy::Preferred, QskSizePolicy::Preferred);
+        icon->setBoxShapeHint(QskPushButton::Panel, QskBoxShapeMetrics(8, Qt::RelativeSize));
+
+        auto* lbl = new QskTextLabel(QString::fromUtf8(tabDefs[i].label), cell);
+        lbl->setAlignment(Qt::AlignCenter);
+        lbl->setPreferredHeight(18);
+        lbl->setSizePolicy(QskSizePolicy::Preferred, QskSizePolicy::Preferred);
+
+        m_navTabs[i].btn = icon;
+        m_navTabs[i].label = lbl;
+
+        connect(icon, &QskAbstractButton::clicked, this, [this, i]() { setActiveTab(i); });
+    }
+
+    setActiveTab(0);
+
+#ifdef Q_OS_ANDROID
+    // auto* safeSpacer = new QskLinearBox(Qt::Horizontal, layout);
+    // safeSpacer->setFixedHeight(30);
+#endif
 }
 
 void MainPage::onNewIntent(const QVariantMap& launchArgs)
@@ -183,10 +216,65 @@ void MainPage::onNewIntent(const QVariantMap& launchArgs)
     }
 }
 
+void MainPage::setActiveTab(int index)
+{
+    m_activeTab = index;
+    const QColor activeColor(255, 255, 255);
+    const QColor inactiveColor(160, 160, 160);
+
+    for (int i = 0; i < 4; ++i) {
+        bool selected = (i == index);
+        m_navTabs[i].btn->setEmphasis(selected
+            ? QskPushButton::HighEmphasis
+            : QskPushButton::LowEmphasis);
+        m_navTabs[i].label->setTextColor(selected ? activeColor : inactiveColor);
+    }
+
+    if (index == 2) {
+        pageManager()->open("settings");
+    } else if (index != 0) {
+        static const char* names[] = { nullptr, "联系人", nullptr, "通知" };
+        if (names[index]) {
+            showToast(QString::fromUtf8(names[index]) + QString::fromUtf8(" (coming soon)"));
+        }
+    }
+}
+
 void MainPage::showToast(const QString& msg, int durationMs) {
     m_toastLabel->setText(msg);
     m_toastLabel->setVisible(true);
     m_toastTimer->start(durationMs);
+}
+
+void MainPage::showChannelMenu(int row, const QPointF& pos) {
+    Q_UNUSED(row)
+    Q_UNUSED(pos)
+
+    for (auto* old : findChildren<QskMenu*>())
+        old->deleteLater();
+    for (auto* old : findChildren<MenuOverlay*>())
+        old->deleteLater();
+
+    auto* menu = new QskMenu(this);
+    menu->setModal(true);
+    menu->addOption(QskLabelData("Mute"));
+    menu->addOption(QskLabelData("Pin"));
+    menu->addOption(QskLabelData("Delete"));
+
+    menu->setOrigin(pos);
+
+    connect(menu, &QskMenu::triggered, this, [this](int index) {
+        Q_UNUSED(index)
+        if (auto* m = qobject_cast<QskMenu*>(sender()))
+            m->close();
+    });
+
+    {
+        auto* overlay = new MenuOverlay(menu);
+        connect(menu, &QObject::destroyed, overlay, &QObject::deleteLater);
+    }
+
+    menu->open();
 }
 
 void MainPage::handleShareIntent(const QString& action, const QString& mimeType,

@@ -4,7 +4,9 @@
 #include "page.h"
 
 class QskTextLabel;
+class QskPushButton;
 class QTimer;
+class ChannelListWidget;
 
 class MainPage : public Page
 {
@@ -27,9 +29,20 @@ protected:
     void onNewIntent(const QVariantMap& launchArgs) override;
 
 private:
+    void showChannelMenu(int row, const QPointF& pos);
+    void setActiveTab(int index);
+
     QskTextLabel* m_toastLabel = nullptr;
     QTimer* m_toastTimer = nullptr;
+    ChannelListWidget* m_channelList = nullptr;
     bool m_keepScreenOn = true;
+
+    struct NavTab {
+        QskPushButton* btn = nullptr;
+        QskTextLabel* label = nullptr;
+    };
+    NavTab m_navTabs[4];
+    int m_activeTab = 0;
 };
 
 void registerMainPage(MainPage* page);

@@ -46,6 +46,8 @@ qt_add_executable(qsktox
     src/menuoverlay.cpp
     src/mainpage.h
     src/mainpage.cpp
+    src/channellist.h
+    src/channellist.cpp
     src/settingspage.h
     src/settingspage.cpp
     src/aboutpage.h
@@ -76,7 +78,7 @@ target_include_directories(qsktox PRIVATE
     ${qlcomp_dir}
 )
 
-target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick Qt6::Network Qt6::Core)
+target_link_libraries(qsktox PRIVATE Qsk::QSkinny Qt6::Quick Qt6::Network Qt6::Core Qt6::QuickPrivate)
 
 # ── extras/go 共享库 (c-shared) ──
 set(GO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extras/go)
