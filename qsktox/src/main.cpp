@@ -395,7 +395,20 @@ int main(int argc, char* argv[]) {
     // 注册失败
     QObject::connect(PushHandler::instance(), &PushHandler::registrationFailed,
         [](const QString& reason) {
-            showAndroidToast("Push 注册失败: " + reason);
+            QString toastMsg;
+            if (reason.contains(QString::fromUtf8("未安装")) || reason.contains("not installed")) {
+                toastMsg = QString::fromUtf8("⚠️ %1\n请安装后重新打开应用").arg(reason);
+            } else if (reason.contains(QString::fromUtf8("未找到")) || reason.contains("no distributor")
+                       || reason.contains("getDistributors")) {
+                toastMsg = QString::fromUtf8("⚠️ 未检测到推送服务\n请安装 ntfy (UnifiedPush) 后重试");
+            } else if (reason.contains(QString::fromUtf8("超时"))) {
+                toastMsg = QString::fromUtf8("⚠️ %1\n请打开 ntfy 后重试").arg(reason);
+            } else if (reason.contains(QString::fromUtf8("启动失败")) || reason.contains("FAILED")) {
+                toastMsg = QString::fromUtf8("⚠️ 推送服务启动失败\n请检查 ntfy 是否在后台运行");
+            } else {
+                toastMsg = QString::fromUtf8("⚠️ Push 注册失败: %1").arg(reason);
+            }
+            showAndroidToast(toastMsg);
         });
 
     // endpoint 注册成功

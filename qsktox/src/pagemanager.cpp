@@ -89,6 +89,11 @@ void PageManager::activatePage(Page* page)
         }
     }
 
+    // 取消延迟移除（页面被重新激活，不应再从 stackbox 移除）
+    if (m_pendingRemove) {
+        m_pendingRemove = nullptr;
+    }
+
     switch (page->state()) {
     case PageState::Created:
         // 新创建: onStart → onResume
@@ -245,10 +250,16 @@ void PageManager::open(const QString& id, const QVariantMap& args,
                     popPage->setFinishing(popPolicy == CachePolicy::Transient);
                     if (popPolicy == CachePolicy::Transient) {
                         destroyPage(popPage);
-                    } else if (popPolicy == CachePolicy::LRU) {
-                        addToCache(popPage);
+                    } else {
+                        if (popPolicy == CachePolicy::LRU) {
+                            addToCache(popPage);
+                        }
+                        QTimer::singleShot(250, this, [this, popPage]() {
+                            if (m_stackBox->indexOf(popPage) >= 0) {
+                                m_stackBox->removeItem(popPage);
+                            }
+                        });
                     }
-                    // Permanent: 保留在 m_pages
                 }
                 m_history.pop_back();
             }
@@ -281,6 +292,10 @@ void PageManager::open(const QString& id, const QVariantMap& args,
     } else {
         // 在缓存中（cacheable/permanent）
         target->onNewIntent(args);
+        // 如果页面在 m_pages 中但不在 stackbox 中（之前 back 时被移除了），重新添加
+        if (m_stackBox->indexOf(target) < 0) {
+            m_stackBox->addItem(target);
+        }
     }
 
     if (!target) {
@@ -292,8 +307,10 @@ void PageManager::open(const QString& id, const QVariantMap& args,
     // 3. 激活目标页
     activatePage(target);
 
-    // 4. 记录历史
-    m_history.push_back(id);
+    // 4. 记录历史（栈顶去重，避免重复推入导致返回栈膨胀）
+    if (m_history.isEmpty() || m_history.last() != id) {
+        m_history.push_back(id);
+    }
 
     m_busy = false;
 }
@@ -333,7 +350,7 @@ void PageManager::back()
 
     Page* current = m_pages.value(currentId);
 
-    // 1. 停用当前页（不销毁，保留 stackbox 中以保证索引正确）
+    // 1. 停用当前页（延迟从 stackbox 移除，保留页面实例）
     if (current) {
         current->setFinishing(policy == CachePolicy::Transient);
         deactivateCurrentPage();
@@ -345,6 +362,10 @@ void PageManager::back()
         QVariantMap savedState = QSettings().value("page_" + targetId + "_state").toMap();
         target = createPage(targetId, {}, savedState);
     } else {
+        // 重新添加到 stackbox（如果之前 back 时被移除了）
+        if (m_stackBox->indexOf(target) < 0) {
+            m_stackBox->addItem(target);
+        }
         auto rit = m_pendingResults.find(targetId);
         if (rit != m_pendingResults.end()) {
             if (current) {
@@ -361,7 +382,7 @@ void PageManager::back()
         activatePage(target);
     }
 
-    // 4. 延迟销毁当前页（等动画完成后 removeItem，避免 animator item 引用失效）
+    // 4. 延迟销毁/移除当前页（等动画完成后 removeItem，避免 animator item 引用失效）
     if (current) {
         if (policy == CachePolicy::Transient) {
             m_pendingDestroy = current;
@@ -371,8 +392,20 @@ void PageManager::back()
                     m_pendingDestroy = nullptr;
                 }
             });
-        } else if (policy == CachePolicy::LRU) {
-            addToCache(current);
+        } else {
+            // LRU/Permanent: 延迟从 stackbox 移除（等动画完成），但保留页面实例
+            if (policy == CachePolicy::LRU) {
+                addToCache(current);
+            }
+            m_pendingRemove = current;
+            QTimer::singleShot(250, this, [this]() {
+                if (m_pendingRemove) {
+                    if (m_stackBox->indexOf(m_pendingRemove) >= 0) {
+                        m_stackBox->removeItem(m_pendingRemove);
+                    }
+                    m_pendingRemove = nullptr;
+                }
+            });
         }
     }
 

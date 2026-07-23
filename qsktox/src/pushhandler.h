@@ -14,12 +14,21 @@ public:
 
     void registerDevice();
     void selectDistributor(const QString& distributor);
+    void cancelRegistrationTimeout();
 
 Q_SIGNALS:
     void distributorsFound(const QStringList& distributors);
     void pushReceived(const QString& endpoint, const QString& instance);
     void pushMessage(const QByteArray& message, const QString& instance);
     void registrationFailed(const QString& reason);
+    void registrationSent();
+
+protected:
+    void timerEvent(QTimerEvent* event) override;
+
+private:
+    void startRegistrationTimeout();
+    int m_regTimeoutTimerId = 0;
 };
 
 #endif

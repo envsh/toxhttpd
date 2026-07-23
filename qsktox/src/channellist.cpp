@@ -287,6 +287,7 @@ ChannelListWidget::ChannelListWidget(QQuickItem* parent)
 
     m_tapHandler = new QQuickTapHandler(this);
     m_tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
+    m_tapHandler->setExclusiveSignals(QQuickTapHandler::SingleTap | QQuickTapHandler::DoubleTap);
 
     connect(m_tapHandler, &QQuickTapHandler::singleTapped, this,
         [this](QEventPoint pt, Qt::MouseButton) {
@@ -297,12 +298,6 @@ ChannelListWidget::ChannelListWidget(QQuickItem* parent)
             int row = rowFromPosition(pt.position());
             if (row >= 0 && row < m_items.size()) {
                 Q_EMIT rowClicked(row, m_items[row].title);
-                if (auto* rowItem = m_visibleRows.value(row)) {
-                    rowItem->setOpacity(0.5);
-                    QTimer::singleShot(150, rowItem, [rowItem]() {
-                        rowItem->setOpacity(1.0);
-                    });
-                }
             }
         });
 

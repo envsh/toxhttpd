@@ -20,6 +20,14 @@
         android:largeScreens="true"
         android:normalScreens="true"
         android:smallScreens="true" />
+
+    <queries>
+        <intent>
+            <action android:name="org.unifiedpush.android.distributor.REGISTER"/>
+        </intent>
+        <package android:name="io.heckel.ntfy"/>
+    </queries>
+
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true"

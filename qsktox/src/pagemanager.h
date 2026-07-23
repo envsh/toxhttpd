@@ -117,6 +117,9 @@ private:
     // 延迟销毁（等动画完成后 removeItem，避免 animator item 引用失效）
     QTimer m_destroyTimer;
     Page* m_pendingDestroy = nullptr;
+
+    // 延迟从 stackbox 移除（LRU/Permanent，等动画完成，可被 activatePage 取消）
+    Page* m_pendingRemove = nullptr;
 };
 
 #endif

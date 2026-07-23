@@ -365,9 +365,9 @@ QSGNode* MessageRowItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
     if (m_dirty) {
         node->setItem(m_item);
         m_dirty = false;
+        node->triggerUpdate(window(), QRectF(QPointF(0, 0), QSizeF(width(), height())),
+            QSizeF(width(), height()));
     }
-    node->triggerUpdate(window(), QRectF(QPointF(0, 0), QSizeF(width(), height())),
-        QSizeF(width(), height()));
     return node;
 }
 
@@ -386,6 +386,7 @@ MessageListWidget::MessageListWidget(QQuickItem* parent)
 
     m_tapHandler = new QQuickTapHandler(this);
     m_tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
+    m_tapHandler->setExclusiveSignals(QQuickTapHandler::SingleTap | QQuickTapHandler::DoubleTap);
 
     connect(m_tapHandler, &QQuickTapHandler::singleTapped, this,
         [this](QEventPoint pt, Qt::MouseButton) {
@@ -396,12 +397,14 @@ MessageListWidget::MessageListWidget(QQuickItem* parent)
             int row = rowFromPosition(pt.position());
             if (row >= 0 && row < m_items.size()) {
                 Q_EMIT rowClicked(row);
-                if (auto* rowItem = m_visibleRows.value(row)) {
-                    rowItem->setOpacity(0.5);
-                    QTimer::singleShot(150, rowItem, [rowItem]() {
-                        rowItem->setOpacity(1.0);
-                    });
-                }
+            }
+        });
+
+    connect(m_tapHandler, &QQuickTapHandler::doubleTapped, this,
+        [this](QEventPoint pt, Qt::MouseButton) {
+            int row = rowFromPosition(pt.position());
+            if (row >= 0 && row < m_items.size()) {
+                Q_EMIT rowDoubleClicked(row);
             }
         });
 
@@ -429,6 +432,13 @@ MessageListWidget::~MessageListWidget()
 
 void MessageListWidget::populateMessages()
 {
+    if (m_fadeAnimator) {
+        m_fadeAnimator->stop();
+        delete m_fadeAnimator;
+        m_fadeAnimator = nullptr;
+    }
+    setOpacity(1.0);
+
     m_items.clear();
     for (int i = 0; i < s_mockCount; ++i) {
         m_items.append(s_mockMessages[i]);
@@ -451,9 +461,9 @@ void MessageListWidget::populateMessages()
 
     QTimer::singleShot(100, this, [this]() {
         if (window()) {
-            auto* anim = new MessageListAnimator(this, this);
-            anim->setWindow(window());
-            anim->start();
+            m_fadeAnimator = new MessageListAnimator(this, this);
+            m_fadeAnimator->setWindow(window());
+            m_fadeAnimator->start();
         }
     });
 }
@@ -542,7 +552,8 @@ void MessageListWidget::updateVisibleRows()
 void MessageListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
 {
     QskScrollArea::geometryChangeEvent(event);
-    if (event->isResized() && m_contentView) {
+    if (event->isResized() && m_contentView && !m_rebuildingLayout) {
+        m_rebuildingLayout = true;
         rebuildLayout(this);
         qreal totalH = m_rowYOffsets.isEmpty() ? 0 : m_rowYOffsets.last();
         qreal viewW = viewContentsRect().width();
@@ -552,6 +563,11 @@ void MessageListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
             row->setWidth(viewW);
         }
         updateVisibleRows();
+        qreal viewH = viewContentsRect().height();
+        if (totalH > viewH) {
+            setScrollPos(QPointF(0, totalH - viewH));
+        }
+        m_rebuildingLayout = false;
     }
 }
 

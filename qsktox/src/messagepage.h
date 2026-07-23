@@ -4,7 +4,6 @@
 #include "page.h"
 
 class MessageListWidget;
-class QskTextLabel;
 class QskTextField;
 
 class MessagePage : public Page

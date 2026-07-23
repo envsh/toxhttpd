@@ -45,6 +45,9 @@ private:
     bool m_dirty = true;
 };
 
+class MessageRowItem;
+class MessageListAnimator;
+
 class MessageListWidget : public QskScrollArea
 {
     Q_OBJECT
@@ -59,6 +62,7 @@ public:
 Q_SIGNALS:
     void rowClicked(int row);
     void rowLongPressed(int row, const QPointF& scenePos);
+    void rowDoubleClicked(int row);
 
 protected:
     void geometryChangeEvent(QskGeometryChangeEvent*) override;
@@ -75,7 +79,9 @@ private:
     QVector<qreal> m_rowYOffsets;
     QMap<int, MessageRowItem*> m_visibleRows;
     QQuickTapHandler* m_tapHandler = nullptr;
+    MessageListAnimator* m_fadeAnimator = nullptr;
     bool m_longPressFired = false;
+    bool m_rebuildingLayout = false;
 };
 
 void rebuildLayout(MessageListWidget*);

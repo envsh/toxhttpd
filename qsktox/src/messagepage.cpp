@@ -1,5 +1,6 @@
 #include "messagepage.h"
 #include "messagelist.h"
+#include "androidutils.h"
 #include "menuoverlay.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
@@ -8,7 +9,6 @@
 #include <QskBoxShapeMetrics.h>
 #include <QskMenu.h>
 #include <QskLabelData.h>
-#include <QTimer>
 #include <QTime>
 
 MessagePage::MessagePage(QQuickItem* parent)
@@ -93,6 +93,12 @@ void MessagePage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     sendBtn->setBoxShapeHint(QskPushButton::Panel,
         QskBoxShapeMetrics(8, Qt::AbsoluteSize));
     connect(sendBtn, &QskAbstractButton::clicked, this, &MessagePage::sendMessage);
+
+    // ── Double click handler ──
+    connect(m_messageList, &MessageListWidget::rowDoubleClicked,
+        this, [this](int row) {
+            showAndroidToast(QString::fromUtf8("双击第 %1 条消息").arg(row + 1));
+        });
 }
 
 void MessagePage::sendMessage()

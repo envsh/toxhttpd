@@ -10,6 +10,7 @@
 #include <QJniObject>
 #include <QSettings>
 #include <QUuid>
+#include <QTimerEvent>
 
 static PushHandler* s_instance = nullptr;
 static const char* UP_CLASS = "org/unifiedpush/android/connector/UnifiedPush";
@@ -39,6 +40,8 @@ void PushHandler::start()
 {
     if (s_instance) return;
     s_instance = new PushHandler();
+    QObject::connect(s_instance, &PushHandler::registrationSent,
+        s_instance, &PushHandler::startRegistrationTimeout);
 
     QSettings s;
     QString deviceToken = s.value("pushDeviceToken").toString();
@@ -50,6 +53,8 @@ void PushHandler::start()
     qDebug() << "[PushHandler] initialized, device=" << deviceToken;
     showAndroidToast("Push 初始化...");
 }
+
+static bool ntfyshPushInstalled = false;
 
 void PushHandler::registerDevice()
 {
@@ -65,6 +70,24 @@ void PushHandler::registerDevice()
             "(Landroid/content/Context;)Ljava/lang/String;",
             ctx.object());
         QString savedDistributor = saved.toString();
+
+        // 前置检测：验证是否有 UnifiedPush 分发器（无条件）
+        QJniObject ctxObj(ctx.object());
+        QJniObject pm = ctxObj.callObjectMethod(
+            "getPackageManager", "()Landroid/content/pm/PackageManager;");
+        QJniObject pkgName = QJniObject::fromString("io.heckel.ntfy");
+        QJniObject packageInfo = pm.callObjectMethod(
+            "getPackageInfo",
+            "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;",
+            pkgName.object(), 0);
+        bool hasDistributor = packageInfo.isValid();
+        ntfyshPushInstalled = hasDistributor;
+        if (!hasDistributor) {
+            qWarning() << "[PushHandler] no UnifiedPush distributor found";
+            QMetaObject::invokeMethod(s_instance, []() {
+                showAndroidToast(QString::fromUtf8("⚠️ 未检测到推送服务，安装 ntfy 可获得消息通知 111"));
+            }, Qt::QueuedConnection);
+        }
 
         if (!savedDistributor.isEmpty()) {
             qDebug() << "[PushHandler]已有 distributor:" << savedDistributor;
@@ -102,6 +125,9 @@ void PushHandler::registerDevice()
             }
 
             qDebug() << "[PushHandler] register sent to" << savedDistributor;
+            QMetaObject::invokeMethod(s_instance, []() {
+                emit s_instance->registrationSent();
+            }, Qt::QueuedConnection);
             return;
         }
 
@@ -133,7 +159,7 @@ void PushHandler::registerDevice()
         QMetaObject::invokeMethod(s_instance, [distributors]() {
             if (distributors.isEmpty()) {
                 qWarning() << "[PushHandler] no distributors found";
-                emit s_instance->registrationFailed("未找到 UnifiedPush 分发器，请安装 ntfy");
+                emit s_instance->registrationFailed("未找到 UnifiedPush 分发器，请安装 ntfy 222");
                 return;
             }
             if (distributors.size() == 1) {
@@ -141,6 +167,9 @@ void PushHandler::registerDevice()
                 return;
             }
             emit s_instance->distributorsFound(distributors);
+        }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(s_instance, []() {
+            emit s_instance->registrationSent();
         }, Qt::QueuedConnection);
     });
 }
@@ -233,6 +262,7 @@ Java_io_fedlet_mobutil_PushServiceImpl_onNewEndpointNative(
     s.sync();
 
     if (s_instance) {
+        s_instance->cancelRegistrationTimeout();
         QMetaObject::invokeMethod(s_instance, [endpoint, instance]() {
             emit s_instance->pushReceived(endpoint, instance);
         }, Qt::QueuedConnection);
@@ -271,6 +301,7 @@ Java_io_fedlet_mobutil_PushServiceImpl_onRegistrationFailedNative(
                << "instance:" << instance;
 
     if (s_instance) {
+        s_instance->cancelRegistrationTimeout();
         QMetaObject::invokeMethod(s_instance, [reason]() {
             emit s_instance->registrationFailed(reason);
         }, Qt::QueuedConnection);
@@ -285,6 +316,31 @@ Java_io_fedlet_mobutil_PushServiceImpl_onUnregisteredNative(
     qDebug() << "[PushHandler] unregistered, instance:" << instance;
 }
 
+void PushHandler::startRegistrationTimeout()
+{
+    if (m_regTimeoutTimerId) {
+        killTimer(m_regTimeoutTimerId);
+    }
+    m_regTimeoutTimerId = startTimer(10000);
+}
+
+void PushHandler::cancelRegistrationTimeout()
+{
+    if (m_regTimeoutTimerId) {
+        killTimer(m_regTimeoutTimerId);
+        m_regTimeoutTimerId = 0;
+    }
+}
+
+void PushHandler::timerEvent(QTimerEvent* event)
+{
+    if (event->timerId() == m_regTimeoutTimerId) {
+        m_regTimeoutTimerId = 0;
+        qWarning() << "[PushHandler] registration timeout - distributor not responding";
+        emit registrationFailed(QString::fromUtf8("推送注册超时，请检查 ntfy 是否在运行, 安装: %1").arg(ntfyshPushInstalled));
+    }
+}
+
 #else
 
 void PushHandler::start() {}
@@ -292,5 +348,8 @@ void PushHandler::stop() {}
 PushHandler* PushHandler::instance() { return nullptr; }
 void PushHandler::registerDevice() {}
 void PushHandler::selectDistributor(const QString&) {}
+void PushHandler::startRegistrationTimeout() {}
+void PushHandler::cancelRegistrationTimeout() {}
+void PushHandler::timerEvent(QTimerEvent*) {}
 
 #endif
