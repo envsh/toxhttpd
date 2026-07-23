@@ -48,6 +48,10 @@ qt_add_executable(qsktox
     src/mainpage.cpp
     src/channellist.h
     src/channellist.cpp
+    src/messagelist.h
+    src/messagelist.cpp
+    src/messagepage.h
+    src/messagepage.cpp
     src/settingspage.h
     src/settingspage.cpp
     src/aboutpage.h

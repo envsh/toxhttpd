@@ -28,6 +28,7 @@
 #include "settingspage.h"
 #include "aboutpage.h"
 #include "logpage.h"
+#include "messagepage.h"
 #include "keepalive.h"
 #include "networkmonitor.h"
 #include "pushhandler.h"
@@ -307,6 +308,10 @@ int main(int argc, char* argv[]) {
 
     pageManager->registerPage("logs", []() -> Page* {
         return new LogPage();
+    }, {CachePolicy::Transient, LaunchMode::Standard});
+
+    pageManager->registerPage("message", []() -> Page* {
+        return new MessagePage();
     }, {CachePolicy::Transient, LaunchMode::Standard});
 
     // ── Window ──

@@ -2,6 +2,7 @@
 #include "pagemanager.h"
 #include "menuoverlay.h"
 #include "channellist.h"
+#include "messagepage.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -145,8 +146,8 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
 
     connect(m_channelList, &ChannelListWidget::rowClicked,
         this, [this](int row, const QString& chatName) {
-            Q_UNUSED(row)
-            showToast(QString::fromUtf8("已选择: ") + chatName);
+            pageManager()->open("message",
+                {{"channelIndex", row}, {"channelName", chatName}});
         });
 
     connect(m_channelList, &ChannelListWidget::rowLongPressed,
