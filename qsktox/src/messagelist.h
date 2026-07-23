@@ -53,23 +53,32 @@ public:
     ~MessageListWidget() override;
 
     void populateMessages();
+    void appendMessage(const MessageItem& item);
+    int messageCount() const { return m_items.size(); }
 
 Q_SIGNALS:
     void rowClicked(int row);
+    void rowLongPressed(int row, const QPointF& scenePos);
 
 protected:
     void geometryChangeEvent(QskGeometryChangeEvent*) override;
 
 private:
+    friend void rebuildLayout(MessageListWidget*);
+
     int rowFromPosition(const QPointF& localPos) const;
     void updateVisibleRows();
 
     QQuickItem* m_contentView = nullptr;
     QVector<MessageItem> m_items;
+    QVector<qreal> m_rowHeights;
+    QVector<qreal> m_rowYOffsets;
     QMap<int, MessageRowItem*> m_visibleRows;
     QQuickTapHandler* m_tapHandler = nullptr;
     bool m_longPressFired = false;
 };
+
+void rebuildLayout(MessageListWidget*);
 
 class MessageListAnimator : public QskAnimator
 {

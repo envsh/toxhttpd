@@ -5,6 +5,7 @@
 
 class MessageListWidget;
 class QskTextLabel;
+class QskTextField;
 
 class MessagePage : public Page
 {
@@ -17,7 +18,10 @@ protected:
                   const QVariantMap& savedState) override;
 
 private:
+    void sendMessage();
+
     MessageListWidget* m_messageList = nullptr;
+    QskTextField* m_input = nullptr;
 };
 
 #endif
