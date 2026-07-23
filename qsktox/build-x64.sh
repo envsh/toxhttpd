@@ -24,5 +24,6 @@ if [ "$(uname)" != "Darwin" ]; then
     sed -i 's/-lQt6Qml -lQt6Quick -lQt6OpenGL//g' CMakeFiles/qsktox.dir/link.txt
 fi
 
-make -j$(nproc)
+#make -j$(nproc)
+make -j1
 echo "=== done: LD_LIBRARY_PATH=build-x64:/opt/qt/qskinny/lib/qskinny:$QTDIR/lib ./build-x64/qsktox ==="

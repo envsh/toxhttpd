@@ -23,7 +23,8 @@ BUILD_DIR=build-android
     -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
 # 2. build native .so only (not apk target)
-cmake --build "$BUILD_DIR" -j$(nproc) --target qsktox
+#cmake --build "$BUILD_DIR" -j$(nproc) --target qsktox
+cmake --build "$BUILD_DIR" -j1 --target qsktox
 
 # 3. prepare android-build dir (copy .so + Qt deps, no Gradle)
 APK_DIR="$BUILD_DIR/android-build"
