@@ -59,6 +59,8 @@ qt_add_executable(qsktox
     src/shareintentreceiver.cpp
     src/pushhandler.h
     src/pushhandler.cpp
+    src/mytaphandler.h
+    src/mytaphandler.cpp
     ${qlapp_dir}/cJSON.c
     ${qlapp_dir}/message_db.cpp
     ${qlapp_dir}/storage.cpp
