@@ -9,8 +9,7 @@
 #include <QVector>
 #include <QMap>
 #include <QPointer>
-#include <private/qquicktaphandler_p.h>
-
+#include <QPointF>
 struct MessageItem {
     QString sender;
     QString content;
@@ -47,6 +46,7 @@ private:
 
 class MessageRowItem;
 class MessageListAnimator;
+class MyTapHandler;
 
 class MessageListWidget : public QskScrollArea
 {
@@ -66,6 +66,8 @@ Q_SIGNALS:
 
 protected:
     void geometryChangeEvent(QskGeometryChangeEvent*) override;
+    bool childMouseEventFilter(QQuickItem* child, QEvent* event) override;
+    bool event(QEvent* event) override;
 
 private:
     friend void rebuildLayout(MessageListWidget*);
@@ -78,9 +80,8 @@ private:
     QVector<qreal> m_rowHeights;
     QVector<qreal> m_rowYOffsets;
     QMap<int, MessageRowItem*> m_visibleRows;
-    QQuickTapHandler* m_tapHandler = nullptr;
     MessageListAnimator* m_fadeAnimator = nullptr;
-    bool m_longPressFired = false;
+    MyTapHandler* m_clickHandler = nullptr;
     bool m_rebuildingLayout = false;
 };
 

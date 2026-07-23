@@ -1,10 +1,13 @@
 #include "messagelist.h"
+#include "mytaphandler.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetrics>
-#include <QTimer>
 #include <QEasingCurve>
 #include <QQuickWindow>
+#include <QCursor>
+#include <QStyleHints>
+#include <QGuiApplication>
 #include <QtMath>
 #include <QskEvent.h>
 
@@ -384,36 +387,26 @@ MessageListWidget::MessageListWidget(QQuickItem* parent)
     m_contentView = new QQuickItem(this);
     setScrolledItem(m_contentView);
 
-    m_tapHandler = new QQuickTapHandler(this);
-    m_tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
-    m_tapHandler->setExclusiveSignals(QQuickTapHandler::SingleTap | QQuickTapHandler::DoubleTap);
-
-    connect(m_tapHandler, &QQuickTapHandler::singleTapped, this,
-        [this](QEventPoint pt, Qt::MouseButton) {
-            if (m_longPressFired) {
-                m_longPressFired = false;
-                return;
-            }
-            int row = rowFromPosition(pt.position());
-            if (row >= 0 && row < m_items.size()) {
-                Q_EMIT rowClicked(row);
-            }
-        });
-
-    connect(m_tapHandler, &QQuickTapHandler::doubleTapped, this,
-        [this](QEventPoint pt, Qt::MouseButton) {
-            int row = rowFromPosition(pt.position());
-            if (row >= 0 && row < m_items.size()) {
-                Q_EMIT rowDoubleClicked(row);
-            }
-        });
-
-    connect(m_tapHandler, &QQuickTapHandler::longPressed, this, [this]() {
-        m_longPressFired = true;
-        QPointF local = m_tapHandler->point().pressPosition();
-        int row = rowFromPosition(local);
+    // ── 点击检测（通过 MyTapHandler 转发事件）──
+    m_clickHandler = new MyTapHandler(this);
+    connect(m_clickHandler, &MyTapHandler::singleClicked, this, [this](const QPointF& scenePos) {
+        QPointF localPos = mapFromScene(scenePos);
+        int row = rowFromPosition(localPos);
         if (row >= 0 && row < m_items.size()) {
-            QPointF scenePos = mapToScene(local);
+            Q_EMIT rowClicked(row);
+        }
+    });
+    connect(m_clickHandler, &MyTapHandler::doubleClicked, this, [this](const QPointF& scenePos) {
+        QPointF localPos = mapFromScene(scenePos);
+        int row = rowFromPosition(localPos);
+        if (row >= 0 && row < m_items.size()) {
+            Q_EMIT rowDoubleClicked(row);
+        }
+    });
+    connect(m_clickHandler, &MyTapHandler::longPressed, this, [this](const QPointF& scenePos) {
+        QPointF localPos = mapFromScene(scenePos);
+        int row = rowFromPosition(localPos);
+        if (row >= 0 && row < m_items.size()) {
             Q_EMIT rowLongPressed(row, scenePos);
         }
     });
@@ -569,6 +562,21 @@ void MessageListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
         }
         m_rebuildingLayout = false;
     }
+}
+
+bool MessageListWidget::childMouseEventFilter(QQuickItem* child, QEvent* event)
+{
+    if (m_clickHandler->filterChildEvent(child, event))
+        return true;
+
+    QskControl::childMouseEventFilter(child, event);
+    return false;
+}
+
+bool MessageListWidget::event(QEvent* event)
+{
+    m_clickHandler->filterEvent(event);
+    return QskScrollArea::event(event);
 }
 
 int MessageListWidget::rowFromPosition(const QPointF& localPos) const

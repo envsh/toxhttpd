@@ -2,9 +2,11 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetrics>
-#include <QTimer>
 #include <QEasingCurve>
 #include <QQuickWindow>
+#include <private/qquicktaphandler_p.h>
+#include <QTimer>
+#include <QCursor>
 #include <QtMath>
 #include <QskEvent.h>
 
@@ -285,31 +287,26 @@ ChannelListWidget::ChannelListWidget(QQuickItem* parent)
     m_contentView = new QQuickItem(this);
     setScrolledItem(m_contentView);
 
-    m_tapHandler = new QQuickTapHandler(this);
-    m_tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
-    m_tapHandler->setExclusiveSignals(QQuickTapHandler::SingleTap | QQuickTapHandler::DoubleTap);
-
-    connect(m_tapHandler, &QQuickTapHandler::singleTapped, this,
-        [this](QEventPoint pt, Qt::MouseButton) {
-            if (m_longPressFired) {
-                m_longPressFired = false;
-                return;
-            }
-            int row = rowFromPosition(pt.position());
+    // ── QQuickTapHandler — 单击和长按检测 ──
+    auto* tapHandler = new QQuickTapHandler(m_contentView);
+    tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
+    connect(tapHandler, &QQuickTapHandler::singleTapped, this,
+        [this](QEventPoint point, Qt::MouseButton) {
+            QPointF pos = point.position();
+            int row = qFloor(pos.y() / ROW_HEIGHT);
             if (row >= 0 && row < m_items.size()) {
                 Q_EMIT rowClicked(row, m_items[row].title);
             }
         });
-
-    connect(m_tapHandler, &QQuickTapHandler::longPressed, this, [this]() {
-        m_longPressFired = true;
-        QPointF local = m_tapHandler->point().pressPosition();
-        int row = rowFromPosition(local);
-        if (row >= 0 && row < m_items.size()) {
-            QPointF scenePos = mapToScene(QPointF(width() / 2, height() / 2));
-            Q_EMIT rowLongPressed(row, scenePos);
-        }
-    });
+    connect(tapHandler, &QQuickTapHandler::longPressed, this,
+        [this]() {
+            QPointF scenePos = m_contentView->window()->mapFromGlobal(QCursor::pos());
+            QPointF localPos = m_contentView->mapFromScene(scenePos);
+            int row = qFloor(localPos.y() / ROW_HEIGHT);
+            if (row >= 0 && row < m_items.size()) {
+                Q_EMIT rowLongPressed(row, scenePos);
+            }
+        });
 
     connect(this, &QskScrollBox::scrollPosChanged,
         this, &ChannelListWidget::updateVisibleRows);
@@ -394,31 +391,6 @@ void ChannelListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
         }
         updateVisibleRows();
     }
-}
-
-int ChannelListWidget::rowAtPos(const QPointF& pos) const
-{
-    const auto vr = viewContentsRect();
-    if (!vr.contains(pos)) {
-        return -1;
-    }
-    const qreal contentY = pos.y() - vr.top() + scrollPos().y();
-    const int row = qFloor(contentY / ROW_HEIGHT);
-    if (row >= 0 && row < m_items.size()) {
-        return row;
-    }
-    return -1;
-}
-
-int ChannelListWidget::rowFromPosition(const QPointF& localPos) const
-{
-    const auto vr = viewContentsRect();
-    qreal contentY = localPos.y() - vr.top() + scrollPos().y();
-    int row = qFloor(contentY / ROW_HEIGHT);
-    if (row >= 0 && row < m_items.size()) {
-        return row;
-    }
-    return -1;
 }
 
 // ═══════════════════════════════════════════════════════════════════

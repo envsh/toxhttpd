@@ -9,7 +9,7 @@
 #include <QVector>
 #include <QMap>
 #include <QPointer>
-#include <private/qquicktaphandler_p.h>
+#include <QPointF>
 
 struct ChannelItem {
     QString avatarLetter;
@@ -64,15 +64,11 @@ protected:
     void geometryChangeEvent(QskGeometryChangeEvent*) override;
 
 private:
-    int rowAtPos(const QPointF& pos) const;
-    int rowFromPosition(const QPointF& localPos) const;
     void updateVisibleRows();
 
     QQuickItem* m_contentView = nullptr;
     QVector<ChannelItem> m_items;
     QMap<int, ChannelRowItem*> m_visibleRows;
-    QQuickTapHandler* m_tapHandler = nullptr;
-    bool m_longPressFired = false;
 };
 
 class StaggerFadeAnimator : public QskAnimator
