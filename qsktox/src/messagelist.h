@@ -57,6 +57,7 @@ public:
     void populateMessages();
     void appendMessage(const MessageItem& item);
     int messageCount() const { return m_items.size(); }
+    const MessageItem& messageItem(int row) const { return m_items[row]; }
 
 Q_SIGNALS:
     void rowClicked(int row);

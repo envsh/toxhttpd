@@ -1,5 +1,6 @@
 #include "messagepage.h"
 #include "messagelist.h"
+#include "msgenlargeoverlay.h"
 #include "androidutils.h"
 #include "menuoverlay.h"
 #include <QskLinearBox.h>
@@ -97,7 +98,11 @@ void MessagePage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     // ── Double click handler ──
     connect(m_messageList, &MessageListWidget::rowDoubleClicked,
         this, [this](int row) {
-            showAndroidToast(QString::fromUtf8("双击第 %1 条消息").arg(row + 1));
+			// showAndroidToast(QString::fromUtf8("双击第 %1 条消息").arg(row + 1));
+            auto* overlay = new MsgEnlargeOverlay(this);
+            overlay->show(m_messageList->messageItem(row));
+            connect(overlay, &MsgEnlargeOverlay::closed,
+                    overlay, &QObject::deleteLater);
         });
 }
 

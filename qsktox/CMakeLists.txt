@@ -52,6 +52,8 @@ qt_add_executable(qsktox
     src/messagelist.cpp
     src/messagepage.h
     src/messagepage.cpp
+    src/msgenlargeoverlay.h
+    src/msgenlargeoverlay.cpp
     src/settingspage.h
     src/settingspage.cpp
     src/aboutpage.h
