@@ -5,6 +5,7 @@
 #include <QtMath>
 #include <QGuiApplication>
 #include <QStyleHints>
+#include <QDateTime>
 
 MyScrollArea::MyScrollArea(QQuickItem* parent)
     : QskScrollArea(parent)
@@ -12,6 +13,16 @@ MyScrollArea::MyScrollArea(QQuickItem* parent)
     auto* hints = QGuiApplication::styleHints();
     m_doubleTapInterval = hints->mouseDoubleClickInterval();
     m_doubleTapDistance = hints->touchDoubleTapDistance();
+}
+
+// 双击 guard：检测到双击后，在 m_doubleTapGuardUntil（now+500ms）之前返回 true。
+// 用于抑制 QQuickTapHandler 的 longPressed 误触发——Android 上 passiveGrab 失败导致
+// 第一次点击的 longPressTimer 无法在 TouchEnd 时取消，500ms 后仍会触发 longPressed。
+bool MyScrollArea::isDoubleTapGuardActive() const
+{
+    if (m_doubleTapGuardUntil == 0)
+        return false;
+    return QDateTime::currentMSecsSinceEpoch() < m_doubleTapGuardUntil;
 }
 
 bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
@@ -37,6 +48,7 @@ bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
                 && (now - m_lastTapTimestamp) < (ulong)m_doubleTapInterval
                 && distSq < (qreal)m_doubleTapDistance * m_doubleTapDistance) {
                 m_lastTapTimestamp = 0;
+                m_doubleTapGuardUntil = QDateTime::currentMSecsSinceEpoch() + 999;
                 Q_EMIT doubleTapped(scenePos);
             }
         }

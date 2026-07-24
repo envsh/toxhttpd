@@ -406,6 +406,10 @@ MessageListWidget::MessageListWidget(QQuickItem* parent)
     //     });
     connect(tapHandler, &QQuickTapHandler::longPressed, this,
         [this]() {
+            // 双击 guard：检测到双击后 500ms 内抑制 longPressed，防止 Android 上
+            // QQuickTapHandler 的 passiveGrab 失败导致 longPressTimer 误触发
+            if (isDoubleTapGuardActive())
+                return;
             QPointF pos = lastTouchScenePos();
             QPointF localPos = mapFromScene(pos);
             int row = rowFromPosition(localPos);
