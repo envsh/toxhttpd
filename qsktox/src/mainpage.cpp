@@ -3,6 +3,7 @@
 #include "menuoverlay.h"
 #include "channellist.h"
 #include "messagepage.h"
+#include "pushstatusbar.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -138,6 +139,9 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
 
         menu->open();
     });
+
+    // ── Push Status Bar ──
+    new PushStatusBar(layout);
 
     // ── ChannelList (频道列表) ──
     m_channelList = new ChannelListWidget(layout);

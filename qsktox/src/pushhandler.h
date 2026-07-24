@@ -11,6 +11,11 @@ public:
     static void start();
     static void stop();
     static PushHandler* instance();
+    static bool isNtfyInstalled();
+    static bool isConnected();
+    static bool isRegistering();
+    void setConnected(bool v);
+    void setRegistering(bool v);
 
     void registerDevice();
     void selectDistributor(const QString& distributor);
@@ -22,6 +27,7 @@ Q_SIGNALS:
     void pushMessage(const QByteArray& message, const QString& instance);
     void registrationFailed(const QString& reason);
     void registrationSent();
+    void statusChanged();
 
 protected:
     void timerEvent(QTimerEvent* event) override;
@@ -29,6 +35,8 @@ protected:
 private:
     void startRegistrationTimeout();
     int m_regTimeoutTimerId = 0;
+    bool m_isConnected = false;
+    bool m_isRegistering = false;
 };
 
 #endif

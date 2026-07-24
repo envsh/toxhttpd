@@ -61,6 +61,8 @@ qt_add_executable(qsktox
     src/shareintentreceiver.cpp
     src/pushhandler.h
     src/pushhandler.cpp
+    src/pushstatusbar.h
+    src/pushstatusbar.cpp
     src/phonemonitor.h
     src/phonemonitor.cpp
     src/mytaphandler.h
