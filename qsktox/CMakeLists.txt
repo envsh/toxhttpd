@@ -61,6 +61,8 @@ qt_add_executable(qsktox
     src/pushhandler.cpp
     src/mytaphandler.h
     src/mytaphandler.cpp
+    src/myscrollarea.h
+    src/myscrollarea.cpp
     ${qlapp_dir}/cJSON.c
     ${qlapp_dir}/message_db.cpp
     ${qlapp_dir}/storage.cpp

@@ -4,9 +4,9 @@
 #include <QFontMetrics>
 #include <QEasingCurve>
 #include <QQuickWindow>
+// #include <private/qquicktaphandler_p.h>
 #include <private/qquicktaphandler_p.h>
 #include <QTimer>
-#include <QCursor>
 #include <QtMath>
 #include <QskEvent.h>
 
@@ -279,7 +279,7 @@ QSGNode* ChannelRowItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
 // ═══════════════════════════════════════════════════════════════════
 
 ChannelListWidget::ChannelListWidget(QQuickItem* parent)
-    : QskScrollArea(parent)
+    : MyScrollArea(parent)
 {
     setFlickableOrientations(Qt::Vertical);
     setItemResizable(false);
@@ -300,11 +300,11 @@ ChannelListWidget::ChannelListWidget(QQuickItem* parent)
         });
     connect(tapHandler, &QQuickTapHandler::longPressed, this,
         [this]() {
-            QPointF scenePos = m_contentView->window()->mapFromGlobal(QCursor::pos());
-            QPointF localPos = m_contentView->mapFromScene(scenePos);
+            QPointF pos = static_cast<MyScrollArea*>(this)->lastTouchScenePos();
+            QPointF localPos = m_contentView->mapFromScene(pos);
             int row = qFloor(localPos.y() / ROW_HEIGHT);
             if (row >= 0 && row < m_items.size()) {
-                Q_EMIT rowLongPressed(row, scenePos);
+                Q_EMIT rowLongPressed(row, pos);
             }
         });
 

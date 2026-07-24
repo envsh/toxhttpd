@@ -1,7 +1,7 @@
 #ifndef CHANNEL_LIST_H
 #define CHANNEL_LIST_H
 
-#include <QskScrollArea.h>
+#include "myscrollarea.h"
 #include <QskAnimator.h>
 #include <QskPaintedNode.h>
 #include <QQuickItem>
@@ -47,7 +47,7 @@ private:
     bool m_dirty = true;
 };
 
-class ChannelListWidget : public QskScrollArea
+class ChannelListWidget : public MyScrollArea
 {
     Q_OBJECT
 public:
