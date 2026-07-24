@@ -4,6 +4,7 @@
 #include <QFontMetrics>
 #include <QEasingCurve>
 #include <QQuickWindow>
+// #include "mytaphandler.h"
 // #include <private/qquicktaphandler_p.h>
 #include <private/qquicktaphandler_p.h>
 #include <QTimer>

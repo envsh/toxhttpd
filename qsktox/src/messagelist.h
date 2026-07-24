@@ -1,7 +1,7 @@
 #ifndef MESSAGE_LIST_H
 #define MESSAGE_LIST_H
 
-#include <QskScrollArea.h>
+#include "myscrollarea.h"
 #include <QskAnimator.h>
 #include <QskPaintedNode.h>
 #include <QQuickItem>
@@ -46,9 +46,8 @@ private:
 
 class MessageRowItem;
 class MessageListAnimator;
-class MyTapHandler;
 
-class MessageListWidget : public QskScrollArea
+class MessageListWidget : public MyScrollArea
 {
     Q_OBJECT
 public:
@@ -66,13 +65,12 @@ Q_SIGNALS:
 
 protected:
     void geometryChangeEvent(QskGeometryChangeEvent*) override;
-    bool childMouseEventFilter(QQuickItem* child, QEvent* event) override;
-    bool event(QEvent* event) override;
 
 private:
     friend void rebuildLayout(MessageListWidget*);
 
     int rowFromPosition(const QPointF& localPos) const;
+    int rowFromContentY(qreal contentY) const;
     void updateVisibleRows();
 
     QQuickItem* m_contentView = nullptr;
@@ -81,7 +79,6 @@ private:
     QVector<qreal> m_rowYOffsets;
     QMap<int, MessageRowItem*> m_visibleRows;
     MessageListAnimator* m_fadeAnimator = nullptr;
-    MyTapHandler* m_clickHandler = nullptr;
     bool m_rebuildingLayout = false;
 };
 

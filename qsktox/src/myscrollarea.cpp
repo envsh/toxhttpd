@@ -3,10 +3,15 @@
 #include <QEvent>
 #include <QTouchEvent>
 #include <QtMath>
+#include <QGuiApplication>
+#include <QStyleHints>
 
 MyScrollArea::MyScrollArea(QQuickItem* parent)
     : QskScrollArea(parent)
 {
+    auto* hints = QGuiApplication::styleHints();
+    m_doubleTapInterval = hints->mouseDoubleClickInterval();
+    m_doubleTapDistance = hints->touchDoubleTapDistance();
 }
 
 bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
@@ -17,11 +22,23 @@ bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
     case QEvent::TouchBegin: {
         auto* te = static_cast<QTouchEvent*>(event);
         if (!te->points().isEmpty()) {
-            m_touchStartScene = te->points().first().scenePosition();
-            m_touchScenePos = m_touchStartScene;
+            QPointF scenePos = te->points().first().scenePosition();
+            m_touchStartScene = scenePos;
+            m_touchScenePos = scenePos;
             m_scrollStartPos = scrollPos();
             m_touchActive = true;
             m_scrolling = false;
+
+            ulong now = te->timestamp();
+            qreal dx = scenePos.x() - m_lastTapScene.x();
+            qreal dy = scenePos.y() - m_lastTapScene.y();
+            qreal distSq = dx * dx + dy * dy;
+            if (m_lastTapTimestamp > 0
+                && (now - m_lastTapTimestamp) < (ulong)m_doubleTapInterval
+                && distSq < (qreal)m_doubleTapDistance * m_doubleTapDistance) {
+                m_lastTapTimestamp = 0;
+                Q_EMIT doubleTapped(scenePos);
+            }
         }
         return false;
     }
@@ -48,6 +65,11 @@ bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
         return false;
     }
     case QEvent::TouchEnd: {
+        auto* te = static_cast<QTouchEvent*>(event);
+        if (m_touchActive && !m_scrolling) {
+            m_lastTapScene = m_touchStartScene;
+            m_lastTapTimestamp = te->timestamp();
+        }
         m_touchActive = false;
         m_scrolling = false;
         return false;

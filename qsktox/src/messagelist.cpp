@@ -1,15 +1,13 @@
 #include "messagelist.h"
-#include "mytaphandler.h"
+#include <private/qquicktaphandler_p.h>
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetrics>
 #include <QEasingCurve>
 #include <QQuickWindow>
-#include <QCursor>
-#include <QStyleHints>
-#include <QGuiApplication>
 #include <QtMath>
 #include <QskEvent.h>
+#include <QTimer>
 
 static constexpr qreal MIN_ROW_HEIGHT = 60;
 static constexpr qreal NAME_HEIGHT = 20;
@@ -379,7 +377,7 @@ QSGNode* MessageRowItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
 // ═══════════════════════════════════════════════════════════════════
 
 MessageListWidget::MessageListWidget(QQuickItem* parent)
-    : QskScrollArea(parent)
+    : MyScrollArea(parent)
 {
     setFlickableOrientations(Qt::Vertical);
     setItemResizable(false);
@@ -387,29 +385,44 @@ MessageListWidget::MessageListWidget(QQuickItem* parent)
     m_contentView = new QQuickItem(this);
     setScrolledItem(m_contentView);
 
-    // ── 点击检测（通过 MyTapHandler 转发事件）──
-    m_clickHandler = new MyTapHandler(this);
-    connect(m_clickHandler, &MyTapHandler::singleClicked, this, [this](const QPointF& scenePos) {
-        QPointF localPos = mapFromScene(scenePos);
-        int row = rowFromPosition(localPos);
-        if (row >= 0 && row < m_items.size()) {
-            Q_EMIT rowClicked(row);
-        }
-    });
-    connect(m_clickHandler, &MyTapHandler::doubleClicked, this, [this](const QPointF& scenePos) {
-        QPointF localPos = mapFromScene(scenePos);
-        int row = rowFromPosition(localPos);
-        if (row >= 0 && row < m_items.size()) {
-            Q_EMIT rowDoubleClicked(row);
-        }
-    });
-    connect(m_clickHandler, &MyTapHandler::longPressed, this, [this](const QPointF& scenePos) {
-        QPointF localPos = mapFromScene(scenePos);
-        int row = rowFromPosition(localPos);
-        if (row >= 0 && row < m_items.size()) {
-            Q_EMIT rowLongPressed(row, scenePos);
-        }
-    });
+    // ── QQuickTapHandler — 单击、长按检测 ──
+    auto* tapHandler = new QQuickTapHandler(m_contentView);
+    tapHandler->setGesturePolicy(QQuickTapHandler::DragThreshold);
+    connect(tapHandler, &QQuickTapHandler::singleTapped, this,
+        [this](QEventPoint point, Qt::MouseButton) {
+            int row = rowFromContentY(point.position().y());
+            if (row >= 0 && row < m_items.size()) {
+                Q_EMIT rowClicked(row);
+            }
+        });
+    // 双击改由 MyScrollArea::childMouseEventFilter 检测
+    // connect(tapHandler, &QQuickTapHandler::doubleTapped, this,
+    //     [this](QEventPoint point, Qt::MouseButton) {
+    //         QPointF localPos = mapFromScene(point.scenePosition());
+    //         int row = rowFromPosition(localPos);
+    //         if (row >= 0 && row < m_items.size()) {
+    //             Q_EMIT rowDoubleClicked(row);
+    //         }
+    //     });
+    connect(tapHandler, &QQuickTapHandler::longPressed, this,
+        [this]() {
+            QPointF pos = lastTouchScenePos();
+            QPointF localPos = mapFromScene(pos);
+            int row = rowFromPosition(localPos);
+            if (row >= 0 && row < m_items.size()) {
+                Q_EMIT rowLongPressed(row, pos);
+            }
+        });
+
+    // ── MyScrollArea 双击检测 ──
+    connect(this, &MyScrollArea::doubleTapped, this,
+        [this](QPointF scenePos) {
+            QPointF localPos = mapFromScene(scenePos);
+            int row = rowFromPosition(localPos);
+            if (row >= 0 && row < m_items.size()) {
+                Q_EMIT rowDoubleClicked(row);
+            }
+        });
 
     connect(this, &QskScrollBox::scrollPosChanged,
         this, &MessageListWidget::updateVisibleRows);
@@ -544,7 +557,7 @@ void MessageListWidget::updateVisibleRows()
 
 void MessageListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
 {
-    QskScrollArea::geometryChangeEvent(event);
+    MyScrollArea::geometryChangeEvent(event);
     if (event->isResized() && m_contentView && !m_rebuildingLayout) {
         m_rebuildingLayout = true;
         rebuildLayout(this);
@@ -564,21 +577,6 @@ void MessageListWidget::geometryChangeEvent(QskGeometryChangeEvent* event)
     }
 }
 
-bool MessageListWidget::childMouseEventFilter(QQuickItem* child, QEvent* event)
-{
-    if (m_clickHandler->filterChildEvent(child, event))
-        return true;
-
-    QskControl::childMouseEventFilter(child, event);
-    return false;
-}
-
-bool MessageListWidget::event(QEvent* event)
-{
-    m_clickHandler->filterEvent(event);
-    return QskScrollArea::event(event);
-}
-
 int MessageListWidget::rowFromPosition(const QPointF& localPos) const
 {
     if (m_rowYOffsets.isEmpty()) return -1;
@@ -586,6 +584,24 @@ int MessageListWidget::rowFromPosition(const QPointF& localPos) const
     qreal contentY = localPos.y() - vr.top() + scrollPos().y();
 
     // 二分查找
+    int lo = 0, hi = m_items.size() - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (contentY < m_rowYOffsets[mid]) {
+            hi = mid - 1;
+        } else if (contentY >= m_rowYOffsets[mid + 1]) {
+            lo = mid + 1;
+        } else {
+            return mid;
+        }
+    }
+    return -1;
+}
+
+int MessageListWidget::rowFromContentY(qreal contentY) const
+{
+    if (m_rowYOffsets.isEmpty()) return -1;
+
     int lo = 0, hi = m_items.size() - 1;
     while (lo <= hi) {
         int mid = (lo + hi) / 2;
