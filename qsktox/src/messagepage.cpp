@@ -99,6 +99,8 @@ void MessagePage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     connect(m_messageList, &MessageListWidget::rowDoubleClicked,
         this, [this](int row) {
 			// showAndroidToast(QString::fromUtf8("双击第 %1 条消息").arg(row + 1));
+            for (auto* old : findChildren<MsgEnlargeOverlay*>())
+                old->deleteLater();
             auto* overlay = new MsgEnlargeOverlay(this);
             overlay->show(m_messageList->messageItem(row));
             connect(overlay, &MsgEnlargeOverlay::closed,

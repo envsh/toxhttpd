@@ -34,6 +34,8 @@
 #include "pushhandler.h"
 #include "androidutils.h"
 #include "pagemanager.h"
+#include "msgenlargeoverlay.h"
+#include "messagepage.h"
 
 #include <memory>
 #include <thread>
@@ -56,6 +58,20 @@ protected:
             auto* ke = static_cast<QKeyEvent*>(event);
             if (ke->key() == Qt::Key_Back) {
                 event->accept();
+
+                // 先检查是否有可见的 MsgEnlargeOverlay
+                if (auto* page = qobject_cast<MessagePage*>(
+                        m_pageManager->currentPage())) {
+                    auto overlays = page->findChildren<MsgEnlargeOverlay*>();
+                    for (auto* o : overlays) {
+                        if (o->isVisible()) {
+                            Q_EMIT o->closed();
+                            o->deleteLater();
+                            return true;
+                        }
+                    }
+                }
+
                 if (m_pageManager->depth() > 1) {
                     m_pageManager->back();
                 } else {

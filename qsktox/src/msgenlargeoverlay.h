@@ -11,7 +11,7 @@ class MsgEnlargeOverlayNode : public QskPaintedNode
 {
 public:
     void setData(const MessageItem& item, int fontSizeIndex, const QSizeF& size,
-                 qreal scrollY);
+                 qreal scrollY, const QRectF& textAreaRect);
     void triggerUpdate(QQuickWindow* window, const QRectF& rect, const QSizeF& size);
     void paint(QPainter*, const QSize&, const void*) override;
     QskHashValue hash(const void*) const override;
@@ -30,6 +30,7 @@ private:
     int m_fontSizeIndex = 1;
     QSizeF m_size;
     qreal m_scrollY = 0;
+    QRectF m_textAreaRect;
 };
 
 class MsgEnlargeOverlay : public QQuickItem
@@ -44,7 +45,10 @@ Q_SIGNALS:
     void closed();
 
 protected:
-    bool event(QEvent* event) override;
+    void touchEvent(QTouchEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void hoverMoveEvent(QHoverEvent* event) override;
     QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
 
 private:
@@ -60,6 +64,8 @@ private:
     qreal m_touchStartY = 0;
     qreal m_scrollStartY = 0;
     bool m_dirty = true;
+    QRectF m_textAreaRect;
+    bool m_ignoreFirstTouch = false;
 };
 
 #endif // MSG_ENLARGE_OVERLAY_H

@@ -11,6 +11,7 @@
 #include <QEvent>
 #include <QTouchEvent>
 #include <QMouseEvent>
+#include <QCursor>
 #include <QSGSimpleRectNode>
 
 static constexpr int FONT_SIZES[] = {18, 24, 32, 40};
@@ -60,7 +61,7 @@ static LayoutRects computeLayout(const QSizeF& size)
     return r;
 }
 
-static int hitTestPos(const QPointF& pos, const QSizeF& size)
+static int hitTestPos(const QPointF& pos, const QSizeF& size, const QRectF& textArea)
 {
     auto r = computeLayout(size);
     if (r.closeBtn.contains(pos)) {
@@ -72,7 +73,7 @@ static int hitTestPos(const QPointF& pos, const QSizeF& size)
     if (r.favBtn.contains(pos)) {
         return MsgEnlargeOverlayNode::BTN_FAV;
     }
-    if (r.textArea.contains(pos)) {
+    if (textArea.contains(pos)) {
         return MsgEnlargeOverlayNode::BTN_TEXT;
     }
     for (int i = 0; i < 4; i++) {
@@ -86,12 +87,14 @@ static int hitTestPos(const QPointF& pos, const QSizeF& size)
 // ── MsgEnlargeOverlayNode ──
 
 void MsgEnlargeOverlayNode::setData(const MessageItem& item, int fontSizeIndex,
-                                     const QSizeF& size, qreal scrollY)
+                                     const QSizeF& size, qreal scrollY,
+                                     const QRectF& textAreaRect)
 {
     m_item = item;
     m_fontSizeIndex = fontSizeIndex;
     m_size = size;
     m_scrollY = scrollY;
+    m_textAreaRect = textAreaRect;
 }
 
 void MsgEnlargeOverlayNode::triggerUpdate(QQuickWindow* window, const QRectF& rect,
@@ -147,8 +150,8 @@ void MsgEnlargeOverlayNode::paint(QPainter* painter, const QSize& size, const vo
     textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
 
     painter->save();
-    painter->setClipRect(layout.textArea);
-    QRectF scrolledTextArea = layout.textArea;
+    painter->setClipRect(m_textAreaRect);
+    QRectF scrolledTextArea = m_textAreaRect;
     scrolledTextArea.moveTop(scrolledTextArea.top() - m_scrollY);
     painter->drawText(scrolledTextArea, m_item.content, textOption);
     painter->restore();
@@ -186,7 +189,7 @@ void MsgEnlargeOverlayNode::paint(QPainter* painter, const QSize& size, const vo
 
 QskHashValue MsgEnlargeOverlayNode::hash(const void*) const
 {
-    return qHash(m_item.content) ^ m_fontSizeIndex;
+    return qHash(m_item.content) ^ qHash(m_fontSizeIndex) ^ qHash(int(m_size.width())) ^ qHash(int(m_size.height()));
 }
 
 // ── MsgEnlargeOverlay ──
@@ -196,19 +199,11 @@ MsgEnlargeOverlay::MsgEnlargeOverlay(QQuickItem* parent)
 {
     setAcceptedMouseButtons(Qt::AllButtons);
     setAcceptTouchEvents(true);
+    setAcceptHoverEvents(true);
     setZ(1000);
     setFlag(ItemHasContents, true);
-}
-
-void MsgEnlargeOverlay::show(const MessageItem& item)
-{
-    m_item = item;
-    m_dirty = true;
-    m_scrollY = 0;
 
     if (auto* p = parentItem()) {
-        setSize(p->size());
-        setPosition(QPointF(0, 0));
         connect(p, &QQuickItem::widthChanged, this, [this]() {
             if (auto* p = parentItem()) {
                 setWidth(p->width());
@@ -225,6 +220,43 @@ void MsgEnlargeOverlay::show(const MessageItem& item)
                 update();
             }
         });
+    }
+}
+
+void MsgEnlargeOverlay::show(const MessageItem& item)
+{
+    m_item = item;
+    m_dirty = true;
+    m_scrollY = 0;
+    m_ignoreFirstTouch = true;
+
+    if (auto* p = parentItem()) {
+        setSize(p->size());
+        setPosition(QPointF(0, 0));
+
+        // 计算文本实际高度，垂直居中
+        const qreal h = p->height();
+        const qreal w = p->width();
+        const qreal contentW = qMin(w - PAD * 2, 500.0);
+        const qreal contentX = (w - contentW) / 2;
+        const qreal senderBottom = PAD + 32 + 20;
+        const qreal actionBarTop = h - BAR_H - PAD;
+        const qreal availableH = actionBarTop - senderBottom;
+
+        QFont msgFont;
+        msgFont.setPixelSize(FONT_SIZES[m_fontSizeIndex]);
+        QTextOption textOption;
+        textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        QTextLayout textLayout(m_item.content, msgFont);
+        textLayout.setTextOption(textOption);
+        textLayout.beginLayout();
+        while (textLayout.createLine().isValid()) {}
+        textLayout.endLayout();
+        qreal textHeight = textLayout.boundingRect().height();
+        qreal textAreaH = qMin(textHeight, availableH);
+        qreal textAreaY = senderBottom + (availableH - textAreaH) / 2.0;
+
+        m_textAreaRect = QRectF(contentX + 10, textAreaY, contentW - 20, textAreaH);
     }
 
     setVisible(true);
@@ -245,7 +277,7 @@ void MsgEnlargeOverlay::recalcMaxScroll()
     while (layout.createLine().isValid()) {}
     layout.endLayout();
 
-    auto rect = computeLayout(size()).textArea;
+    auto rect = m_textAreaRect;
     m_maxScrollY = qMax(0.0, layout.boundingRect().height() - rect.height());
     m_scrollY = qBound(0.0, m_scrollY, m_maxScrollY);
 }
@@ -263,7 +295,7 @@ QSGNode* MsgEnlargeOverlay::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeDat
         node = new MsgEnlargeOverlayNode();
     }
     if (m_dirty) {
-        node->setData(m_item, m_fontSizeIndex, size(), m_scrollY);
+        node->setData(m_item, m_fontSizeIndex, size(), m_scrollY, m_textAreaRect);
         node->triggerUpdate(window(),
             QRectF(QPointF(0, 0), size()), size());
         m_dirty = false;
@@ -271,19 +303,18 @@ QSGNode* MsgEnlargeOverlay::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeDat
     return node;
 }
 
-bool MsgEnlargeOverlay::event(QEvent* event)
+void MsgEnlargeOverlay::touchEvent(QTouchEvent* event)
 {
-    switch (event->type()) {
-    case QEvent::MouseButtonPress: {
-        handlePress(static_cast<QMouseEvent*>(event)->scenePosition());
-        return true;
-    }
-    case QEvent::TouchBegin: {
-        auto& touch = *static_cast<QTouchEvent*>(event);
-        if (!touch.points().isEmpty()) {
-            auto& pt = touch.points().first();
+    if (event->type() == QEvent::TouchBegin) {
+        if (m_ignoreFirstTouch) {
+            m_ignoreFirstTouch = false;
+            event->accept();
+            return;
+        }
+        if (!event->points().isEmpty()) {
+            auto& pt = event->points().first();
             QPointF localPos = mapFromScene(pt.scenePosition());
-            int hit = hitTestPos(localPos, size());
+            int hit = hitTestPos(localPos, size(), m_textAreaRect);
             if (hit == MsgEnlargeOverlayNode::BTN_TEXT) {
                 m_touchScrolling = true;
                 m_touchStartY = pt.scenePosition().y();
@@ -291,35 +322,64 @@ bool MsgEnlargeOverlay::event(QEvent* event)
             }
             handlePress(pt.scenePosition());
         }
-        return true;
-    }
-    case QEvent::TouchUpdate: {
-        if (m_touchScrolling) {
-            auto& touch = *static_cast<QTouchEvent*>(event);
-            if (!touch.points().isEmpty()) {
-                auto& pt = touch.points().first();
-                qreal dy = pt.scenePosition().y() - m_touchStartY;
-                m_scrollY = qBound(0.0, m_scrollStartY - dy, m_maxScrollY);
-                m_dirty = true;
-                update();
-            }
+        event->accept();
+    } else if (event->type() == QEvent::TouchUpdate) {
+        if (m_touchScrolling && !event->points().isEmpty()) {
+            auto& pt = event->points().first();
+            qreal dy = pt.scenePosition().y() - m_touchStartY;
+            m_scrollY = qBound(0.0, m_scrollStartY - dy, m_maxScrollY);
+            m_dirty = true;
+            update();
         }
-        return true;
-    }
-    case QEvent::TouchEnd: {
+        event->accept();
+    } else if (event->type() == QEvent::TouchEnd) {
         m_touchScrolling = false;
-        return true;
+        event->accept();
+    } else {
+        QQuickItem::touchEvent(event);
     }
-    default:
-        break;
+}
+
+void MsgEnlargeOverlay::mousePressEvent(QMouseEvent* event)
+{
+    if (m_ignoreFirstTouch) {
+        m_ignoreFirstTouch = false;
+        event->accept();
+        return;
     }
-    return QQuickItem::event(event);
+    handlePress(event->scenePosition());
+    event->accept();
+}
+
+void MsgEnlargeOverlay::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Escape) {
+        Q_EMIT closed();
+        deleteLater();
+        return;
+    }
+    QQuickItem::keyPressEvent(event);
+}
+
+void MsgEnlargeOverlay::hoverMoveEvent(QHoverEvent* event)
+{
+    int hit = hitTestPos(event->position(), size(), m_textAreaRect);
+    if (hit == MsgEnlargeOverlayNode::BTN_CLOSE
+        || hit == MsgEnlargeOverlayNode::BTN_COPY
+        || hit == MsgEnlargeOverlayNode::BTN_FAV
+        || (hit >= MsgEnlargeOverlayNode::BTN_SIZE_S
+            && hit <= MsgEnlargeOverlayNode::BTN_SIZE_XL)) {
+        setCursor(QCursor(Qt::PointingHandCursor));
+    } else {
+        unsetCursor();
+    }
+    QQuickItem::hoverMoveEvent(event);
 }
 
 void MsgEnlargeOverlay::handlePress(const QPointF& scenePos)
 {
     QPointF localPos = mapFromScene(scenePos);
-    int hit = hitTestPos(localPos, size());
+    int hit = hitTestPos(localPos, size(), m_textAreaRect);
 
     switch (hit) {
     case MsgEnlargeOverlayNode::BTN_CLOSE:
