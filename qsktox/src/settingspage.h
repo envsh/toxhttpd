@@ -46,6 +46,7 @@ private:
     QskSwitchButton* m_darkSwitch = nullptr;
     QskComboBox* m_fontScaleCombo = nullptr;
     QskSwitchButton* m_debugBgSwitch = nullptr;
+    QskComboBox* m_phoneAnswerCombo = nullptr;
 
     static QPointer<SettingsPage> s_instance;
 };

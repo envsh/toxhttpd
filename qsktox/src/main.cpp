@@ -32,6 +32,7 @@
 #include "keepalive.h"
 #include "networkmonitor.h"
 #include "pushhandler.h"
+#include "phonemonitor.h"
 #include "androidutils.h"
 #include "pagemanager.h"
 #include "msgenlargeoverlay.h"
@@ -390,6 +391,7 @@ int main(int argc, char* argv[]) {
     KeepAlive::start();
     NetworkMonitor::start();
     PushHandler::start();
+    PhoneMonitor::start();
 
     // distributor 选择对话框
     QObject::connect(PushHandler::instance(), &PushHandler::distributorsFound,

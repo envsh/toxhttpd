@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
     <supports-screens
         android:anyDensity="true"
@@ -102,5 +106,12 @@
             <action android:name="org.unifiedpush.android.connector.PUSH_EVENT"/>
         </intent-filter>
     </service>
+    <receiver
+        android:name="io.fedlet.mobutil.BootReceiver"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        </intent-filter>
+    </receiver>
     </application>
 </manifest>

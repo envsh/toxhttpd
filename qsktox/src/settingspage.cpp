@@ -1,5 +1,6 @@
 #include "settingspage.h"
 #include "pagemanager.h"
+#include "phonemonitor.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -117,6 +118,21 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     debugLabel->setPreferredWidth(160);
     m_debugBgSwitch = new QskSwitchButton(row5);
 
+    new QskSeparator(Qt::Horizontal, layout);
+
+    // ── Row 6: Phone Answer ──
+    auto* row6 = new QskLinearBox(Qt::Horizontal, layout);
+    row6->setPreferredHeight(48);
+    row6->setSpacing(12);
+    auto* phoneLabel = new QskTextLabel("Phone Answer", row6);
+    phoneLabel->setPreferredWidth(160);
+    m_phoneAnswerCombo = new QskComboBox(row6);
+    m_phoneAnswerCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_phoneAnswerCombo->addOption(QskLabelData("Disabled"));
+    m_phoneAnswerCombo->addOption(QskLabelData("Manual"));
+    m_phoneAnswerCombo->addOption(QskLabelData("Auto"));
+    m_phoneAnswerCombo->setCurrentIndex(0);
+
     layout->addStretch(1);
 }
 
@@ -163,6 +179,7 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     m_darkSwitch->setChecked(settings.value("darkMode", false).toBool());
     m_fontScaleCombo->setCurrentIndex(settings.value("fontScale", 1).toInt());
     m_debugBgSwitch->setChecked(settings.value("debugBackground", false).toBool());
+    m_phoneAnswerCombo->setCurrentIndex(settings.value("phoneAnswer", 0).toInt());
 
     if (m_signalsConnected) return;
     m_signalsConnected = true;
@@ -233,6 +250,14 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
             QskSetup::setUpdateFlag(
                 QskItem::DebugForceBackground, checked);
             qDebug() << "[qsktox] debug background:" << checked;
+        });
+
+    // ── Row 6: Phone Answer toggle ──
+    connect(m_phoneAnswerCombo, &QskComboBox::currentIndexChanged,
+        this, [](int index) {
+            QSettings().setValue("phoneAnswer", index);
+            PhoneMonitor::setAnswerMode(index);
+            qDebug() << "[qsktox] phone answer mode:" << index;
         });
 
     // Sync debug background (restored value may differ from QskSetup default)
