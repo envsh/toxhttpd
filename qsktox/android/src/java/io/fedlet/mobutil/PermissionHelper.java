@@ -51,12 +51,22 @@ public class PermissionHelper {
             Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED;
     }
 
+    public static boolean hasReadPhoneStatePermission(Activity activity) {
+        return ContextCompat.checkSelfPermission(activity,
+            Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED;
+    }
+
     public static void requestPhoneCallPermission(Activity activity) {
-        if (Build.VERSION.SDK_INT < 29)
-            return;
-        if (hasPhoneCallPermission(activity))
-            return;
-        ActivityCompat.requestPermissions(activity,
-            new String[]{Manifest.permission.ANSWER_PHONE_CALLS}, REQ_PHONE_CALL);
+        java.util.List<String> perms = new java.util.ArrayList<>();
+        if (Build.VERSION.SDK_INT >= 29 && !hasPhoneCallPermission(activity)) {
+            perms.add(Manifest.permission.ANSWER_PHONE_CALLS);
+        }
+        if (!hasReadPhoneStatePermission(activity)) {
+            perms.add(Manifest.permission.READ_PHONE_STATE);
+        }
+        if (!perms.isEmpty()) {
+            ActivityCompat.requestPermissions(activity,
+                perms.toArray(new String[0]), REQ_PHONE_CALL);
+        }
     }
 }

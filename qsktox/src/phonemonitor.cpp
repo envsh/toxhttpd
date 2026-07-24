@@ -57,6 +57,21 @@ void PhoneMonitor::setAnswerMode(int mode)
             "setPhoneAnswerMode",
             "(Landroid/content/Context;I)V",
             ctx.object(), mode);
+
+        // Dynamic register/unregister receiver
+        if (mode != 0) {
+            QJniObject::callStaticMethod<void>(
+                "io/fedlet/mobutil/PhoneStateReceiver",
+                "registerReceiver",
+                "(Landroid/content/Context;)V",
+                ctx.object());
+        } else {
+            QJniObject::callStaticMethod<void>(
+                "io/fedlet/mobutil/PhoneStateReceiver",
+                "unregisterReceiver",
+                "(Landroid/content/Context;)V",
+                ctx.object());
+        }
     });
 }
 

@@ -16,6 +16,9 @@
 #include <QskSkin.h>
 #include <QSettings>
 #include <QDebug>
+#if defined(Q_OS_ANDROID)
+#include <QJniObject>
+#endif
 
 std::shared_ptr<FontSizes> SettingsPage::sharedFontSizes;
 std::function<void()>      SettingsPage::applyAndroidFonts;
@@ -258,6 +261,18 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
             QSettings().setValue("phoneAnswer", index);
             PhoneMonitor::setAnswerMode(index);
             qDebug() << "[qsktox] phone answer mode:" << index;
+#if defined(Q_OS_ANDROID)
+            if (index != 0) {
+                QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
+                    auto ctx = QNativeInterface::QAndroidApplication::context();
+                    QJniObject::callStaticMethod<void>(
+                        "io/fedlet/mobutil/PermissionHelper",
+                        "requestPhoneCallPermission",
+                        "(Landroid/app/Activity;)V",
+                        ctx.object());
+                });
+            }
+#endif
         });
 
     // Sync debug background (restored value may differ from QskSetup default)
