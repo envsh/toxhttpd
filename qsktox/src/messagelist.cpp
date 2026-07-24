@@ -1,5 +1,6 @@
 #include "messagelist.h"
 #include <private/qquicktaphandler_p.h>
+#include <private/qquickpincharea_p.h>
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetrics>

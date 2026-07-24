@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QStyleHints>
 #include <QDateTime>
+#include <QTimer>
 
 MyScrollArea::MyScrollArea(QQuickItem* parent)
     : QskScrollArea(parent)
@@ -13,6 +14,10 @@ MyScrollArea::MyScrollArea(QQuickItem* parent)
     auto* hints = QGuiApplication::styleHints();
     m_doubleTapInterval = hints->mouseDoubleClickInterval();
     m_doubleTapDistance = hints->touchDoubleTapDistance();
+
+    m_eventDebugTimer = new QTimer(this);
+    connect(m_eventDebugTimer, &QTimer::timeout, this, &MyScrollArea::dumpEventCounts);
+    m_eventDebugTimer->start(3000);
 }
 
 // 双击 guard：检测到双击后，在 m_doubleTapGuardUntil（now+500ms）之前返回 true。
@@ -28,6 +33,22 @@ bool MyScrollArea::isDoubleTapGuardActive() const
 bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
 {
     Q_UNUSED(child)
+
+    static const QMap<QEvent::Type, const char*> eventNames = {
+        { QEvent::TouchBegin, "TouchBegin" },
+        { QEvent::TouchUpdate, "TouchUpdate" },
+        { QEvent::TouchEnd, "TouchEnd" },
+        { QEvent::TouchCancel, "TouchCancel" },
+        { QEvent::MouseButtonPress, "MouseButtonPress" },
+        { QEvent::MouseButtonRelease, "MouseButtonRelease" },
+        { QEvent::MouseMove, "MouseMove" },
+    };
+    auto it = eventNames.find(event->type());
+    if (it != eventNames.end()) {
+        m_eventCounts[it.value()]++;
+    } else {
+        m_eventCounts[QLatin1String("Other:") + QString::number(int(event->type()))]++;
+    }
 
     switch (event->type()) {
     case QEvent::TouchBegin: {
@@ -91,4 +112,19 @@ bool MyScrollArea::childMouseEventFilter(QQuickItem* child, QEvent* event)
     }
 
     return false;
+}
+
+void MyScrollArea::dumpEventCounts()
+{
+    if (m_eventCounts.isEmpty())
+        return;
+    QString msg;
+    for (auto it = m_eventCounts.constBegin(); it != m_eventCounts.constEnd(); ++it) {
+        if (!msg.isEmpty()) {
+            msg += ' ';
+        }
+        msg += it.key() + ':' + QString::number(it.value());
+    }
+    qWarning().noquote() << msg;
+    m_eventCounts.clear();
 }

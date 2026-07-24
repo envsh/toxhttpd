@@ -3,7 +3,11 @@
 
 #include <QskScrollArea.h>
 #include <QPointF>
+#include <QMap>
+#include <QString>
 #include <QtGlobal>
+
+class QTimer;
 
 class MyScrollArea : public QskScrollArea
 {
@@ -38,6 +42,10 @@ private:
     ulong m_doubleTapGuardUntil = 0; // 双击 guard 截止时间戳（ms），now+500，0=无 guard
     bool m_touchActive = false;     // 是否有活跃的触摸（TouchBegin ~ TouchEnd）
     bool m_scrolling = false;       // 当前触摸是否已进入滚动状态
+
+    QTimer* m_eventDebugTimer = nullptr;
+    QMap<QString, int> m_eventCounts;
+    void dumpEventCounts();
 };
 
 #endif

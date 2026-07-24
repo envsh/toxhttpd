@@ -35,7 +35,13 @@ API 21 - 34 <=> Android 5 - 14
 API 23 - 34 <=> Android 6 - 14
 
 同qt6.7.3联用，ndk r18 编译通过但运行报错，dlopen failed: cannot locate symbol "_ZTVNSt6__ndk13pmr25monotonic_buffer_resourceE" referenced by "libQt6Core_arm64-v8a.so"
-	
+
+
+### 可直接使用的qtquick组件
+
+PinchArea / TapHandler
+
+
 ### qskinny 编译
 
 /mnt/sda5/aur/qskinny-master/build-arm64.sh
