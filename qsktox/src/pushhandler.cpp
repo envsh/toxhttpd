@@ -85,6 +85,15 @@ QString PushHandler::upDistributorDisplayName(const QString& packageName)
     return lastDot >= 0 ? packageName.mid(lastDot + 1) : packageName;
 }
 
+QVector<QPair<QString,QString>> PushHandler::knownDistributors()
+{
+    QVector<QPair<QString,QString>> result;
+    for (auto it = s_upDisplayNames.constBegin(); it != s_upDisplayNames.constEnd(); ++it) {
+        result.append({it.key(), it.value()});
+    }
+    return result;
+}
+
 QStringList PushHandler::installedDistributors()
 {
     QStringList result;
@@ -108,6 +117,7 @@ QStringList PushHandler::installedDistributors()
 
         QMetaObject::invokeMethod(s_instance, [distributors]() {
             s_instance->m_installedDistributorsCache = distributors;
+            emit s_instance->distributorsFound(distributors);
         }, Qt::QueuedConnection);
     });
 

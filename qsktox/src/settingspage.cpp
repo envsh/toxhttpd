@@ -54,12 +54,11 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 1: Page Transition ──
     auto* row1 = new QskLinearBox(Qt::Horizontal, layout);
-    row1->setPreferredHeight(48);
     row1->setSpacing(12);
     auto* transitionLabel = new QskTextLabel("Page Transition", row1);
     transitionLabel->setPreferredWidth(160);
     m_transitionCombo = new QskComboBox(row1);
-    m_transitionCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_transitionCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Fixed);
     m_transitionCombo->addOption(QskLabelData("Slide"));
     m_transitionCombo->addOption(QskLabelData("2D"));
     m_transitionCombo->addOption(QskLabelData("3D"));
@@ -70,12 +69,11 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 2: Theme ──
     auto* row2 = new QskLinearBox(Qt::Horizontal, layout);
-    row2->setPreferredHeight(48);
     row2->setSpacing(12);
     auto* themeLabel = new QskTextLabel("Theme", row2);
     themeLabel->setPreferredWidth(160);
     m_skinCombo = new QskComboBox(row2);
-    m_skinCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_skinCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Fixed);
     m_skinCombo->addOption(QskLabelData("Fusion"));
     m_skinCombo->addOption(QskLabelData("Fluent2"));
     m_skinCombo->addOption(QskLabelData("Material3"));
@@ -85,7 +83,6 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 3: Color Scheme ──
     auto* row3 = new QskLinearBox(Qt::Horizontal, layout);
-    row3->setPreferredHeight(48);
     row3->setSpacing(12);
     auto* schemeLabel = new QskTextLabel("Color Scheme", row3);
     schemeLabel->setPreferredWidth(160);
@@ -106,7 +103,7 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     auto* fontLabel = new QskTextLabel("Font Size", row4);
     fontLabel->setPreferredWidth(160);
     m_fontScaleCombo = new QskComboBox(row4);
-    m_fontScaleCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_fontScaleCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Fixed);
     m_fontScaleCombo->addOption(QskLabelData("Small"));
     m_fontScaleCombo->addOption(QskLabelData("Medium"));
     m_fontScaleCombo->addOption(QskLabelData("Large"));
@@ -117,7 +114,6 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 5: Debug Background ──
     auto* row5 = new QskLinearBox(Qt::Horizontal, layout);
-    row5->setPreferredHeight(48);
     row5->setSpacing(12);
     auto* debugLabel = new QskTextLabel("Debug Background", row5);
     debugLabel->setPreferredWidth(160);
@@ -127,12 +123,11 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 6: Phone Answer ──
     auto* row6 = new QskLinearBox(Qt::Horizontal, layout);
-    row6->setPreferredHeight(48);
     row6->setSpacing(12);
     auto* phoneLabel = new QskTextLabel("Phone Answer", row6);
     phoneLabel->setPreferredWidth(160);
     m_phoneAnswerCombo = new QskComboBox(row6);
-    m_phoneAnswerCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_phoneAnswerCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Fixed);
     m_phoneAnswerCombo->addOption(QskLabelData("Disabled"));
     m_phoneAnswerCombo->addOption(QskLabelData("Manual"));
     m_phoneAnswerCombo->addOption(QskLabelData("Auto"));
@@ -142,7 +137,6 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 7: Push Notification ──
     auto* row7 = new QskLinearBox(Qt::Horizontal, layout);
-    row7->setPreferredHeight(48);
     row7->setSpacing(12);
     auto* pushNotifyLabel = new QskTextLabel("Push Notification", row7);
     pushNotifyLabel->setPreferredWidth(160);
@@ -150,37 +144,26 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     new QskSeparator(Qt::Horizontal, layout);
 
-    // ── Row 8: Push Provider ──
+    // ── Row 8: Push Backend (merged provider + distributor) ──
     auto* row8 = new QskLinearBox(Qt::Horizontal, layout);
-    row8->setPreferredHeight(48);
     row8->setSpacing(12);
-    auto* providerLabel = new QskTextLabel("Push Provider", row8);
-    providerLabel->setPreferredWidth(160);
-    m_providerCombo = new QskComboBox(row8);
-    m_providerCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
-    m_providerCombo->addOption(QskLabelData("UnifiedPush"));
-    m_providerCombo->addOption(QskLabelData("Gotify (coming soon)"));
-    m_providerCombo->setCurrentIndex(0);
+    auto* backendLabel = new QskTextLabel("Push Backend", row8);
+    backendLabel->setPreferredWidth(160);
+    m_backendCombo = new QskComboBox(row8);
+    m_backendCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Fixed);
+    m_backendCombo->addOption(QskLabelData("Auto (system default)"));
+    auto knownDists = PushHandler::knownDistributors();
+    for (const auto& dist : knownDists) {
+        m_knownDistPackages.append(dist.first);
+        m_backendCombo->addOption(QskLabelData(dist.second + " (" + dist.first + ")"));
+    }
+    m_backendCombo->addOption(QskLabelData("Gotify direct (coming soon)"));
+    m_backendCombo->setCurrentIndex(0);
 
     new QskSeparator(Qt::Horizontal, layout);
 
-    // ── Row 9: UP Distributor (visible when provider=UnifiedPush) ──
-    m_distributorRow = new QskLinearBox(Qt::Horizontal, layout);
-    m_distributorRow->setPreferredHeight(48);
-    m_distributorRow->setSpacing(12);
-    auto* distributorLabel = new QskTextLabel("UP Distributor", m_distributorRow);
-    distributorLabel->setPreferredWidth(160);
-    m_distributorCombo = new QskComboBox(m_distributorRow);
-    m_distributorCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
-    m_distributorCombo->addOption(QskLabelData("Auto (system default)"));
-    m_distributorCombo->setCurrentIndex(0);
-
-    auto* distSep = new QskSeparator(Qt::Horizontal, layout);
-    m_distributorSep = distSep;
-
-    // ── Row 9b: Gotify Server (visible when provider=Gotify) ──
+    // ── Row 9: Gotify Server (visible when Gotify direct selected) ──
     m_gotifyRow = new QskLinearBox(Qt::Horizontal, layout);
-    m_gotifyRow->setPreferredHeight(48);
     m_gotifyRow->setSpacing(12);
     auto* gotifyUrlLabel = new QskTextLabel("Gotify URL", m_gotifyRow);
     gotifyUrlLabel->setPreferredWidth(160);
@@ -193,7 +176,6 @@ SettingsPage::SettingsPage(QQuickItem* parent)
 
     // ── Row 10: Gotify Token ──
     m_gotifyRow2 = new QskLinearBox(Qt::Horizontal, layout);
-    m_gotifyRow2->setPreferredHeight(48);
     m_gotifyRow2->setSpacing(12);
     auto* gotifyTokenLabel = new QskTextLabel("Gotify Token", m_gotifyRow2);
     gotifyTokenLabel->setPreferredWidth(160);
@@ -204,8 +186,7 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     auto* gsep2 = new QskSeparator(Qt::Horizontal, layout);
     m_gotifySep2 = gsep2;
 
-    // 初始可见性
-    updateProviderVisibility(0);
+    updateGotifyVisibility(0);
 
     layout->addStretch(1);
 }
@@ -242,15 +223,39 @@ void SettingsPage::changeFontScale(int delta)
     }
 }
 
-void SettingsPage::updateProviderVisibility(int providerIndex)
+void SettingsPage::updateGotifyVisibility(int backendIndex)
 {
-    bool isUP = (providerIndex == 0);
-    if (m_distributorRow) m_distributorRow->setVisible(isUP);
-    if (m_distributorSep) m_distributorSep->setVisible(isUP);
-    if (m_gotifyRow) m_gotifyRow->setVisible(!isUP);
-    if (m_gotifySep1) m_gotifySep1->setVisible(!isUP);
-    if (m_gotifyRow2) m_gotifyRow2->setVisible(!isUP);
-    if (m_gotifySep2) m_gotifySep2->setVisible(!isUP);
+    bool isGotify = (backendIndex == m_knownDistPackages.size() + 1);
+    if (m_gotifyRow) m_gotifyRow->setVisible(isGotify);
+    if (m_gotifySep1) m_gotifySep1->setVisible(isGotify);
+    if (m_gotifyRow2) m_gotifyRow2->setVisible(isGotify);
+    if (m_gotifySep2) m_gotifySep2->setVisible(isGotify);
+}
+
+void SettingsPage::rebuildBackendLabels(const QStringList& installed)
+{
+    m_backendCombo->blockSignals(true);
+    int savedIdx = m_backendCombo->currentIndex();
+
+    QVector<QskLabelData> opts;
+    opts.append(QskLabelData("Auto (system default)"));
+    for (int i = 0; i < m_knownDistPackages.size(); ++i) {
+        QString pkg = m_knownDistPackages[i];
+        QString name = PushHandler::upDistributorDisplayName(pkg);
+        bool found = installed.contains(pkg);
+        QString label = name + " (" + pkg + ")";
+        if (found) {
+            label += " ✓";
+        }
+        opts.append(QskLabelData(label));
+    }
+    opts.append(QskLabelData("Gotify direct (coming soon)"));
+    m_backendCombo->setOptions(opts);
+
+    if (savedIdx >= 0 && savedIdx < opts.size()) {
+        m_backendCombo->setCurrentIndex(savedIdx);
+    }
+    m_backendCombo->blockSignals(false);
 }
 
 void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
@@ -267,32 +272,29 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     m_phoneAnswerCombo->setCurrentIndex(settings.value("phoneAnswer", 0).toInt());
     m_pushNotifySwitch->setChecked(settings.value("pushNotification", true).toBool());
 
-    // ── Restore Push Provider settings ──
-    m_providerCombo->setCurrentIndex(settings.value("pushProvider", 0).toInt());
+    // ── Restore Push Backend settings ──
     m_gotifyUrlEdit->setText(settings.value("gotifyUrl").toString());
     m_gotifyTokenEdit->setText(settings.value("gotifyToken").toString());
 
-    // 填充已安装的 UP distributor 列表
-#ifdef Q_OS_ANDROID
-    QStringList installed = PushHandler::installedDistributors();
-    QString savedDist = settings.value("pushDistributor").toString();
-    int savedDistIdx = 0;
-    for (const auto& pkg : installed) {
-        QString displayName = PushHandler::upDistributorDisplayName(pkg);
-        m_distributorCombo->addOption(QskLabelData(displayName + " (" + pkg + ")"));
-    }
-    if (!savedDist.isEmpty()) {
-        for (int i = 0; i < installed.size(); ++i) {
-            if (installed[i] == savedDist) {
-                savedDistIdx = i + 1; // +1 for "Auto" option
-                break;
+    {
+        QString savedBackend = settings.value("pushBackend").toString();
+        int savedIdx = 0; // 0 = Auto
+        if (!savedBackend.isEmpty()) {
+            if (savedBackend == "gotify") {
+                savedIdx = m_knownDistPackages.size() + 1; // last item = Gotify direct
+            } else {
+                for (int i = 0; i < m_knownDistPackages.size(); ++i) {
+                    if (m_knownDistPackages[i] == savedBackend) {
+                        savedIdx = i + 1; // +1 for Auto
+                        break;
+                    }
+                }
             }
         }
+        m_backendCombo->setCurrentIndex(savedIdx);
     }
-    m_distributorCombo->setCurrentIndex(savedDistIdx);
-#endif
 
-    updateProviderVisibility(m_providerCombo->currentIndex());
+    updateGotifyVisibility(m_backendCombo->currentIndex());
 
     if (m_signalsConnected) return;
     m_signalsConnected = true;
@@ -392,32 +394,32 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
             qDebug() << "[qsktox] push notification:" << checked;
         });
 
-    // ── Row 8: Push Provider toggle ──
-    connect(m_providerCombo, &QskComboBox::currentIndexChanged,
+    // ── Row 8: Push Backend selection ──
+    connect(m_backendCombo, &QskComboBox::currentIndexChanged,
         this, [this](int index) {
-            QSettings().setValue("pushProvider", index);
-            PushHandler::instance()->setProviderType(static_cast<PushProviderType>(index));
-            updateProviderVisibility(index);
-            qDebug() << "[qsktox] push provider:" << index;
-        });
-
-    // ── Row 9: UP Distributor selection ──
-    connect(m_distributorCombo, &QskComboBox::currentIndexChanged,
-        this, [](int index) {
+            updateGotifyVisibility(index);
             if (index == 0) {
-                // "Auto" — 清除保存的 distributor，让系统选择
-                QSettings().remove("pushDistributor");
-                qDebug() << "[qsktox] push distributor: auto";
+                QSettings().setValue("pushBackend", "");
+                PushHandler::instance()->setProviderType(PushProviderType::UnifiedPush);
+                qDebug() << "[qsktox] push backend: auto";
+            } else if (index <= m_knownDistPackages.size()) {
+                QString pkg = m_knownDistPackages[index - 1];
+                QSettings().setValue("pushBackend", pkg);
+                PushHandler::instance()->setProviderType(PushProviderType::UnifiedPush);
+                PushHandler::instance()->switchDistributor(pkg);
+                qDebug() << "[qsktox] push backend:" << pkg;
             } else {
-                QStringList installed = PushHandler::installedDistributors();
-                if (index - 1 < installed.size()) {
-                    QString pkg = installed[index - 1];
-                    QSettings().setValue("pushDistributor", pkg);
-                    qDebug() << "[qsktox] push distributor:" << pkg;
-                    PushHandler::instance()->switchDistributor(pkg);
-                }
+                QSettings().setValue("pushBackend", "gotify");
+                PushHandler::instance()->setProviderType(PushProviderType::Gotify);
+                qDebug() << "[qsktox] push backend: gotify direct";
             }
         });
+
+    connect(PushHandler::instance(), &PushHandler::distributorsFound,
+        this, [this](const QStringList& installed) {
+            rebuildBackendLabels(installed);
+        });
+    PushHandler::installedDistributors();
 
     // ── Row 9b/10: Gotify settings (save on text change) ──
     connect(m_gotifyUrlEdit, &QskTextField::textChanged,

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QStringList>
+#include <QVector>
 
 enum class PushProviderType {
     UnifiedPush = 0,
@@ -21,6 +22,7 @@ public:
     static bool isRegistering();
     static QString upDistributorDisplayName(const QString& packageName);
     static QStringList installedDistributors();
+    static QVector<QPair<QString,QString>> knownDistributors();
     void setConnected(bool v);
     void setRegistering(bool v);
 
