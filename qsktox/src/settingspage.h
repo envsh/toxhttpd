@@ -8,6 +8,10 @@
 #include <memory>
 #include <functional>
 
+class QskTextField;
+class QskSeparator;
+class QskLinearBox;
+
 struct FontSizes {
     int body = 21, title = 29, caption = 19, global = 16;
 };
@@ -39,8 +43,10 @@ protected:
                   const QVariantMap& savedState) override;
 
 private:
+    void updateProviderVisibility(int providerIndex);
+
     bool m_signalsConnected = false;
-    int m_currentAnimatorIdx = 3;   // 当前 animator 类型索引，避免重复分配
+    int m_currentAnimatorIdx = 3;
     QskComboBox* m_transitionCombo = nullptr;
     QskComboBox* m_skinCombo = nullptr;
     QskSwitchButton* m_darkSwitch = nullptr;
@@ -48,6 +54,16 @@ private:
     QskSwitchButton* m_debugBgSwitch = nullptr;
     QskComboBox* m_phoneAnswerCombo = nullptr;
     QskSwitchButton* m_pushNotifySwitch = nullptr;
+    QskComboBox* m_providerCombo = nullptr;
+    QskComboBox* m_distributorCombo = nullptr;
+    QskTextField* m_gotifyUrlEdit = nullptr;
+    QskTextField* m_gotifyTokenEdit = nullptr;
+    QskLinearBox* m_distributorRow = nullptr;
+    QskLinearBox* m_gotifyRow = nullptr;
+    QskLinearBox* m_gotifyRow2 = nullptr;
+    QskSeparator* m_distributorSep = nullptr;
+    QskSeparator* m_gotifySep1 = nullptr;
+    QskSeparator* m_gotifySep2 = nullptr;
 
     static QPointer<SettingsPage> s_instance;
 };

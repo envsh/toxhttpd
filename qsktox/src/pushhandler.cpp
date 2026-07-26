@@ -15,6 +15,18 @@
 static PushHandler* s_instance = nullptr;
 static const char* UP_CLASS = "org/unifiedpush/android/connector/UnifiedPush";
 
+// ═══════════════════════════════════════════════════════════════════
+// 已知 UP distributor 包名 → 友好名称映射
+// ═══════════════════════════════════════════════════════════════════
+
+static const QHash<QString, QString> s_upDisplayNames = {
+    {"io.heckel.ntfy",                       "ntfy"},
+    {"org.unifiedpush.distributor.sunup",    "Sunup"},
+    {"com.github.gotify.up",                 "Gotify-UP"},
+    {"org.unifiedpush.distributor.nextpush", "NextPush"},
+    {"org.unifiedpush.distributor.gcompat",  "gCompat-UP"},
+};
+
 static bool checkMethod(const char* methodName, const char* sig)
 {
     QJniEnvironment env;
@@ -63,6 +75,67 @@ void PushHandler::setRegistering(bool v)
     m_isRegistering = v;
 }
 
+QString PushHandler::upDistributorDisplayName(const QString& packageName)
+{
+    auto it = s_upDisplayNames.find(packageName);
+    if (it != s_upDisplayNames.end()) {
+        return it.value();
+    }
+    int lastDot = packageName.lastIndexOf('.');
+    return lastDot >= 0 ? packageName.mid(lastDot + 1) : packageName;
+}
+
+QStringList PushHandler::installedDistributors()
+{
+    QStringList result;
+    if (!s_instance) return result;
+
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
+        auto ctx = QNativeInterface::QAndroidApplication::context();
+        QJniObject list = QJniObject::callStaticMethod<jobject>(
+            UP_CLASS,
+            "getDistributors",
+            "(Landroid/content/Context;)Ljava/util/List;",
+            ctx.object());
+        if (!list.isValid()) return;
+
+        QStringList distributors;
+        jint size = list.callMethod<jint>("size", "()I");
+        for (jint i = 0; i < size; i++) {
+            QJniObject item = list.callObjectMethod("get", "(I)Ljava/lang/Object;", i);
+            distributors.append(item.toString());
+        }
+
+        QMetaObject::invokeMethod(s_instance, [distributors]() {
+            s_instance->m_installedDistributorsCache = distributors;
+        }, Qt::QueuedConnection);
+    });
+
+    // 返回缓存（首次可能为空，后续会有值）
+    return s_instance ? s_instance->m_installedDistributorsCache : result;
+}
+
+PushProviderType PushHandler::providerType() const
+{
+    return m_providerType;
+}
+
+QString PushHandler::currentDistributorDisplayName() const
+{
+    return upDistributorDisplayName(m_currentDistributor);
+}
+
+void PushHandler::setProviderType(PushProviderType type)
+{
+    m_providerType = type;
+    QSettings().setValue("pushProvider", static_cast<int>(type));
+}
+
+void PushHandler::setCurrentDistributor(const QString& dist)
+{
+    m_currentDistributor = dist;
+}
+
 void PushHandler::start()
 {
     if (s_instance) return;
@@ -87,6 +160,16 @@ void PushHandler::registerDevice()
 {
     if (!s_instance) return;
 
+    // 检查 provider type
+    PushProviderType type = static_cast<PushProviderType>(
+        QSettings().value("pushProvider", 0).toInt());
+    s_instance->m_providerType = type;
+
+    if (type == PushProviderType::Gotify) {
+        qDebug() << "[PushHandler] Gotify provider not yet implemented";
+        return;
+    }
+
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
 
@@ -98,26 +181,13 @@ void PushHandler::registerDevice()
             ctx.object());
         QString savedDistributor = saved.toString();
 
-        // 前置检测：验证是否有 UnifiedPush 分发器（无条件）
-        QJniObject ctxObj(ctx.object());
-        QJniObject pm = ctxObj.callObjectMethod(
-            "getPackageManager", "()Landroid/content/pm/PackageManager;");
-        QJniObject pkgName = QJniObject::fromString("io.heckel.ntfy");
-        QJniObject packageInfo = pm.callObjectMethod(
-            "getPackageInfo",
-            "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;",
-            pkgName.object(), 0);
-        bool hasDistributor = packageInfo.isValid();
-        ntfyshPushInstalled = hasDistributor;
-        if (!hasDistributor) {
-            qWarning() << "[PushHandler] no UnifiedPush distributor found";
-            QMetaObject::invokeMethod(s_instance, []() {
-                showAndroidToast(QString::fromUtf8("⚠️ 未检测到推送服务，安装 ntfy 可获得消息通知 111"));
-            }, Qt::QueuedConnection);
-        }
-
         if (!savedDistributor.isEmpty()) {
             qDebug() << "[PushHandler]已有 distributor:" << savedDistributor;
+
+            // 更新当前 distributor 显示名
+            QMetaObject::invokeMethod(s_instance, [savedDistributor]() {
+                s_instance->m_currentDistributor = savedDistributor;
+            }, Qt::QueuedConnection);
 
             // 检测 1：调用前验证 register 方法签名
             const char* registerSig = "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V";
@@ -174,7 +244,7 @@ void PushHandler::registerDevice()
             "(Landroid/content/Context;)Ljava/util/List;",
             ctx.object());
 
-        // 检测 3：返回值有效性（仅适用于 jobject 返回值）
+        // 检测 3：返回值有效性
         if (!list.isValid()) {
             qWarning() << "[PushHandler] getDistributors returned invalid";
             QMetaObject::invokeMethod(s_instance, []() {
@@ -196,11 +266,14 @@ void PushHandler::registerDevice()
 
         // 回到 Qt 线程处理
         QMetaObject::invokeMethod(s_instance, [distributors]() {
+            // 缓存已安装列表
+            s_instance->m_installedDistributorsCache = distributors;
+
             if (distributors.isEmpty()) {
                 qWarning() << "[PushHandler] no distributors found";
                 s_instance->setConnected(false);
                 s_instance->setRegistering(false);
-                emit s_instance->registrationFailed("未找到 UnifiedPush 分发器，请安装 ntfy 222");
+                emit s_instance->registrationFailed("未找到 UnifiedPush 分发器，请安装 ntfy/Sunup 等");
                 emit s_instance->statusChanged();
                 return;
             }
@@ -268,6 +341,58 @@ void PushHandler::selectDistributor(const QString& distributor)
     });
 }
 
+void PushHandler::switchDistributor(const QString& newDistributor)
+{
+    if (!s_instance) return;
+
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([newDistributor]() {
+        auto ctx = QNativeInterface::QAndroidApplication::context();
+
+        // 1. unregister 旧 distributor
+        if (checkMethod("unregister", "(Landroid/content/Context;Ljava/lang/String;)V")) {
+            QJniObject::callStaticMethod<void>(
+                UP_CLASS,
+                "unregister",
+                "(Landroid/content/Context;Ljava/lang/String;)V",
+                ctx.object(),
+                QJniObject::fromString("default").object());
+            qDebug() << "[PushHandler] unregistered old distributor";
+        }
+
+        // 2. saveDistributor 新 distributor
+        QJniObject::callStaticMethod<void>(
+            UP_CLASS,
+            "saveDistributor",
+            "(Landroid/content/Context;Ljava/lang/String;)V",
+            ctx.object(),
+            QJniObject::fromString(newDistributor).object());
+        qDebug() << "[PushHandler] saveDistributor:" << newDistributor;
+
+        // 3. register 到新 distributor
+        const char* registerSig = "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V";
+        if (checkMethod("register", registerSig)) {
+            QJniObject::callStaticMethod<void>(
+                UP_CLASS,
+                "register",
+                registerSig,
+                ctx.object(),
+                QJniObject::fromString("default").object(),
+                QJniObject().object(),
+                QJniObject().object());
+            qDebug() << "[PushHandler] register sent to" << newDistributor;
+        }
+
+        // 4. 更新状态
+        QMetaObject::invokeMethod(s_instance, [newDistributor]() {
+            s_instance->m_currentDistributor = newDistributor;
+            s_instance->setRegistering(true);
+            s_instance->setConnected(false);
+            emit s_instance->registrationSent();
+            emit s_instance->statusChanged();
+        }, Qt::QueuedConnection);
+    });
+}
+
 void PushHandler::stop()
 {
     if (!s_instance) return;
@@ -312,9 +437,20 @@ Java_io_fedlet_mobutil_PushServiceImpl_onNewEndpointNative(
 
     if (s_instance) {
         s_instance->cancelRegistrationTimeout();
-        QMetaObject::invokeMethod(s_instance, [endpoint, instance]() {
+        // 从 saved distributor 获取当前使用的 distributor
+        QJniObject saved = QJniObject::callStaticMethod<jobject>(
+            UP_CLASS,
+            "getSavedDistributor",
+            "(Landroid/content/Context;)Ljava/lang/String;",
+            QNativeInterface::QAndroidApplication::context().object());
+        QString currentDist = saved.toString();
+
+        QMetaObject::invokeMethod(s_instance, [endpoint, instance, currentDist]() {
             s_instance->setConnected(true);
             s_instance->setRegistering(false);
+            if (!currentDist.isEmpty()) {
+                s_instance->setCurrentDistributor(currentDist);
+            }
             emit s_instance->pushReceived(endpoint, instance);
             emit s_instance->statusChanged();
         }, Qt::QueuedConnection);
@@ -407,10 +543,17 @@ PushHandler* PushHandler::instance() { return nullptr; }
 bool PushHandler::isNtfyInstalled() { return false; }
 bool PushHandler::isConnected() { return false; }
 bool PushHandler::isRegistering() { return false; }
+QString PushHandler::upDistributorDisplayName(const QString&) { return {}; }
+QStringList PushHandler::installedDistributors() { return {}; }
 void PushHandler::setConnected(bool) {}
 void PushHandler::setRegistering(bool) {}
 void PushHandler::registerDevice() {}
 void PushHandler::selectDistributor(const QString&) {}
+void PushHandler::switchDistributor(const QString&) {}
+PushProviderType PushHandler::providerType() const { return PushProviderType::UnifiedPush; }
+QString PushHandler::currentDistributorDisplayName() const { return {}; }
+void PushHandler::setProviderType(PushProviderType) {}
+void PushHandler::setCurrentDistributor(const QString&) {}
 void PushHandler::startRegistrationTimeout() {}
 void PushHandler::cancelRegistrationTimeout() {}
 void PushHandler::timerEvent(QTimerEvent*) {}

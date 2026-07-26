@@ -4,6 +4,11 @@
 #include <QObject>
 #include <QStringList>
 
+enum class PushProviderType {
+    UnifiedPush = 0,
+    Gotify = 1,
+};
+
 class PushHandler : public QObject
 {
     Q_OBJECT
@@ -14,12 +19,20 @@ public:
     static bool isNtfyInstalled();
     static bool isConnected();
     static bool isRegistering();
+    static QString upDistributorDisplayName(const QString& packageName);
+    static QStringList installedDistributors();
     void setConnected(bool v);
     void setRegistering(bool v);
 
     void registerDevice();
     void selectDistributor(const QString& distributor);
+    void switchDistributor(const QString& newDistributor);
     void cancelRegistrationTimeout();
+
+    PushProviderType providerType() const;
+    QString currentDistributorDisplayName() const;
+    void setProviderType(PushProviderType type);
+    void setCurrentDistributor(const QString& dist);
 
 Q_SIGNALS:
     void distributorsFound(const QStringList& distributors);
@@ -37,6 +50,9 @@ private:
     int m_regTimeoutTimerId = 0;
     bool m_isConnected = false;
     bool m_isRegistering = false;
+    PushProviderType m_providerType = PushProviderType::UnifiedPush;
+    QString m_currentDistributor;
+    QStringList m_installedDistributorsCache;
 };
 
 #endif

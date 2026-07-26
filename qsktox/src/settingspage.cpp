@@ -1,6 +1,7 @@
 #include "settingspage.h"
 #include "pagemanager.h"
 #include "phonemonitor.h"
+#include "pushhandler.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -14,6 +15,7 @@
 #include <QskItem.h>
 #include <QskSkinManager.h>
 #include <QskSkin.h>
+#include <QskTextField.h>
 #include <QSettings>
 #include <QDebug>
 #if defined(Q_OS_ANDROID)
@@ -146,6 +148,65 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     pushNotifyLabel->setPreferredWidth(160);
     m_pushNotifySwitch = new QskSwitchButton(row7);
 
+    new QskSeparator(Qt::Horizontal, layout);
+
+    // ── Row 8: Push Provider ──
+    auto* row8 = new QskLinearBox(Qt::Horizontal, layout);
+    row8->setPreferredHeight(48);
+    row8->setSpacing(12);
+    auto* providerLabel = new QskTextLabel("Push Provider", row8);
+    providerLabel->setPreferredWidth(160);
+    m_providerCombo = new QskComboBox(row8);
+    m_providerCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_providerCombo->addOption(QskLabelData("UnifiedPush"));
+    m_providerCombo->addOption(QskLabelData("Gotify (coming soon)"));
+    m_providerCombo->setCurrentIndex(0);
+
+    new QskSeparator(Qt::Horizontal, layout);
+
+    // ── Row 9: UP Distributor (visible when provider=UnifiedPush) ──
+    m_distributorRow = new QskLinearBox(Qt::Horizontal, layout);
+    m_distributorRow->setPreferredHeight(48);
+    m_distributorRow->setSpacing(12);
+    auto* distributorLabel = new QskTextLabel("UP Distributor", m_distributorRow);
+    distributorLabel->setPreferredWidth(160);
+    m_distributorCombo = new QskComboBox(m_distributorRow);
+    m_distributorCombo->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+    m_distributorCombo->addOption(QskLabelData("Auto (system default)"));
+    m_distributorCombo->setCurrentIndex(0);
+
+    auto* distSep = new QskSeparator(Qt::Horizontal, layout);
+    m_distributorSep = distSep;
+
+    // ── Row 9b: Gotify Server (visible when provider=Gotify) ──
+    m_gotifyRow = new QskLinearBox(Qt::Horizontal, layout);
+    m_gotifyRow->setPreferredHeight(48);
+    m_gotifyRow->setSpacing(12);
+    auto* gotifyUrlLabel = new QskTextLabel("Gotify URL", m_gotifyRow);
+    gotifyUrlLabel->setPreferredWidth(160);
+    m_gotifyUrlEdit = new QskTextField(m_gotifyRow);
+    m_gotifyUrlEdit->setPlaceholderText("https://push.example.com");
+    m_gotifyUrlEdit->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+
+    auto* gsep1 = new QskSeparator(Qt::Horizontal, layout);
+    m_gotifySep1 = gsep1;
+
+    // ── Row 10: Gotify Token ──
+    m_gotifyRow2 = new QskLinearBox(Qt::Horizontal, layout);
+    m_gotifyRow2->setPreferredHeight(48);
+    m_gotifyRow2->setSpacing(12);
+    auto* gotifyTokenLabel = new QskTextLabel("Gotify Token", m_gotifyRow2);
+    gotifyTokenLabel->setPreferredWidth(160);
+    m_gotifyTokenEdit = new QskTextField(m_gotifyRow2);
+    m_gotifyTokenEdit->setPlaceholderText("client token");
+    m_gotifyTokenEdit->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Preferred);
+
+    auto* gsep2 = new QskSeparator(Qt::Horizontal, layout);
+    m_gotifySep2 = gsep2;
+
+    // 初始可见性
+    updateProviderVisibility(0);
+
     layout->addStretch(1);
 }
 
@@ -181,6 +242,17 @@ void SettingsPage::changeFontScale(int delta)
     }
 }
 
+void SettingsPage::updateProviderVisibility(int providerIndex)
+{
+    bool isUP = (providerIndex == 0);
+    if (m_distributorRow) m_distributorRow->setVisible(isUP);
+    if (m_distributorSep) m_distributorSep->setVisible(isUP);
+    if (m_gotifyRow) m_gotifyRow->setVisible(!isUP);
+    if (m_gotifySep1) m_gotifySep1->setVisible(!isUP);
+    if (m_gotifyRow2) m_gotifyRow2->setVisible(!isUP);
+    if (m_gotifySep2) m_gotifySep2->setVisible(!isUP);
+}
+
 void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
 {
     s_instance = this;
@@ -194,6 +266,33 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     m_debugBgSwitch->setChecked(settings.value("debugBackground", false).toBool());
     m_phoneAnswerCombo->setCurrentIndex(settings.value("phoneAnswer", 0).toInt());
     m_pushNotifySwitch->setChecked(settings.value("pushNotification", true).toBool());
+
+    // ── Restore Push Provider settings ──
+    m_providerCombo->setCurrentIndex(settings.value("pushProvider", 0).toInt());
+    m_gotifyUrlEdit->setText(settings.value("gotifyUrl").toString());
+    m_gotifyTokenEdit->setText(settings.value("gotifyToken").toString());
+
+    // 填充已安装的 UP distributor 列表
+#ifdef Q_OS_ANDROID
+    QStringList installed = PushHandler::installedDistributors();
+    QString savedDist = settings.value("pushDistributor").toString();
+    int savedDistIdx = 0;
+    for (const auto& pkg : installed) {
+        QString displayName = PushHandler::upDistributorDisplayName(pkg);
+        m_distributorCombo->addOption(QskLabelData(displayName + " (" + pkg + ")"));
+    }
+    if (!savedDist.isEmpty()) {
+        for (int i = 0; i < installed.size(); ++i) {
+            if (installed[i] == savedDist) {
+                savedDistIdx = i + 1; // +1 for "Auto" option
+                break;
+            }
+        }
+    }
+    m_distributorCombo->setCurrentIndex(savedDistIdx);
+#endif
+
+    updateProviderVisibility(m_providerCombo->currentIndex());
 
     if (m_signalsConnected) return;
     m_signalsConnected = true;
@@ -291,6 +390,43 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
         this, [](bool checked) {
             QSettings().setValue("pushNotification", checked);
             qDebug() << "[qsktox] push notification:" << checked;
+        });
+
+    // ── Row 8: Push Provider toggle ──
+    connect(m_providerCombo, &QskComboBox::currentIndexChanged,
+        this, [this](int index) {
+            QSettings().setValue("pushProvider", index);
+            PushHandler::instance()->setProviderType(static_cast<PushProviderType>(index));
+            updateProviderVisibility(index);
+            qDebug() << "[qsktox] push provider:" << index;
+        });
+
+    // ── Row 9: UP Distributor selection ──
+    connect(m_distributorCombo, &QskComboBox::currentIndexChanged,
+        this, [](int index) {
+            if (index == 0) {
+                // "Auto" — 清除保存的 distributor，让系统选择
+                QSettings().remove("pushDistributor");
+                qDebug() << "[qsktox] push distributor: auto";
+            } else {
+                QStringList installed = PushHandler::installedDistributors();
+                if (index - 1 < installed.size()) {
+                    QString pkg = installed[index - 1];
+                    QSettings().setValue("pushDistributor", pkg);
+                    qDebug() << "[qsktox] push distributor:" << pkg;
+                    PushHandler::instance()->switchDistributor(pkg);
+                }
+            }
+        });
+
+    // ── Row 9b/10: Gotify settings (save on text change) ──
+    connect(m_gotifyUrlEdit, &QskTextField::textChanged,
+        this, [](const QString& text) {
+            QSettings().setValue("gotifyUrl", text);
+        });
+    connect(m_gotifyTokenEdit, &QskTextField::textChanged,
+        this, [](const QString& text) {
+            QSettings().setValue("gotifyToken", text);
         });
 
     // Sync debug background (restored value may differ from QskSetup default)

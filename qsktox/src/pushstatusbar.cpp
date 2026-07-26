@@ -32,8 +32,11 @@ void PushStatusBar::updateStatus()
     setVisible(false);
     return;
 #else
-    QString backend = PushHandler::isNtfyInstalled()
-        ? QStringLiteral("ntfy") : QStringLiteral("push");
+    QString backend = PushHandler::instance() ? PushHandler::instance()->currentDistributorDisplayName() : QString();
+    if (backend.isEmpty()) {
+        backend = PushHandler::isNtfyInstalled()
+            ? QStringLiteral("ntfy") : QStringLiteral("push");
+    }
 
     QString status;
     if (PushHandler::isConnected()) {

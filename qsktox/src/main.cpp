@@ -443,7 +443,16 @@ int main(int argc, char* argv[]) {
         });
 
     // 触发注册流程
-    PushHandler::instance()->registerDevice();
+    {
+        PushProviderType type = static_cast<PushProviderType>(
+            QSettings().value("pushProvider", 0).toInt());
+        if (type == PushProviderType::UnifiedPush) {
+            PushHandler::instance()->registerDevice();
+        } else {
+            qDebug() << "[qsktox] push provider type:" << static_cast<int>(type)
+                     << "- not registering (Gotify not yet implemented)";
+        }
+    }
 
     qDebug() << "[qsktox] KeepAlive service started";
 #endif
