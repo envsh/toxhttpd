@@ -245,7 +245,7 @@ void SettingsPage::rebuildBackendLabels(const QStringList& installed)
         bool found = installed.contains(pkg);
         QString label = name + " (" + pkg + ")";
         if (found) {
-            label += " ✓";
+            label = "✓ " + label;
         }
         opts.append(QskLabelData(label));
     }
