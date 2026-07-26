@@ -2,6 +2,7 @@
 #include "pagemanager.h"
 #include "phonemonitor.h"
 #include "pushhandler.h"
+#include "androidutils.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -237,6 +238,10 @@ void SettingsPage::rebuildBackendLabels(const QStringList& installed)
     m_backendCombo->blockSignals(true);
     int savedIdx = m_backendCombo->currentIndex();
 
+    QString active;
+    if (auto* ph = PushHandler::instance())
+        active = ph->currentDistributor();
+
     QVector<QskLabelData> opts;
     opts.append(QskLabelData("Auto (system default)"));
     for (int i = 0; i < m_knownDistPackages.size(); ++i) {
@@ -245,7 +250,7 @@ void SettingsPage::rebuildBackendLabels(const QStringList& installed)
         bool found = installed.contains(pkg);
         QString label = name + " (" + pkg + ")";
         if (found) {
-            label = "✓ " + label;
+            label = (pkg == active ? "⚫ " : "✓ ") + label;
         }
         opts.append(QskLabelData(label));
     }
@@ -404,9 +409,11 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
                 qDebug() << "[qsktox] push backend: auto";
             } else if (index <= m_knownDistPackages.size()) {
                 QString pkg = m_knownDistPackages[index - 1];
+                QString name = PushHandler::upDistributorDisplayName(pkg);
                 QSettings().setValue("pushBackend", pkg);
                 PushHandler::instance()->setProviderType(PushProviderType::UnifiedPush);
                 PushHandler::instance()->switchDistributor(pkg);
+                showAndroidToast(QString::fromUtf8("切换到 %1...").arg(name));
                 qDebug() << "[qsktox] push backend:" << pkg;
             } else {
                 QSettings().setValue("pushBackend", "gotify");
@@ -418,6 +425,10 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     connect(PushHandler::instance(), &PushHandler::distributorsUpdated,
         this, [this](const QStringList& installed) {
             rebuildBackendLabels(installed);
+        });
+    connect(PushHandler::instance(), &PushHandler::statusChanged,
+        this, [this]() {
+            rebuildBackendLabels(PushHandler::installedDistributors());
         });
     PushHandler::installedDistributors();
 

@@ -32,6 +32,7 @@ public:
     void cancelRegistrationTimeout();
 
     PushProviderType providerType() const;
+    QString currentDistributor() const;
     QString currentDistributorDisplayName() const;
     void setProviderType(PushProviderType type);
     void setCurrentDistributor(const QString& dist);

@@ -130,6 +130,11 @@ PushProviderType PushHandler::providerType() const
     return m_providerType;
 }
 
+QString PushHandler::currentDistributor() const
+{
+    return m_currentDistributor;
+}
+
 QString PushHandler::currentDistributorDisplayName() const
 {
     return upDistributorDisplayName(m_currentDistributor);
@@ -561,6 +566,7 @@ void PushHandler::registerDevice() {}
 void PushHandler::selectDistributor(const QString&) {}
 void PushHandler::switchDistributor(const QString&) {}
 PushProviderType PushHandler::providerType() const { return PushProviderType::UnifiedPush; }
+QString PushHandler::currentDistributor() const { return {}; }
 QString PushHandler::currentDistributorDisplayName() const { return {}; }
 void PushHandler::setProviderType(PushProviderType) {}
 void PushHandler::setCurrentDistributor(const QString&) {}
