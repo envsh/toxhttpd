@@ -56,6 +56,7 @@ public:
 
     void populateMessages();
     void appendMessage(const MessageItem& item);
+    void setChannel(const QString& chatId);
     int messageCount() const { return m_items.size(); }
     const MessageItem& messageItem(int row) const { return m_items[row]; }
 
@@ -75,6 +76,7 @@ private:
     void updateVisibleRows();
 
     QQuickItem* m_contentView = nullptr;
+    QString m_chatId;
     QVector<MessageItem> m_items;
     QVector<qreal> m_rowHeights;
     QVector<qreal> m_rowYOffsets;

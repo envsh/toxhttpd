@@ -20,6 +20,7 @@ MessagePage::MessagePage(QQuickItem* parent)
 void MessagePage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
 {
     QString channelName = launchArgs.value("channelName").toString();
+    QString chatId = launchArgs.value("chatId").toString();
 
     setAutoLayoutChildren(true);
     auto* layout = new QskLinearBox(Qt::Vertical, this);
@@ -44,7 +45,7 @@ void MessagePage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
     // ── MessageList ──
     m_messageList = new MessageListWidget(layout);
     m_messageList->setSizePolicy(QskSizePolicy::Expanding, QskSizePolicy::Expanding);
-    m_messageList->populateMessages();
+    m_messageList->setChannel(chatId);
 
     // ── Long press menu ──
     connect(m_messageList, &MessageListWidget::rowLongPressed,

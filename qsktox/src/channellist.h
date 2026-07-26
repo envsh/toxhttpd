@@ -10,6 +10,7 @@
 #include <QMap>
 #include <QPointer>
 #include <QPointF>
+#include <QHash>
 
 struct ChannelItem {
     QString avatarLetter;
@@ -18,6 +19,7 @@ struct ChannelItem {
     QString lastMessage;
     QString time;
     int     unreadCount;
+    QString chatId;
 };
 
 class ChannelRowNode : public QskPaintedNode
@@ -55,6 +57,8 @@ public:
     ~ChannelListWidget() override;
 
     void populateData();
+    void insertOrUpdateChannel(const QString& chatId, const ChannelItem& item);
+    QString chatIdForRow(int row) const;
 
 Q_SIGNALS:
     void rowClicked(int row, const QString& chatName);
@@ -68,6 +72,7 @@ private:
 
     QQuickItem* m_contentView = nullptr;
     QVector<ChannelItem> m_items;
+    QHash<QString, int> m_chatIdIndex;
     QMap<int, ChannelRowItem*> m_visibleRows;
 };
 

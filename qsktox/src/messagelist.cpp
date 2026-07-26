@@ -1,4 +1,5 @@
 #include "messagelist.h"
+#include "messagestore.h"
 #include <private/qquicktaphandler_p.h>
 #include <private/qquickpincharea_p.h>
 #include <QPainter>
@@ -499,6 +500,49 @@ void MessageListWidget::appendMessage(const MessageItem& item)
     setScrollPos(QPointF(0, qMax(0.0, totalH - viewH)));
 
     updateVisibleRows();
+}
+
+void MessageListWidget::setChannel(const QString& chatId)
+{
+    if (m_fadeAnimator) {
+        m_fadeAnimator->stop();
+        delete m_fadeAnimator;
+        m_fadeAnimator = nullptr;
+    }
+    setOpacity(1.0);
+
+    m_chatId = chatId;
+    m_items.clear();
+    m_rowHeights.clear();
+    m_rowYOffsets.clear();
+    for (auto* row : std::as_const(m_visibleRows)) {
+        row->deleteLater();
+    }
+    m_visibleRows.clear();
+
+    if (m_chatId.isEmpty()) {
+        populateMessages();
+        return;
+    }
+
+    auto msgs = MessageStore::instance()->getMessages(m_chatId);
+    for (const auto& msg : msgs) {
+        m_items.append(msg);
+    }
+
+    rebuildLayout(this);
+
+    qreal totalH = m_rowYOffsets.isEmpty() ? 0 : m_rowYOffsets.last();
+    qreal viewW = viewContentsRect().width();
+    if (viewW <= 0) viewW = width();
+    m_contentView->setSize(QSizeF(viewW, totalH));
+    update();
+    updateVisibleRows();
+
+    qreal viewH = viewContentsRect().height();
+    if (totalH > viewH) {
+        setScrollPos(QPointF(0, totalH - viewH));
+    }
 }
 
 void MessageListWidget::updateVisibleRows()

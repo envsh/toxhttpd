@@ -4,6 +4,8 @@
 #include "channellist.h"
 #include "messagepage.h"
 #include "pushstatusbar.h"
+#include "pushhandler.h"
+#include "messagestore.h"
 #include <QskLinearBox.h>
 #include <QskTextLabel.h>
 #include <QskPushButton.h>
@@ -14,7 +16,10 @@
 #include <QCoreApplication>
 #include <QSettings>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonArray>
+#include <QTime>
+#include <QDateTime>
 #include "androidutils.h"
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -150,13 +155,76 @@ void MainPage::onCreate(const QVariantMap& launchArgs, const QVariantMap&)
 
     connect(m_channelList, &ChannelListWidget::rowClicked,
         this, [this](int row, const QString& chatName) {
+            QString chatId = m_channelList->chatIdForRow(row);
             pageManager()->open("message",
-                {{"channelIndex", row}, {"channelName", chatName}});
+                {{"channelIndex", row}, {"channelName", chatName}, {"chatId", chatId}});
         });
 
     connect(m_channelList, &ChannelListWidget::rowLongPressed,
         this, [this](int row, const QPointF& pos) {
             showChannelMenu(row, pos);
+        });
+
+    // ── Push message handler ──
+    connect(PushHandler::instance(), &PushHandler::pushMessage,
+        this, [this](const QByteArray& message, const QString& instance) {
+            qDebug() << "[MainPage] push message received, size:" << message.size()
+                     << "content:" << QString::fromUtf8(message).left(300);
+
+            QJsonDocument doc = QJsonDocument::fromJson(message);
+            if (!doc.isObject()) {
+                qWarning() << "[MainPage] invalid JSON payload";
+                return;
+            }
+            QJsonObject obj = doc.object();
+
+            QString chatId = obj.value("chat_id").toString();
+            if (chatId.isEmpty()) {
+                qWarning() << "[MainPage] chat_id is empty, skip";
+                return;
+            }
+
+            QString chatName = obj.value("chat_name").toString();
+            QString username = obj.value("usernick").toString();
+            if (username.isEmpty()) {
+                username = obj.value("username").toString();
+            }
+            QString text = obj.value("text").toString();
+            qint64 timestamp = obj.value("timestamp").toVariant().toLongLong();
+
+            QString timeStr;
+            if (timestamp > 0) {
+                timeStr = QDateTime::fromSecsSinceEpoch(timestamp).toString("HH:mm");
+            } else {
+                timeStr = QTime::currentTime().toString("HH:mm");
+            }
+
+            static const QColor s_palette[] = {
+                QColor("#4CAF50"), QColor("#2196F3"), QColor("#FF9800"),
+                QColor("#E91E63"), QColor("#9C27B0"), QColor("#00BCD4"),
+                QColor("#FF5722"), QColor("#795548"), QColor("#607D8B"),
+            };
+            QColor avatarColor = s_palette[qHash(chatId) % 9];
+            QString avatarLetter = chatName.isEmpty()
+                ? QString(chatId.at(0).toUpper())
+                : QString(chatName.at(0));
+
+            MessageItem msgItem;
+            msgItem.sender = username;
+            msgItem.content = text;
+            msgItem.time = timeStr;
+            msgItem.isSelf = false;
+            MessageStore::instance()->addMessage(chatId, msgItem);
+
+            ChannelItem chItem;
+            chItem.avatarLetter = avatarLetter;
+            chItem.avatarColor = avatarColor;
+            chItem.title = chatName.isEmpty() ? chatId : chatName;
+            chItem.lastMessage = text;
+            chItem.time = timeStr;
+            chItem.unreadCount = 1;
+            chItem.chatId = chatId;
+            m_channelList->insertOrUpdateChannel(chatId, chItem);
         });
 
     // ── Toast label (initially hidden, overlaid on top) ──

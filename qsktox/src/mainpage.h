@@ -19,6 +19,7 @@ public:
                            const QString& text, const QString& urisJson);
     bool keepScreenOn() const { return m_keepScreenOn; }
     void setKeepScreenOn(bool on);
+    ChannelListWidget* channelList() const { return m_channelList; }
 
 Q_SIGNALS:
     void keepScreenOnChanged(bool on);

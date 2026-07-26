@@ -136,6 +136,16 @@ SettingsPage::SettingsPage(QQuickItem* parent)
     m_phoneAnswerCombo->addOption(QskLabelData("Auto"));
     m_phoneAnswerCombo->setCurrentIndex(0);
 
+    new QskSeparator(Qt::Horizontal, layout);
+
+    // ── Row 7: Push Notification ──
+    auto* row7 = new QskLinearBox(Qt::Horizontal, layout);
+    row7->setPreferredHeight(48);
+    row7->setSpacing(12);
+    auto* pushNotifyLabel = new QskTextLabel("Push Notification", row7);
+    pushNotifyLabel->setPreferredWidth(160);
+    m_pushNotifySwitch = new QskSwitchButton(row7);
+
     layout->addStretch(1);
 }
 
@@ -183,6 +193,7 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     m_fontScaleCombo->setCurrentIndex(settings.value("fontScale", 1).toInt());
     m_debugBgSwitch->setChecked(settings.value("debugBackground", false).toBool());
     m_phoneAnswerCombo->setCurrentIndex(settings.value("phoneAnswer", 0).toInt());
+    m_pushNotifySwitch->setChecked(settings.value("pushNotification", true).toBool());
 
     if (m_signalsConnected) return;
     m_signalsConnected = true;
@@ -273,6 +284,13 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
                 });
             }
 #endif
+        });
+
+    // ── Row 7: Push Notification toggle ──
+    connect(m_pushNotifySwitch, &QskAbstractButton::toggled,
+        this, [](bool checked) {
+            QSettings().setValue("pushNotification", checked);
+            qDebug() << "[qsktox] push notification:" << checked;
         });
 
     // Sync debug background (restored value may differ from QskSetup default)

@@ -61,6 +61,8 @@ qt_add_executable(qsktox
     src/shareintentreceiver.cpp
     src/pushhandler.h
     src/pushhandler.cpp
+    src/messagestore.h
+    src/messagestore.cpp
     src/pushstatusbar.h
     src/pushstatusbar.cpp
     src/phonemonitor.h
