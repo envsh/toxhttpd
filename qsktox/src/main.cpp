@@ -393,14 +393,16 @@ int main(int argc, char* argv[]) {
     PushHandler::start();
     PhoneMonitor::start();
 
-    // distributor 选择对话框
+    // distributor 选择对话框（仅启动时、多于1个分发器时弹出）
     QObject::connect(PushHandler::instance(), &PushHandler::distributorsFound,
         [&window](const QStringList& distributors) {
+            if (distributors.size() <= 1) return;
             QStringList displayNames;
             for (const auto& d : distributors) {
                 displayNames.append(d);
             }
             QskDialog* dialog = qskDialog;
+            dialog->setTransientParent(&window);
             QString selected = dialog->select("选择推送服务", displayNames);
             if (!selected.isEmpty()) {
                 int idx = displayNames.indexOf(selected);

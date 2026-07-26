@@ -40,7 +40,7 @@ main.cpp (入口 + BackButtonFilter + extras线程)
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `main.cpp` | 369 | 入口：QGuiApplication、皮肤、字体、窗口、页面注册、extras线程 |
+| `main.cpp` | 448 | 入口：QGuiApplication、皮肤、字体、窗口、页面注册、extras线程、Push分发器选择 |
 | `page.h/cpp` | 107+26 | Page 基类，Android 风格生命周期模型 |
 | `pagemanager.h/cpp` | 122+505 | 导航栈 + 生命周期管理 + LRU缓存 + 状态保存 |
 | `loginpage.h/cpp` | 16+47 | 登录页：3个硬编码服务器按钮 |
@@ -52,6 +52,7 @@ main.cpp (入口 + BackButtonFilter + extras线程)
 | `menuoverlay.h/cpp` | 47+69 | 透明遮罩层，点击外部关闭 QskMenu |
 | `networkmonitor.h/cpp` | 14+195 | 4平台网络监控 |
 | `keepalive.h/cpp` | 14+42 | Android 前台服务保活 |
+| `pushhandler.h/cpp` | 60+571 | UnifiedPush 注册、分发器管理、信号路由 |
 | `androidutils.h/cpp` | 8+26 | Android Toast 工具函数 |
 | `shareintentreceiver.cpp` | 45 | JNI 桥接：ShareActivity → MainPage |
 
@@ -379,3 +380,47 @@ extern "C" void csoMainLoop() {
 6. **extras 独立** — Go/C++ 共享库与主程序无通信，仅作为独立线程运行
 7. **平台通知差异** — Android Toast ~3.5s，Linux notify-send 7s，Windows/macOS 使用系统默认
 8. **IMPORTED_NO_SONAME** — Go 共享库防止绝对路径写入 RPATH，Android 通过文件名查找 .so
+
+---
+
+## Push Handler 流程
+
+### 文件
+- `pushhandler.h/cpp` — UnifiedPush 注册、分发器管理
+- `main.cpp` — 启动时弹出分发器选择对话框（`QskDialog::select`）
+- `settingspage.cpp` — Settings 页查询已安装分发器，更新 combo 标签
+
+### 信号路由
+
+| 信号 | 触发源 | 消费方 |
+|------|--------|--------|
+| `distributorsFound` | `registerDevice()`（启动注册） | `main.cpp` → 弹 dialog 选择 |
+| `distributorsUpdated` | `installedDistributors()`（Settings 页查询） | `settingspage.cpp` → 更新 combo 标签 |
+
+### 启动注册流程 (`registerDevice`)
+
+```
+PushHandler::start()
+  → registerDevice()
+    → Android getSavedDistributor()
+      → 有 saved → 直接 register(saved)，不弹任何东西
+      → 无 saved → getDistributors()
+            → 空 → 报错 "未找到 UnifiedPush 分发器"
+            → 1个 → selectDistributor() 自动选
+            → >1个 → emit distributorsFound → main.cpp 弹 dialog
+```
+
+### Settings 页查询流程 (`installedDistributors`)
+
+```
+SettingsPage::onCreate()
+  → PushHandler::installedDistributors()（异步）
+    → Android getDistributors()
+      → emit distributorsUpdated → rebuildBackendLabels() 更新 combo 标签
+```
+
+### 分发器切换
+
+用户在 Settings 页手动切换分发器：
+- `switchDistributor(newDistributor)` → 重新注册
+- `selectDistributor(distributor)` → 直接选择（Android native 调用）

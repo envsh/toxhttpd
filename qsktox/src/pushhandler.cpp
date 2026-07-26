@@ -117,7 +117,7 @@ QStringList PushHandler::installedDistributors()
 
         QMetaObject::invokeMethod(s_instance, [distributors]() {
             s_instance->m_installedDistributorsCache = distributors;
-            emit s_instance->distributorsFound(distributors);
+            emit s_instance->distributorsUpdated(distributors);
         }, Qt::QueuedConnection);
     });
 

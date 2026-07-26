@@ -38,6 +38,7 @@ public:
 
 Q_SIGNALS:
     void distributorsFound(const QStringList& distributors);
+    void distributorsUpdated(const QStringList& distributors);
     void pushReceived(const QString& endpoint, const QString& instance);
     void pushMessage(const QByteArray& message, const QString& instance);
     void registrationFailed(const QString& reason);

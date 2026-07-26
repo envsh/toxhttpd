@@ -415,7 +415,7 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
             }
         });
 
-    connect(PushHandler::instance(), &PushHandler::distributorsFound,
+    connect(PushHandler::instance(), &PushHandler::distributorsUpdated,
         this, [this](const QStringList& installed) {
             rebuildBackendLabels(installed);
         });
