@@ -192,7 +192,7 @@ void ChannelRowNode::paint(QPainter* painter, const QSize& size, const void*)
 
     // ── 第1行：标题（bold，白色）──
     QFont titleFont;
-    titleFont.setPixelSize(15);
+    titleFont.setPixelSize(17);
     titleFont.setBold(true);
     painter->setFont(titleFont);
     painter->setPen(Qt::white);
@@ -209,7 +209,7 @@ void ChannelRowNode::paint(QPainter* painter, const QSize& size, const void*)
 
     // ── 第2行：消息（灰色，截断）──
     QFont msgFont;
-    msgFont.setPixelSize(13);
+    msgFont.setPixelSize(15);
     painter->setFont(msgFont);
     painter->setPen(QColor("#999"));
 

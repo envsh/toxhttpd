@@ -165,7 +165,7 @@ static constexpr int s_mockCount = sizeof(s_mockMessages) / sizeof(s_mockMessage
 static qreal calcRowHeight(const MessageItem& item, qreal availableWidth)
 {
     QFont msgFont;
-    msgFont.setPixelSize(14);
+    msgFont.setPixelSize(16);
     QFontMetrics msgFm(msgFont);
 
     qreal maxBubbleWidth = availableWidth * 65.0 / 100.0;
@@ -230,12 +230,12 @@ void MessageRowNode::paint(QPainter* painter, const QSize& size, const void*)
 
     // ── 发送者名字 ──
     QFont nameFont;
-    nameFont.setPixelSize(11);
+    nameFont.setPixelSize(13);
     painter->setFont(nameFont);
 
     // ── 气泡绘制 ──
     QFont msgFont;
-    msgFont.setPixelSize(14);
+    msgFont.setPixelSize(16);
     painter->setFont(msgFont);
     QFontMetrics msgFm(msgFont);
 
@@ -293,7 +293,7 @@ void MessageRowNode::paint(QPainter* painter, const QSize& size, const void*)
 
         // 时间
         QFont timeFont;
-        timeFont.setPixelSize(9);
+        timeFont.setPixelSize(11);
         painter->setFont(timeFont);
         painter->setPen(QColor("#666"));
         int timeW = QFontMetrics(timeFont).horizontalAdvance(m_item.time);
@@ -326,7 +326,7 @@ void MessageRowNode::paint(QPainter* painter, const QSize& size, const void*)
 
         // 时间
         QFont timeFont;
-        timeFont.setPixelSize(9);
+        timeFont.setPixelSize(11);
         painter->setFont(timeFont);
         painter->setPen(QColor("#666"));
         int timeW = QFontMetrics(timeFont).horizontalAdvance(m_item.time);
