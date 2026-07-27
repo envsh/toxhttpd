@@ -14,6 +14,30 @@
 
 static PushHandler* s_instance = nullptr;
 static const char* UP_CLASS = "org/unifiedpush/android/connector/UnifiedPush";
+static QAtomicInt s_ignoredMsgCount = 0;
+
+static QString pushInstance()
+{
+    return "default"; // UP connector 为每个 instance 生成独立 token，UUID 无实际作用
+    QSettings s;
+    QString token = s.value("pushDeviceToken").toString();
+    if (token.isEmpty()) {
+        token = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        s.setValue("pushDeviceToken", token);
+        s.sync();
+    }
+    return token;
+}
+
+static QString distInstance(const QString& distPkg)
+{
+    if (distPkg == "io.heckel.ntfy")                       return "default_ntfy";
+    if (distPkg == "org.unifiedpush.distributor.sunup")     return "default_sunup";
+    if (distPkg == "com.github.gotify.up")                  return "default_gotifyup";
+    if (distPkg == "org.unifiedpush.distributor.nextpush")  return "default_nextpush";
+    if (distPkg == "org.unifiedpush.distributor.gcompat")   return "default_gcompat";
+    return "default";
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // 已知 UP distributor 包名 → 友好名称映射
@@ -160,14 +184,7 @@ void PushHandler::start()
     QObject::connect(s_instance, &PushHandler::registrationSent,
         s_instance, &PushHandler::startRegistrationTimeout);
 
-    QSettings s;
-    QString deviceToken = s.value("pushDeviceToken").toString();
-    if (deviceToken.isEmpty()) {
-        deviceToken = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        s.setValue("pushDeviceToken", deviceToken);
-        s.sync();
-    }
-    qDebug() << "[PushHandler] initialized, device=" << deviceToken;
+    qDebug() << "[PushHandler] initialized, device=" << pushInstance();
     showAndroidToast("Push 初始化...");
 }
 
@@ -221,7 +238,7 @@ void PushHandler::registerDevice()
                 "register",
                 registerSig,
                 ctx.object(),
-                QJniObject::fromString("default").object(),
+                QJniObject::fromString(distInstance(savedDistributor)).object(),
                 QJniObject().object(),
                 QJniObject().object());
 
@@ -348,7 +365,7 @@ void PushHandler::selectDistributor(const QString& distributor)
             "register",
             registerSig,
             ctx.object(),
-            QJniObject::fromString("default").object(),
+            QJniObject::fromString(distInstance(distributor)).object(),
             QJniObject().object(),
             QJniObject().object());
 
@@ -363,47 +380,67 @@ void PushHandler::switchDistributor(const QString& newDistributor)
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([newDistributor]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
 
-        // 1. unregister 旧 distributor
-        if (checkMethod("unregister", "(Landroid/content/Context;Ljava/lang/String;)V")) {
-            QJniObject::callStaticMethod<void>(
-                UP_CLASS,
-                "unregister",
-                "(Landroid/content/Context;Ljava/lang/String;)V",
-                ctx.object(),
-                QJniObject::fromString("default").object());
-            qDebug() << "[PushHandler] unregistered old distributor";
-        }
+        // saveDistributor 已注释：不删除旧 distributor，保留 token
+        // QJniObject::callStaticMethod<void>(
+        //     UP_CLASS,
+        //     "saveDistributor",
+        //     "(Landroid/content/Context;Ljava/lang/String;)V",
+        //     ctx.object(),
+        //     QJniObject::fromString(newDistributor).object());
 
-        // 2. saveDistributor 新 distributor
-        QJniObject::callStaticMethod<void>(
-            UP_CLASS,
-            "saveDistributor",
-            "(Landroid/content/Context;Ljava/lang/String;)V",
+        // 直接替换 distributor（DELETE + INSERT，FK OFF 保留 token）
+        QJniObject::callStaticMethod<jboolean>(
+            "io/fedlet/mobutil/PushServiceImpl",
+            "replaceDistributor",
+            "(Landroid/content/Context;Ljava/lang/String;)Z",
             ctx.object(),
             QJniObject::fromString(newDistributor).object());
-        qDebug() << "[PushHandler] saveDistributor:" << newDistributor;
+        qDebug() << "[PushHandler] replaceDistributor:" << newDistributor;
 
-        // 3. register 到新 distributor
-        const char* registerSig = "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V";
-        if (checkMethod("register", registerSig)) {
-            QJniObject::callStaticMethod<void>(
-                UP_CLASS,
-                "register",
-                registerSig,
-                ctx.object(),
-                QJniObject::fromString("default").object(),
-                QJniObject().object(),
-                QJniObject().object());
-            qDebug() << "[PushHandler] register sent to" << newDistributor;
+        // 检查 instance 是否已注册，避免重复注册导致 topic 变化
+        QString instance = distInstance(newDistributor);
+        bool alreadyRegistered = false;
+        {
+            QJniObject ctxObj(ctx.object());
+            QJniObject instObj = QJniObject::fromString(instance);
+            alreadyRegistered = QJniObject::callStaticMethod<jboolean>(
+                "io/fedlet/mobutil/PushServiceImpl",
+                "isInstanceRegistered",
+                "(Landroid/content/Context;Ljava/lang/String;)Z",
+                ctxObj.object(), instObj.object());
+        }
+        qDebug() << "[PushHandler] switchDistributor instance:" << instance << "alreadyRegistered:" << alreadyRegistered;
+
+        if (alreadyRegistered) {
+            qDebug() << "[PushHandler] instance" << instance << "already registered, skip register";
+        } else {
+            // 注册
+            const char* registerSig = "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V";
+            if (checkMethod("register", registerSig)) {
+                QJniObject::callStaticMethod<void>(
+                    UP_CLASS,
+                    "register",
+                    registerSig,
+                    ctx.object(),
+                    QJniObject::fromString(instance).object(),
+                    QJniObject().object(),
+                    QJniObject().object());
+                qDebug() << "[PushHandler] register sent to" << newDistributor;
+            }
         }
 
-        // 4. 更新状态
-        QMetaObject::invokeMethod(s_instance, [newDistributor]() {
+        // 更新状态 + 保存活跃 distributor
+        QMetaObject::invokeMethod(s_instance, [newDistributor, alreadyRegistered]() {
             s_instance->m_currentDistributor = newDistributor;
-            s_instance->setRegistering(true);
-            s_instance->setConnected(false);
-            emit s_instance->registrationSent();
-            emit s_instance->statusChanged();
+            s_instance->setRegistering(!alreadyRegistered);
+            s_instance->setConnected(alreadyRegistered);
+            QSettings().setValue("pushActiveDistributor", newDistributor);
+            if (alreadyRegistered) {
+                emit s_instance->statusChanged();
+            } else {
+                emit s_instance->registrationSent();
+                emit s_instance->statusChanged();
+            }
         }, Qt::QueuedConnection);
     });
 }
@@ -415,12 +452,17 @@ void PushHandler::stop()
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
         auto ctx = QNativeInterface::QAndroidApplication::context();
 
+        QJniObject saved = QJniObject::callStaticMethod<jobject>(
+            UP_CLASS,
+            "getSavedDistributor",
+            "(Landroid/content/Context;)Ljava/lang/String;",
+            ctx.object());
         QJniObject::callStaticMethod<void>(
             UP_CLASS,
             "unregister",
             "(Landroid/content/Context;Ljava/lang/String;)V",
             ctx.object(),
-            QJniObject::fromString("default").object());
+            QJniObject::fromString(distInstance(saved.toString())).object());
 
         qDebug() << "[PushHandler] unregistered";
     });
@@ -474,7 +516,7 @@ Java_io_fedlet_mobutil_PushServiceImpl_onNewEndpointNative(
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_fedlet_mobutil_PushServiceImpl_onMessageNative(
-    JNIEnv* env, jobject /*thiz*/, jbyteArray jMessage, jstring jInstance)
+    JNIEnv* env, jobject /*thiz*/, jbyteArray jMessage, jstring jInstance, jstring jDistributor)
 {
     QByteArray message;
     if (jMessage) {
@@ -484,6 +526,16 @@ Java_io_fedlet_mobutil_PushServiceImpl_onMessageNative(
             reinterpret_cast<jbyte*>(message.data()));
     }
     QString instance = jstringToQString(env, jInstance);
+    QString distributor = jstringToQString(env, jDistributor);
+
+    QString activeDist = QSettings().value("pushActiveDistributor").toString();
+    if (!activeDist.isEmpty() && distributor != activeDist) {
+        s_ignoredMsgCount.fetchAndAddRelaxed(1);
+        qDebug() << "[PushHandler] ignored msg from" << distributor
+                 << ", total ignored:" << s_ignoredMsgCount.loadRelaxed();
+        return;
+    }
+
     qDebug() << "[PushHandler] message received, size:" << message.size()
              << "instance:" << instance;
 
@@ -492,6 +544,11 @@ Java_io_fedlet_mobutil_PushServiceImpl_onMessageNative(
             emit s_instance->pushMessage(message, instance);
         }, Qt::QueuedConnection);
     }
+}
+
+int PushHandler::ignoredMessageCount()
+{
+    return s_ignoredMsgCount.loadRelaxed();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -570,6 +627,7 @@ QString PushHandler::currentDistributor() const { return {}; }
 QString PushHandler::currentDistributorDisplayName() const { return {}; }
 void PushHandler::setProviderType(PushProviderType) {}
 void PushHandler::setCurrentDistributor(const QString&) {}
+int PushHandler::ignoredMessageCount() { return 0; }
 void PushHandler::startRegistrationTimeout() {}
 void PushHandler::cancelRegistrationTimeout() {}
 void PushHandler::timerEvent(QTimerEvent*) {}

@@ -23,6 +23,7 @@ public:
     static QString upDistributorDisplayName(const QString& packageName);
     static QStringList installedDistributors();
     static QVector<QPair<QString,QString>> knownDistributors();
+    static int ignoredMessageCount();
     void setConnected(bool v);
     void setRegistering(bool v);
 
