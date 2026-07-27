@@ -216,6 +216,12 @@ void PushHandler::registerDevice()
         if (!savedDistributor.isEmpty()) {
             qDebug() << "[PushHandler]已有 distributor:" << savedDistributor;
 
+            QJniObject::callStaticMethod<void>(
+                "io/fedlet/mobutil/PushServiceImpl",
+                "setActiveDistributor",
+                "(Ljava/lang/String;)V",
+                QJniObject::fromString(savedDistributor).object());
+
             // 更新当前 distributor 显示名
             QMetaObject::invokeMethod(s_instance, [savedDistributor]() {
                 s_instance->m_currentDistributor = savedDistributor;
@@ -359,6 +365,14 @@ void PushHandler::selectDistributor(const QString& distributor)
             QJniObject::fromString(distributor).object());
         qDebug() << "[PushHandler] saveDistributor:" << distributor;
 
+        // 设置活跃 distributor（onMessageNative 过滤用）
+        QJniObject::callStaticMethod<void>(
+            "io/fedlet/mobutil/PushServiceImpl",
+            "setActiveDistributor",
+            "(Ljava/lang/String;)V",
+            QJniObject::fromString(distributor).object());
+        QSettings().setValue("pushActiveDistributor", distributor);
+
         // 注册
         QJniObject::callStaticMethod<void>(
             UP_CLASS,
@@ -397,6 +411,13 @@ void PushHandler::switchDistributor(const QString& newDistributor)
             QJniObject::fromString(newDistributor).object());
         qDebug() << "[PushHandler] replaceDistributor:" << newDistributor;
 
+        QJniObject::callStaticMethod<void>(
+            "io/fedlet/mobutil/PushServiceImpl",
+            "setActiveDistributor",
+            "(Ljava/lang/String;)V",
+            QJniObject::fromString(newDistributor).object());
+        QSettings().setValue("pushActiveDistributor", newDistributor);
+
         // 检查 instance 是否已注册，避免重复注册导致 topic 变化
         QString instance = distInstance(newDistributor);
         bool alreadyRegistered = false;
@@ -434,7 +455,6 @@ void PushHandler::switchDistributor(const QString& newDistributor)
             s_instance->m_currentDistributor = newDistributor;
             s_instance->setRegistering(!alreadyRegistered);
             s_instance->setConnected(alreadyRegistered);
-            QSettings().setValue("pushActiveDistributor", newDistributor);
             if (alreadyRegistered) {
                 emit s_instance->statusChanged();
             } else {
