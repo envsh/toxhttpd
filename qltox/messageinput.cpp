@@ -199,7 +199,7 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
     if (QImageDrag::canDecode(src)) {
         QImage img;
         if (QImageDrag::decode(src, img)) {
-            QString tmpPath = QString("/tmp/toxhttpd_paste_%1.png")
+            QString tmpPath = QString("/tmp/fedox_httpd_paste_%1.png")
                               .arg(s_pasteCounter++);
             img.save(tmpPath, "PNG");
             int ret = QMessageBox::question(this, _("confirm"),
@@ -249,7 +249,7 @@ bool MessageInput::handleMimeData(const QMimeData* data) {
     if (data->hasImage()) {
         QImage img = data->imageData().value<QImage>();
         if (!img.isNull()) {
-            QString tmpPath = QString("/tmp/toxhttpd_paste_%1.png")
+            QString tmpPath = QString("/tmp/fedox_httpd_paste_%1.png")
                               .arg(s_pasteCounter++);
             img.save(tmpPath, "PNG");
             int ret = QMessageBox::question(this, _("confirm"),
