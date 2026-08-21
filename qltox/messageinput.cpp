@@ -3,8 +3,10 @@
 #include <qmessagebox.h>
 #ifdef QT3_BUILD
 #include <qfile.h>
+#include <qfileinfo.h>
 #else
 #include <QFile>
+#include <QFileInfo>
 #endif
 
 #ifdef QT3_BUILD
@@ -28,6 +30,16 @@
 #endif
 
 int MessageInput::s_pasteCounter = 0;
+
+// 人类可读的文件大小："845 B" / "123.4 KB" / "5.6 MB" / "1.2 GB"
+static QString formatFileSize(uint bytes) {
+    if (bytes < 1024) { return QString("%1 B").arg(bytes); }
+    double kb = bytes / 1024.0;
+    if (kb < 1024.0) { return QString("%1 KB").arg(kb, 0, 'f', 1); }
+    double mb = kb / 1024.0;
+    if (mb < 1024.0) { return QString("%1 MB").arg(mb, 0, 'f', 1); }
+    return QString("%1 GB").arg(mb / 1024.0, 0, 'f', 2);
+}
 
 MessageInput::MessageInput(QWidget* parent)
     : QTextEdit(parent), m_historyIndex(-1) {
@@ -189,8 +201,9 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
             QString path = uris;
             if (path.startsWith("file://")) path = path.mid(7);
             if (path.isEmpty() || !QFile::exists(path)) { return false; }
+            QString sizeStr = formatFileSize((uint)QFileInfo(path).size());
             int ret = QMessageBox::question(this, _("confirm"),
-                        _("confirm_send_file").arg(path),
+                        _A("confirm_send_file", QStringList() << path << sizeStr),
                         QMessageBox::Yes, QMessageBox::No);
             if (ret == QMessageBox::Yes) { emit filePasteRequested(path); return true; }
             return false;
@@ -202,8 +215,9 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
             QString tmpPath = QString("/tmp/fedox_httpd_paste_%1.png")
                               .arg(s_pasteCounter++);
             img.save(tmpPath, "PNG");
+            QString sizeStr = formatFileSize((uint)QFileInfo(tmpPath).size());
             int ret = QMessageBox::question(this, _("confirm"),
-                        _("confirm_send_file").arg(tmpPath),
+                        _A("confirm_send_file", QStringList() << tmpPath << sizeStr),
                         QMessageBox::Yes, QMessageBox::No);
             if (ret == QMessageBox::Yes) { emit filePasteRequested(tmpPath); return true; }
             return false;
@@ -214,8 +228,9 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
         if (QTextDrag::decode(src, text)) {
             text = text.stripWhiteSpace();
             if (QFile::exists(text)) {
+                QString sizeStr = formatFileSize((uint)QFileInfo(text).size());
                 int ret = QMessageBox::question(this, _("confirm"),
-                            _("confirm_send_file").arg(text),
+                            _A("confirm_send_file", QStringList() << text << sizeStr),
                             QMessageBox::Yes, QMessageBox::No);
                 if (ret == QMessageBox::Yes) { emit filePasteRequested(text); return true; }
                 return false;
@@ -238,8 +253,9 @@ bool MessageInput::handleMimeData(const QMimeData* data) {
         for (int i = 0; i < urls.size(); i++) {
             QString path = urls[i].toLocalFile();
             if (!path.isEmpty() && QFile::exists(path)) {
+                QString sizeStr = formatFileSize((uint)QFileInfo(path).size());
                 int ret = QMessageBox::question(this, _("confirm"),
-                            _("confirm_send_file").arg(path),
+                            _A("confirm_send_file", QStringList() << path << sizeStr),
                             QMessageBox::Yes, QMessageBox::No);
                 if (ret == QMessageBox::Yes) { emit filePasteRequested(path); return true; }
                 return false;
@@ -252,8 +268,9 @@ bool MessageInput::handleMimeData(const QMimeData* data) {
             QString tmpPath = QString("/tmp/fedox_httpd_paste_%1.png")
                               .arg(s_pasteCounter++);
             img.save(tmpPath, "PNG");
+            QString sizeStr = formatFileSize((uint)QFileInfo(tmpPath).size());
             int ret = QMessageBox::question(this, _("confirm"),
-                        _("confirm_send_file").arg(tmpPath),
+                        _A("confirm_send_file", QStringList() << tmpPath << sizeStr),
                         QMessageBox::Yes, QMessageBox::No);
             if (ret == QMessageBox::Yes) { emit filePasteRequested(tmpPath); return true; }
             return false;
@@ -262,8 +279,9 @@ bool MessageInput::handleMimeData(const QMimeData* data) {
     {
         QString text = data->text().trimmed();
         if (!text.isEmpty() && QFile::exists(text)) {
+            QString sizeStr = formatFileSize((uint)QFileInfo(text).size());
             int ret = QMessageBox::question(this, _("confirm"),
-                        _("confirm_send_file").arg(text),
+                        _A("confirm_send_file", QStringList() << text << sizeStr),
                         QMessageBox::Yes, QMessageBox::No);
             if (ret == QMessageBox::Yes) { emit filePasteRequested(text); return true; }
             return false;

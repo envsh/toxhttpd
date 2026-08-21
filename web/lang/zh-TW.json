@@ -142,7 +142,7 @@
     "theme_dark": "深色主題",
     "theme_light": "淺色主題",
     "confirm": "確認",
-    "confirm_send_file": "確認發送該檔案？\n{0}",
+    "confirm_send_file": "確認發送該檔案？（大小：{1}）\n{0}",
     "confirm_delete_friend": "確定刪除好友 {0} 嗎？",
     "confirm_leave_conference": "確定離開會議 {0} 嗎？",
     "invite_to_conference": "邀請進會議",

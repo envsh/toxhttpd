@@ -183,7 +183,7 @@
     "theme_dark": "深色主题",
     "theme_light": "浅色主题",
     "confirm": "确认",
-    "confirm_send_file": "确认发送该文件？\n{0}",
+    "confirm_send_file": "确认发送该文件？（大小：{1}）\n{0}",
     "confirm_delete_friend": "确定删除好友 {0} 吗？",
     "confirm_leave_conference": "确定离开会议 {0} 吗？",
     "invite_to_conference": "邀请进会议",

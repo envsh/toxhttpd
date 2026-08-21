@@ -153,7 +153,7 @@
     "theme_dark": "Dark Theme",
     "theme_light": "Light Theme",
     "confirm": "Confirm",
-    "confirm_send_file": "Confirm sending this file?\n{0}",
+    "confirm_send_file": "Confirm sending this file? (Size: {1})\n{0}",
     "confirm_delete_friend": "Delete friend {0}?",
     "confirm_leave_conference": "Leave conference {0}?",
     "invite_to_conference": "Invite to Conference",

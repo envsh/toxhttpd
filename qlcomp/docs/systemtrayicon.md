@@ -19,12 +19,28 @@ SystemTrayIcon : QObject            ← 适配层（systemtrayicon.h/cpp，类�
 
 | 文件 | 来源 | 角色 |
 |------|------|------|
-| `trayicon.h/cpp` | Psi 0.10（Debian 源码包 src/tools/trayicon/）原样拷入 | 公共逻辑（LGPL 2.1 头保留） |
+| `trayicon.h/cpp` | Psi 0.10-2（见下方来源与版本记录）原样拷入 | 公共逻辑（LGPL 2.1 头保留） |
 | `trayicon_x11.cpp` | 同上 | freedesktop 协议实现 |
 | `trayicon_win.cpp` | 同上 | Shell_NotifyIcon 实现 |
 | `systemtrayicon.h/cpp` | 新写 | 适配层 |
 
 mac 版 `trayicon_mac.cpp` 未引入（项目无 mac 构建目标），需要时从同源补抓并加 `macx` scope。
+
+## 来源与版本记录
+
+| 项 | 值 |
+|----|-----|
+| 上游项目 | Psi <https://psi-im.org> |
+| 版本 | 0.10（Debian 修订版 **0.10-2**，Qt3 终版） |
+| 文件 | trayicon.h / trayicon.cpp / trayicon_x11.cpp / trayicon_win.cpp |
+| 来源 URL | <https://sources.debian.org/data/main/p/psi/0.10-2/src/tools/trayicon/> |
+| 抓取日期 | 2026-08-21 |
+| 许可证 | LGPL 2.1（原头注释完整保留，版权 Justin Karneges 2003 等） |
+| 本地修改 | 无（原样拷贝），仅编译进 Qt3 构建 |
+| 上游状态 | Psi 0.11+ 切换 Qt4 时整体删除此组件改用原生 QSystemTrayIcon；官方从未做 Qt3/Qt4 双兼容 |
+
+> 升级提示：若需更新此组件，从 Debian 同路径取更高修订版；
+> 不要期待上游新版本——0.11 起该目录已不存在。
 
 ## API 设计要点
 
