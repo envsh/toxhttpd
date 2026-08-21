@@ -742,8 +742,19 @@ void MainWindow::customEvent(CustomEventBase* event) {
             return;
         }
         QPixmap pix;
+        QByteArray origData;
         {
             const auto& rd = e->rawData;
+            // Qt3 QByteArray 缺少 (const char*,int) 构造，故用 resize+memcpy 深拷贝。
+            // 内存安全性已核对：
+            // - resize(n)+全量覆盖：无未初始化字节
+            // - 值拷贝独立于事件生命周期，无悬垂风险；QGArray 引用计数自动释放
+            // - empty 保护规避 memcpy(dst,nullptr,0) 的标准 UB
+            // - (int) 截断仅理论风险（需 >2GB 图片，消息媒体不可能达到）
+            origData.resize((int)rd.size());
+            if (!rd.empty()) {
+                memcpy(origData.data(), rd.data(), rd.size());
+            }
             std::string rawStr(rd.begin(), rd.end());
             if (!pix.loadFromData((const uchar*)rawStr.data(), rawStr.size())) {
                 if (isWebP(rawStr))
@@ -751,7 +762,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
             }
         }
         if (pix.isNull()) { return; }
-        PhotoViewer* pv = new PhotoViewer(this, pix);
+        PhotoViewer* pv = new PhotoViewer(this, pix, origData);   // 原始文件字节带入
         pv->show();
         return;
     }

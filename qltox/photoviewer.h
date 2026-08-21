@@ -57,7 +57,9 @@ private:
 class PhotoViewer : public QDialog {
     Q_OBJECT
 public:
-    PhotoViewer(QWidget* parent, const QPixmap& pixmap);
+    // origData: 原始压缩文件字节（JPEG/PNG），供剪贴板直传原文件；空则回退像素模式
+    PhotoViewer(QWidget* parent, const QPixmap& pixmap,
+                const QByteArray& origData = QByteArray());
     ~PhotoViewer();
 
 protected:
@@ -95,6 +97,8 @@ private:
     int m_savedW;
     int m_savedH;
     QPixmap m_origPixmap;
+    QByteArray m_origData;   // 原始文件字节（可为空）
+    QString m_origMime;      // 魔数探测结果："image/png"/"image/jpeg"/"image/webp"/""
 };
 
 #endif

@@ -6,17 +6,106 @@
 #include <qpainter.h>
 #include <qcursor.h>
 #include <qapplication.h>
+#include <qfile.h>
+#include <qmessagebox.h>
 #include <algorithm>
+#include <string.h>
 #ifdef QT3_BUILD
 #include <qclipboard.h>
+#include <qmime.h>
+#include <qimage.h>
+#include <qbuffer.h>
 #include <qfiledialog.h>
 #include <qdesktopwidget.h>
 #else
 #include <QClipboard>
+#include <QMimeData>
+#include <QImage>
+#include <QBuffer>
 #include <QFileDialog>
 #endif
 using std::min;
 using std::max;
+
+// 魔数探测图片 mime；无法识别返回空串
+static QString sniffImageMime(const QByteArray& data) {
+    if (data.size() >= 12) {
+        const uchar* p = (const uchar*)data.data();   // Qt3 QMemArray 无 constData()
+        if (p[0] == 0xFF && p[1] == 0xD8) { return "image/jpeg"; }
+        if (p[0] == 0x89 && p[1] == 'P' && p[2] == 'N' && p[3] == 'G') { return "image/png"; }
+        if (memcmp(p, "RIFF", 4) == 0 && memcmp(p + 8, "WEBP", 4) == 0) { return "image/webp"; }
+    }
+    return QString();
+}
+
+#ifdef QT3_BUILD
+// 剪贴板数据源（修复 CPU 100% 的核心）：
+// 原图是 JPEG/PNG 时直接返回原始文件字节——零转换；
+// 其余格式懒编码一次并缓存，把"每次 SelectionRequest 全图重编码"
+// 变成"首次编码、后续 memcpy"。无 Q_OBJECT，不涉 moc。
+class PhotoClipSource : public QMimeSource {
+public:
+    PhotoClipSource(const QByteArray& origData, const QString& origMime,
+                    const QImage& img)
+        : m_orig(origData), m_mime(origMime), m_img(img),
+          m_havePng(false), m_havePpm(false) {}
+
+    virtual const char* format(int n) const {
+        if (m_mime == "image/png") {
+            if (n == 0) { return "image/png"; }
+            if (n == 1) { return "image/ppm"; }
+        } else if (m_mime == "image/jpeg") {
+            if (n == 0) { return "image/jpeg"; }
+            if (n == 1) { return "image/png"; }
+            if (n == 2) { return "image/ppm"; }
+        } else {
+            if (n == 0) { return "image/png"; }
+            if (n == 1) { return "image/ppm"; }
+        }
+        return 0;
+    }
+
+    virtual QByteArray encodedData(const char* fmt) const {
+        if (!fmt) { return QByteArray(); }
+        // 原始字节直通（300KB 原图粘贴后仍是 300KB）
+        if (m_mime == "image/png" && qstrcmp(fmt, "image/png") == 0) {
+            return m_orig;
+        }
+        if (m_mime == "image/jpeg" && qstrcmp(fmt, "image/jpeg") == 0) {
+            return m_orig;
+        }
+        if (qstrcmp(fmt, "image/png") == 0) {
+            if (!m_havePng) { encodeTo(m_png, "PNG"); m_havePng = true; }
+            return m_png;
+        }
+        if (qstrcmp(fmt, "image/ppm") == 0) {
+            if (!m_havePpm) { encodeTo(m_ppm, "PPM"); m_havePpm = true; }
+            return m_ppm;
+        }
+        return QByteArray();
+    }
+
+private:
+    // Qt3 QBuffer 按值持有 QByteArray，必须写完再取回 buffer()
+    void encodeTo(QByteArray& out, const char* f) const {
+        QBuffer buf;
+        buf.open(IO_WriteOnly);
+        QImageIO io(&buf, f);
+        io.setImage(m_img);
+        io.write();
+        buf.close();
+        out = buf.buffer();
+    }
+
+    QByteArray m_orig;
+    QString m_mime;
+    QImage m_img;
+    mutable QByteArray m_png;
+    mutable QByteArray m_ppm;
+    mutable bool m_havePng;
+    mutable bool m_havePpm;
+};
+#endif
 
 // ============================================================
 // PhotoCanvas
@@ -283,7 +372,8 @@ void PhotoCanvas::resizeEvent(QResizeEvent* event) {
 // PhotoViewer
 // ============================================================
 
-PhotoViewer::PhotoViewer(QWidget* parent, const QPixmap& pixmap)
+PhotoViewer::PhotoViewer(QWidget* parent, const QPixmap& pixmap,
+                         const QByteArray& origData)
     : QDialog(parent
 #ifdef QT3_BUILD
       , nullptr, false, WDestructiveClose
@@ -299,6 +389,8 @@ PhotoViewer::PhotoViewer(QWidget* parent, const QPixmap& pixmap)
     , m_savedW(800)
     , m_savedH(600)
     , m_origPixmap(pixmap)
+    , m_origData(origData)
+    , m_origMime(sniffImageMime(origData))
 {
 #ifndef QT3_BUILD
     setAttribute(Qt::WA_DeleteOnClose);
@@ -412,7 +504,7 @@ void PhotoViewer::keyPressEvent(QKeyEvent* e) {
         onSave();
         return;
     case Qt::Key_C:
-        onCopy();
+        if (!e->isAutoRepeat()) { onCopy(); }   // 长按 c 不再疯狂重复拷贝
         return;
     case Qt::Key_Up:
     case Qt::Key_Equal:
@@ -484,17 +576,74 @@ void PhotoViewer::onSave() {
         this, qFromUtf8("保存图片"), qGetHomePath(),
         qFromUtf8("Images (*.png *.jpg)"));
 #endif
-    if (!path.isEmpty()) {
+    if (path.isEmpty()) { return; }
+
+    // 与剪贴板同策略：扩展名与原格式一致时直接写原始字节，零重编码
+    // （300KB 原图保存后仍是 300KB）
 #ifdef QT3_BUILD
-        m_origPixmap.save(path, "PNG");
+    QString lower = path.lower();
 #else
-        m_origPixmap.save(path);
+    QString lower = path.toLower();
 #endif
+    bool isPngPath = lower.endsWith(".png");
+    bool isJpgPath = lower.endsWith(".jpg") || lower.endsWith(".jpeg");
+
+    if ((isPngPath && m_origMime == "image/png")
+            || (isJpgPath && m_origMime == "image/jpeg")) {
+        QFile f(path);
+#ifdef QT3_BUILD
+        if (!f.open(IO_WriteOnly)) {
+#else
+        if (!f.open(QIODevice::WriteOnly)) {
+#endif
+            QMessageBox::warning(this, qFromUtf8("保存失败"), path);
+            return;
+        }
+#ifdef QT3_BUILD
+        f.writeBlock(m_origData);          // QByteArray 重载 qfile.h:89
+#else
+        f.write(m_origData.constData(), m_origData.size());
+#endif
+        f.close();
+        return;
+    }
+
+    // 转码路径：按扩展名选格式
+    // （顺带修复：Qt3 原实现存 .jpg 时硬编码 "PNG"，实际写入 PNG 数据）
+    bool ok;
+#ifdef QT3_BUILD
+    const char* fmt = isJpgPath ? "JPEG" : "PNG";
+    ok = m_origPixmap.save(path, fmt);
+#else
+    ok = m_origPixmap.save(path);          // Qt4 按扩展名自动识别
+#endif
+    if (!ok) {
+        QMessageBox::warning(this, qFromUtf8("保存失败"), path);
     }
 }
 
+// 不再用 setPixmap 让进程持有大像素图作为 selection owner：
+// 旧实现下每个 SelectionRequest 都在 GUI 线程同步重编码整幅图，
+// 导致 UI 卡死级延迟 + CPU 100%，且关闭查看器也无法解除 owner 身份。
+// 新实现：缓存式数据源，请求成本≈memcpy；粘贴方拿到的是原始文件字节。
 void PhotoViewer::onCopy() {
-    QApplication::clipboard()->setPixmap(m_origPixmap);
+#ifdef QT3_BUILD
+    QApplication::clipboard()->setData(
+        new PhotoClipSource(m_origData, m_origMime,
+                            m_origPixmap.convertToImage()));  // 所有权移交剪贴板
+#else
+    QMimeData* md = new QMimeData();
+    if (m_origMime == "image/png" || m_origMime == "image/jpeg") {
+        md->setData(m_origMime, m_origData);                  // 原始字节直通
+    } else {
+        QBuffer buf;                                          // webp/空：转 PNG 一次
+        buf.open(QIODevice::WriteOnly);
+        m_origPixmap.save(&buf, "PNG");
+        md->setData("image/png", buf.buffer());
+    }
+    md->setImageData(m_origPixmap.toImage());                 // 像素兜底（GIMP 等）
+    QApplication::clipboard()->setMimeData(md);               // 所有权移交剪贴板
+#endif
 }
 
 void PhotoViewer::onZoomIn() {
