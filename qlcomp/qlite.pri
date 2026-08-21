@@ -23,7 +23,8 @@ QTCOMP_CPP = $$PWD/limelog.cpp $$PWD/appsetup.cpp $$PWD/compat34.cpp $$PWD/trans
 			$$PWD/screenshotmanager.cpp \
 			$$PWD/screenshotoverlay.cpp \
 			$$PWD/screenshotpreview.cpp \
-			$$PWD/sleepblocker.cpp
+			$$PWD/sleepblocker.cpp \
+			$$PWD/systemtrayicon.cpp
 
 QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translator.h $$PWD/compat34.h \
 			$$PWD/emojiutil.h $$PWD/emojiwidgets.h $$PWD/emojiitems.h \
@@ -41,7 +42,20 @@ QTCOMP_HDR = $$PWD/limelog.h $$PWD/appsetup.h $$PWD/appsetup_c.h $$PWD/translato
 			$$PWD/screenshotmanager.h \
 			$$PWD/screenshotoverlay.h \
 			$$PWD/screenshotpreview.h \
-			$$PWD/sleepblocker.h
+			$$PWD/sleepblocker.h \
+			$$PWD/systemtrayicon.h
+
+# SystemTrayIcon 平台依赖：Qt3 分支用 Psi TrayIcon（qpopupmenu.h 等 Qt3 专属 API，
+# 不能进 Qt4 构建）；Qt4 分支用原生 QSystemTrayIcon，无需平台文件。
+# 注意：qltox.pro 在 include(qlite.pri) 之后才 DEFINES += QT3_BUILD，
+# 所以这里不能用 contains(DEFINES, QT3_BUILD)，必须用 isEmpty(QT_VERSION) 自判。
+# 此块必须在下方 HEADERS/SOURCES += 之前——$$ 展开发生在赋值行，后追加不生效。
+isEmpty(QT_VERSION) {
+    QTCOMP_HDR += $$PWD/trayicon.h
+    QTCOMP_CPP += $$PWD/trayicon.cpp
+    unix:!macx { QTCOMP_CPP += $$PWD/trayicon_x11.cpp }
+    win32      { QTCOMP_CPP += $$PWD/trayicon_win.cpp }
+}
 
 HEADERS += $$LIME_STYLE_H $$QTCOMP_HDR
 SOURCES += $$LIME_STYLE_CPP $$QTCOMP_CPP
