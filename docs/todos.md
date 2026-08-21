@@ -15,7 +15,7 @@
 - [ ] restore translate button usable
 - [ ] chat message timestamp format, multiple style, proper short/long
 - [ ] chat message context menu, add
-	- [x] @ TA,
+	- [x] @ TA, 需要特定的格式或字段
 	- [ ] reply,
 	- [ ] publish website,
 	- [ ] forward fedsite
@@ -29,12 +29,21 @@
 - [ ] contact 切换使用ctrl+tab, ctrl+shift+tab
 - [ ] 显示replyto/mentions要特定格式
 - [ ] 回复桥接的消息要特定格式[@telegram_7594774259:kimiblock.top](https://matrix.to/#/@telegram_7594774259:kimiblock.top)  -- Re: @telegram_7594774259:kimiblock.to
-- [ ] add settings window, log/aichat-account/proxy/fedclipauto
+- [x] add settings window, log/aichat-account/proxy/fedclipauto
 - [ ] message sending/error/success flag
 - [ ] peer info/profile dialog
+- [x] persist chat message history locally with sqlite
 - [ ] persist chat message history locally with bdb
+- [ ] persist translate locally with bdb
 - [ ] maybe split msg parses to plugin is better
 - [ ] qltox memory keep increase
 - [ ] qltox中使用QT_VERSION检测版本
-- [ ] c++/qt彩色日志
-- [ ] rich text: Markdown→Entities 解析器 + ChatElement entities + drawRichText + 链接点击
+- [x] c++/qt彩色日志
+- [ ] c++/qt5日志行的文件字段
+- [x] rich text: Markdown→Entities 解析器 + ChatElement entities + drawRichText + 链接点击
+- [ ] 不同协议的发送消息框额外选项按钮
+- [ ] bug: send en按钮, 当在翻译过程中切换到其他群, 翻译完成的消息会发送到切换后的群中
+- [ ] 图片圆角
+- [ ] 群图片分布式加载问题, 当前节点没有mtx认证信息
+- [ ] 消息管理窗口
+- [ ] 图片/文件附件管理

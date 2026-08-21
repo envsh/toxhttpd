@@ -1044,6 +1044,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
                 m_lyrics->setPlayedColor(QColor(0xFF,0x44,0x44));
                 m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送失败"));
+                m_lyrics->setPosition(0);   // setLrcText 只装载不定位，需显式定位首行才渲染
                 m_hintActive = true;
 #ifdef QT3_BUILD
                 m_msgTimer->start(5000, true);
@@ -1055,6 +1056,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 ToastWidget::show(chatWidget, _("send_success").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 2000);
                 m_lyrics->setPlayedColor(QColor(0x00,0xB4,0xD8));
                 m_lyrics->setLrcText(qFromUtf8("[00:00.000]已发送"));
+                m_lyrics->setPosition(0);   // setLrcText 只装载不定位，需显式定位首行才渲染
                 m_hintActive = true;
 #ifdef QT3_BUILD
                 m_msgTimer->start(5000, true);
@@ -1432,6 +1434,7 @@ void MainWindow::onMessageSending(const QString& message) {
         chatWidget->loadingBar()->showLoading(kLoadSendMsg, _("sending_message"));
         m_lyrics->setPlayedColor(QColor(0xBB,0xBB,0xBB));
         m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送中..."));
+        m_lyrics->setPosition(0);   // setLrcText 只装载不定位，需显式定位首行才渲染
         m_hintActive = true;
 #ifdef QT3_BUILD
         m_msgTimer->start(5000, true);

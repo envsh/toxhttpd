@@ -364,6 +364,11 @@ void DesktopLyrics::parseLrc(const QString& content, std::vector<LrcLine>& out)
     }
 }
 
+// 装载 LRC 文本但不定位显示（load ≠ play 的播放器组件惯例）：
+// 解析后 m_currentLine=-1，paintEvent 会画 "No Lyrics" 占位而非歌词；
+// 必须随后调用 setPosition(msec) 定位活动行才开始渲染。
+// 单行提示类用法（[00:00.000] 立即显示）请紧跟 setPosition(0)，
+// 参照 showClockOnLyrics() 的写法。
 void DesktopLyrics::setLrcText(const QString& lrcContent)
 {
     m_lines.clear();
