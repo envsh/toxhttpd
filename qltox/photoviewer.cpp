@@ -9,6 +9,7 @@
 #include <qfile.h>
 #include <qmessagebox.h>
 #include <algorithm>
+#include <math.h>
 #include <string.h>
 #ifdef QT3_BUILD
 #include <qclipboard.h>
@@ -310,8 +311,13 @@ void PhotoCanvas::wheelEvent(QWheelEvent* event) {
     int delta = event->delta();
     if (delta == 0) { return; }
 
+    // 缩放幅度与滚动角度成比例（120 = 一个标准齿格），Qt 官方推荐的
+    // "partial response" 模式：标准滚轮一格 ±120 → ×1.25/÷0.8 手感不变；
+    // 触控板/高分辨率滚轮的小步长事件流细粒度缩放，
+    // 修复 Qt4 平滑滚动下"一事件一整格"导致的过快
+    double steps = delta / 120.0;
+    double factor = pow(1.25, steps);
     double oldScale = m_scale;
-    double factor = (delta > 0) ? 1.25 : 0.8;
     double newScale = max(0.05, m_scale * factor);
 
     double cx = (double)event->x() - m_offX;
