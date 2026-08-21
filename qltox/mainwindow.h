@@ -22,6 +22,7 @@
 #include "memberlistdialog.h"
 #include "ConfigDialog.h"
 #include "sleepblocker.h"
+#include "systemtrayicon.h"
 #include "plugin_loader.h"
 #include "EmbeddedMenuBar.h"
 #include "mdeditor.h"
@@ -41,6 +42,8 @@ public:
     
 protected:
     bool event(QEvent* event) override;
+    // 托盘可见时拦截关闭 → 隐藏到托盘；无托盘或强制退出时正常关闭
+    void closeEvent(QCloseEvent* event) override;
 protected slots:
     void onFirstPaintComplete();
     void initLoadPlugins();
@@ -86,6 +89,9 @@ protected slots:
     void onEtappCloseAll();
     void openPluginManager();
     void openMdEditor();
+    void quitApp();                 // 真正退出应用（绕过 closeEvent 托盘拦截）
+    void trayShowMainWindow();      // 从托盘恢复并激活主窗口
+    void trayActivated(int reason); // 托盘点击：Trigger/DoubleClick 恢复窗口
     
 private:
     FramelessHelper* framelessHelper;
@@ -125,6 +131,8 @@ private:
     QColor m_savedPlayedColor;
     SleepBlocker* m_sleepBlocker;
     MenuWidget34* m_etappsMenu;
+    SystemTrayIcon* m_tray;   // 系统托盘（关闭时最小化到托盘）
+    bool m_forceQuit;         // 退出菜单/托盘退出置 true，绕过 closeEvent 拦截
 
 #ifdef QT3_BUILD
     QMap<int, int> m_etappItemToIndex;

@@ -51,6 +51,8 @@
 #include <qpushbutton.h>
 #include <qlineedit.h>
 #include "plugin_manager_dialog.h"
+#include <qevent.h>
+#include "app_icon.xpm"
 #ifndef QT3_BUILD
 #include <QSignalMapper>
 #endif
@@ -390,6 +392,8 @@ MainWindow::MainWindow(QWidget* parent)
     currentChatId(-1), currentChatType("") {
     qWarning("MainWindow: constructor started");
     m_sleepBlocker = nullptr;
+    m_tray = nullptr;
+    m_forceQuit = false;
     
     // 设置窗口
     qSetWindowTitle(this, _("app_title"));
@@ -587,7 +591,7 @@ MainWindow::MainWindow(QWidget* parent)
     MenuWidget34* file = mb->addMenu(qFromUtf8("文件(&F)"));
     EmbeddedMenuBar::addItem(file, qFromUtf8("新建\tCtrl+N"), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addSeparator(file);
-    EmbeddedMenuBar::addItem(file, qFromUtf8("退出\tCtrl+Q"), this, SLOT(close()));
+    EmbeddedMenuBar::addItem(file, qFromUtf8("退出\tCtrl+Q"), this, SLOT(quitApp()));
 
     MenuWidget34* edit = mb->addMenu(qFromUtf8("编辑(&E)"));
     EmbeddedMenuBar::addItem(edit, qFromUtf8("撤销\tCtrl+Z"), this, SLOT(onMenu1Stub()));
@@ -612,6 +616,21 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(help, qFromUtf8("关于(&A)..."), this, SLOT(onAboutApp()));
 
     mb->finalize();
+
+    // ── 系统托盘：关闭最小化到托盘，左键/双击恢复 ──
+    if (SystemTrayIcon::isSystemTrayAvailable()) {
+        m_tray = new SystemTrayIcon(QPixmap(app_icon), this);
+        m_tray->setToolTip(_("app_title"));
+        connect(m_tray, SIGNAL(activated(int)), this, SLOT(trayActivated(int)));
+
+        PopupMenu* trayMenu = new PopupMenu(this);
+        EmbeddedMenuBar::addItem(trayMenu, qFromUtf8("打开主窗口"), this, SLOT(trayShowMainWindow()));
+        EmbeddedMenuBar::addSeparator(trayMenu);
+        EmbeddedMenuBar::addItem(trayMenu, qFromUtf8("退出"), this, SLOT(quitApp()));
+        m_tray->setContextMenu(trayMenu);
+
+        m_tray->show();
+    }
 
     // ── Screenshot 截图模块 ──
     {
@@ -1143,6 +1162,44 @@ bool MainWindow::event(QEvent* event) {
 		}
     }
     return ret;
+}
+
+// 关闭拦截：托盘可用时点 X / Alt+F4 不退出，改为隐藏到托盘（最小化到托盘）。
+// 真正退出必须走 quitApp()（先置 m_forceQuit 再 close）；
+// 托盘不可见（无托盘环境）时才允许直接关闭，避免窗口藏起来后应用不可达。
+void MainWindow::closeEvent(QCloseEvent* event) {
+    if (!m_forceQuit && m_tray && m_tray->isVisible()) {
+        hide();
+        event->ignore();
+        return;
+    }
+    event->accept();
+}
+
+// 真正退出应用：「文件→退出」菜单与托盘右键菜单的共同入口。
+// 先置 m_forceQuit 绕过 closeEvent 的托盘拦截，再走正常 close 流程
+// （触发窗口关闭、子控件析构等清理逻辑）。
+void MainWindow::quitApp() {
+    m_forceQuit = true;
+    close();
+}
+
+// 从托盘恢复主窗口：托盘左键/双击、托盘菜单「打开主窗口」共用。
+// show + raise + qActivateWindow 三步，保证被遮挡或最小化状态下都能置前。
+void MainWindow::trayShowMainWindow() {
+    show();
+    raise();
+    qActivateWindow(this);
+}
+
+// 托盘图标点击响应。reason 为 SystemTrayIcon::ActivationReason：
+// Trigger(左键)/DoubleClick(双击) → 恢复主窗口；
+// Context(右键) 由 SystemTrayIcon 内部弹上下文菜单，无需处理；
+// MiddleClick(中键) 暂无动作。
+void MainWindow::trayActivated(int reason) {
+    if (reason == SystemTrayIcon::Trigger || reason == SystemTrayIcon::DoubleClick) {
+        trayShowMainWindow();
+    }
 }
 
 void MainWindow::onFirstPaintComplete() {
