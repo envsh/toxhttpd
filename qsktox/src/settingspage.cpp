@@ -433,11 +433,13 @@ void SettingsPage::onCreate(const QVariantMap&, const QVariantMap&)
     PushHandler::installedDistributors();
 
     // ── Row 9b/10: Gotify settings (save on text change) ──
-    connect(m_gotifyUrlEdit, &QskTextField::textChanged,
+    // 注意：新版 QSkinny (a46557b) 中 textChanged() 无参（纯属性通知），
+    // 带文本的用户编辑信号是 textEdited(const QString&)
+    connect(m_gotifyUrlEdit, &QskTextField::textEdited,
         this, [](const QString& text) {
             QSettings().setValue("gotifyUrl", text);
         });
-    connect(m_gotifyTokenEdit, &QskTextField::textChanged,
+    connect(m_gotifyTokenEdit, &QskTextField::textEdited,
         this, [](const QString& text) {
             QSettings().setValue("gotifyToken", text);
         });
