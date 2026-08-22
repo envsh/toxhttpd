@@ -380,6 +380,8 @@ jobs:
           echo "QT_HOST=$HOST_DIR" >> $GITHUB_ENV
       - name: Install EGL dependencies
         run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev
+      - name: Download vendor prebuilt libs (curl/openssl/sqlite for arm64)
+        run: ./scripts/ci_prebuild_qsktox_vendor.sh
       - name: Cache QSkinny arm64
         uses: actions/cache@v4
         id: cache-qskinny-arm64

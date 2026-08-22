@@ -26,12 +26,16 @@
 - OpenSSL: 3.6.x
 - Source: https://github.com/XDcobra/libcurl-ios-android-prebuilt-and-buildscripts/releases/tag/v8.19.0-1
 - Android arm64 prebuilt .so:
+  - zip 内来源目录：`libcurl-openssl/jniLibs/arm64-v8a/`（openssl 后端变体；
+    包内可能并存其它 SSL 后端变体，取库须限定此目录）
   - `lib/arm64-v8a/libcurl.so` (SHA256: `5ceb34ff92d9f6cd6b28901cc220bc2917a53e2614e8c9f6764af18c89063b88`)
   - `lib/arm64-v8a/libssl.so` (SHA256: `96d844acd9b264face6529b3502269577c1c14843cef4b55031deb114db8f0a7`)
   - `lib/arm64-v8a/libcrypto.so` (SHA256: `953e2c534771b09e022bf4ef3d7d3ff4c18ba10241fb430036d1147399a28a90`)
 - Headers:
   - `include/curl/` (curl 头文件)
-  - `include/openssl/` (OpenSSL 头文件)
+  - 注：v8.19.0-1 包内不含 OpenSSL 头，本地 `include/openssl/` 为另行放置；
+    qsktox 无直接 `#include <openssl/>`，CI 缺此头不影响编译链接
+- 此目录不入库：CI 于构建时经 `scripts/ci_prebuild_qsktox_vendor.sh` 自动下载归位并校验 SHA256
 
 ## UnifiedPush android-connector
 
