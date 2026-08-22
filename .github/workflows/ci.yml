@@ -351,11 +351,23 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Setup Android SDK + NDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: 'ndk;25.2.9519653 build-tools;34.0.0 platforms;android-34'
+          packages: 'build-tools;34.0.0 platforms;android-34'
+      - name: Align toolchain paths with local build-android.sh
+        run: |
+          # JDK 17.0.13+11 → /opt/jdk-17.0.13+11（与本地一致）
+          cd /opt && sudo wget -q https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz
+          sudo tar xzf OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz && sudo rm OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz
+          # NDK r26b → /opt/android-ndk-r26b
+          sudo wget -q https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
+          sudo unzip -q android-ndk-r26b-linux.zip && sudo rm android-ndk-r26b-linux.zip
+          # SDK 软链到本地同款路径
+          sudo ln -sfn "$ANDROID_HOME" /opt/android-sdk
+          # 补装 platforms;android-33（脚本 properties: androidCompileSdkVersion=android-33）
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-33" >/dev/null || true
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -378,6 +390,8 @@ jobs:
           echo "Detected host Qt dir: $HOST_DIR"
           echo "QT_ANDROID=/opt/qt/6.7.3/android_arm64_v8a" >> $GITHUB_ENV
           echo "QT_HOST=$HOST_DIR" >> $GITHUB_ENV
+          # Qt host 目录对齐本地命名（build-android.sh 硬编码 gcc_64）
+          ln -sfn "$HOST_DIR" /opt/qt/6.7.3/gcc_64
       - name: Install EGL dependencies
         run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev
       - name: Download vendor prebuilt libs (curl/openssl/sqlite for arm64)
@@ -387,11 +401,11 @@ jobs:
         id: cache-qskinny-arm64
         with:
           path: /opt/qt/qskinny-arm64
-          key: qskinny-android-arm64-v3-${{ hashFiles('qsktox/patches/qskinny-qt6.patch', '.github/workflows/ci.yml') }}
+          key: qskinny-android-arm64-v4-${{ hashFiles('qsktox/patches/qskinny-qt6.patch', '.github/workflows/ci.yml') }}
       - name: Build and install QSkinny arm64
         if: steps.cache-qskinny-arm64.outputs.cache-hit != 'true'
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+          ANDROID_NDK_ROOT: /opt/android-ndk-r26b
         run: |
           git clone https://github.com/uwerat/qskinny.git /tmp/qskinny-arm64
           cd /tmp/qskinny-arm64
@@ -411,77 +425,18 @@ jobs:
           cmake --install build
       - name: Build Go extras (Android)
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+          ANDROID_NDK_ROOT: /opt/android-ndk-r26b
         run: |
           cd qsktox/extras/go
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
             CC="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang" \
             go build -buildmode=c-shared -o libgoso.so .
-      - name: Configure
+      - name: Build APK (build-android.sh)
+        working-directory: qsktox
         env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-        run: |
-          cd qsktox
-          "$QT_ANDROID/bin/qt-cmake" -S . -B build-android \
-            -DANDROID_SDK_ROOT="${{ env.ANDROID_HOME }}" \
-            -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-24 \
-            -DCMAKE_PREFIX_PATH="/opt/qt/qskinny-arm64" \
-            -DQSkinny_DIR="/opt/qt/qskinny-arm64/lib/cmake/QSkinny" \
-            -DQT_HOST_PATH="$QT_HOST" \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo
-      - name: Build native libs
-        run: cmake --build qsktox/build-android -j$(nproc) --target qsktox
-      - name: Prepare APK directory
-        run: |
-          cd qsktox
-          APK_DIR=build-android/android-build
-          LIB_DIR=$APK_DIR/libs/arm64-v8a
-          mkdir -p "$LIB_DIR"
-          cp build-android/libqsktox_arm64-v8a.so "$LIB_DIR/"
-          cp /opt/qt/qskinny-arm64/lib/qskinny/plugins/skins/*.so "$LIB_DIR/"
-          cp /opt/qt/qskinny-arm64/lib/qskinny/plugins/platforminputcontexts/*.so "$LIB_DIR/"
-          cp extras/go/libgoso.so "$LIB_DIR/"
-          cp build-android/libcso.so "$LIB_DIR/"
-      - name: androiddeployqt
-        run: |
-          cd qsktox
-          "$QT_HOST/bin/androiddeployqt" \
-            --input build-android/android-qsktox-deployment-settings.json \
-            --output build-android/android-build \
-            --deployment bundled \
-            --builddir build-android \
-            --aux-mode
-      - name: Copy custom Java sources and resources
-        run: |
-          cd qsktox
-          APK_DIR=build-android/android-build
-          mkdir -p "$APK_DIR/src/main/java"
-          cp -R android/src/java/* "$APK_DIR/src/main/java/"
-          mkdir -p "$APK_DIR/res/drawable"
-          cp app_icon.png "$APK_DIR/res/drawable/ic_launcher.png"
-          cp android/AndroidManifest.xml "$APK_DIR/AndroidManifest.xml"
-      - name: Patch Gradle
-        run: |
-          cd qsktox/build-android/android-build
-          sed -i '/renderscript\.srcDirs/d' build.gradle
-          cat >> gradle.properties <<'PROPS'
-          androidBuildToolsVersion=34.0.0
-          androidCompileSdkVersion=android-34
-          androidNdkVersion=25.2.9519653
-          androidPackageName=io.fedlet.qsktox
-          buildDir=build
-          qtAndroidDir=/opt/qt/6.7.3/android_arm64_v8a/src/android/java
-          qtMinSdkVersion=23
-          qtTargetAbiList=arm64-v8a
-          qtTargetSdkVersion=34
-          PROPS
-          sed -i 's/-Xmx[0-9]*m/-Xmx386m/' gradle.properties
-      - name: Build debug APK
-        run: |
-          cd qsktox/build-android/android-build
-          GRADLE_OPTS="-Xmx386m" ./gradlew --no-daemon --max-workers=2 assembleDebug
+          ANDROID_HOME: /opt/android-sdk
+          ANDROID_SDK_ROOT: /opt/android-sdk
+        run: bash build-android.sh
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

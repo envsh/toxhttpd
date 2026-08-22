@@ -62,11 +62,40 @@ cp app_icon.png "$APK_DIR/res/drawable/ic_launcher.png"
 # 移除 renderscript.srcDirs 配置（build-tools 34+ 不再支持，且会干扰自定义 Java 源码）
 sed -i '/renderscript\.srcDirs/d' "$APK_DIR/build.gradle"
 
+# ── 注入 UnifiedPush connector（Maven 依赖，见 vendor/vendorinfos.md）──
+# build.gradle 是 androiddeployqt 生成的产物，aux-mode 不覆写已存在的文件，
+# 本地残留手工修改不会自动出现在全新生成的 CI 工程中，故每次注入并防重
+if ! grep -q "org.unifiedpush.android:connector" "$APK_DIR/build.gradle"; then
+    cat > /tmp/up_conf.txt <<'EOF'
+
+configurations.configureEach {
+    def tink = "com.google.crypto.tink:tink-android:1.20.0"
+    resolutionStrategy {
+        force(tink)
+        dependencySubstitution {
+           substitute module('com.google.crypto.tink:tink') using module(tink)
+        }
+        force 'com.google.errorprone:error_prone_annotations:2.20.0'
+        // 锁定与本地一致的 androidx 版本链（CI 直连 Google Maven 会拉到
+        // core 1.13.1 / experimental 1.4.0，强制要求 compileSdk ≥34）
+        force 'androidx.core:core:1.10.1'
+        force 'androidx.annotation:annotation-experimental:1.3.0'
+    }
+}
+EOF
+    sed -i "/^apply plugin: 'com.android.application'/r /tmp/up_conf.txt" "$APK_DIR/build.gradle"
+    echo "    implementation('org.unifiedpush.android:connector:3.3.3')" > /tmp/up_dep.txt
+    sed -i '/^dependencies {/r /tmp/up_dep.txt' "$APK_DIR/build.gradle"
+fi
+
 # 覆盖 manifest（包含所有自定义：activity、intent-filter、权限、service）
 cp android/AndroidManifest.xml "$APK_DIR/AndroidManifest.xml"
 
 # 4. append Qt-specific properties (missing from --aux-mode)
 cat >> "$APK_DIR/gradle.properties" <<PROPS
+# 模板默认 -Xmx386m 过小，packageDebug 打包 Qt+vendor 大 .so 时 OOM；
+# java.util.Properties 后值覆盖前值，此行覆盖模板头部的旧 jvmargs
+org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8
 androidBuildToolsVersion=34.0.0
 androidCompileSdkVersion=android-33
 androidNdkVersion=26.1.10909125
