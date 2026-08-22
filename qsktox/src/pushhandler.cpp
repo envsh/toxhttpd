@@ -637,6 +637,9 @@ bool PushHandler::isConnected() { return false; }
 bool PushHandler::isRegistering() { return false; }
 QString PushHandler::upDistributorDisplayName(const QString&) { return {}; }
 QStringList PushHandler::installedDistributors() { return {}; }
+// 桌面平台无 UnifiedPush 分发器概念，返回空表；
+// SettingsPage 由此跳过已知分发器下拉项（仅剩 Auto/Gotify 选项）
+QVector<QPair<QString,QString>> PushHandler::knownDistributors() { return {}; }
 void PushHandler::setConnected(bool) {}
 void PushHandler::setRegistering(bool) {}
 void PushHandler::registerDevice() {}
