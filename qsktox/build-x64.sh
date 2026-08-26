@@ -26,4 +26,4 @@ fi
 
 #make -j$(nproc)
 make -j1
-echo "=== done: LD_LIBRARY_PATH=build-x64:/opt/qt/qskinny/lib/qskinny:$QTDIR/lib ./build-x64/qsktox ==="
+echo "=== done: DYLD_LIBRARY_PATH=\$PWD/build-x64:/opt/qt/qskinny/lib/qskinny:$QTDIR/lib ./build-x64/qsktox ==="

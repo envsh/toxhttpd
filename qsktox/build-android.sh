@@ -88,6 +88,10 @@ EOF
     sed -i '/^dependencies {/r /tmp/up_dep.txt' "$APK_DIR/build.gradle"
 fi
 
+# Qt 模板强制 DEFLATE 压缩全部 .so（useLegacyPackaging true），packageDebug 在堆上
+# 压缩 45 个共 111MB 的库导致 OOM；minSdk≥23 时 false=官方默认的 STORED 页对齐直拷
+sed -i 's/packagingOptions.jniLibs.useLegacyPackaging true/packagingOptions.jniLibs.useLegacyPackaging false/' "$APK_DIR/build.gradle"
+
 # 覆盖 manifest（包含所有自定义：activity、intent-filter、权限、service）
 cp android/AndroidManifest.xml "$APK_DIR/AndroidManifest.xml"
 
