@@ -28,6 +28,9 @@ struct StickerRow {
     int deleted = 0;
 };
 
+// list_packs 的 installed 取值：-1 = 全部（不按 installed 过滤）
+constexpr int kPacksAll = -1;
+
 class StickerDbSyncInterface {
 public:
     virtual ~StickerDbSyncInterface() = default;
@@ -37,7 +40,12 @@ public:
     virtual bool delete_pack(const char* pack_id) = 0;
     virtual bool update_pack_position(const char* pack_id, int position) = 0;
     virtual std::unique_ptr<StickerPackRow> get_pack(const char* pack_id) = 0;
-    virtual std::vector<StickerPackRow> list_packs(int installed = 1) = 0;
+    // orderby 白名单见 StickerDbSync 实现；orderby 未知时回落默认序。
+    // limit=0 不限；offset 仅当 limit>0 时生效。
+    virtual std::vector<StickerPackRow> list_packs(
+        int installed = 1,
+        const char* orderby = "created_at DESC",
+        int limit = 0, int offset = 0) = 0;
 
     // sticker operations
     virtual bool add_sticker(const StickerRow& sticker) = 0;
@@ -45,7 +53,14 @@ public:
     virtual bool delete_stickers_by_pack(const char* pack_id) = 0;
     virtual bool touch_sticker(const char* sticker_id, int64_t now) = 0;
     virtual std::unique_ptr<StickerRow> get_sticker(const char* sticker_id) = 0;
-    virtual std::vector<StickerRow> list_stickers(const char* pack_id) = 0;
+    // orderby 白名单见 StickerDbSync 实现；orderby 未知时回落"rowid DESC"。
+    // limit=0 不限；offset 仅当 limit>0 时生效。
+    // deleted: 0=仅存活(默认) 1=仅已删 -1=全部；emoji 非空时精确匹配。
+    virtual std::vector<StickerRow> list_stickers(
+        const char* pack_id,
+        const char* orderby = "rowid DESC",
+        int limit = 0, int offset = 0,
+        int deleted = 0, const char* emoji = nullptr) = 0;
     virtual std::vector<StickerRow> list_recent_stickers(int limit = 30) = 0;
     virtual std::vector<StickerRow> search_stickers(const char* query) = 0;
     virtual int count_stickers(const char* pack_id = nullptr) = 0;

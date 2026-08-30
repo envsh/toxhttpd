@@ -3,6 +3,26 @@
 
 namespace {
 
+// orderby 白名单："<列名> ASC/DESC"；列名或方向不合法返回 false（回落默认序）。
+static bool sticker_orderby(const char* orderby, const char* const* cols,
+                            int ncols, std::string& outSql)
+{
+    if (!orderby || !*orderby) { return false; }
+    std::string t(orderby);
+    const size_t sp = t.find(' ');
+    const std::string col = (sp == std::string::npos) ? t : t.substr(0, sp);
+    const std::string dir = (sp == std::string::npos) ? "ASC" : t.substr(sp + 1);
+    const bool desc = (dir == "DESC" || dir == "desc");
+    if (!desc && dir != "ASC" && dir != "asc") { return false; }
+    bool ok = false;
+    for (int i = 0; i < ncols; ++i) {
+        if (col == cols[i]) { ok = true; break; }
+    }
+    if (!ok) { return false; }
+    outSql = "ORDER BY " + col + (desc ? " DESC" : " ASC");
+    return true;
+}
+
 class StickerDbSync final : public StickerDbSyncInterface {
     std::shared_ptr<SqliteConnectionSafe> m_conn;
 public:
@@ -68,14 +88,37 @@ public:
         return row;
     }
 
-    std::vector<StickerPackRow> list_packs(int installed) override {
+    std::vector<StickerPackRow> list_packs(int installed, const char* orderby,
+                                           int limit, int offset) override {
         std::vector<StickerPackRow> rows;
         auto _ = m_conn->get();
-        auto stmt = _->prepare(
+        std::string sql =
             "SELECT id,title,author,cover_path,installed,position,created_at "
-            "FROM sticker_packs WHERE installed=?1 ORDER BY position ASC, created_at ASC");
+            "FROM sticker_packs";
+        int next = 1;
+        if (installed >= 0) { sql += " WHERE installed=?1"; next = 2; }
+        std::string ord;
+        static const char* const cols[] = { "created_at", "position", "title" };
+        if (!sticker_orderby(orderby, cols, 3, ord)) {
+            ord = "ORDER BY created_at DESC";
+        }
+        sql += " " + ord;
+        if (limit > 0) {
+            char b[32];
+            std::snprintf(b, sizeof b, " LIMIT ?%d", next++);
+            sql += b;
+        }
+        if (offset > 0) {
+            char b[32];
+            std::snprintf(b, sizeof b, " OFFSET ?%d", next++);
+            sql += b;
+        }
+        auto stmt = _->prepare(sql.c_str());
         if (!stmt.isPrepared()) { return rows; }
-        if (!stmt.bind(1, installed)) { return rows; }
+        if (installed >= 0) { if (!stmt.bind(1, installed)) { return rows; } }
+        int bindIdx = (installed >= 0) ? 2 : 1;
+        if (limit > 0)  { if (!stmt.bind(bindIdx++, limit))  { return rows; } }
+        if (offset > 0) { if (!stmt.bind(bindIdx++, offset)) { return rows; } }
         while (stmt.stepRow()) {
             StickerPackRow row;
             row.id = stmt.columnText(0);
@@ -164,14 +207,49 @@ public:
         return row;
     }
 
-    std::vector<StickerRow> list_stickers(const char* pack_id) override {
+    std::vector<StickerRow> list_stickers(const char* pack_id, const char* orderby,
+                                          int limit, int offset,
+                                          int deleted, const char* emoji) override {
         std::vector<StickerRow> rows;
         auto _ = m_conn->get();
-        auto stmt = _->prepare(
+        std::string sql =
             "SELECT id,pack_id,file_path,emoji,width,height,size,last_used,position,description "
-            "FROM stickers WHERE pack_id=?1 AND deleted=0 ORDER BY position ASC");
+            "FROM stickers WHERE pack_id=?1";
+        int next = 2;
+        if (deleted >= 0) {
+            char b[32];
+            std::snprintf(b, sizeof b, " AND deleted=?%d", next++);
+            sql += b;
+        }
+        if (emoji && *emoji) {
+            char b[32];
+            std::snprintf(b, sizeof b, " AND emoji=?%d", next++);
+            sql += b;
+        }
+        std::string ord;
+        static const char* const cols[] = { "rowid", "position", "last_used" };
+        if (!sticker_orderby(orderby, cols, 3, ord)) {
+            ord = "ORDER BY rowid DESC";
+        }
+        sql += " " + ord;
+        if (limit > 0) {
+            char b[32];
+            std::snprintf(b, sizeof b, " LIMIT ?%d", next++);
+            sql += b;
+        }
+        if (offset > 0) {
+            char b[32];
+            std::snprintf(b, sizeof b, " OFFSET ?%d", next++);
+            sql += b;
+        }
+        auto stmt = _->prepare(sql.c_str());
         if (!stmt.isPrepared()) { return rows; }
         if (!stmt.bind(1, pack_id)) { return rows; }
+        int bindIdx = 2;
+        if (deleted >= 0) { if (!stmt.bind(bindIdx++, deleted)) { return rows; } }
+        if (emoji && *emoji) { if (!stmt.bind(bindIdx++, emoji)) { return rows; } }
+        if (limit > 0)  { if (!stmt.bind(bindIdx++, limit))  { return rows; } }
+        if (offset > 0) { if (!stmt.bind(bindIdx++, offset)) { return rows; } }
         while (stmt.stepRow()) {
             StickerRow row;
             row.id = stmt.columnText(0);
