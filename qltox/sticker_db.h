@@ -39,6 +39,7 @@ public:
     virtual bool add_pack(const StickerPackRow& pack) = 0;
     virtual bool delete_pack(const char* pack_id) = 0;
     virtual bool update_pack_position(const char* pack_id, int position) = 0;
+    virtual bool update_pack_installed(const char* pack_id, int installed) = 0;
     virtual std::unique_ptr<StickerPackRow> get_pack(const char* pack_id) = 0;
     // orderby 白名单见 StickerDbSync 实现；orderby 未知时回落默认序。
     // limit=0 不限；offset 仅当 limit>0 时生效。

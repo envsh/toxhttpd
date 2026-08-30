@@ -69,6 +69,16 @@ public:
         return stmt.step();
     }
 
+    bool update_pack_installed(const char* pack_id, int installed) override {
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
+            "UPDATE sticker_packs SET installed=?2 WHERE id=?1");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, pack_id)) { return false; }
+        if (!stmt.bind(2, installed)) { return false; }
+        return stmt.step();
+    }
+
     std::unique_ptr<StickerPackRow> get_pack(const char* pack_id) override {
         auto _ = m_conn->get();
         auto stmt = _->prepare(
