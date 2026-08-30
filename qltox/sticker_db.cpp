@@ -94,8 +94,8 @@ public:
         auto _ = m_conn->get();
         auto stmt = _->prepare(
             "INSERT OR REPLACE INTO stickers "
-            "(id,pack_id,file_path,emoji,width,height,size,last_used,position) "
-            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)");
+            "(id,pack_id,file_path,emoji,width,height,size,last_used,position,description) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, sticker.id.c_str())) { return false; }
         if (!stmt.bind(2, sticker.pack_id.c_str())) { return false; }
@@ -106,6 +106,7 @@ public:
         if (!stmt.bind(7, sticker.size)) { return false; }
         if (!stmt.bind(8, sticker.last_used)) { return false; }
         if (!stmt.bind(9, sticker.position)) { return false; }
+        if (!stmt.bind(10, sticker.description.c_str())) { return false; }
         if (!stmt.step()) {
             qWarning("StickerDb::add_sticker failed for %s", sticker.id.c_str());
             return false;
@@ -115,7 +116,8 @@ public:
 
     bool delete_sticker(const char* sticker_id) override {
         auto _ = m_conn->get();
-        auto stmt = _->prepare("DELETE FROM stickers WHERE id=?1");
+        auto stmt = _->prepare(
+            "UPDATE stickers SET deleted=1 WHERE id=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, sticker_id)) { return false; }
         return stmt.step();
@@ -123,7 +125,8 @@ public:
 
     bool delete_stickers_by_pack(const char* pack_id) override {
         auto _ = m_conn->get();
-        auto stmt = _->prepare("DELETE FROM stickers WHERE pack_id=?1");
+        auto stmt = _->prepare(
+            "UPDATE stickers SET deleted=1 WHERE pack_id=?1");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, pack_id)) { return false; }
         return stmt.step();
@@ -142,8 +145,8 @@ public:
     std::unique_ptr<StickerRow> get_sticker(const char* sticker_id) override {
         auto _ = m_conn->get();
         auto stmt = _->prepare(
-            "SELECT id,pack_id,file_path,emoji,width,height,size,last_used,position "
-            "FROM stickers WHERE id=?1");
+            "SELECT id,pack_id,file_path,emoji,width,height,size,last_used,position,description "
+            "FROM stickers WHERE id=?1 AND deleted=0");
         if (!stmt.isPrepared()) { return nullptr; }
         if (!stmt.bind(1, sticker_id)) { return nullptr; }
         if (!stmt.stepRow()) { return nullptr; }
@@ -157,6 +160,7 @@ public:
         row->size = stmt.columnInt(6);
         row->last_used = stmt.columnInt64(7);
         row->position = stmt.columnInt(8);
+        row->description = stmt.columnText(9);
         return row;
     }
 
@@ -164,8 +168,8 @@ public:
         std::vector<StickerRow> rows;
         auto _ = m_conn->get();
         auto stmt = _->prepare(
-            "SELECT id,pack_id,file_path,emoji,width,height,size,last_used,position "
-            "FROM stickers WHERE pack_id=?1 ORDER BY position ASC");
+            "SELECT id,pack_id,file_path,emoji,width,height,size,last_used,position,description "
+            "FROM stickers WHERE pack_id=?1 AND deleted=0 ORDER BY position ASC");
         if (!stmt.isPrepared()) { return rows; }
         if (!stmt.bind(1, pack_id)) { return rows; }
         while (stmt.stepRow()) {
@@ -179,6 +183,7 @@ public:
             row.size = stmt.columnInt(6);
             row.last_used = stmt.columnInt64(7);
             row.position = stmt.columnInt(8);
+            row.description = stmt.columnText(9);
             rows.push_back(std::move(row));
         }
         return rows;
@@ -189,9 +194,9 @@ public:
         auto _ = m_conn->get();
         auto stmt = _->prepare(
             "SELECT s.id,s.pack_id,s.file_path,s.emoji,s.width,s.height,"
-            "       s.size,s.last_used,s.position "
+            "       s.size,s.last_used,s.position,s.description "
             "FROM stickers s "
-            "WHERE s.last_used > 0 "
+            "WHERE s.last_used > 0 AND s.deleted=0 "
             "ORDER BY s.last_used DESC LIMIT ?1");
         if (!stmt.isPrepared()) { return rows; }
         if (!stmt.bind(1, limit)) { return rows; }
@@ -206,6 +211,7 @@ public:
             row.size = stmt.columnInt(6);
             row.last_used = stmt.columnInt64(7);
             row.position = stmt.columnInt(8);
+            row.description = stmt.columnText(9);
             rows.push_back(std::move(row));
         }
         return rows;
@@ -216,10 +222,11 @@ public:
         auto _ = m_conn->get();
         auto stmt = _->prepare(
             "SELECT s.id,s.pack_id,s.file_path,s.emoji,s.width,s.height,"
-            "       s.size,s.last_used,s.position "
+            "       s.size,s.last_used,s.position,s.description "
             "FROM stickers s "
             "JOIN sticker_packs p ON s.pack_id = p.id "
-            "WHERE s.emoji LIKE ?1 OR p.title LIKE ?1 "
+            "WHERE s.deleted=0 AND (s.emoji LIKE ?1 OR p.title LIKE ?1 "
+            "       OR s.description LIKE ?1) "
             "ORDER BY s.last_used DESC LIMIT 50");
         if (!stmt.isPrepared()) { return rows; }
         std::string pattern = "%";
@@ -237,6 +244,7 @@ public:
             row.size = stmt.columnInt(6);
             row.last_used = stmt.columnInt64(7);
             row.position = stmt.columnInt(8);
+            row.description = stmt.columnText(9);
             rows.push_back(std::move(row));
         }
         return rows;
@@ -246,13 +254,14 @@ public:
         auto _ = m_conn->get();
         if (pack_id) {
             auto stmt = _->prepare(
-                "SELECT COUNT(*) FROM stickers WHERE pack_id=?1");
+                "SELECT COUNT(*) FROM stickers WHERE pack_id=?1 AND deleted=0");
             if (!stmt.isPrepared()) { return 0; }
             if (!stmt.bind(1, pack_id)) { return 0; }
             if (!stmt.stepRow()) { return 0; }
             return stmt.columnInt(0);
         } else {
-            auto stmt = _->prepare("SELECT COUNT(*) FROM stickers");
+            auto stmt = _->prepare(
+                "SELECT COUNT(*) FROM stickers WHERE deleted=0");
             if (!stmt.isPrepared()) { return 0; }
             if (!stmt.stepRow()) { return 0; }
             return stmt.columnInt(0);
@@ -307,11 +316,33 @@ bool init_sticker_db(SqliteDb& db) {
         "  height         INTEGER DEFAULT 0,"
         "  size           INTEGER DEFAULT 0,"
         "  last_used      INTEGER DEFAULT 0,"
-        "  position       INTEGER DEFAULT 0"
+        "  position       INTEGER DEFAULT 0,"
+        "  description    TEXT DEFAULT '',"
+        "  deleted        INTEGER NOT NULL DEFAULT 0"
         ")")) { return false; }
     db.exec("CREATE INDEX IF NOT EXISTS idx_stickers_pack ON stickers(pack_id)");
     db.exec("CREATE INDEX IF NOT EXISTS idx_stickers_recent ON stickers(last_used DESC)");
     db.exec("PRAGMA foreign_keys = ON");
+
+    // 存量库迁移：新装库 CREATE 已含新列（自然跳过）；老库幂等补齐
+    {
+        bool hasDeleted = false;
+        bool hasDesc = false;
+        auto stmt = db.prepare("PRAGMA table_info(stickers)");
+        while (stmt.isPrepared() && stmt.stepRow()) {
+            const std::string name = stmt.columnText(1);
+            if (name == "deleted")     hasDeleted = true;
+            if (name == "description") hasDesc    = true;
+        }
+        if (!hasDeleted &&
+            !db.exec("ALTER TABLE stickers ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")) {
+            return false;
+        }
+        if (!hasDesc &&
+            !db.exec("ALTER TABLE stickers ADD COLUMN description TEXT DEFAULT ''")) {
+            return false;
+        }
+    }
     return true;
 }
 

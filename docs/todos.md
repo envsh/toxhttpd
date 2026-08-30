@@ -27,7 +27,7 @@
 - [x] contact identicon fixed mode
 - [ ] contact identicon multiple combined mode
 - [ ] contact 切换使用ctrl+tab, ctrl+shift+tab
-- [ ] 显示replyto/mentions要特定格式
+- [ ] 显示replyto/mentions要特定格式+1
 - [ ] 回复桥接的消息要特定格式[@telegram_7594774259:kimiblock.top](https://matrix.to/#/@telegram_7594774259:kimiblock.top)  -- Re: @telegram_7594774259:kimiblock.to
 - [x] add settings window, log/aichat-account/proxy/fedclipauto
 - [ ] message sending/error/success flag
@@ -47,3 +47,5 @@
 - [ ] 群图片分布式加载问题, 当前节点没有mtx认证信息
 - [ ] 消息管理窗口
 - [ ] 图片/文件附件管理
+- [ ] 固定快速回复消息列表功能
+- [ ]

@@ -24,6 +24,8 @@ struct StickerRow {
     int size = 0;
     int64_t last_used = 0;
     int position = 0;
+    std::string description;  // 图片描述（≤140 字，StickerStore::MaxDescriptionLength）
+    int deleted = 0;
 };
 
 class StickerDbSyncInterface {
