@@ -37,7 +37,7 @@
 - [ ] persist translate locally with bdb
 - [ ] maybe split msg parses to plugin is better
 - [ ] qltox memory keep increase
-- [ ] qltox中使用QT_VERSION检测版本
+- [ ] qltox中使用QT_VERSION检测版本,减少QT3_BUILD宏的依赖
 - [x] c++/qt彩色日志
 - [ ] c++/qt5日志行的文件字段
 - [x] rich text: Markdown→Entities 解析器 + ChatElement entities + drawRichText + 链接点击

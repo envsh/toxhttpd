@@ -147,8 +147,8 @@ public:
         auto _ = m_conn->get();
         auto stmt = _->prepare(
             "INSERT OR REPLACE INTO stickers "
-            "(id,pack_id,file_path,emoji,width,height,size,last_used,position,description) "
-            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)");
+            "(id,pack_id,file_path,emoji,width,height,size,last_used,position,description,is_public) "
+            "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, sticker.id.c_str())) { return false; }
         if (!stmt.bind(2, sticker.pack_id.c_str())) { return false; }
@@ -160,6 +160,7 @@ public:
         if (!stmt.bind(8, sticker.last_used)) { return false; }
         if (!stmt.bind(9, sticker.position)) { return false; }
         if (!stmt.bind(10, sticker.description.c_str())) { return false; }
+        if (!stmt.bind(11, sticker.is_public)) { return false; }
         if (!stmt.step()) {
             qWarning("StickerDb::add_sticker failed for %s", sticker.id.c_str());
             return false;
@@ -406,7 +407,8 @@ bool init_sticker_db(SqliteDb& db) {
         "  last_used      INTEGER DEFAULT 0,"
         "  position       INTEGER DEFAULT 0,"
         "  description    TEXT DEFAULT '',"
-        "  deleted        INTEGER NOT NULL DEFAULT 0"
+        "  deleted        INTEGER NOT NULL DEFAULT 0,"
+        "  is_public      INTEGER NOT NULL DEFAULT 0"
         ")")) { return false; }
     db.exec("CREATE INDEX IF NOT EXISTS idx_stickers_pack ON stickers(pack_id)");
     db.exec("CREATE INDEX IF NOT EXISTS idx_stickers_recent ON stickers(last_used DESC)");
@@ -416,11 +418,13 @@ bool init_sticker_db(SqliteDb& db) {
     {
         bool hasDeleted = false;
         bool hasDesc = false;
+        bool hasPublic = false;
         auto stmt = db.prepare("PRAGMA table_info(stickers)");
         while (stmt.isPrepared() && stmt.stepRow()) {
             const std::string name = stmt.columnText(1);
             if (name == "deleted")     hasDeleted = true;
             if (name == "description") hasDesc    = true;
+            if (name == "is_public")   hasPublic  = true;
         }
         if (!hasDeleted &&
             !db.exec("ALTER TABLE stickers ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")) {
@@ -428,6 +432,10 @@ bool init_sticker_db(SqliteDb& db) {
         }
         if (!hasDesc &&
             !db.exec("ALTER TABLE stickers ADD COLUMN description TEXT DEFAULT ''")) {
+            return false;
+        }
+        if (!hasPublic &&
+            !db.exec("ALTER TABLE stickers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0")) {
             return false;
         }
     }

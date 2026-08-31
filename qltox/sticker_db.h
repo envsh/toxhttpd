@@ -26,6 +26,7 @@ struct StickerRow {
     int position = 0;
     std::string description;  // 图片描述（≤140 字，StickerStore::MaxDescriptionLength）
     int deleted = 0;
+    int is_public = 0;       // 是否公开（默认不公开）
 };
 
 // list_packs 的 installed 取值：-1 = 全部（不按 installed 过滤）
