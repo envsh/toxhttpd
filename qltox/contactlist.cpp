@@ -319,8 +319,12 @@ RowData* ContactListData::addToEnd(std::unique_ptr<RowData> rd) {
     auto it = m_map.find(key);
     if (it != m_map.end()) {
         RowData* existing = it->second.get();
-        existing->name = rd->name;
-        existing->nameUpper = rd->nameUpper;
+        // Matrix room ID (!<id>:<server>) 作为名称是异常值；
+        // 若新值是异常值而旧值有效，跳过名称覆盖
+        if (!rd->name.startsWith(QString("!")) || existing->name.isEmpty() || existing->name.startsWith(QString("!"))) {
+            existing->name = rd->name;
+            existing->nameUpper = rd->nameUpper;
+        }
         existing->status = rd->status;
         existing->chatId = rd->chatId;
         existing->isConnected = rd->isConnected;
@@ -786,9 +790,13 @@ void ContactListWidget::clear() {
 void ContactListWidget::updateFriendName(int friendId, const QString& newName) {
     RowData* rd = m_list.get(friendId, "friend");
     if (!rd) return;
-    rd->name = newName;
-    rd->nameUpper = qToUpper(newName);
-    rd->cachedWidth = 0;
+    // Matrix room ID (!<id>:<server>) 作为名称是异常值；
+    // 若新值是异常值而旧值有效，跳过名称覆盖
+    if (!newName.startsWith(QString("!")) || rd->name.isEmpty() || rd->name.startsWith(QString("!"))) {
+        rd->name = newName;
+        rd->nameUpper = qToUpper(newName);
+        rd->cachedWidth = 0;
+    }
     if (!m_batchLevel) {
         m_list.adjustBySort(rd->index);
         m_view->invalidateAllCaches();
@@ -814,8 +822,12 @@ void ContactListWidget::updateContact(int id, const QString& type, const QString
     RowData* rd = m_list.get(id, type);
     if (!rd) return;
     if (!name.isEmpty()) {
-        rd->name = name;
-        rd->nameUpper = qToUpper(name);
+        // Matrix room ID (!<id>:<server>) 作为名称是异常值；
+        // 若新值是异常值而旧值有效，跳过名称覆盖
+        if (!name.startsWith(QString("!")) || rd->name.isEmpty() || rd->name.startsWith(QString("!"))) {
+            rd->name = name;
+            rd->nameUpper = qToUpper(name);
+        }
     }
     if (!chatId.isEmpty()) rd->chatId = chatId;
     if (!status.isEmpty()) { rd->status = status; rd->cachedWidth = 0; }
