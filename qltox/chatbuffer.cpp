@@ -39,6 +39,9 @@ void ChatBuffer::clearDisplayCacheFor(int chatId, const std::string& chatType) {
 void ChatHistory::append(const ChatElement& el) {
     m_items.push_back(el);
     trimOverflow();
+    if (el.dbRowid > newestRowid) {
+        newestRowid = el.dbRowid;
+    }
     if (m_observer) {
         m_observer->onInsertOne(m_items.size() - 1);
     }
@@ -49,6 +52,17 @@ void ChatHistory::prepend(const std::vector<ChatElement>& els) {
     if (space <= 0) { return; }
     int toInsert = std::min((int)els.size(), space);
     m_items.insert(m_items.begin(), els.end() - toInsert, els.end());
+    for (int i = 0; i < toInsert; ++i) {
+        const ChatElement& e = m_items[i];
+        if (e.dbRowid > 0) {
+            if (e.dbRowid > newestRowid) {
+                newestRowid = e.dbRowid;
+            }
+            if (oldestRowid == 0 || e.dbRowid < oldestRowid) {
+                oldestRowid = e.dbRowid;
+            }
+        }
+    }
     if (m_observer && toInsert > 0) {
         m_observer->onInsertRange(0, toInsert);
     }

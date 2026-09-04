@@ -25,6 +25,7 @@ ChatElement msgRowToElement(const MessageRow& row) {
     el.durationSec  = row.duration_sec;
     el.sendState    = (ChatElement::SendState)row.send_state;
     el.messageId    = qFromUtf8(row.event_id);
+    el.dbRowid      = row.rowid;
     if (!row.reply_to_ids.empty())
         el.replyTos = qSplit(qFromUtf8(row.reply_to_ids), QString(","));
     if (!row.mentions_text.empty())
@@ -76,12 +77,17 @@ static MessageRow elementToRow(int id, const std::string& type,
 }
 
 // ── Async insert ──
-void db_writeMessage(int id, const std::string& type, const ChatElement& el) {
+void db_writeMessage(int id, const std::string& type, const ChatElement& el,
+                     WriteMsgCallback cb) {
     auto* db = Storage::instance().messageDbAsync();
     if (!db) { return; }
     MessageRow row = elementToRow(id, type, el);
     std::string cid = row.chanid;
-    db->insert_message(std::move(row), [cid](int64_t rowid) {
-        if (rowid <= 0) { qWarning("msgdb: insert_message failed chanid=%s", cid.c_str()); }
+    db->insert_message(std::move(row), [cid, cb](int64_t rowid) {
+        if (rowid <= 0) {
+            qWarning("msgdb: insert_message failed chanid=%s", cid.c_str());
+            return;
+        }
+        if (cb) { cb(rowid); }
     });
 }

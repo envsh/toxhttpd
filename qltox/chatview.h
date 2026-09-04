@@ -94,6 +94,7 @@ struct ChatElement {
     uchar firstInGroup : 1;
     SendState sendState;
     int sendmsgseq = -1;
+    int64_t dbRowid = 0;      // SQLite rowid，由 DB 加载时填充
     QString messageId;        // 服务端消息 ID（暂未填充）
     QString sendErrorMsg;
     QRect resendIconRect;
