@@ -206,23 +206,16 @@ static std::string chanidStr(int id, const QString& type) {
     return std::string(qToUtf8(type).data()) + "_" + std::to_string(id);
 }
 
-static void db_writeUnreadReset(int id, const QString& type, int64_t lastReadRowid = 0) {
+static void db_writeMarkRead(int id, const QString& type, int64_t lastReadRowid) {
     auto* async = Storage::instance().channelDbAsync();
     if (!async) return;
-    ChannelUpdate upd;
-    upd.hasUnreadCount = true;
-    upd.unread_count = 0;
-    if (lastReadRowid > 0) {
-        upd.hasLastReadRowid = true;
-        upd.last_read_rowid = lastReadRowid;
-    }
-    async->update_channel(chanidStr(id, type), std::move(upd), nullptr);
+    async->mark_read(chanidStr(id, type), lastReadRowid, nullptr);
 }
 
-static void db_writeUnreadIncrement(int id, const QString& type) {
+static void db_writeUnreadIncrement(int id, const QString& type, int64_t msgRowid = 0) {
     auto* async = Storage::instance().channelDbAsync();
     if (!async) return;
-    async->increment_unread(chanidStr(id, type), 1, nullptr);
+    async->increment_unread(chanidStr(id, type), 1, msgRowid, nullptr);
 }
 
 static void db_writeLastMessage(int id, const QString& type,
@@ -1367,9 +1360,7 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
 
     // 写入读游标：取最新消息的 rowid
     if (hist.newestRowid > 0) {
-        db_writeUnreadReset(id, type, hist.newestRowid);
-    } else {
-        db_writeUnreadReset(id, type);
+        db_writeMarkRead(id, type, hist.newestRowid);
     }
 
     // ── HTTP fallback ──

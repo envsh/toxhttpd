@@ -373,12 +373,25 @@ public:
         return stmt.step();
     }
 
-    bool increment_unread(const char* chanid, int delta) override {
+    bool increment_unread(const char* chanid, int delta,
+                          int64_t msgRowid = 0) override {
         auto _ = m_conn->get();
         auto stmt = _->prepare(
-            "UPDATE channels SET unread_count = unread_count + ?1 WHERE chanid=?2");
+            "UPDATE channels SET unread_count = unread_count + ?1 "
+            "WHERE chanid = ?2 AND (?3 = 0 OR ?3 > last_read_rowid)");
         if (!stmt.isPrepared()) { return false; }
         if (!stmt.bind(1, delta)) { return false; }
+        if (!stmt.bind(2, chanid)) { return false; }
+        if (!stmt.bind(3, msgRowid)) { return false; }
+        return stmt.step();
+    }
+
+    bool mark_read(const char* chanid, int64_t lastReadRowid) override {
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
+            "UPDATE channels SET last_read_rowid = ?1, unread_count = 0 WHERE chanid = ?2");
+        if (!stmt.isPrepared()) { return false; }
+        if (!stmt.bind(1, lastReadRowid)) { return false; }
         if (!stmt.bind(2, chanid)) { return false; }
         return stmt.step();
     }
@@ -517,11 +530,20 @@ public:
         });
     }
 
-    void increment_unread(std::string chanid, int delta,
+    void increment_unread(std::string chanid, int delta, int64_t msgRowid,
                           std::function<void(bool)> done) override {
         auto sync = m_sync;
-        post([sync, chanid, delta, done]() {
-            bool ok = sync->get().increment_unread(chanid.c_str(), delta);
+        post([sync, chanid, delta, msgRowid, done]() {
+            bool ok = sync->get().increment_unread(chanid.c_str(), delta, msgRowid);
+            if (done) { done(ok); }
+        });
+    }
+
+    void mark_read(std::string chanid, int64_t lastReadRowid,
+                   std::function<void(bool)> done) override {
+        auto sync = m_sync;
+        post([sync, chanid, lastReadRowid, done]() {
+            bool ok = sync->get().mark_read(chanid.c_str(), lastReadRowid);
             if (done) { done(ok); }
         });
     }

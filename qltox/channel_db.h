@@ -69,7 +69,9 @@ public:
 
     virtual bool add_contact_channel(const ChannelRow& row) = 0;
     virtual bool update_contact_channel(const ChannelRow& row) = 0;
-    virtual bool increment_unread(const char* chanid, int delta) = 0;
+    virtual bool increment_unread(const char* chanid, int delta,
+                                  int64_t msgRowid = 0) = 0;
+    virtual bool mark_read(const char* chanid, int64_t lastReadRowid) = 0;
 
     virtual bool add_peer(const PeerRow& row) = 0;
     virtual bool update_peer(const PeerRow& row) = 0;
@@ -103,8 +105,10 @@ public:
         std::function<void(std::vector<ChannelRow>)> done) = 0;
     virtual void add_contact_channel(ChannelRow row, std::function<void(bool)> done) = 0;
     virtual void update_contact_channel(ChannelRow row, std::function<void(bool)> done) = 0;
-    virtual void increment_unread(std::string chanid, int delta,
+    virtual void increment_unread(std::string chanid, int delta, int64_t msgRowid,
                                   std::function<void(bool)> done) = 0;
+    virtual void mark_read(std::string chanid, int64_t lastReadRowid,
+                           std::function<void(bool)> done) = 0;
     virtual void add_peer(PeerRow row, std::function<void(bool)> done) = 0;
     virtual void update_peer(PeerRow row, std::function<void(bool)> done) = 0;
     virtual void get_chan_peer(std::string chanid, int peer_number,
