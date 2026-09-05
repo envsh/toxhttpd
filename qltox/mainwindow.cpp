@@ -1519,13 +1519,16 @@ void MainWindow::handleEvents(const EventList& events) {
                     el.time = getCurrentTime();
                     m_chatbuf.append(friendId, "friend", el);
                     QString friendTimeStr = timenowhm();
+                    bool friendNotCurrent = !(friendId == currentChatId && currentChatType == "friend");
                     db_writeMessage(friendId, "friend", el,
-                        [friendId, message, friendTimeStr](int64_t rowid) {
+                        [friendId, message, friendTimeStr, friendNotCurrent](int64_t rowid) {
                             db_writeLastMessage(friendId, "friend", message, friendTimeStr, rowid);
+                            if (friendNotCurrent) {
+                                db_writeUnreadIncrement(friendId, "friend", rowid);
+                            }
                         });
-                    if (!(friendId == currentChatId && currentChatType == "friend")) {
+                    if (friendNotCurrent) {
                         contactListWidget->incrementUnread(friendId, "friend");
-                        db_writeUnreadIncrement(friendId, "friend");
                     }
                     contactListWidget->updateContactLastMessage(friendId, "friend", message, timenowhm());
                     if (!qIsAppActive())
@@ -1617,6 +1620,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         updatePeerInDb(key, it->second);
                     }
 
+                    bool confNotCurrent = !(confNumber == currentChatId && currentChatType == "conference");
+
                     {
                         ChatElement el;
                         el.messageText = message;
@@ -1633,13 +1638,15 @@ void MainWindow::handleEvents(const EventList& events) {
                         m_chatbuf.append(confNumber, "conference", el);
                         QString confTimeStr = timenowhm();
                         db_writeMessage(confNumber, "conference", el,
-                            [confNumber, message, confTimeStr](int64_t rowid) {
+                            [confNumber, message, confTimeStr, confNotCurrent](int64_t rowid) {
                                 db_writeLastMessage(confNumber, "conference", message, confTimeStr, rowid);
+                                if (confNotCurrent) {
+                                    db_writeUnreadIncrement(confNumber, "conference", rowid);
+                                }
                             });
                     }
-                    if (!(confNumber == currentChatId && currentChatType == "conference")) {
+                    if (confNotCurrent) {
                         contactListWidget->incrementUnread(confNumber, "conference");
-                        db_writeUnreadIncrement(confNumber, "conference");
                     }
                     contactListWidget->updateContactLastMessage(confNumber, "conference", message, timenowhm());
                     if (!qIsAppActive())
@@ -1727,6 +1734,8 @@ void MainWindow::handleEvents(const EventList& events) {
                         updatePeerInDb(key, it->second);
                     }
 
+                    bool groupNotCurrent = !(groupNumber == currentChatId && currentChatType == "group");
+
                     {
                         ChatElement el;
                         el.messageText = message;
@@ -1744,13 +1753,15 @@ void MainWindow::handleEvents(const EventList& events) {
                         m_chatbuf.append(groupNumber, "group", el);
                         QString groupTimeStr = timenowhm();
                         db_writeMessage(groupNumber, "group", el,
-                            [groupNumber, message, groupTimeStr](int64_t rowid) {
+                            [groupNumber, message, groupTimeStr, groupNotCurrent](int64_t rowid) {
                                 db_writeLastMessage(groupNumber, "group", message, groupTimeStr, rowid);
+                                if (groupNotCurrent) {
+                                    db_writeUnreadIncrement(groupNumber, "group", rowid);
+                                }
                             });
                     }
-                    if (!(groupNumber == currentChatId && currentChatType == "group")) {
+                    if (groupNotCurrent) {
                         contactListWidget->incrementUnread(groupNumber, "group");
-                        db_writeUnreadIncrement(groupNumber, "group");
                     }
                     contactListWidget->updateContactLastMessage(groupNumber, "group", message, timenowhm());
                     if (!qIsAppActive())
@@ -2129,16 +2140,19 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_chatbuf.append(VIRTUAL_REDDIT_ID, kTopicType, msg);
                 QString redditTimeStr = timenowhm();
                 QString redditMsgText = msg.messageText;
+                bool redditNotCurrent = !(currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType);
                 db_writeMessage(VIRTUAL_REDDIT_ID, kTopicType, msg,
-                    [redditTimeStr, redditMsgText](int64_t rowid) {
+                    [redditTimeStr, redditMsgText, redditNotCurrent](int64_t rowid) {
                         db_writeLastMessage(VIRTUAL_REDDIT_ID, kTopicType, redditMsgText, redditTimeStr, rowid);
+                        if (redditNotCurrent) {
+                            db_writeUnreadIncrement(VIRTUAL_REDDIT_ID, kTopicType, rowid);
+                        }
                     });
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_REDDIT_ID, kTopicType, msg.messageText, timenowhm());
-                    if (!(currentChatId == VIRTUAL_REDDIT_ID && currentChatType == kTopicType)) {
-                        contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
-                        db_writeUnreadIncrement(VIRTUAL_REDDIT_ID, kTopicType);
-                    }
+                if (redditNotCurrent) {
+                    contactListWidget->incrementUnread(VIRTUAL_REDDIT_ID, kTopicType);
+                }
             } else {
                 ChatElement msg;
                 msg.category = "other";
@@ -2156,15 +2170,18 @@ void MainWindow::handleEvents(const EventList& events) {
                 m_chatbuf.append(VIRTUAL_UNKNOWN_ID, kUnknownType, msg);
                 QString unkTimeStr = timenowhm();
                 QString unkMsgText = msg.messageText;
+                bool unkNotCurrent = !(currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType);
                 db_writeMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, msg,
-                    [unkTimeStr, unkMsgText](int64_t rowid) {
+                    [unkTimeStr, unkMsgText, unkNotCurrent](int64_t rowid) {
                         db_writeLastMessage(VIRTUAL_UNKNOWN_ID, kUnknownType, unkMsgText, unkTimeStr, rowid);
+                        if (unkNotCurrent) {
+                            db_writeUnreadIncrement(VIRTUAL_UNKNOWN_ID, kUnknownType, rowid);
+                        }
                     });
                 contactListWidget->updateContactLastMessage(
                     VIRTUAL_UNKNOWN_ID, kUnknownType, msg.messageText, timenowhm());
-                if (!(currentChatId == VIRTUAL_UNKNOWN_ID && currentChatType == kUnknownType)) {
+                if (unkNotCurrent) {
                     contactListWidget->incrementUnread(VIRTUAL_UNKNOWN_ID, kUnknownType);
-                    db_writeUnreadIncrement(VIRTUAL_UNKNOWN_ID, kUnknownType);
                 }
             }
         }

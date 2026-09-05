@@ -21,7 +21,7 @@
 	- [ ] forward fedsite
 	- [ ] 转发到其他群
 	- [ ] edit/resend
-	- [ ] delete/remove/redact
+	- [ ] delete/remove/redact,撤回消息
 	- [ ] favorit
 - [x] fix chat message identicon
 - [x] contact identicon fixed mode
