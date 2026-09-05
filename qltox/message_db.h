@@ -119,6 +119,11 @@ public:
 
     virtual bool clear_channel(const char* chanid) = 0;
 
+    virtual int64_t countMessages() = 0;
+    virtual int64_t countTranslations() = 0;
+    virtual int64_t countReactions() = 0;
+    virtual int64_t countBookmarks() = 0;
+
     virtual bool begin_write_transaction() = 0;
     virtual bool commit_transaction() = 0;
 };

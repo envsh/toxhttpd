@@ -77,6 +77,7 @@ protected slots:
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
     void openStickerManager();
+    void openStatistics();
     void onMenu1Stub();
     void onMenu2Stub();
     void onAboutApp();

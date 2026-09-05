@@ -413,6 +413,38 @@ public:
     bool begin_write_transaction() override { auto _ = m_conn->get(); return _->beginTransaction(); }
     bool commit_transaction() override { auto _ = m_conn->get(); return _->commitTransaction(); }
 
+    int64_t countMessages() override {
+        SlowGuard _w("msg::count_messages", 500);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM messages");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
+    int64_t countTranslations() override {
+        SlowGuard _w("msg::count_translations", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM translations");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
+    int64_t countReactions() override {
+        SlowGuard _w("msg::count_reactions", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM reactions");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
+    int64_t countBookmarks() override {
+        SlowGuard _w("msg::count_bookmarks", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM bookmarks");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
 private:
     static MessageRow readRow(SqliteStatement& stmt) {
         MessageRow row;

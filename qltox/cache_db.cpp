@@ -286,6 +286,22 @@ public:
         auto _lock = m_cacheConn->get();
         return _lock->commitTransaction();
     }
+
+    int64_t countCache() override {
+        SlowGuard _w("cache::count_cache", 300);
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare("SELECT COUNT(*) FROM cache");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
+    int64_t countFileRefs() override {
+        SlowGuard _w("cache::count_filerefs", 300);
+        auto _lock = m_cacheConn->get();
+        auto stmt = _lock->prepare("SELECT COUNT(*) FROM file_refs");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
 };
 
 class CacheDbSyncSafe final : public CacheDbSyncSafeInterface {

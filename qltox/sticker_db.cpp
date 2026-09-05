@@ -357,6 +357,14 @@ public:
         }
     }
 
+    int countPacks() override {
+        SlowGuard _w("sticker::count_packs", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM sticker_packs");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return 0; }
+        return stmt.columnInt(0);
+    }
+
     bool begin_write_transaction() override {
         auto _ = m_conn->get();
         return _->exec("BEGIN IMMEDIATE");

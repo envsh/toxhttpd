@@ -66,6 +66,7 @@ public:
     virtual std::vector<StickerRow> list_recent_stickers(int limit = 30) = 0;
     virtual std::vector<StickerRow> search_stickers(const char* query) = 0;
     virtual int count_stickers(const char* pack_id = nullptr) = 0;
+    virtual int countPacks() = 0;
 
     virtual bool begin_write_transaction() = 0;
     virtual bool commit_transaction() = 0;

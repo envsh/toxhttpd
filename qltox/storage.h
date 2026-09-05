@@ -211,6 +211,7 @@ public:
     const char* sqliteVersion() const { return m_sqliteVersion.c_str(); }
     bool hasFts5() const    { return m_hasFts5; }
     bool hasTrigram() const { return m_hasTrigram; }
+    const std::string& dataDir() const { return m_dataDir; }
 
 private:
     Storage();

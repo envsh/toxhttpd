@@ -130,6 +130,14 @@ public:
 
     bool begin_write_transaction() override { auto _ = m_conn->get(); return _->beginTransaction(); }
     bool commit_transaction() override { auto _ = m_conn->get(); return _->commitTransaction(); }
+
+    int64_t countPending() override {
+        SlowGuard _w("pending::count", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM pending_messages");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
 };
 
 class PendingDbSyncSafe final : public PendingDbSyncSafeInterface {

@@ -27,6 +27,7 @@
 #include <qinputdialog.h>
 #include "placeholderlineedit.h"
 #include "stickermanager.h"
+#include "statisticsdialog.h"
 #include "sound.h"
 #include "screenshotmanager.h"
 #include "screenshotpreview.h"
@@ -601,7 +602,7 @@ MainWindow::MainWindow(QWidget* parent)
     EmbeddedMenuBar::addItem(edit, qFromUtf8("重做\tCtrl+Shift+Z"), this, SLOT(onMenu1Stub()));
 
     MenuWidget34* tool = mb->addMenu(qFromUtf8("工具(&T)"));
-    EmbeddedMenuBar::addItem(tool, qFromUtf8("统计(&T)..."), this, SLOT(onMenu1Stub()));
+    EmbeddedMenuBar::addItem(tool, qFromUtf8("统计(&T)..."), this, SLOT(openStatistics()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("日志(&L)..."), this, SLOT(onMenu1Stub()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("贴纸管理器(&S)..."), this, SLOT(openStickerManager()));
     EmbeddedMenuBar::addItem(tool, qFromUtf8("设置(&S)...\tCtrl+,"), this, SLOT(openSettings()));
@@ -3282,6 +3283,11 @@ void MainWindow::openStickerManager() {
     if (db) { mgr->setStickerDb(db); }
     mgr->loadData();
     mgr->show();
+}
+
+void MainWindow::openStatistics() {
+    StatisticsDialog* dlg = new StatisticsDialog(this);
+    dlg->show();
 }
 
 void MainWindow::onScreenshotRequested() {

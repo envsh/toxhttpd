@@ -398,6 +398,30 @@ public:
 
     bool begin_write_transaction() override { auto _ = m_conn->get(); return _->beginTransaction(); }
     bool commit_transaction() override { auto _ = m_conn->get(); return _->commitTransaction(); }
+
+    int64_t countChannels() override {
+        SlowGuard _w("chan::count_channels", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM channels");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
+    int64_t countPeers() override {
+        SlowGuard _w("chan::count_peers", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COUNT(*) FROM peers");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
+
+    int64_t totalUnread() override {
+        SlowGuard _w("chan::total_unread", 300);
+        auto _ = m_conn->get();
+        auto stmt = _->prepare("SELECT COALESCE(SUM(unread_count),0) FROM channels");
+        if (!stmt.isPrepared() || !stmt.stepRow()) { return -1; }
+        return stmt.columnInt64(0);
+    }
 };
 
 class ChannelDbSyncSafe final : public ChannelDbSyncSafeInterface {

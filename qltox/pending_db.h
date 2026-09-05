@@ -39,6 +39,8 @@ public:
 
     virtual bool begin_write_transaction() = 0;
     virtual bool commit_transaction() = 0;
+
+    virtual int64_t countPending() = 0;
 };
 
 class PendingDbSyncSafeInterface {

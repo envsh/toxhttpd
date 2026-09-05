@@ -81,6 +81,10 @@ public:
 
     virtual bool begin_write_transaction() = 0;
     virtual bool commit_transaction() = 0;
+
+    virtual int64_t countChannels() = 0;
+    virtual int64_t countPeers() = 0;
+    virtual int64_t totalUnread() = 0;
 };
 
 class ChannelDbSyncSafeInterface {
