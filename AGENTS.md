@@ -32,6 +32,7 @@
 
 - Peer name cache key: `"conference_{id}_{peer}"` / `"group_{id}_{peer}"` — web (`app.js`) and qltox (`mainwindow.cpp`) must stay in sync.
 - Event system: long-poll `/api/events`. qltox uses `QThread` + libcurl, events delivered via `CustomEventBase` (compat wrapper).
+- **DB identity invariant**: `messages.rowid` (client) and `events.rowid` (server) rely on `INTEGER PRIMARY KEY AUTOINCREMENT` for monotonic, never-reused rowids — read cursor `last_read_rowid`, unread comparisons, `rowid<?` pagination, translation cache, and the FTS external-content table all depend on it. **Never remove `AUTOINCREMENT` and never explicitly reinsert old rowids**; deletion-related changes must preserve monotonicity.
 - Translation: nested JSON in `lang/*.json`, loaded by `Translator` class (`_("key")`), supports dot-path (e.g. `"statuses.online"`).
 - ChatView scroll multiplier: `wheelEvent` uses `step * N`, adjusted for feel (currently `*5`).
 - **C++ 代码不要抛出异常，也不要 try-catch**。Qt3 编译环境可能未启用异常支持，且项目风格不依赖异常处理。所有错误通过返回值或结构体（如 `TranslateApiResult`）传递。

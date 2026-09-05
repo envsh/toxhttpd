@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -110,6 +111,13 @@ func initMsgHistDB(dbPath string) (*sql.DB, error) {
 		log.Printf("[DB] Warning: Could not verify sqlite_sequence: %v", err)
 	} else {
 		log.Printf("[DB] Verified: events sequence set to %d (next rowid will be %d)", seqVal, seqVal+1)
+	}
+
+	// rowid 单调性守卫：客户端以 events.rowid 作为 event_id 去重/同步，必须保证永不复用
+	var evSql string
+	err = db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='events'`).Scan(&evSql)
+	if err != nil || !strings.Contains(evSql, "INTEGER PRIMARY KEY AUTOINCREMENT") {
+		log.Printf("[DB] GUARD: events 缺少 INTEGER PRIMARY KEY AUTOINCREMENT (%v)，event_id 同步机制将失效", err)
 	}
 
 	log.Printf("[DB] Database initialized successfully")

@@ -724,6 +724,19 @@ bool init_message_db(SqliteDb& db) {
         "  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")")) { return false; }
 
+    // 身份不变量守卫：游标/未读/翻译缓存/FTS 均依赖 messages.rowid 单调永不复用（见 AGENTS.md）
+    {
+        auto guardStmt = db.prepare(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='messages'");
+        if (guardStmt.isPrepared() && guardStmt.stepRow()) {
+            std::string def = guardStmt.columnText(0);
+            if (def.find("INTEGER PRIMARY KEY AUTOINCREMENT") == std::string::npos) {
+                qWarning("[DB] GUARD: messages 缺少 INTEGER PRIMARY KEY AUTOINCREMENT，"
+                         "rowid 游标/未读/翻译机制将失效！请恢复 AUTOINCREMENT 后重启。");
+            }
+        }
+    }
+
     db.exec("ALTER TABLE messages ADD COLUMN reply_to_ids TEXT DEFAULT ''");
     db.exec("ALTER TABLE messages ADD COLUMN mentions_text TEXT DEFAULT ''");
 
