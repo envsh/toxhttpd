@@ -1308,6 +1308,7 @@ void MainWindow::initLoadPlugins() {
 }
 
 void MainWindow::onContactSelected(int id, const QString& type, const QString& name) {
+    chatWidget->resetPendingContext();
     TimePoint _t0 = timeNow();
     // 如果已经是当前选中的聊天对象，不重新加载（避免清空消息）
     if (id == currentChatId && type == currentChatType) {
@@ -1572,7 +1573,6 @@ void MainWindow::handleEvents(const EventList& events) {
                     el.time = getCurrentTime();
                     {
                         auto fit = peerInfoMap.find("friend_" + std::to_string(friendId));
-                        if (fit != peerInfoMap.end()) el.senderAddress = qFromUtf8(fit->second.publicKey);
                     }
                     m_chatbuf.append(friendId, "friend", el);
                     QString friendTimeStr = timenowhm();
@@ -1689,7 +1689,6 @@ void MainWindow::handleEvents(const EventList& events) {
                             el.senderName = qFromUtf8(it->second.name);
                             if (!it->second.nickname.empty())
                                 el.senderNickname = qFromUtf8(it->second.nickname);
-                            el.senderAddress = qFromUtf8(it->second.publicKey);
                         } else if (peerNameItem && cJSON_IsString(peerNameItem)) {
                             el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
@@ -1805,7 +1804,6 @@ void MainWindow::handleEvents(const EventList& events) {
                             el.ipAddress = qFromUtf8(it->second.peerIp);
                             if (!it->second.nickname.empty())
                                 el.senderNickname = qFromUtf8(it->second.nickname);
-                            el.senderAddress = qFromUtf8(it->second.publicKey);
                         } else if (peerNameItem && cJSON_IsString(peerNameItem)) {
                             el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
@@ -2072,7 +2070,6 @@ void MainWindow::handleEvents(const EventList& events) {
                     msg.peerNumber = (int)hm.sender_number;
                     msg.avatarUrl = avatarMxc;
                     msg.messageId = qFromUtf8(hm.eventId);
-                    msg.senderAddress = qFromUtf8(hm.sender_pubkey);
 
                     int chatId = VIRTUAL_REDDIT_ID;
                     std::string chatType = kTopicType;
@@ -2565,6 +2562,7 @@ void MainWindow::onDeleteOrLeaveRequested(int id, const QString& type) {
             if (id == currentChatId && type == currentChatType) {
                 currentChatId = -1;
                 currentChatType = "";
+                chatWidget->resetPendingContext();
                 chatWidget->setHeaderText(_("select_chat_object"));
                 chatWidget->setBuffer(nullptr);
             }

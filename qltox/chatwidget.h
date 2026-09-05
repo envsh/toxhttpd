@@ -4,8 +4,18 @@
 #include "compat34.h"
 #ifdef QT3_BUILD
 #include <qmap.h>
+#include <qstringlist.h>
 #else
 #include <QMap>
+#include <QStringList>
+#include <QList>
+#endif
+#include <qwidget.h>
+#ifdef QT3_BUILD
+#include <qptrlist.h>
+typedef QPtrList<QWidget> ChipWidgetList;      // Qt3：存 QWidget（非指针参数类型）
+#else
+typedef QList<QWidget*> ChipWidgetList;        // Qt4：存 QWidget*
 #endif
 #include <qwidget.h>
 #include <qlabel.h>
@@ -39,6 +49,7 @@ public:
     void retranslateUi();
     void showUnreadBanner(int count);
     void setAutoTranslateEnabled(bool enabled) { m_autoTranslateEnabled = enabled; }
+    void resetPendingContext();                       // 会话切换/发送后清空待发扩展上下文
     
 signals:
     void messageSent(const QString& message, const QMap<QString,QString>& context);
@@ -67,11 +78,12 @@ private slots:
     void onSendEnClicked();
     void onTranslateClicked(int msgIndex);
     void onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
-    void onMentionClicked(const QString& username, const QString& address);
+    void onMentionClicked(const QString& senderName);
     void onReplyRequested(int msgIndex);
     void onEditRequested(int msgIndex);
     void onDeleteRequested(int msgIndex);
     void onRedactRequested(int msgIndex);
+    void onReplyStripClose();
     void hideUnreadBanner();
 
 public slots:
@@ -109,6 +121,22 @@ private:
     // 必须及时清理：onSendClicked 发送后 clear()；切换会话/清空输入等时机也应 clear()。
     // 残留的引用/提及会被误带到下一条消息。
     QMap<QString,QString> m_pendingCtx;
+    // ── 待发扩展上下文的可见指示（输入区上方 m_ctxBar，纯增量，不动 >> /@ 输入行为）──
+    QWidget* m_ctxBar;                                // 容器（初始 hide）
+    QWidget* m_replyRow;                              // 引用条行
+    QLabel*  m_replyStrip;                            // "↩ 回复: <名>"
+    QLabel*  m_replySnippet;                          // 单行摘要（自截断，Qt3 无 elide）
+    QPushButton* m_replyCloseBtn;                     // ✕
+    QWidget* m_chipRow;                               // 提及 chip 行
+    ChipWidgetList m_chipWidgets;                    // 当前 chip 列表（用于重建）
+    QString m_replyDisplayName;
+    QString m_replySnippetText;
+    QString m_replyMentionedName;                     // MSC3952：回复捆绑进 mentions 的显示名，✕ 时一并移除
+    QStringList m_pendingMentionDisplay;              // senderName 去重列表（chip 渲染用）
+    void updateReplyStrip();
+    void updateMentionChips();
+    void updateCtxBarVisibility();
+    void onChipClose(const QString& senderName);      // 由 LambdaSlot 调用
 };
 
 #endif // CHATWIDGET_H

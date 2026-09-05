@@ -16,6 +16,17 @@
 #include "stickerpicker.h"
 #include "storage.h"
 #ifdef QT3_BUILD
+#include <qlayout.h>
+#include <qhbox.h>
+#include <qvbox.h>
+#else
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+#endif
+
+static void clearChipRow(QWidget* row, ChipWidgetList& chips);
+
+#ifdef QT3_BUILD
 #include <qfiledialog.h>
 #else
 #include <QFileDialog>
@@ -131,6 +142,37 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     // 消息区域（虚拟化列表）
     messageArea = new ChatView(this);
     mainLayout->addWidget(messageArea, 1);
+
+    // ── 待发扩展上下文指示区（引用条 + 提及 chip 行，初始隐藏）──
+    m_ctxBar = new QWidget(this);
+    {
+        QVBoxLayout* barLay = new QVBoxLayout(m_ctxBar);
+        barLay->setSpacing(2);
+
+        m_replyRow = new QWidget(m_ctxBar);
+        {
+            QHBoxLayout* rl = new QHBoxLayout(m_replyRow);
+            rl->setSpacing(4);
+            m_replyStrip = new QLabel(m_replyRow);
+            m_replySnippet = new QLabel(m_replyRow);
+            m_replyCloseBtn = new QPushButton(qFromUtf8("×"), m_replyRow);
+            m_replyCloseBtn->setFixedSize(18, 18);
+            rl->addWidget(m_replyStrip);
+            rl->addWidget(m_replySnippet, 1);
+            rl->addWidget(m_replyCloseBtn);
+            connect(m_replyCloseBtn, SIGNAL(clicked()), this, SLOT(onReplyStripClose()));
+        }
+        m_replyRow->hide();
+
+        m_chipRow = new QWidget(m_ctxBar);
+        new QHBoxLayout(m_chipRow);
+        m_chipRow->hide();
+
+        barLay->addWidget(m_replyRow);
+        barLay->addWidget(m_chipRow);
+    }
+    m_ctxBar->hide();
+    mainLayout->addWidget(m_ctxBar);
     /*
      * Qt3 SIGNAL/SLOT 空格问题：
      *    Qt3 的 connect() 不自动归一化空格 (normalizeSignalSlot 是 protected，
@@ -154,8 +196,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(messageArea, SIGNAL(resendMessage(int)), this, SIGNAL(resendMessage(int)));
     connect(messageArea, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SIGNAL(openFullSizeImage(int, const QString&)));
-    connect(messageArea, SIGNAL(mentionClicked(const QString&, const QString&)),
-            this, SLOT(onMentionClicked(const QString&, const QString&)));
+    connect(messageArea, SIGNAL(mentionClicked(const QString&)),
+            this, SLOT(onMentionClicked(const QString&)));
     connect(messageArea, SIGNAL(autoTranslateRequested(int, const QString&, const QString&)),
             this, SLOT(onAutoTranslateRequested(int, const QString&, const QString&)));
     connect(messageArea, SIGNAL(replyRequested(int)), this, SLOT(onReplyRequested(int)));
@@ -327,6 +369,13 @@ void ChatWidget::onSendClicked() {
     inputEdit->saveToHistory(msg);
     emit messageSent(msg, m_pendingCtx);
     m_pendingCtx.clear();
+    m_pendingMentionDisplay.clear();
+    m_replyMentionedName.truncate(0);
+    m_replyDisplayName.truncate(0);
+    m_replySnippetText.truncate(0);
+    m_replyRow->hide();
+    clearChipRow(m_chipRow, m_chipWidgets);
+    m_ctxBar->hide();
 #ifdef QT3_BUILD
     inputEdit->selectAll();
     inputEdit->removeSelectedText();
@@ -606,8 +655,55 @@ static void appendCsvField(QMap<QString,QString>& ctx, const QString& key, const
     }
 }
 
-void ChatWidget::onMentionClicked(const QString& username, const QString& address) {
-    QString mention = "@" + username + " ";
+// 从 ctx 的 key 的 CSV 中移除一个值；空则删除该 key
+static void removeCsvField(QMap<QString,QString>& ctx, const QString& key, const QString& value) {
+    QString cur;
+    QMap<QString,QString>::iterator it = ctx.find(key);
+    if (it != ctx.end()) {
+#ifdef QT3_BUILD
+        cur = it.data();
+#else
+        cur = it.value();
+#endif
+    }
+    QStringList keep;
+    QStringList parts = cur.isEmpty() ? QStringList() : qSplit(cur, ",");
+    for (QStringList::const_iterator p = parts.begin(); p != parts.end(); ++p) {
+        if (*p != value) keep.append(*p);
+    }
+    if (keep.isEmpty()) ctx.remove(key);
+    else ctx.insert(key, keep.join(","));
+}
+
+// 被引用摘要截断（Qt3 QLabel 无 elide，手动截断到 ~60 字符）
+static QString snippetOneLine(const QString& text) {
+    QString one = text;
+    one.replace('\n', ' ');
+    one.replace('\r', ' ');
+    if (one.length() > 60) one = one.left(59) + qFromUtf8("…");
+    return one;
+}
+
+// 清空 chip 行：Qt3 用 remove+delete，Qt4 用 takeAt 循环（两 API 不一致）
+static void clearChipRow(QWidget* row, ChipWidgetList& chips) {
+    for (int i = 0; i < chips.count(); ++i) {
+#ifdef QT3_BUILD
+        row->layout()->remove(chips.at(i));
+        delete chips.at(i);
+#endif
+    }
+#ifndef QT3_BUILD
+    while (row->layout()->count() > 0) {
+        QLayoutItem* li = row->layout()->takeAt(0);
+        if (li->widget()) delete li->widget();
+        delete li;
+    }
+#endif
+    chips.clear();
+}
+
+void ChatWidget::onMentionClicked(const QString& senderName) {
+    QString mention = "@" + senderName + " ";
     inputEdit->clearPlaceholder();
 #ifdef QT3_BUILD
     inputEdit->insert(mention);
@@ -615,7 +711,10 @@ void ChatWidget::onMentionClicked(const QString& username, const QString& addres
     inputEdit->insertPlainText(mention);
 #endif
     inputEdit->setFocus();
-    if (!address.isEmpty()) appendCsvField(m_pendingCtx, "mentions", address);
+    appendCsvField(m_pendingCtx, "mentions", senderName);
+    if (!m_pendingMentionDisplay.contains(senderName))
+        m_pendingMentionDisplay.append(senderName);
+    updateMentionChips();
 }
 
 void ChatWidget::onReplyRequested(int msgIndex) {
@@ -628,10 +727,90 @@ void ChatWidget::onReplyRequested(int msgIndex) {
 #endif
     inputEdit->setFocus();
     ChatElement& target = messageArea->messageAt(msgIndex);   // 仅追加副作用，不改变 >> 行为
-    if (!target.messageId.isEmpty())
+    if (!target.messageId.isEmpty()) {
+        // 引用条为单值：新回复覆盖旧引用，并把旧引用捆绑的提到先撤掉
+        if (!m_replyMentionedName.isEmpty())
+            removeCsvField(m_pendingCtx, "mentions", m_replyMentionedName);
         appendCsvField(m_pendingCtx, "reply_to", target.messageId);
-    if (!target.senderAddress.isEmpty())
-        appendCsvField(m_pendingCtx, "mentions", target.senderAddress);
+        m_replyDisplayName = target.senderName;
+        m_replySnippetText = snippetOneLine(target.messageText);
+    } else {
+        m_replyDisplayName.truncate(0);
+        m_replySnippetText.truncate(0);
+    }
+    if (!target.senderName.isEmpty())
+        appendCsvField(m_pendingCtx, "mentions", target.senderName);
+    m_replyMentionedName = target.senderName;
+    updateReplyStrip();
+}
+
+void ChatWidget::onReplyStripClose() {
+    m_pendingCtx.remove("reply_to");
+    if (!m_replyMentionedName.isEmpty())
+        removeCsvField(m_pendingCtx, "mentions", m_replyMentionedName);
+    m_replyMentionedName.truncate(0);
+    m_replyDisplayName.truncate(0);
+    m_replySnippetText.truncate(0);
+    updateReplyStrip();
+}
+
+void ChatWidget::updateReplyStrip() {
+    if (m_replySnippetText.isEmpty()) {
+        m_replyRow->hide();
+    } else {
+        m_replyStrip->setText(qFromUtf8("» ") + m_replyDisplayName);
+        m_replySnippet->setText(m_replySnippetText);
+        m_replyRow->show();
+    }
+    updateCtxBarVisibility();
+}
+
+void ChatWidget::updateMentionChips() {
+    clearChipRow(m_chipRow, m_chipWidgets);
+    for (QStringList::const_iterator it = m_pendingMentionDisplay.begin();
+         it != m_pendingMentionDisplay.end(); ++it) {
+        const QString name = *it;
+        QWidget* chip = new QWidget(m_chipRow);
+        QHBoxLayout* hl = new QHBoxLayout(chip);
+        hl->setSpacing(2);
+        QLabel* nameLbl = new QLabel(qFromUtf8("@") + name, chip);
+        QPushButton* xBtn = new QPushButton(qFromUtf8("×"), chip);
+        xBtn->setMinimumSize(18, 18);
+        hl->addWidget(nameLbl);
+        hl->addWidget(xBtn);
+        auto* slot = new LambdaSlot(xBtn, [this, name]() { onChipClose(name); });
+        connect(xBtn, SIGNAL(clicked()), slot, SLOT(call()));
+        static_cast<QHBoxLayout*>(m_chipRow->layout())->addWidget(chip);
+        m_chipWidgets.append(chip);
+    }
+    if (m_chipWidgets.count() > 0) m_chipRow->show(); else m_chipRow->hide();
+    updateCtxBarVisibility();
+}
+
+void ChatWidget::onChipClose(const QString& senderName) {
+    removeCsvField(m_pendingCtx, "mentions", senderName);
+#ifdef QT3_BUILD
+    m_pendingMentionDisplay.remove(senderName);
+#else
+    m_pendingMentionDisplay.removeAll(senderName);
+#endif
+    updateMentionChips();
+}
+
+void ChatWidget::updateCtxBarVisibility() {
+    bool visible = !m_replySnippetText.isEmpty() || m_chipWidgets.count() > 0;
+    if (visible) m_ctxBar->show(); else m_ctxBar->hide();
+}
+
+void ChatWidget::resetPendingContext() {
+    m_pendingCtx.clear();
+    m_pendingMentionDisplay.clear();
+    m_replyMentionedName.truncate(0);
+    m_replyDisplayName.truncate(0);
+    m_replySnippetText.truncate(0);
+    m_replyRow->hide();
+    clearChipRow(m_chipRow, m_chipWidgets);
+    m_ctxBar->hide();
 }
 
 void ChatWidget::onEditRequested(int msgIndex) {
