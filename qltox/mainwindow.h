@@ -73,6 +73,7 @@ protected slots:
     void onSourceClicked(int msgIndex);
     void onRetryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void onResendMessage(int msgIndex);
+    void onRequestRedactMessage(int msgIndex);
     void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
@@ -114,6 +115,7 @@ private:
     static const int kLoadMessages = 3;
     static const int kLoadMembers = 4;
     static const int kLoadSendMsg = 5;
+    static const int kLoadRedactMsg = 6;
 
     bool m_firstPaintLogged = false;
     int m_paintCounter = 0;

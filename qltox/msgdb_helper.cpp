@@ -34,6 +34,7 @@ ChatElement msgRowToElement(const MessageRow& row) {
     el.sendState    = (ChatElement::SendState)row.send_state;
     el.messageId    = qFromUtf8(row.event_id);
     el.dbRowid      = row.rowid;
+    el.redacted     = (row.redacted != 0);
     if (!row.reply_to_ids.empty())
         el.replyTos = qSplit(qFromUtf8(row.reply_to_ids), QString(","));
     if (!row.mentions_text.empty())
@@ -66,6 +67,7 @@ static MessageRow elementToRow(int id, const std::string& type,
     row.gif_path    = std::string(qToUtf8(el.gifPath).data());
     row.send_state  = (int)el.sendState;
     row.event_id    = std::string(qToUtf8(el.messageId).data());
+    row.redacted    = el.redacted ? 1 : 0;
     {
         QStringList sl;
         for (const auto& s : el.replyTos) sl.append(s);

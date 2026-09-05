@@ -22,11 +22,11 @@ public:
             " duration_sec,local_path,gif_path,thumbnail_key,"
             " cache_tag,send_state,reply_to_rowid,edited,"
             " forwarded_from,mention,"
-            " reply_to_ids,mentions_text) "
+            " reply_to_ids,mentions_text,redacted) "
             "VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,"
             "?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,"
             "?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,"
-            "?31,?32)");
+            "?31,?32,?33)");
         if (!stmt.isPrepared()) { return 0; }
         int i = 1;
         if (!stmt.bind(i++, row.event_id.c_str())) { return 0; }
@@ -61,6 +61,7 @@ public:
         if (!stmt.bind(i++, row.mention)) { return 0; }
         if (!stmt.bind(i++, row.reply_to_ids.c_str())) { return 0; }
         if (!stmt.bind(i++, row.mentions_text.c_str())) { return 0; }
+        if (!stmt.bind(i++, row.redacted)) { return 0; }
         if (!stmt.step()) {
             qWarning("MessageDb::insert_message failed for chanid=%s: %s",
                      row.chanid.c_str(), sqliteError(*_));
@@ -96,6 +97,7 @@ public:
         if (upd.hasThumbnailKey) addField("thumbnail_key");
         if (upd.hasSendState)    addField("send_state");
         if (upd.hasEdited)       addField("edited");
+        if (upd.hasRedacted)     addField("redacted");
         if (upd.hasForwardedFrom) addField("forwarded_from");
         if (upd.hasMention)      addField("mention");
         if (upd.hasReplyToIds)   addField("reply_to_ids");
@@ -123,6 +125,7 @@ public:
         if (upd.hasThumbnailKey) { stmt.bind(idx++, upd.thumbnail_key.c_str()); }
         if (upd.hasSendState)    { stmt.bind(idx++, upd.send_state); }
         if (upd.hasEdited)       { stmt.bind(idx++, upd.edited); }
+        if (upd.hasRedacted)     { stmt.bind(idx++, upd.redacted); }
         if (upd.hasForwardedFrom) { stmt.bind(idx++, upd.forwarded_from.c_str()); }
         if (upd.hasMention)      { stmt.bind(idx++, upd.mention); }
         if (upd.hasReplyToIds)   { stmt.bind(idx++, upd.reply_to_ids.c_str()); }
@@ -151,7 +154,7 @@ public:
             " duration_sec,local_path,gif_path,thumbnail_key,"
             " cache_tag,send_state,reply_to_rowid,edited,"
             " forwarded_from,mention,"
-            " reply_to_ids,mentions_text "
+            " reply_to_ids,mentions_text,redacted "
             "FROM messages WHERE rowid=?1");
         if (!stmt.isPrepared()) { return nullptr; }
         if (!stmt.bind(1, rowid)) { return nullptr; }
@@ -187,6 +190,7 @@ public:
         row->send_state     = stmt.columnInt(i++);
         row->reply_to_rowid = stmt.columnInt64(i++);
         row->edited         = stmt.columnInt(i++);
+        row->redacted       = stmt.columnInt(i++);
         row->forwarded_from = stmt.columnText(i++);
         row->mention        = stmt.columnInt(i++);
         row->reply_to_ids   = stmt.columnText(i++);
@@ -207,7 +211,7 @@ public:
             " duration_sec,local_path,gif_path,thumbnail_key,"
             " cache_tag,send_state,reply_to_rowid,edited,"
             " forwarded_from,mention,"
-            " reply_to_ids,mentions_text "
+            " reply_to_ids,mentions_text,redacted "
             "FROM messages WHERE chanid=?1 "
             "ORDER BY rowid DESC LIMIT ?2");
         if (!stmt.isPrepared()) { return rows; }
@@ -234,7 +238,7 @@ public:
             " duration_sec,local_path,gif_path,thumbnail_key,"
             " cache_tag,send_state,reply_to_rowid,edited,"
             " forwarded_from,mention,"
-            " reply_to_ids,mentions_text "
+            " reply_to_ids,mentions_text,redacted "
             "FROM messages WHERE chanid=?1 AND rowid<?2 "
             "ORDER BY rowid DESC LIMIT ?3");
         if (!stmt.isPrepared()) { return rows; }
@@ -478,6 +482,7 @@ private:
         row.send_state     = stmt.columnInt(i++);
         row.reply_to_rowid = stmt.columnInt64(i++);
         row.edited         = stmt.columnInt(i++);
+        row.redacted       = stmt.columnInt(i++);
         row.forwarded_from = stmt.columnText(i++);
         row.mention        = stmt.columnInt(i++);
         row.reply_to_ids   = stmt.columnText(i++);
@@ -739,6 +744,7 @@ bool init_message_db(SqliteDb& db) {
 
     db.exec("ALTER TABLE messages ADD COLUMN reply_to_ids TEXT DEFAULT ''");
     db.exec("ALTER TABLE messages ADD COLUMN mentions_text TEXT DEFAULT ''");
+    db.exec("ALTER TABLE messages ADD COLUMN redacted INTEGER DEFAULT 0");
 
     db.exec("CREATE INDEX IF NOT EXISTS idx_messages_chanid"
             "  ON messages(chanid, rowid DESC)");

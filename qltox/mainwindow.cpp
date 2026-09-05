@@ -500,6 +500,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(sourceClicked(int)), this, SLOT(onSourceClicked(int)));
     connect(chatWidget, SIGNAL(retryClicked(int, const QString&, const QString&)), this, SLOT(onRetryClicked(int, const QString&, const QString&)));
     connect(chatWidget, SIGNAL(resendMessage(int)), this, SLOT(onResendMessage(int)));
+    connect(chatWidget, SIGNAL(requestRedactMessage(int)), this, SLOT(onRequestRedactMessage(int)));
     connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
     connect(chatWidget, SIGNAL(fileSendRequested(const QString&)),
@@ -1085,6 +1086,39 @@ void MainWindow::customEvent(CustomEventBase* event) {
 #endif
             }
             chatWidget->repaintMessages();
+            return;
+        }
+        
+        // 消息撤回结果
+        if (e->type == ApiRedactMessage) {
+            RedactResultEvent* evt = static_cast<RedactResultEvent*>(event);
+            chatWidget->loadingBar()->hideLoading(kLoadRedactMsg);
+            if (evt->success) {
+                int64_t dbRowid = 0;
+                for (int i = chatWidget->messageCount() - 1; i >= 0; i--) {
+                    ChatElement& el = chatWidget->mutableMessageAt(i);
+                    if (el.category == "self" && el.messageId == qFromUtf8(evt->messageId)) {
+                        el.redacted = true;
+                        el.messageText = _("context.msg_redacted");
+                        el.caption = QString();
+                        el.mediaUrl = QString();
+                        el.fileName = QString();
+                        el.showTranslation = false;
+                        dbRowid = el.dbRowid;
+                        break;
+                    }
+                }
+                chatWidget->relayout();
+                chatWidget->repaintMessages();
+                if (dbRowid > 0) {
+                    MessageUpdate upd;
+                    upd.hasRedacted = true;
+                    upd.redacted = 1;
+                    Storage::instance().messageDbAsync()->update_message(dbRowid, upd, [](bool){});
+                }
+            } else {
+                ToastWidget::show(chatWidget, _("redact_failed").arg(qFromUtf8(evt->errorMessage)), 4000);
+            }
             return;
         }
         
@@ -2964,6 +2998,17 @@ void MainWindow::onResendMessage(int msgIndex) {
 #else
     ToxAPI::sendMessage(currentChatId, "friend", std::string(qToUtf8(msgText)));
 #endif
+}
+
+void MainWindow::onRequestRedactMessage(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    if (currentChatId == -1 || currentChatType.isEmpty()) { return; }
+    const ChatElement& el = chatWidget->messageAt(msgIndex);
+    if (el.category != "self" || el.messageId.isEmpty()) { return; }
+    std::string type = std::string(qToUtf8(currentChatType).data());
+    std::string msgId = std::string(qToUtf8(el.messageId).data());
+    chatWidget->loadingBar()->showLoading(kLoadRedactMsg, _("redacting_message"));
+    ToxAPI::redactMessage(currentChatId, type, msgId);
 }
 
 void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {

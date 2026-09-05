@@ -257,6 +257,14 @@ int ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
     return ctx->sendmsgseq;
 }
 
+int ToxAPI::redactMessage(int chatId, const std::string& type, const std::string& messageId) {
+    auto* ctx = new ApiCtx(ApiRedactMessage, chatId, messageId, type);
+    request({"/api/messages/redact", "POST",
+            "type=" + type + "&id=" + std::to_string(chatId)
+            + "&message_id=" + urlEncode(messageId), 90}, ctx);
+    return 0;
+}
+
 int ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message,
                           const std::string& idOverride,
                           const std::string& fileData,
@@ -909,6 +917,25 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
             case ApiSendConferenceMessage: ev->chatType = "conference"; break;
             case ApiSendGroupMessage: ev->chatType = "group"; break;
         }
+        QApplication::postEvent(s_target, ev);
+        break;
+    }
+
+    case ApiRedactMessage: {
+        auto* ev = new RedactResultEvent();
+        ev->elapsedMs = resp.elapsedMs;
+        ev->success = (resp.httpCode == 200);
+        if (!ev->success) {
+            if (!resp.curlErrStr.empty())
+                ev->errorMessage = resp.curlErrStr;
+            else if (resp.httpCode != 200)
+                ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
+            else
+                ev->errorMessage = "unknown error";
+        }
+        ev->chatId = ctx->id;
+        ev->messageId = ctx->str1;
+        ev->chatType = ctx->str2;
         QApplication::postEvent(s_target, ev);
         break;
     }

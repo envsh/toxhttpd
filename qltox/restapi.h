@@ -58,6 +58,7 @@ public:
     static int  sendFriendMessage(int friendId, const std::string& message);
     static int  sendConferenceMessage(int conferenceId, const std::string& message);
     static int  sendGroupMessage(int groupId, const std::string& message);
+    static int  redactMessage(int chatId, const std::string& type, const std::string& messageId);
     static void addFriend(const std::string& publicKey);
     static void deleteFriend(int friendId);
     static void getGroupMembers(int groupId);

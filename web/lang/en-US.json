@@ -116,6 +116,8 @@
     "select_chat_first": "Please select chat first",
     "send_failed": "Send to %1 failed (%2)",
     "send_success": "Sent to %1 (%2)",
+    "redacting_message": "Redacting...",
+    "redact_failed": "Redact failed (%1)",
     "add_friend_prompt": "Please enter valid public key (64 chars) or address (76 chars)",
     "add_friend_success": "Friend added successfully!",
     "add_friend_failed": "Add failed",
@@ -193,7 +195,8 @@
         "reply": "Reply",
         "edit_message": "Edit message",
         "delete_message": "Delete message",
-        "redact_message": "Redact message"
+        "redact_message": "Redact message",
+        "msg_redacted": "Message redacted"
     },
     "rename": {
         "title": "Change Group Nick",

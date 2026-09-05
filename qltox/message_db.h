@@ -35,6 +35,7 @@ struct MessageRow {
     int send_state = 0;
     int64_t reply_to_rowid = 0;
     int edited = 0;
+    int redacted = 0;
     std::string forwarded_from;
     int mention = 0;
     std::string reply_to_ids;    // "eventId1,eventId2"
@@ -59,6 +60,7 @@ struct MessageUpdate {
     bool hasThumbnailKey = false;   std::string thumbnail_key;
     bool hasSendState = false;      int send_state;
     bool hasEdited = false;         int edited;
+    bool hasRedacted = false;       int redacted;
     bool hasForwardedFrom = false;  std::string forwarded_from;
     bool hasMention = false;        int mention;
     bool hasReplyToIds = false;     std::string reply_to_ids;

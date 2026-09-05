@@ -609,6 +609,16 @@ static QString formatAdaptiveMessageTime(const QString& timeStr) {
 // ───── ChatElement methods ─────
 
 int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont) {
+    if (redacted) {
+        ChatElement tmp = *this;
+        tmp.etype = Text;
+        tmp.messageText = _("context.msg_redacted");
+        tmp.showTranslation = false;
+        tmp.caption = QString();
+        tmp.mediaUrl = QString();
+        tmp.fileName = QString();
+        return tmp.calcHeight(viewWidth, fm, emojiW, baseFont);
+    }
     switch (etype) {
     case Text: {
         if (viewWidth <= 0) { viewWidth = 400; }
@@ -879,6 +889,17 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
                         const std::vector<QRect>& selRects,
                         const QFontMetrics& fm, int emojiW,
                         const QFont& baseFont, const StyleParams::Palette& pal) {
+    if (redacted) {
+        ChatElement tmp = *this;
+        tmp.etype = Text;
+        tmp.messageText = _("context.msg_redacted");
+        tmp.showTranslation = false;
+        tmp.caption = QString();
+        tmp.mediaUrl = QString();
+        tmp.fileName = QString();
+        tmp.paint(p, y, viewWidth, isSelected, selRects, fm, emojiW, baseFont, pal);
+        return;
+    }
     switch (etype) {
     case Text: {
         QFont f = baseFont;
@@ -3265,6 +3286,9 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     bool canRetry = (msgIndex >= 0 && msgIndex < (int)m_history->size()
                      && (*m_history)[msgIndex].sendState == ChatElement::SendFailed
                      && (*m_history)[msgIndex].category == "self");
+    bool canRedact = (msgIndex >= 0 && msgIndex < (int)m_history->size()
+                      && (*m_history)[msgIndex].category == "self"
+                      && !(*m_history)[msgIndex].messageId.isEmpty());
     // Copy full message
 #ifdef QT3_BUILD
     // Qt3 QMenuData::insertItem() 自动生成的 ID 是负数（-1, -2, ...），
@@ -3296,7 +3320,9 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         editMsgId = menu.insertItem(_("context.edit_message"));
         menu.insertSeparator();
         deleteMsgId = menu.insertItem(_("context.delete_message"));
-        redactMsgId = menu.insertItem(_("context.redact_message"));
+        if (canRedact) {
+            redactMsgId = menu.insertItem(_("context.redact_message"));
+        }
     }
 #else
     QAction* copyMsgAction = menu.addAction(_("context.copy_message"));
@@ -3324,7 +3350,9 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         editMsgAction = menu.addAction(_("context.edit_message"));
         menu.addSeparator();
         deleteMsgAction = menu.addAction(_("context.delete_message"));
-        redactMsgAction = menu.addAction(_("context.redact_message"));
+        if (canRedact) {
+            redactMsgAction = menu.addAction(_("context.redact_message"));
+        }
     }
 #endif
 #ifdef QT3_BUILD
@@ -3357,7 +3385,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         emit editRequested(msgIndex);
     } else if (hasMsgActions && choice == deleteMsgId) {
         emit deleteRequested(msgIndex);
-    } else if (hasMsgActions && choice == redactMsgId) {
+    } else if (canRedact && choice == redactMsgId) {
         emit redactRequested(msgIndex);
     }
 #else

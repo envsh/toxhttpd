@@ -100,6 +100,7 @@ struct ChatElement {
     QRect resendIconRect;
     QStringList replyTos;
     QStringList mentions;
+    bool redacted = false;
 
     ChatElement()
         : etype(Text), peerNumber(-1), showTranslation(false)

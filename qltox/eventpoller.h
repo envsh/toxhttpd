@@ -72,6 +72,7 @@ enum ApiRequestType {
     ApiLoadPartialData,
     ApiMediaDownload,
     ApiAvatarDownload,
+    ApiRedactMessage,
 };
 
 // ── 数据类型（事件契约）──
@@ -221,6 +222,16 @@ public:
     std::string chatType;
     std::string errorMessage;
     std::string messageId;
+};
+
+class RedactResultEvent : public ApiResultEvent {
+public:
+    RedactResultEvent() : ApiResultEvent(ApiRedactMessage), success(false) {}
+    bool success;
+    int chatId = 0;
+    std::string chatType;
+    std::string messageId;
+    std::string errorMessage;
 };
 
 class MembersLoadedEvent : public ApiResultEvent {

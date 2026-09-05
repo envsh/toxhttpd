@@ -617,5 +617,8 @@ void ChatWidget::onDeleteRequested(int msgIndex) {
 }
 
 void ChatWidget::onRedactRequested(int msgIndex) {
-    // TODO: 撤回消息（暂未实现）
+    if (msgIndex < 0 || msgIndex >= messageCount()) { return; }
+    const ChatElement& el = messageArea->messageAt(msgIndex);
+    if (el.category != "self" || el.messageId.isEmpty()) { return; }
+    emit requestRedactMessage(msgIndex);
 }
