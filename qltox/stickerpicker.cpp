@@ -68,7 +68,7 @@ StickerPicker::StickerPicker(QWidget* parent)
 #endif
              ) {
     m_windowMode = false;
-    setFixedSize(320, 400);
+    setMinimumSize(240, 100);
     init();
 }
 
@@ -135,9 +135,23 @@ void StickerPicker::rebuildTabBar() {
 
     if (m_packs.empty()) {
         m_tabBar->hide();
+
+        QWidget* page = new QWidget(m_pageStack);
+        QVBoxLayout* vl = new QVBoxLayout(page);
+        vl->setMargin(4);
+        vl->setSpacing(2);
+        QLabel* empty = new QLabel(_("stickerpicker.empty"), page);
+        empty->setAlignment(Qt::AlignCenter);
+        vl->addWidget(empty);
+        m_pageStack->addWidget(page);
+        m_packPages.push_back(page);
+        qStackSetCurrent(m_pageStack, page);
+
+        setFixedSize(280, 200);
         return;
     }
     m_tabBar->show();
+    setFixedSize(320, 400);
 
     for (size_t i = 0; i < m_packs.size(); i++) {
         QString title = qFromUtf8(m_packs[i].title);

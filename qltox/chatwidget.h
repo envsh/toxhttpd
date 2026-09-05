@@ -14,6 +14,8 @@
 #include "loadingbar.h"
 #include <string>
 
+class StickerPicker;
+
 class ChatWidget : public QWidget {
     Q_OBJECT
 public:
@@ -54,6 +56,8 @@ private slots:
     void onEmojiInsert(const QString& emoji);
     void onFileClicked();
     void onFilePaste(const QString& filePath);
+    void onStickerClicked();
+    void onQuickReplyClicked();
     void onSendEnClicked();
     void onTranslateClicked(int msgIndex);
     void onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
@@ -81,9 +85,12 @@ private:
     MessageInput* inputEdit;
     EmojiPushButton* emojiBtn;
     EmojiPushButton* fileBtn;
+    EmojiPushButton* stickerBtn;
+    EmojiPushButton* quickReplyBtn;
     QPushButton* sendBtn;
     QPushButton* m_sendEnBtn;
     EmojiPicker* emojiPicker;
+    StickerPicker* m_stickerPicker = nullptr;
     bool m_autoTranslateEnabled = false;
 };
 

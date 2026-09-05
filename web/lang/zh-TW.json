@@ -41,6 +41,12 @@
         "add": "新增",
         "join_group": "加入"
     },
+    "tooltips": {
+        "emoji": "表情",
+        "file": "發送檔案",
+        "sticker": "貼圖",
+        "quickreply": "快速回覆"
+    },
     "placeholders": {
         "add_friend": "輸入 Tox ID 添加好友",
         "join_group": "群組chat_id",

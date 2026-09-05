@@ -46,6 +46,12 @@
         "add": "Add",
         "join_group": "Join"
     },
+    "tooltips": {
+        "emoji": "Emoji",
+        "file": "Send file",
+        "sticker": "Stickers",
+        "quickreply": "Quick reply"
+    },
     "placeholders": {
         "add_friend": "Enter Tox ID to add friend",
         "join_group": "Group chat_id",

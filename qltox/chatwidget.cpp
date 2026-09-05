@@ -13,11 +13,44 @@
 
 #include "config.h"
 #include "ThemeManager.h"
+#include "stickerpicker.h"
+#include "storage.h"
 #ifdef QT3_BUILD
 #include <qfiledialog.h>
 #else
 #include <QFileDialog>
 #endif
+
+namespace {
+
+QStringList defaultQuickReplies() {
+    QStringList list;
+    list << qFromUtf8("你好，在的");
+    list << qFromUtf8("收到，谢谢");
+    list << qFromUtf8("好的，没问题");
+    list << qFromUtf8("请稍等，我看一下");
+    list << qFromUtf8("好的，马上就来");
+    list << qFromUtf8("稍等，我查一下再回复您");
+    list << qFromUtf8("了解，收到");
+    list << qFromUtf8("不好意思，刚才有点忙");
+    list << qFromUtf8("你方便的时候再回复我");
+    return list;
+}
+
+QStringList quickReplies() {
+    QString raw = Config::value("quick_replies");
+    if (!raw.isEmpty()) {
+#ifdef QT3_BUILD
+        QStringList split = QStringList::split("\n", raw);
+#else
+        QStringList split = raw.split("\n", QString::SkipEmptyParts);
+#endif
+        if (!split.isEmpty()) { return split; }
+    }
+    return defaultQuickReplies();
+}
+
+}  // namespace
 
 ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     if (s_autoTranslateArg) { m_autoTranslateEnabled = true; }
@@ -127,27 +160,37 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD
-    QGridLayout* inputGrid = new QGridLayout(2, 3, 2);
+    QGridLayout* inputGrid = new QGridLayout(2, 4, 2);
     inputEdit = new MessageInput(this);
     inputGrid->addMultiCellWidget(inputEdit, 0, 1, 0, 0);
     emojiBtn = new EmojiPushButton(qFromUtf8("😊"), this);
     emojiBtn->setFixedSize(24, 24);
+    qSetToolTip(emojiBtn, _("tooltips.emoji"));
     inputGrid->addWidget(emojiBtn, 0, 1);
     fileBtn = new EmojiPushButton(qFromUtf8("📎"), this);
     fileBtn->setFixedSize(24, 24);
+    qSetToolTip(fileBtn, _("tooltips.file"));
     inputGrid->addWidget(fileBtn, 1, 1);
+    stickerBtn = new EmojiPushButton(qFromUtf8("🧸"), this);
+    stickerBtn->setFixedSize(24, 24);
+    qSetToolTip(stickerBtn, _("tooltips.sticker"));
+    inputGrid->addWidget(stickerBtn, 0, 2);
+    quickReplyBtn = new EmojiPushButton(qFromUtf8("⚡"), this);
+    quickReplyBtn->setFixedSize(24, 24);
+    qSetToolTip(quickReplyBtn, _("tooltips.quickreply"));
+    inputGrid->addWidget(quickReplyBtn, 1, 2);
     sendBtn = new QPushButton(_("buttons.send"), this);
     QFontMetrics fm = inputEdit->fontMetrics();
     int twoLineH = fm.lineSpacing() * 2 + fm.lineSpacing() / 2 + 6;
     inputEdit->setMaximumHeight(twoLineH);
     sendBtn->setFixedSize(twoLineH, twoLineH);
-    inputGrid->addMultiCellWidget(sendBtn, 0, 1, 2, 2);
+    inputGrid->addMultiCellWidget(sendBtn, 0, 1, 3, 3);
     inputGrid->setColStretch(0, 1);
 
     m_sendEnBtn = new QPushButton("Send EN", this);
     m_sendEnBtn->setFixedWidth(60);
     m_sendEnBtn->setFixedHeight(twoLineH);
-    inputGrid->addMultiCellWidget(m_sendEnBtn, 0, 1, 3, 3);
+    inputGrid->addMultiCellWidget(m_sendEnBtn, 0, 1, 4, 4);
 #else
     QGridLayout* inputGrid = new QGridLayout();
     inputGrid->setSpacing(2);
@@ -155,22 +198,32 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     inputGrid->addWidget(inputEdit, 0, 0, 2, 1);
     emojiBtn = new EmojiPushButton(qFromUtf8("😊"), this);
     emojiBtn->setFixedSize(24, 24);
+    qSetToolTip(emojiBtn, _("tooltips.emoji"));
     inputGrid->addWidget(emojiBtn, 0, 1);
     fileBtn = new EmojiPushButton(qFromUtf8("📎"), this);
     fileBtn->setFixedSize(24, 24);
+    qSetToolTip(fileBtn, _("tooltips.file"));
     inputGrid->addWidget(fileBtn, 1, 1);
+    stickerBtn = new EmojiPushButton(qFromUtf8("🧸"), this);
+    stickerBtn->setFixedSize(24, 24);
+    qSetToolTip(stickerBtn, _("tooltips.sticker"));
+    inputGrid->addWidget(stickerBtn, 0, 2);
+    quickReplyBtn = new EmojiPushButton(qFromUtf8("⚡"), this);
+    quickReplyBtn->setFixedSize(24, 24);
+    qSetToolTip(quickReplyBtn, _("tooltips.quickreply"));
+    inputGrid->addWidget(quickReplyBtn, 1, 2);
     sendBtn = new QPushButton(_("buttons.send"), this);
     QFontMetrics fm = inputEdit->fontMetrics();
     int twoLineH = fm.lineSpacing() * 2 + fm.lineSpacing() / 2 + 6;
     inputEdit->setMaximumHeight(twoLineH);
     sendBtn->setFixedSize(twoLineH, twoLineH);
-    inputGrid->addWidget(sendBtn, 0, 2, 2, 1);
+    inputGrid->addWidget(sendBtn, 0, 3, 2, 1);
     inputGrid->setColumnStretch(0, 1);
 
     m_sendEnBtn = new QPushButton("Send EN", this);
     m_sendEnBtn->setFixedWidth(60);
     m_sendEnBtn->setFixedHeight(twoLineH);
-    inputGrid->addWidget(m_sendEnBtn, 0, 3, 2, 1);
+    inputGrid->addWidget(m_sendEnBtn, 0, 4, 2, 1);
 #endif
 
         inputEdit->setPlaceholderText(_("placeholders.type_message"));
@@ -184,6 +237,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(inputEdit, SIGNAL(sendRequested()), this, SLOT(onSendClicked()));
     connect(emojiBtn, SIGNAL(clicked()), this, SLOT(onEmojiClicked()));
     connect(fileBtn, SIGNAL(clicked()), this, SLOT(onFileClicked()));
+    connect(stickerBtn, SIGNAL(clicked()), this, SLOT(onStickerClicked()));
+    connect(quickReplyBtn, SIGNAL(clicked()), this, SLOT(onQuickReplyClicked()));
     connect(inputEdit, SIGNAL(filePasteRequested(const QString&)), this, SLOT(onFilePaste(const QString&)));
     
     mainLayout->addLayout(inputGrid);
@@ -478,6 +533,51 @@ void ChatWidget::onFileClicked() {
 void ChatWidget::onFilePaste(const QString& filePath) {
     if (filePath.isEmpty()) { return; }
     emit fileSendRequested(filePath);
+}
+
+void ChatWidget::onStickerClicked() {
+    if (!m_stickerPicker) {
+        m_stickerPicker = new StickerPicker(this);
+        m_stickerPicker->setStickerDb(Storage::instance().stickerDb());
+    }
+    m_stickerPicker->loadPacks();
+    QPoint btnPos = stickerBtn->mapToGlobal(QPoint(0, 0));
+    int w = m_stickerPicker->width();
+    int h = m_stickerPicker->height();
+    int x = btnPos.x() + stickerBtn->width() - w;
+    int y = btnPos.y() - h;
+    if (y < 0) { y = btnPos.y() + stickerBtn->height(); }
+    m_stickerPicker->showAt(QPoint(x, y));
+}
+
+void ChatWidget::onQuickReplyClicked() {
+    QStringList list = quickReplies();
+    if (list.isEmpty()) { return; }
+#ifdef QT3_BUILD
+    QPopupMenu menu(this);
+    for (int i = 0; i < (int)list.size(); ++i) {
+        menu.insertItem(list[i], i);
+    }
+    int choice = menu.exec(quickReplyBtn->mapToGlobal(QPoint(0, quickReplyBtn->height())));
+    if (choice < 0 || choice >= (int)list.size()) { return; }
+    QString text = list[choice];
+#else
+    QMenu menu(this);
+    for (int i = 0; i < list.size(); ++i) {
+        QAction* act = menu.addAction(list[i]);
+        act->setData(i);
+    }
+    QAction* sel = menu.exec(quickReplyBtn->mapToGlobal(QPoint(0, quickReplyBtn->height())));
+    if (!sel) { return; }
+    QString text = list[sel->data().toInt()];
+#endif
+    inputEdit->clearPlaceholder();
+#ifdef QT3_BUILD
+    inputEdit->insert(text);
+#else
+    inputEdit->insertPlainText(text);
+#endif
+    inputEdit->setFocus();
 }
 
 bool ChatWidget::s_autoTranslateArg = false;
