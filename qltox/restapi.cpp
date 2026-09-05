@@ -265,17 +265,49 @@ int ToxAPI::redactMessage(int chatId, const std::string& type, const std::string
     return 0;
 }
 
+// 可上送的 context key 白名单（扩展新字段时在 map 中 insert 一个 key 即可）
+static const QMap<QString, bool>& ctxAllowedKeys() {
+    static QMap<QString, bool> m;
+    static bool initialized = false;
+    if (!initialized) {
+        m.insert("reply_to",   true);
+        m.insert("mentions",   true);
+        m.insert("visibility", true);
+        initialized = true;
+    }
+    return m;
+}
+
 int ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& message,
                           const std::string& idOverride,
                           const std::string& fileData,
-                          const std::string& filename) {
+                          const std::string& filename,
+                          const QMap<QString,QString>& context) {
     auto* ctx = new ApiCtx(ApiSendMessage, chatId, message, type);
     ctx->sendmsgseq = ++s_sendMsgSeq;
     std::string idStr = idOverride.empty() ? std::to_string(chatId) : idOverride;
 
+    // 遍历核对：白名单 key（ctxAllowedKeys）才上送，未知 key 记日志并忽略
+    std::string extraFields;
+    for (QMap<QString,QString>::const_iterator it = context.begin(); it != context.end(); ++it) {
+        if (!ctxAllowedKeys().contains(it.key())) {
+            qWarning("sendMessage: 忽略未知 context key: %s", qToUtf8(it.key()).data());
+            continue;
+        }
+#ifdef QT3_BUILD
+        const QString v = it.data();
+#else
+        const QString v = it.value();
+#endif
+        if (v.isEmpty()) continue;
+        extraFields += "&" + urlEncode(std::string(qToUtf8(it.key()).data()))
+                     + "=" + urlEncode(std::string(qToUtf8(v).data()));
+    }
+
     if (fileData.empty()) {
         request({"/api/messages/send", "POST",
-                "type=" + type + "&id=" + urlEncode(idStr) + "&message=" + urlEncode(message), 90}, ctx);
+                "type=" + type + "&id=" + urlEncode(idStr)
+                + "&message=" + urlEncode(message) + extraFields, 90}, ctx);
     } else {
         std::string boundary = "----toxhttpd" + std::to_string(time(nullptr));
         std::string body;
@@ -287,6 +319,19 @@ int ToxAPI::sendMessage(int chatId, const std::string& type, const std::string& 
         af("id", idStr);
         af("message", message);
         af("filename", filename);
+        for (QMap<QString,QString>::const_iterator it = context.begin(); it != context.end(); ++it) {
+            if (!ctxAllowedKeys().contains(it.key())) {   // multipart 分支同样走 QMap 核对
+                qWarning("sendMessage: 忽略未知 context key: %s", qToUtf8(it.key()).data());
+                continue;
+            }
+#ifdef QT3_BUILD
+            const QString v = it.data();
+#else
+            const QString v = it.value();
+#endif
+            if (v.isEmpty()) continue;
+            af(std::string(qToUtf8(it.key()).data()), std::string(qToUtf8(v).data()));
+        }
         body += "--" + boundary + "\r\n"
                 "Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n"
                 "Content-Type: application/octet-stream\r\n\r\n";

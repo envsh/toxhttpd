@@ -43,6 +43,7 @@ struct ChatElement {
 
     // Common
     QString senderName;
+    QString senderAddress;   // 服务器可解析的接收者标识（好友=publicKey，matrix=mxid）
     QString senderNickname;
     int     peerNumber;
     QString avatarUrl;
@@ -187,7 +188,7 @@ protected:
 signals:
     void translateClicked(int msgIndex);
     void sourceClicked(int msgIndex);
-    void mentionClicked(const QString& username);
+    void mentionClicked(const QString& username, const QString& address);
     void retryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void downloadNeeded(int msgIndex, const QString& mediaUrl);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);

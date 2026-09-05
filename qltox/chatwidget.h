@@ -2,6 +2,11 @@
 #define CHATWIDGET_H
 
 #include "compat34.h"
+#ifdef QT3_BUILD
+#include <qmap.h>
+#else
+#include <QMap>
+#endif
 #include <qwidget.h>
 #include <qlabel.h>
 #include <qcombobox.h>
@@ -36,7 +41,7 @@ public:
     void setAutoTranslateEnabled(bool enabled) { m_autoTranslateEnabled = enabled; }
     
 signals:
-    void messageSent(const QString& message);
+    void messageSent(const QString& message, const QMap<QString,QString>& context);
     void languageChanged(const QString& langCode);
     void fileSendRequested(const QString& filePath);
     void translateRequested(int msgIndex, const QString& text, const QString& targetLang);
@@ -62,7 +67,7 @@ private slots:
     void onSendEnClicked();
     void onTranslateClicked(int msgIndex);
     void onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
-    void onMentionClicked(const QString& username);
+    void onMentionClicked(const QString& username, const QString& address);
     void onReplyRequested(int msgIndex);
     void onEditRequested(int msgIndex);
     void onDeleteRequested(int msgIndex);
@@ -97,6 +102,13 @@ private:
     EmojiPicker* emojiPicker;
     StickerPicker* m_stickerPicker = nullptr;
     bool m_autoTranslateEnabled = false;
+    // 待发送扩展上下文（key=wire 表单字段名）。key 必须在白名单内：
+    //   reply_to   —— 引用目标（逗号分隔）
+    //   mentions   —— 提及目标（逗号分隔）
+    //   visibility —— 可见性
+    // 必须及时清理：onSendClicked 发送后 clear()；切换会话/清空输入等时机也应 clear()。
+    // 残留的引用/提及会被误带到下一条消息。
+    QMap<QString,QString> m_pendingCtx;
 };
 
 #endif // CHATWIDGET_H

@@ -3378,7 +3378,8 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     } else if (hasNick && choice == copyNickId) {
         QApplication::clipboard()->setText(displayName);
     } else if (hasNick && choice == mentionId) {
-        emit mentionClicked((*m_history)[msgIndex].senderName);
+        emit mentionClicked((*m_history)[msgIndex].senderName,
+                            (*m_history)[msgIndex].senderAddress);
     } else if (hasMsgActions && choice == replyMsgId) {
         emit replyRequested(msgIndex);
     } else if (hasMsgActions && choice == editMsgId) {
@@ -3410,7 +3411,8 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     } else if (chosen == copyNickAction) {
         QApplication::clipboard()->setText(displayName);
     } else if (chosen == mentionAction) {
-        emit mentionClicked((*m_history)[msgIndex].senderName);
+        emit mentionClicked((*m_history)[msgIndex].senderName,
+                            (*m_history)[msgIndex].senderAddress);
     } else if (replyMsgAction && chosen == replyMsgAction) {
         emit replyRequested(msgIndex);
     } else if (editMsgAction && chosen == editMsgAction) {

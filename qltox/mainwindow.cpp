@@ -486,7 +486,8 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onSetConferenceTitleRequested(int)));
     connect(contactListWidget, SIGNAL(inviteToConferenceRequested(int)),
             this, SLOT(onInviteToConferenceRequested(int)));
-    connect(chatWidget, SIGNAL(messageSent(const QString&)), this, SLOT(onMessageSending(const QString&)));
+    connect(chatWidget, SIGNAL(messageSent(const QString&, const QMap<QString,QString>&)),
+            this, SLOT(onMessageSending(const QString&, const QMap<QString,QString>&)));
     connect(chatWidget, SIGNAL(languageChanged(const QString&)), 
             this, SLOT(onLanguageChanged(const QString&)));
     /*
@@ -1448,7 +1449,7 @@ static void handleAichatMessage(const QString&) {}
 static void handlePastebinMessage(const QString&) {}
 static void handleTranslateMessage(const QString&) {}
 
-void MainWindow::onMessageSending(const QString& message) {
+void MainWindow::onMessageSending(const QString& message, const QMap<QString,QString>& context) {
     // ── 统一发送 API ──
     // 注释掉下面这行可切回旧的三条独立端点
 #define USE_UNIFIED_SEND_API
@@ -1499,7 +1500,7 @@ void MainWindow::onMessageSending(const QString& message) {
 #else
         m_msgTimer->start(5000);
 #endif
-        sendmsgseq = ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride);
+        sendmsgseq = ToxAPI::sendMessage(currentChatId, type, std::string(qToUtf8(message)), idOverride, "", "", context);
     }
 #else
     // ✅ 改为异步请求
@@ -1569,6 +1570,10 @@ void MainWindow::handleEvents(const EventList& events) {
                     el.category = "other";
                     el.peerNumber = friendId;
                     el.time = getCurrentTime();
+                    {
+                        auto fit = peerInfoMap.find("friend_" + std::to_string(friendId));
+                        if (fit != peerInfoMap.end()) el.senderAddress = qFromUtf8(fit->second.publicKey);
+                    }
                     m_chatbuf.append(friendId, "friend", el);
                     QString friendTimeStr = timenowhm();
                     bool friendNotCurrent = !(friendId == currentChatId && currentChatType == "friend");
@@ -1684,6 +1689,7 @@ void MainWindow::handleEvents(const EventList& events) {
                             el.senderName = qFromUtf8(it->second.name);
                             if (!it->second.nickname.empty())
                                 el.senderNickname = qFromUtf8(it->second.nickname);
+                            el.senderAddress = qFromUtf8(it->second.publicKey);
                         } else if (peerNameItem && cJSON_IsString(peerNameItem)) {
                             el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
@@ -1799,6 +1805,7 @@ void MainWindow::handleEvents(const EventList& events) {
                             el.ipAddress = qFromUtf8(it->second.peerIp);
                             if (!it->second.nickname.empty())
                                 el.senderNickname = qFromUtf8(it->second.nickname);
+                            el.senderAddress = qFromUtf8(it->second.publicKey);
                         } else if (peerNameItem && cJSON_IsString(peerNameItem)) {
                             el.senderName = qFromUtf8(cJSON_GetStringValue(peerNameItem));
                         }
@@ -2065,6 +2072,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     msg.peerNumber = (int)hm.sender_number;
                     msg.avatarUrl = avatarMxc;
                     msg.messageId = qFromUtf8(hm.eventId);
+                    msg.senderAddress = qFromUtf8(hm.sender_pubkey);
 
                     int chatId = VIRTUAL_REDDIT_ID;
                     std::string chatType = kTopicType;

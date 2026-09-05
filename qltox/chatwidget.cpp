@@ -154,7 +154,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(messageArea, SIGNAL(resendMessage(int)), this, SIGNAL(resendMessage(int)));
     connect(messageArea, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SIGNAL(openFullSizeImage(int, const QString&)));
-    connect(messageArea, SIGNAL(mentionClicked(const QString&)), this, SLOT(onMentionClicked(const QString&)));
+    connect(messageArea, SIGNAL(mentionClicked(const QString&, const QString&)),
+            this, SLOT(onMentionClicked(const QString&, const QString&)));
     connect(messageArea, SIGNAL(autoTranslateRequested(int, const QString&, const QString&)),
             this, SLOT(onAutoTranslateRequested(int, const QString&, const QString&)));
     connect(messageArea, SIGNAL(replyRequested(int)), this, SLOT(onReplyRequested(int)));
@@ -324,7 +325,8 @@ void ChatWidget::onSendClicked() {
     if (msg.isEmpty()) return;
     
     inputEdit->saveToHistory(msg);
-    emit messageSent(msg);
+    emit messageSent(msg, m_pendingCtx);
+    m_pendingCtx.clear();
 #ifdef QT3_BUILD
     inputEdit->selectAll();
     inputEdit->removeSelectedText();
@@ -586,7 +588,25 @@ void ChatWidget::onQuickReplyClicked() {
 
 bool ChatWidget::s_autoTranslateArg = false;
 
-void ChatWidget::onMentionClicked(const QString& username) {
+// 往 ctx 的 key 追加一个 CSV 值（去重）
+static void appendCsvField(QMap<QString,QString>& ctx, const QString& key, const QString& value) {
+    QString cur;
+    QMap<QString,QString>::iterator it = ctx.find(key);
+    if (it != ctx.end()) {
+#ifdef QT3_BUILD
+        cur = it.data();
+#else
+        cur = it.value();
+#endif
+    }
+    QStringList parts = cur.isEmpty() ? QStringList() : qSplit(cur, ",");
+    if (!parts.contains(value)) {
+        parts.append(value);
+        ctx.insert(key, parts.join(","));
+    }
+}
+
+void ChatWidget::onMentionClicked(const QString& username, const QString& address) {
     QString mention = "@" + username + " ";
     inputEdit->clearPlaceholder();
 #ifdef QT3_BUILD
@@ -595,6 +615,7 @@ void ChatWidget::onMentionClicked(const QString& username) {
     inputEdit->insertPlainText(mention);
 #endif
     inputEdit->setFocus();
+    if (!address.isEmpty()) appendCsvField(m_pendingCtx, "mentions", address);
 }
 
 void ChatWidget::onReplyRequested(int msgIndex) {
@@ -606,6 +627,11 @@ void ChatWidget::onReplyRequested(int msgIndex) {
     inputEdit->insertPlainText(">> " + text);
 #endif
     inputEdit->setFocus();
+    ChatElement& target = messageArea->messageAt(msgIndex);   // 仅追加副作用，不改变 >> 行为
+    if (!target.messageId.isEmpty())
+        appendCsvField(m_pendingCtx, "reply_to", target.messageId);
+    if (!target.senderAddress.isEmpty())
+        appendCsvField(m_pendingCtx, "mentions", target.senderAddress);
 }
 
 void ChatWidget::onEditRequested(int msgIndex) {
