@@ -1,6 +1,14 @@
 #include "msgdb_helper.h"
 #include "compat34.h"
 #include "storage.h"
+#include "eventpoller.h"
+#include <qapplication.h>
+
+static QObject* s_rowidTarget = nullptr;
+
+void setRowidEventTarget(QObject* target) {
+    s_rowidTarget = target;
+}
 
 // ── MessageRow → ChatElement ──
 ChatElement msgRowToElement(const MessageRow& row) {
@@ -83,11 +91,23 @@ void db_writeMessage(int id, const std::string& type, const ChatElement& el,
     if (!db) { return; }
     MessageRow row = elementToRow(id, type, el);
     std::string cid = row.chanid;
-    db->insert_message(std::move(row), [cid, cb](int64_t rowid) {
+    std::string evid = row.event_id;
+    QObject* rowidTarget = s_rowidTarget;
+    // 插入完成（WriteQueue 线程）后回填元素 rowid：翻译缓存写库需要 rowid。
+    // postEvent 线程安全，事件在主线程处理；目标为空或元素已不在缓冲内则跳过。
+    db->insert_message(std::move(row), [cid, evid, cb, rowidTarget, id, type](int64_t rowid) {
         if (rowid <= 0) {
             qWarning("msgdb: insert_message failed chanid=%s", cid.c_str());
             return;
         }
         if (cb) { cb(rowid); }
+        if (rowidTarget && !evid.empty()) {
+            RowidBackfillEvent* ev = new RowidBackfillEvent();
+            ev->chatId = id;
+            ev->chatType = type;
+            ev->rowid = rowid;
+            ev->eventId = evid;
+            QApplication::postEvent(rowidTarget, ev);
+        }
     });
 }

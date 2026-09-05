@@ -72,6 +72,8 @@ private:
     QString m_baseHeader;
     void scrollBottomIfNeeded();
     void updateHeaderCount();
+    // 若消息已缓存翻译，直接应用并返回 true（不发网络请求）
+    bool applyCachedTranslation(int msgIndex, const QString& toLang);
     QComboBox* langSelector;
     QComboBox* m_styleSelector;
     QCheckBox* themeCheckBox;

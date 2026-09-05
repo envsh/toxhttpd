@@ -508,6 +508,7 @@ MainWindow::MainWindow(QWidget* parent)
     // 启动事件轮询引擎
     EventPoller::start();
     ToxAPI::setEventTarget(this);
+    setRowidEventTarget(this);
     ToxAPI::startPollEvent();
 
     // 桌面歌词（消息发送/结果提示）
@@ -766,6 +767,22 @@ void MainWindow::customEvent(CustomEventBase* event) {
         if (pix.isNull()) { return; }
         PhotoViewer* pv = new PhotoViewer(this, pix, origData);   // 原始文件字节带入
         pv->show();
+        return;
+    }
+
+    // 数据库插入完成 → 回填内存元素的 rowid（翻译缓存写库需要）
+    if (event->type() == RowidBackfillReadyType) {
+        RowidBackfillEvent* e = static_cast<RowidBackfillEvent*>(event);
+        ChatHistory* h = m_chatbuf.ptr(e->chatId, e->chatType);
+        if (h) {
+            QString evid = qFromUtf8(e->eventId);
+            for (int i = 0; i < h->size(); ++i) {
+                if ((*h)[i].messageId == evid) {
+                    (*h)[i].dbRowid = e->rowid;
+                    break;
+                }
+            }
+        }
         return;
     }
 

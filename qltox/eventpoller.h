@@ -34,6 +34,7 @@ const EventType34 ApiResultReadyType = toEventType34(QEvent::User + 102);
 const EventType34 MediaDownloadReadyType = toEventType34(QEvent::User + 103);
 const EventType34 AvatarDownloadReadyType = toEventType34(QEvent::User + 104);
 const EventType34 DiskLoadReadyType       = toEventType34(QEvent::User + 105);
+const EventType34 RowidBackfillReadyType  = toEventType34(QEvent::User + 106);
 
 // ── API 请求类型 ──
 enum ApiRequestType {
@@ -186,6 +187,15 @@ public:
     std::vector<uint8_t> rawData;
     bool success = false;
     std::string errorInfo;
+};
+
+class RowidBackfillEvent : public CustomEventBase {
+public:
+    RowidBackfillEvent() : CustomEventBase(RowidBackfillReadyType) {}
+    int chatId = 0;
+    std::string chatType;
+    int64_t rowid = 0;
+    std::string eventId;
 };
 
 class SelfInfoResultEvent : public ApiResultEvent {

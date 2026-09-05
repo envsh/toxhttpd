@@ -10,6 +10,7 @@
 #include "chatwidget.h"
 #include "config.h"
 #include "version.h"
+#include "translation_cache.h"
 #include <stdio.h>
 #include <string.h>
 #ifdef __linux__
@@ -36,18 +37,23 @@ int main(int argc, char* argv[]) {
 
     // Parse command line (before QApplication, for Qt3 compat)
     bool autoTranslateArg = false;
+    bool noTranslateCacheArg = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-auto-translate") == 0) {
             autoTranslateArg = true;
+        } else if (strcmp(argv[i], "-no-translate-cache") == 0) {
+            noTranslateCacheArg = true;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("Usage: qltox [options]\n"
                    "Options:\n"
-                   "  -auto-translate    Automatically translate messages\n"
-                   "  -h, --help         Show this help\n");
+                   "  -auto-translate      Automatically translate messages\n"
+                   "  -no-translate-cache  Disable translation cache (default: on)\n"
+                   "  -h, --help           Show this help\n");
             return 0;
         }
     }
     ChatWidget::s_autoTranslateArg = autoTranslateArg;
+    if (noTranslateCacheArg) { setTranslationCacheEnabled(false); }
 
     QApplication app(argc, argv);
 #ifndef QT3_BUILD

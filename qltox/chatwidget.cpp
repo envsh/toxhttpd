@@ -4,6 +4,7 @@
 #include <cassert>
 #include "restapi.h"
 #include "translate_util.h"
+#include "translation_cache.h"
 #ifdef QT3_BUILD
 #include <qtimer.h>
 #else
@@ -343,6 +344,29 @@ void ChatWidget::onTranslateTolangChanged(int index) {
     Config::setValue("translate_tolang", langCodeFromIndex(index));
 }
 
+bool ChatWidget::applyCachedTranslation(int msgIndex, const QString& toLang) {
+    if (toLang.isEmpty() || msgIndex < 0 || msgIndex >= (int)messageArea->messageCount()) {
+        return false;
+    }
+    ChatElement& msg = messageArea->messageAt(msgIndex);
+    if (msg.dbRowid <= 0) { return false; }
+    std::string cached;
+    if (!translationCache()->lookup(msg.dbRowid,
+            std::string(qToUtf8(toLang).data()), cached)
+        || cached.empty()) {
+        return false;
+    }
+    qWarning("ChatWidget: translation cache hit msgIndex=%d rowid=%lld lang=%s",
+             msgIndex, (long long)msg.dbRowid, qToUtf8(toLang).data());
+    msg.transState = TransState::Done;
+    msg.translatedText = qFromUtf8(cached);
+    msg.showTranslation = true;
+    msg.translateError = QString();
+    msg.cachedWidth = -1;  // 强制 updateElement 重算高度
+    messageArea->updateElement(msgIndex);
+    return true;
+}
+
 void ChatWidget::onTranslateClicked(int msgIndex) {
     ChatElement& msg = messageArea->messageAt(msgIndex);
     if (msg.transState == TransState::InFlight) { return; }
@@ -353,6 +377,9 @@ void ChatWidget::onTranslateClicked(int msgIndex) {
         messageArea->updateElement(msgIndex);
         return;
     }
+
+    // 翻译缓存命中：直接显示，不发网络请求
+    if (applyCachedTranslation(msgIndex, Config::value("translate_tolang"))) { return; }
 
     msg.translateError = QString();
     msg.transState = TransState::InFlight;
@@ -371,6 +398,9 @@ void ChatWidget::onAutoTranslateRequested(int msgIndex, const QString& text, con
         return;
     }
 
+    // 翻译缓存命中：直接显示，不发网络请求
+    if (applyCachedTranslation(msgIndex, toLang)) { return; }
+
     qWarning("ChatWidget: auto-translate request msgIndex=%d toLang=%s text=[%.80s]",
              msgIndex, qToUtf8(toLang).data(), qToUtf8(text).data());
     msg.translateError = QString();
@@ -388,6 +418,12 @@ void ChatWidget::onTranslateResult(int msgIndex, bool success, const QString& tr
         msg.showTranslation = true;
         msg.translateError = QString();
         msg.cachedWidth = -1;  // 强制 updateElement 重算高度，否则 cachedWidth==w 时不会展开气泡
+        // 写入翻译缓存（异步、幂等），供下次加载同消息时直接使用
+        if (msg.dbRowid > 0) {
+            translationCache()->save(msg.dbRowid,
+                std::string(qToUtf8(Config::value("translate_tolang")).data()),
+                std::string(qToUtf8(translatedText).data()));
+        }
     } else {
         msg.transState = TransState::Done;
         msg.translateError = errorMessage;
