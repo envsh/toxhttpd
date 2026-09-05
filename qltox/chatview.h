@@ -192,6 +192,10 @@ signals:
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
     void resendMessage(int msgIndex);
     void autoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
+    void replyRequested(int msgIndex);
+    void editRequested(int msgIndex);
+    void deleteRequested(int msgIndex);
+    void redactRequested(int msgIndex);
 
 private slots:
     void onScrollChanged(int value);

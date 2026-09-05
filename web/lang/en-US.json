@@ -189,7 +189,11 @@
     "style.github": "GitHub",
     "context": {
         "copy_message": "Copy Message",
-        "select_all": "Select All"
+        "select_all": "Select All",
+        "reply": "Reply",
+        "edit_message": "Edit message",
+        "delete_message": "Delete message",
+        "redact_message": "Redact message"
     },
     "rename": {
         "title": "Change Group Nick",

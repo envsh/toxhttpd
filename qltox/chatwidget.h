@@ -62,6 +62,10 @@ private slots:
     void onTranslateClicked(int msgIndex);
     void onAutoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
     void onMentionClicked(const QString& username);
+    void onReplyRequested(int msgIndex);
+    void onEditRequested(int msgIndex);
+    void onDeleteRequested(int msgIndex);
+    void onRedactRequested(int msgIndex);
     void hideUnreadBanner();
 
 public slots:

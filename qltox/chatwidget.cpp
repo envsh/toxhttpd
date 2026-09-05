@@ -157,6 +157,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(messageArea, SIGNAL(mentionClicked(const QString&)), this, SLOT(onMentionClicked(const QString&)));
     connect(messageArea, SIGNAL(autoTranslateRequested(int, const QString&, const QString&)),
             this, SLOT(onAutoTranslateRequested(int, const QString&, const QString&)));
+    connect(messageArea, SIGNAL(replyRequested(int)), this, SLOT(onReplyRequested(int)));
+    connect(messageArea, SIGNAL(editRequested(int)), this, SLOT(onEditRequested(int)));
+    connect(messageArea, SIGNAL(deleteRequested(int)), this, SLOT(onDeleteRequested(int)));
+    connect(messageArea, SIGNAL(redactRequested(int)), this, SLOT(onRedactRequested(int)));
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD
@@ -591,4 +595,27 @@ void ChatWidget::onMentionClicked(const QString& username) {
     inputEdit->insertPlainText(mention);
 #endif
     inputEdit->setFocus();
+}
+
+void ChatWidget::onReplyRequested(int msgIndex) {
+    QString text = messageArea->messageAt(msgIndex).messageText;
+    inputEdit->clearPlaceholder();
+#ifdef QT3_BUILD
+    inputEdit->insert(">> " + text);
+#else
+    inputEdit->insertPlainText(">> " + text);
+#endif
+    inputEdit->setFocus();
+}
+
+void ChatWidget::onEditRequested(int msgIndex) {
+    // TODO: 编辑消息（暂未实现）
+}
+
+void ChatWidget::onDeleteRequested(int msgIndex) {
+    // TODO: 删除消息（暂未实现）
+}
+
+void ChatWidget::onRedactRequested(int msgIndex) {
+    // TODO: 撤回消息（暂未实现）
 }

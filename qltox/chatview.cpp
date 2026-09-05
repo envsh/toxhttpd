@@ -3289,6 +3289,15 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         copyNickId = menu.insertItem(qFromUtf8("复制昵称"));
         mentionId = menu.insertItem(qFromUtf8("@ TA"));
     }
+    bool hasMsgActions = (msgIndex >= 0 && msgIndex < (int)m_history->size());
+    int replyMsgId = 0, editMsgId = 0, deleteMsgId = 0, redactMsgId = 0;
+    if (hasMsgActions) {
+        replyMsgId = menu.insertItem(_("context.reply"));
+        editMsgId = menu.insertItem(_("context.edit_message"));
+        menu.insertSeparator();
+        deleteMsgId = menu.insertItem(_("context.delete_message"));
+        redactMsgId = menu.insertItem(_("context.redact_message"));
+    }
 #else
     QAction* copyMsgAction = menu.addAction(_("context.copy_message"));
     QAction* showRawAction = msgIndex >= 0 ? menu.addAction(qFromUtf8("查看原始数据")) : nullptr;
@@ -3305,6 +3314,17 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     if (onName) {
         copyNickAction = menu.addAction(qFromUtf8("复制昵称"));
         mentionAction = menu.addAction(qFromUtf8("@ TA"));
+    }
+    QAction* replyMsgAction = nullptr;
+    QAction* editMsgAction = nullptr;
+    QAction* deleteMsgAction = nullptr;
+    QAction* redactMsgAction = nullptr;
+    if (msgIndex >= 0 && msgIndex < (int)m_history->size()) {
+        replyMsgAction = menu.addAction(_("context.reply"));
+        editMsgAction = menu.addAction(_("context.edit_message"));
+        menu.addSeparator();
+        deleteMsgAction = menu.addAction(_("context.delete_message"));
+        redactMsgAction = menu.addAction(_("context.redact_message"));
     }
 #endif
 #ifdef QT3_BUILD
@@ -3331,6 +3351,14 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         QApplication::clipboard()->setText(displayName);
     } else if (hasNick && choice == mentionId) {
         emit mentionClicked((*m_history)[msgIndex].senderName);
+    } else if (hasMsgActions && choice == replyMsgId) {
+        emit replyRequested(msgIndex);
+    } else if (hasMsgActions && choice == editMsgId) {
+        emit editRequested(msgIndex);
+    } else if (hasMsgActions && choice == deleteMsgId) {
+        emit deleteRequested(msgIndex);
+    } else if (hasMsgActions && choice == redactMsgId) {
+        emit redactRequested(msgIndex);
     }
 #else
     QAction* chosen = menu.exec(event->globalPos());
@@ -3355,6 +3383,14 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         QApplication::clipboard()->setText(displayName);
     } else if (chosen == mentionAction) {
         emit mentionClicked((*m_history)[msgIndex].senderName);
+    } else if (replyMsgAction && chosen == replyMsgAction) {
+        emit replyRequested(msgIndex);
+    } else if (editMsgAction && chosen == editMsgAction) {
+        emit editRequested(msgIndex);
+    } else if (deleteMsgAction && chosen == deleteMsgAction) {
+        emit deleteRequested(msgIndex);
+    } else if (redactMsgAction && chosen == redactMsgAction) {
+        emit redactRequested(msgIndex);
     }
 #endif
 }

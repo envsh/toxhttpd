@@ -199,7 +199,11 @@
     "style.github": "GitHub",
     "context": {
         "copy_message": "複製訊息",
-        "select_all": "全選"
+        "select_all": "全選",
+        "reply": "回覆",
+        "edit_message": "編輯訊息",
+        "delete_message": "刪除訊息",
+        "redact_message": "撤回訊息"
     },
     "rename": {
         "title": "修改群組暱稱",

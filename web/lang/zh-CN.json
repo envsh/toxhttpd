@@ -130,6 +130,12 @@
     "save_failed": "保存失败",
     "connecting_network": "正在连接网络...",
     "connect_failed": "连接失败",
+    "context": {
+        "reply": "回复",
+        "edit_message": "编辑消息",
+        "delete_message": "删除消息",
+        "redact_message": "撤回消息"
+    },
     "context_menu": {
         "view_info": "查看信息",
         "pin": "置顶",
