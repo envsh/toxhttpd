@@ -114,7 +114,7 @@
     },
     "friend_label": "Friend {0}",
     "select_chat_first": "Please select chat first",
-    "send_failed": "Send to %1 failed (%2)",
+    "send_failed": "Send to %1 failed (%2) %3",
     "send_success": "Sent to %1 (%2)",
     "redacting_message": "Redacting...",
     "redact_failed": "Redact failed (%1)",

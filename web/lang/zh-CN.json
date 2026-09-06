@@ -114,7 +114,7 @@
     },
     "friend_label": "好友 {0}",
     "select_chat_first": "请先选择聊天对象",
-    "send_failed": "发送给 %1 失败（%2）",
+    "send_failed": "发送给 %1 失败（%2）%3",
     "send_success": "已发送给 %1（%2）",
     "redacting_message": "撤回中...",
     "redact_failed": "撤回失败（%1）",

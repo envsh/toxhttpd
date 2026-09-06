@@ -935,12 +935,25 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->elapsedMs = resp.elapsedMs;
         ev->success = (resp.httpCode == 200 && !resp.body.empty());
         if (!ev->success) {
-            if (!resp.curlErrStr.empty())
+            if (!resp.curlErrStr.empty()) {
                 ev->errorMessage = resp.curlErrStr;
-            else if (resp.httpCode != 200)
-                ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
-            else
-                ev->errorMessage = "unknown error";
+            } else {
+                std::string serverErr;
+                cJSON* r = cJSON_Parse(resp.body.c_str());
+                if (r) {
+                    cJSON* e = cJSON_GetObjectItem(r, "error");
+                    if (e && cJSON_IsString(e))
+                        serverErr = cJSON_GetStringValue(e);
+                    cJSON_Delete(r);
+                }
+                if (!serverErr.empty())
+                    ev->errorMessage = "HTTP " + std::to_string(resp.httpCode)
+                                       + ": " + serverErr;
+                else if (resp.httpCode != 200)
+                    ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
+                else
+                    ev->errorMessage = "unknown error";
+            }
         } else if (!resp.body.empty()) {
             cJSON* root = cJSON_Parse(resp.body.c_str());
             if (root) {

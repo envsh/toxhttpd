@@ -106,7 +106,7 @@
     "select_chat_first": "請先選擇聊天對象",
     "redacting_message": "撤回中...",
     "redact_failed": "撤回失敗（%1）",
-    "send_failed": "傳送失敗",
+    "send_failed": "傳送給 %1 失敗（%2）%3",
     "add_friend_prompt": "請輸入有效的公鑰 (64字元) 或地址 (76字元)",
     "add_friend_success": "新增成功！",
     "add_friend_failed": "新增失敗",

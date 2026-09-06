@@ -1063,7 +1063,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 }
             }
             if (!evt->success) {
-                ToastWidget::show(chatWidget, _("send_failed").arg(targetName).arg(formatElapsedMs(evt->elapsedMs)), 8000);
+                ToastWidget::show(chatWidget, _("send_failed").arg(targetName)
+                .arg(formatElapsedMs(evt->elapsedMs)).arg(qFromUtf8(evt->errorMessage)), 8000);
                 m_lyrics->setPlayedColor(QColor(0xFF,0x44,0x44));
                 m_lyrics->setLrcText(qFromUtf8("[00:00.000]发送失败"));
                 m_lyrics->setPosition(0);   // setLrcText 只装载不定位，需显式定位首行才渲染
