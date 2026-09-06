@@ -53,11 +53,11 @@ uint64_t qCrc64Str(const QString& s)
 #ifdef QT3_BUILD
     QCString bytes = s.utf8();
     return qcrc64(reinterpret_cast<const uint8_t*>(bytes.data()),
-                  bytes.length(), ~static_cast<qcrc64_t>(0));
+                  bytes.length(), static_cast<qcrc64_t>(0));
 #else
     const QByteArray bytes = s.toUtf8();
     return qcrc64(reinterpret_cast<const uint8_t*>(bytes.constData()),
-                  size_t(bytes.size()), ~static_cast<qcrc64_t>(0));
+                  size_t(bytes.size()), static_cast<qcrc64_t>(0));
 #endif
 }
 
@@ -71,7 +71,7 @@ uint64_t qCrc64File(const QString& path)
 #endif
         return 0;
 
-    qcrc64_t crc = ~static_cast<qcrc64_t>(0);
+    qcrc64_t crc = static_cast<qcrc64_t>(0);
     char buf[65536];
     while (!f.atEnd()) {
 #ifdef QT3_BUILD

@@ -236,24 +236,7 @@ bool qIsAppActive(const QWidget* widget) {
 }
 
 // ========== URL 打开兼容 ==========
-#ifdef QT3_BUILD
-#include <stdlib.h>
-void qOpenUrl(const QString& url) {
-#if defined(Q_OS_WIN32)
-    system(QString("cmd /c start \"\" \"" + url + "\"").local8Bit().data());
-#elif defined(Q_OS_MACX)
-    system(QString("open \"" + url + "\"").local8Bit().data());
-#else
-    system(QString("xdg-open '" + url + "'").local8Bit().data());
-#endif
-}
-#else
-#include <QDesktopServices>
-#include <QUrl>
-void qOpenUrl(const QString& url) {
-    QDesktopServices::openUrl(QUrl(url));
-}
-#endif
+// qOpenUrl 实现见 compatcore34.cpp（兼容到 kBuiltinSources / 跨项目复用）
 
 #ifdef QT3_BUILD
 namespace {

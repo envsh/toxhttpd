@@ -61,6 +61,9 @@ QString qFormatISO8601(const QString& iso8601Str);
 QString qFmtTime(uint timestamp);
 QString getCurrentTime();
 
+// 系统打开 URL（非 QT3: QDesktopServices::openUrl；QT3: 平台 shell 命令）
+void qOpenUrl(const QString& url);
+
 // ========== QPtrList 兼容（Qt4 模拟） ==========
 #ifndef QT3_BUILD
 template<typename T>

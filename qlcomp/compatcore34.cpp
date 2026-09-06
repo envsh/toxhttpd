@@ -347,3 +347,22 @@ QString qToUnicode(const QByteArray& data, const char* codecName) {
 }
 
 #endif
+
+// ========== URL 打开兼容 ==========
+#ifdef QT3_BUILD
+void qOpenUrl(const QString& url) {
+#if defined(Q_OS_WIN32)
+    system(QString("cmd /c start \"\" \"" + url + "\"").local8Bit().data());
+#elif defined(Q_OS_MACX)
+    system(QString("open \"" + url + "\"").local8Bit().data());
+#else
+    system(QString("xdg-open '" + url + "'").local8Bit().data());
+#endif
+}
+#else
+#include <QDesktopServices>
+#include <QUrl>
+void qOpenUrl(const QString& url) {
+    QDesktopServices::openUrl(QUrl(url));
+}
+#endif

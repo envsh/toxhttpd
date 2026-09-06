@@ -78,8 +78,6 @@ typedef QScrollArea ScrollArea;
 // ========== 活动窗口检测 ==========
 bool qIsAppActive(const QWidget* widget = 0);
 
-void qOpenUrl(const QString& url);
-
 void showTempTooltip(QWidget* parent, const QRect& btnRect, const QString& text, int timeoutMs = 3000);
 
 void qActivateWindow(QWidget* w);
