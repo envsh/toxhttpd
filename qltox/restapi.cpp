@@ -24,6 +24,43 @@ static SeenUnknown s_seenUnknown;
 
 // ── Helpers ──
 
+// ── REST 响应错误提取 ──
+// 优先 curl 错误；其次按候选 key 循环解析服务器错误字段，字符串直接取，
+// 对象（如 {"error":{message,detail}}）下钻内部 message/detail；HTTP 码始终保留。
+static std::string extractRespError(const HttpResponse& resp) {
+    if (!resp.curlErrStr.empty())
+        return resp.curlErrStr;
+    std::string serverErr;
+    cJSON* r = cJSON_Parse(resp.body.c_str());
+    if (r) {
+        static const char* kErrorKeys[] = {
+            "error", "errmsg", "errMsg", "message", "detail", "title", "msg"
+        };
+        for (size_t i = 0; i < sizeof(kErrorKeys) / sizeof(kErrorKeys[0]) && serverErr.empty(); i++) {
+            cJSON* e = cJSON_GetObjectItem(r, kErrorKeys[i]);
+            if (!e) { continue; }
+            if (cJSON_IsString(e)) {
+                serverErr = cJSON_GetStringValue(e);
+            } else if (cJSON_IsObject(e)) {
+                cJSON* sub = cJSON_GetObjectItem(e, "message");
+                if (sub && cJSON_IsString(sub)) {
+                    serverErr = cJSON_GetStringValue(sub);
+                } else {
+                    sub = cJSON_GetObjectItem(e, "detail");
+                    if (sub && cJSON_IsString(sub))
+                        serverErr = cJSON_GetStringValue(sub);
+                }
+            }
+        }
+        cJSON_Delete(r);
+    }
+    if (!serverErr.empty())
+        return "HTTP " + std::to_string(resp.httpCode) + ": " + serverErr;
+    if (resp.httpCode != 200)
+        return "HTTP " + std::to_string(resp.httpCode);
+    return "unknown error";
+}
+
 static std::string jsonStr(cJSON* item) {
     return (item && cJSON_IsString(item)) ? std::string(cJSON_GetStringValue(item)) : "";
 }
@@ -935,25 +972,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->elapsedMs = resp.elapsedMs;
         ev->success = (resp.httpCode == 200 && !resp.body.empty());
         if (!ev->success) {
-            if (!resp.curlErrStr.empty()) {
-                ev->errorMessage = resp.curlErrStr;
-            } else {
-                std::string serverErr;
-                cJSON* r = cJSON_Parse(resp.body.c_str());
-                if (r) {
-                    cJSON* e = cJSON_GetObjectItem(r, "error");
-                    if (e && cJSON_IsString(e))
-                        serverErr = cJSON_GetStringValue(e);
-                    cJSON_Delete(r);
-                }
-                if (!serverErr.empty())
-                    ev->errorMessage = "HTTP " + std::to_string(resp.httpCode)
-                                       + ": " + serverErr;
-                else if (resp.httpCode != 200)
-                    ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
-                else
-                    ev->errorMessage = "unknown error";
-            }
+            ev->errorMessage = extractRespError(resp);
         } else if (!resp.body.empty()) {
             cJSON* root = cJSON_Parse(resp.body.c_str());
             if (root) {
@@ -984,12 +1003,7 @@ void ToxAPI::dispatchResult(ApiCtx* ctx, const HttpResponse& resp) {
         ev->elapsedMs = resp.elapsedMs;
         ev->success = (resp.httpCode == 200);
         if (!ev->success) {
-            if (!resp.curlErrStr.empty())
-                ev->errorMessage = resp.curlErrStr;
-            else if (resp.httpCode != 200)
-                ev->errorMessage = "HTTP " + std::to_string(resp.httpCode);
-            else
-                ev->errorMessage = "unknown error";
+            ev->errorMessage = extractRespError(resp);
         }
         ev->chatId = ctx->id;
         ev->messageId = ctx->str1;
