@@ -794,7 +794,7 @@ bool init_message_db(SqliteDb& db) {
         "  tokenize='trigram case_sensitive 0',"
         "  content='messages',"
         "  content_rowid='rowid')")) {
-        qWarning("Trigram not available, falling back to unicode61");
+        qWarning("Trigram not available (需 SQLite >= 3.34.0), 消息搜索回退到 unicode61");
         if (!db.tryExec(
             "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5("
             "  content,"
@@ -802,7 +802,11 @@ bool init_message_db(SqliteDb& db) {
             "  content='messages',"
             "  content_rowid='rowid')")) {
             qWarning("FTS5 not available, message search disabled");
+        } else {
+            qWarning("Message search: unicode61 (CJK 子串匹配降级, trigram 不可用)");
         }
+    } else {
+        qDebug("Message search: trigram");
     }
 
     db.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_insert"

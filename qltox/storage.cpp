@@ -384,7 +384,13 @@ bool Storage::initAsyncDomains() {
 
 void Storage::checkFeatures() {
     m_sqliteVersion = sqlite3_libversion();
-    qDebug("SQLite version: %s", m_sqliteVersion.c_str());
+    const int vnum  = sqlite3_libversion_number();
+    const int vMaj  = vnum / 1000000;
+    const int vMin  = (vnum / 1000) % 1000;
+    const int vPat  = vnum % 1000;
+    const bool trigramCapable = (vMaj > 3 || (vMaj == 3 && vMin >= 34));
+    qDebug("SQLite version: %s%s", m_sqliteVersion.c_str(),
+           trigramCapable ? "" : " (trigram 需要 SQLite >= 3.34.0)");
 
     m_hasFts5 = m_msgDb.tryExec(
         "CREATE VIRTUAL TABLE IF NOT EXISTS _t_fts5 USING fts5(c)");
@@ -394,7 +400,12 @@ void Storage::checkFeatures() {
     m_hasTrigram = m_msgDb.tryExec(
         "CREATE VIRTUAL TABLE IF NOT EXISTS _t_tri USING fts5(c, tokenize='trigram')");
     m_msgDb.exec("DROP TABLE IF EXISTS _t_tri");
-    qDebug("Trigram: %s", m_hasTrigram ? "OK" : "NOT AVAILABLE (CJK search degraded)");
+    if (m_hasTrigram) {
+        qDebug("Trigram: OK (CJK 子串搜索启用)");
+    } else {
+        qDebug("Trigram: NOT AVAILABLE (需 SQLite >= 3.34.0, 当前 %d.%d.%d; CJK 搜索降级为 unicode61)",
+               vMaj, vMin, vPat);
+    }
 }
 
 // ── 域类 accessors ──
