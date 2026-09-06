@@ -3011,7 +3011,8 @@ void MainWindow::onRequestRedactMessage(int msgIndex) {
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
     if (currentChatId == -1 || currentChatType.isEmpty()) { return; }
     const ChatElement& el = chatWidget->messageAt(msgIndex);
-    if (el.category != "self" || el.messageId.isEmpty()) { return; }
+    // TEMP(临时): 全放开，回滚时取消注释。
+    // if (el.category != "self" || el.messageId.isEmpty()) { return; }
     std::string type = std::string(qToUtf8(currentChatType).data());
     std::string msgId = std::string(qToUtf8(el.messageId).data());
     chatWidget->loadingBar()->showLoading(kLoadRedactMsg, _("redacting_message"));

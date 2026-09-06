@@ -3289,6 +3289,8 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     bool canRedact = (msgIndex >= 0 && msgIndex < (int)m_history->size()
                       && (*m_history)[msgIndex].category == "self"
                       && !(*m_history)[msgIndex].messageId.isEmpty());
+    // TEMP(临时): 所有消息均显示"撤回"。回滚时删除下面这行即可恢复原检测。
+    canRedact = true;
     // Copy full message
 #ifdef QT3_BUILD
     // Qt3 QMenuData::insertItem() 自动生成的 ID 是负数（-1, -2, ...），

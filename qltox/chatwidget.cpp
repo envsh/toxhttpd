@@ -823,7 +823,8 @@ void ChatWidget::onDeleteRequested(int msgIndex) {
 
 void ChatWidget::onRedactRequested(int msgIndex) {
     if (msgIndex < 0 || msgIndex >= messageCount()) { return; }
-    const ChatElement& el = messageArea->messageAt(msgIndex);
-    if (el.category != "self" || el.messageId.isEmpty()) { return; }
+    // TEMP(临时): 全放开点击，回滚时取消注释。
+    // const ChatElement& el = messageArea->messageAt(msgIndex);
+    // if (el.category != "self" || el.messageId.isEmpty()) { return; }
     emit requestRedactMessage(msgIndex);
 }
