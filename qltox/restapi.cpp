@@ -294,10 +294,13 @@ int ToxAPI::sendGroupMessage(int groupId, const std::string& message) {
     return ctx->sendmsgseq;
 }
 
-int ToxAPI::redactMessage(int chatId, const std::string& type, const std::string& messageId) {
+int ToxAPI::redactMessage(int chatId, const std::string& type, const std::string& messageId,
+                          const std::string& idOverride) {
+    std::string idStr = idOverride.empty() ? std::to_string(chatId) : idOverride;
+    ALOG_INFO("redact request >>", "type=", type, "id=", idStr, "message_id=", messageId);
     auto* ctx = new ApiCtx(ApiRedactMessage, chatId, messageId, type);
     request({"/api/messages/redact", "POST",
-            "type=" + type + "&id=" + std::to_string(chatId)
+            "type=" + type + "&id=" + urlEncode(idStr)
             + "&message_id=" + urlEncode(messageId), 90}, ctx);
     return 0;
 }

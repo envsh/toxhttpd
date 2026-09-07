@@ -1118,6 +1118,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
                     upd.redacted = 1;
                     Storage::instance().messageDbAsync()->update_message(dbRowid, upd, [](bool){});
                 }
+                ToastWidget::show(chatWidget, _("redact_success").arg(formatElapsedMs(evt->elapsedMs)), 2500);
             } else {
                 ToastWidget::show(chatWidget, _("redact_failed").arg(qFromUtf8(evt->errorMessage)), 4000);
             }
@@ -3015,8 +3016,20 @@ void MainWindow::onRequestRedactMessage(int msgIndex) {
     // if (el.category != "self" || el.messageId.isEmpty()) { return; }
     std::string type = std::string(qToUtf8(currentChatType).data());
     std::string msgId = std::string(qToUtf8(el.messageId).data());
+    // 虚拟类型使用 chatId 字符串（如 gomuks room ID）而非 numeric contactId
+    std::string idOverride;
+    if (type == kGomuksRoomType || type == kUnktoxConferenceType
+        || type == kUnktoxFriendType || type == kUnktoxGroupType
+        || type == kMisskeyType || type == kImapMailType) {
+        for (const auto& cd : m_accumulatedContactData) {
+            if (cd.id == currentChatId && cd.type == type) {
+                idOverride = cd.chatId;
+                break;
+            }
+        }
+    }
     chatWidget->loadingBar()->showLoading(kLoadRedactMsg, _("redacting_message"));
-    ToxAPI::redactMessage(currentChatId, type, msgId);
+    ToxAPI::redactMessage(currentChatId, type, msgId, idOverride);
 }
 
 void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {

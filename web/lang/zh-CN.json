@@ -117,6 +117,7 @@
     "send_failed": "发送给 %1 失败（%2）%3",
     "send_success": "已发送给 %1（%2）",
     "redacting_message": "撤回中...",
+    "redact_success": "撤回成功（%1）",
     "redact_failed": "撤回失败（%1）",
     "add_friend_prompt": "请输入有效的公钥 (64字符) 或地址 (76字符)",
     "add_friend_success": "添加成功！",
