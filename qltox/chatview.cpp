@@ -612,7 +612,8 @@ int ChatElement::calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, c
     if (redacted) {
         ChatElement tmp = *this;
         tmp.etype = Text;
-        tmp.messageText = _("context.msg_redacted");
+        tmp.redacted = false;                     // 防递归
+        tmp.messageText = qFromUtf8("🗑 ") + _("context.msg_redacted") + qFromUtf8("：") + messageText;
         tmp.showTranslation = false;
         tmp.caption = QString();
         tmp.mediaUrl = QString();
@@ -892,7 +893,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
     if (redacted) {
         ChatElement tmp = *this;
         tmp.etype = Text;
-        tmp.messageText = _("context.msg_redacted");
+        tmp.redacted = false;                     // 防递归
+        tmp.messageText = qFromUtf8("🗑 ") + _("context.msg_redacted") + qFromUtf8("：") + messageText;
         tmp.showTranslation = false;
         tmp.caption = QString();
         tmp.mediaUrl = QString();
@@ -2817,6 +2819,8 @@ void ChatView::showRawData(int msgIndex) {
         default:                       sendStr = "?";           break;
     }
     QString text;
+    text += QString("dbRowid:        %1\n").arg(qFromUtf8(std::to_string((long long)el.dbRowid).c_str()));
+    text += QString("redacted:       %1\n").arg(el.redacted ? "true" : "false");
     text += QString("etype:          %1\n").arg(etypeStr);
     text += QString("senderName:     %1\n").arg(el.senderName);
     text += QString("senderNickname: %1\n").arg(el.senderNickname);

@@ -188,13 +188,13 @@ public:
         row->thumbnail_key  = stmt.columnText(i++);
         row->cache_tag      = stmt.columnInt(i++);
         row->send_state     = stmt.columnInt(i++);
-        row->reply_to_rowid = stmt.columnInt64(i++);
+row->reply_to_rowid = stmt.columnInt64(i++);
         row->edited         = stmt.columnInt(i++);
-        row->redacted       = stmt.columnInt(i++);
         row->forwarded_from = stmt.columnText(i++);
         row->mention        = stmt.columnInt(i++);
         row->reply_to_ids   = stmt.columnText(i++);
         row->mentions_text  = stmt.columnText(i++);
+        row->redacted       = stmt.columnInt(i++);
         return row;
     }
 
@@ -482,11 +482,11 @@ private:
         row.send_state     = stmt.columnInt(i++);
         row.reply_to_rowid = stmt.columnInt64(i++);
         row.edited         = stmt.columnInt(i++);
-        row.redacted       = stmt.columnInt(i++);
         row.forwarded_from = stmt.columnText(i++);
         row.mention        = stmt.columnInt(i++);
         row.reply_to_ids   = stmt.columnText(i++);
         row.mentions_text  = stmt.columnText(i++);
+        row.redacted       = stmt.columnInt(i++);
         return row;
     }
 };

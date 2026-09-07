@@ -37,6 +37,7 @@
 - ChatView scroll multiplier: `wheelEvent` uses `step * N`, adjusted for feel (currently `*5`).
 - **C++ 代码不要抛出异常，也不要 try-catch**。Qt3 编译环境可能未启用异常支持，且项目风格不依赖异常处理。所有错误通过返回值或结构体（如 `TranslateApiResult`）传递。
 - **emoji 不要使用 `\x` 转义格式**（如 `"\xF0\x9F\x93\x8B"`），直接用原始 UTF-8 字符（如 `"📋"`）。源代码文件本身是 UTF-8 编码，字符串字面量中的 emoji 自然包含正确字节序列。
+- **CJK/emoji 字符串字面量必须用 `qFromUtf8()` 包装**：禁止裸 `QString("）")` 这类直构（含 `+ "："` 拼接、`QString("🗑 ")` 等）。`QString(const char*)` 在 Qt3/Qt4 默认按 Latin-1 逐字节解码，UTF-8 多字节字面量会乱码（如撤回前缀 🗑、全角"："）。统一写 `qFromUtf8("中文")` / `qFromUtf8("🗑 ")`。仅纯 ASCII 字面量可裸用（`QString(",")`、`" "` 等）。
 - **Brace all control bodies**: `if`/`for`/`while` 必须使用 `{}`，禁止 `if (cond) stmt;` 或换行无括号形式。
 - **构建顺序**：先 `buildqt3.sh`、再 `buildqt4.sh`，**不要并行编译**（同一 .o 目录会冲突）。
 

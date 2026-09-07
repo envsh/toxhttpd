@@ -1099,24 +1099,28 @@ void MainWindow::customEvent(CustomEventBase* event) {
                 int64_t dbRowid = 0;
                 for (int i = chatWidget->messageCount() - 1; i >= 0; i--) {
                     ChatElement& el = chatWidget->mutableMessageAt(i);
-                    if (el.category == "self" && el.messageId == qFromUtf8(evt->messageId)) {
-                        el.redacted = true;
-                        el.messageText = _("context.msg_redacted");
-                        el.caption = QString();
-                        el.mediaUrl = QString();
-                        el.fileName = QString();
-                        el.showTranslation = false;
-                        dbRowid = el.dbRowid;
-                        break;
-                    }
+                    if (el.messageId != qFromUtf8(evt->messageId)) { continue; }
+                    el.redacted = true;
+                    el.caption = QString();
+                    el.mediaUrl = QString();
+                    el.fileName = QString();
+                    el.showTranslation = false;
+                    if (el.dbRowid > 0 && dbRowid == 0) { dbRowid = el.dbRowid; }
                 }
                 chatWidget->relayout();
                 chatWidget->repaintMessages();
                 if (dbRowid > 0) {
+                    qDebug("redact: 更新 DB rowid=%lld messageId=%s chatId=%d chatType=%s",
+                           (long long)dbRowid, evt->messageId.c_str(), evt->chatId,
+                           qFromUtf8(evt->chatType).data());
                     MessageUpdate upd;
                     upd.hasRedacted = true;
                     upd.redacted = 1;
                     Storage::instance().messageDbAsync()->update_message(dbRowid, upd, [](bool){});
+                } else {
+                    qWarning("redact: 无已回填 rowid，跳过 DB 更新 msgId=%s chatId=%d chatType=%s",
+                             evt->messageId.c_str(), evt->chatId,
+                             qFromUtf8(evt->chatType).data());
                 }
                 ToastWidget::show(chatWidget, _("redact_success").arg(formatElapsedMs(evt->elapsedMs)), 2500);
             } else {
