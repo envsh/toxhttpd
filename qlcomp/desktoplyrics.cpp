@@ -21,6 +21,9 @@
 #include <QPainterPath>
 #endif
 
+static const int kLyricsBorder = 2;
+static bool gLyricsBorderEnabled = false;
+
 static void lrcTrim(QString& s)
 {
     if (s.isEmpty()) return;
@@ -565,6 +568,11 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
 #ifdef QT3_BUILD
             p.setPen(QColor(0x88, 0x88, 0x88));
             p.drawText(bgR, Qt::AlignCenter, msg);
+            if (gLyricsBorderEnabled) {
+                p.setPen(QPen(m_playedColor, kLyricsBorder));
+                p.setBrush(Qt::NoBrush);
+                p.drawRoundRect(QRect(0, 0, width() - 1, height() - 1), 6, 6);
+            }
             {
                 QBitmap bm(size());
                 bm.fill(Qt::color0);
@@ -577,6 +585,11 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
                                  bgR.width(), bgR.height());
                         bp.drawText(r2, Qt::AlignCenter, msg);
                     }
+                if (gLyricsBorderEnabled) {
+                    bp.setPen(QPen(Qt::color1, kLyricsBorder));
+                    bp.setBrush(Qt::NoBrush);
+                    bp.drawRoundRect(0, 0, width() - 1, height() - 1, 6, 6);
+                }
                 bp.end();
                 Pixmap xm = (Pixmap)bm.handle();
                 XShapeCombineMask(QPaintDevice::x11Display(), winId(),
@@ -591,6 +604,14 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
             p.fillPath(path, QColor(0, 0, 0, 180));
             p.setPen(QColor(0x88, 0x88, 0x88));
             p.drawText(bgR, Qt::AlignCenter, msg);
+            if (gLyricsBorderEnabled) {
+                p.save();
+                p.setPen(QPen(QColor(m_playedColor.red(), m_playedColor.green(),
+                                     m_playedColor.blue(), 110), kLyricsBorder));
+                p.setBrush(Qt::NoBrush);
+                p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 6, 6);
+                p.restore();
+            }
 #endif
         } else {
             p.setPen(QColor(0x88, 0x88, 0x88));
@@ -636,6 +657,22 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
         int nextY = height() * 3 / 4 + fh / 2;
         recordText(nextX, nextY - fm.ascent(), nextTextWidth, fh);
         drawTextWithStroke(p, nextText, nextX, nextY, m_unplayedColor);
+    }
+
+    // 透明模式：沿窗口边缘画 2px 圆角边框（Qt3 同时并入掩码，Qt4 直接画）
+    if (m_transparentBg && gLyricsBorderEnabled) {
+#ifdef QT3_BUILD
+        p.setPen(QPen(m_playedColor, kLyricsBorder));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundRect(QRect(0, 0, width() - 1, height() - 1), 6, 6);
+#else
+        p.save();
+        p.setPen(QPen(QColor(m_playedColor.red(), m_playedColor.green(),
+                             m_playedColor.blue(), 110), kLyricsBorder));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 6, 6);
+        p.restore();
+#endif
     }
 
     // Background rect behind text (Qt4 only, opaque mode)
@@ -699,6 +736,11 @@ void DesktopLyrics::paintEvent(QPaintEvent*)
             if (nx < 4) nx = 4;
             int ny = height() * 3 / 4 + fh2 / 2;
             maskAll(nx, ny, nt);
+        }
+        if (m_transparentBg && gLyricsBorderEnabled) {
+            bp.setPen(QPen(Qt::color1, kLyricsBorder));
+            bp.setBrush(Qt::NoBrush);
+            bp.drawRoundRect(0, 0, width() - 1, height() - 1, 6, 6);
         }
     }
     Pixmap xm = (Pixmap)bm.handle();

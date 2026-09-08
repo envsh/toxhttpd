@@ -153,6 +153,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
         {
             QHBoxLayout* rl = new QHBoxLayout(m_replyRow);
             rl->setSpacing(4);
+            qSetMargins(rl, 0, 0, 16, 0);      // 把 × 移离最右缘 ~16px，避开右缘覆盖条带
             m_replyStrip = new QLabel(m_replyRow);
             m_replySnippet = new QLabel(m_replyRow);
             m_replyCloseBtn = new QPushButton(qFromUtf8("×"), m_replyRow);
@@ -160,7 +161,10 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
             rl->addWidget(m_replyStrip);
             rl->addWidget(m_replySnippet, 1);
             rl->addWidget(m_replyCloseBtn);
-            connect(m_replyCloseBtn, SIGNAL(clicked()), this, SLOT(onReplyStripClose()));
+            {
+                bool ok = connect(m_replyCloseBtn, SIGNAL(clicked()), this, SLOT(onReplyStripClose()));
+                qWarning("DIA replyClose connect ok=%d", (int)ok);
+            }
         }
         m_replyRow->hide();
 
@@ -742,9 +746,14 @@ void ChatWidget::onReplyRequested(int msgIndex) {
         appendCsvField(m_pendingCtx, "mentions", target.senderName);
     m_replyMentionedName = target.senderName;
     updateReplyStrip();
+    qWarning("DIA btn geo=%d,%d %dx%d rowVis=%d ctxVis=%d",
+             m_replyCloseBtn->x(), m_replyCloseBtn->y(),
+             m_replyCloseBtn->width(), m_replyCloseBtn->height(),
+             (int)m_replyRow->isVisible(), (int)m_ctxBar->isVisible());
 }
 
 void ChatWidget::onReplyStripClose() {
+    qWarning("DIA onReplyStripClose called");
     m_pendingCtx.remove("reply_to");
     if (!m_replyMentionedName.isEmpty())
         removeCsvField(m_pendingCtx, "mentions", m_replyMentionedName);
