@@ -653,6 +653,10 @@ ContactListWidget::ContactListWidget(QWidget* parent)
     sortBtn = new QPushButton(_("sort.button"), this);
     connect(sortBtn, SIGNAL(clicked()), this, SLOT(onSortMenuClicked()));
     searchRow->addWidget(sortBtn);
+    plusBtn = new QPushButton(QString("+"), this);
+    plusBtn->setFixedWidth(26);
+    connect(plusBtn, SIGNAL(clicked()), this, SLOT(onPlusMenuClicked()));
+    searchRow->addWidget(plusBtn);
     layout->addLayout(searchRow);
 
     m_sortCriteria.push_back("online_first");
@@ -1124,6 +1128,30 @@ void ContactListWidget::onSortMenuClicked() {
     m_list.sort(m_sortCriteria);
     m_view->invalidateAllCaches();
     refreshView();
+}
+
+void ContactListWidget::onPlusMenuClicked() {
+#ifdef QT3_BUILD
+    QPopupMenu menu(this);
+    menu.insertItem(_("plus.global_search"), 1);
+    menu.insertItem(_("plus.create_group_chat"), 2);
+    menu.insertItem(_("plus.create_conference"), 3);
+    menu.insertItem(_("plus.add_friend"), 4);
+    menu.insertItem(_("plus.join_group"), 5);
+    menu.insertItem(_("plus.join_conference"), 6);
+    menu.insertItem(_("plus.speed_send_file"), 7);
+    menu.exec(plusBtn->mapToGlobal(QPoint(0, plusBtn->height())));
+#else
+    QMenu menu(this);
+    menu.addAction(_("plus.global_search"));
+    menu.addAction(_("plus.create_group_chat"));
+    menu.addAction(_("plus.create_conference"));
+    menu.addAction(_("plus.add_friend"));
+    menu.addAction(_("plus.join_group"));
+    menu.addAction(_("plus.join_conference"));
+    menu.addAction(_("plus.speed_send_file"));
+    menu.exec(plusBtn->mapToGlobal(QPoint(0, plusBtn->height())));
+#endif
 }
 
 void ContactListWidget::onScrollChanged(int value) {

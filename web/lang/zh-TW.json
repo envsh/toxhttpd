@@ -41,6 +41,15 @@
         "add": "新增",
         "join_group": "加入"
     },
+    "plus": {
+        "global_search": "🔍 開啟綜合搜尋",
+        "create_group_chat": "💬 建立群聊",
+        "create_conference": "🎙 建立會議",
+        "add_friend": "🤝 添加好友",
+        "join_group": "👥 加入群組",
+        "join_conference": "📞 加入會議",
+        "speed_send_file": "⚡ 閃傳檔案"
+    },
     "tooltips": {
         "emoji": "表情",
         "file": "發送檔案",

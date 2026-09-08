@@ -190,6 +190,7 @@ private slots:
     void onAddFriendClicked();
     void onCreateConferenceClicked();
     void onCreateGroupClicked();
+    void onPlusMenuClicked();
     void onScrollChanged(int value);
 
 public:
@@ -221,6 +222,7 @@ private:
     PlaceholderLineEdit* searchInput;
     QLabel* countLabel;
     QPushButton* sortBtn;
+    QPushButton* plusBtn;
     QString m_searchText;
     int m_itemHeight = 60;
     std::vector<QString> m_sortCriteria;

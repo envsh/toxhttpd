@@ -46,6 +46,15 @@
         "add": "Add",
         "join_group": "Join"
     },
+    "plus": {
+        "global_search": "🔍 Global search",
+        "create_group_chat": "💬 New group chat",
+        "create_conference": "🎙 New conference",
+        "add_friend": "🤝 Add friend",
+        "join_group": "👥 Join group",
+        "join_conference": "📞 Join conference",
+        "speed_send_file": "⚡ Flash Transfer"
+    },
     "tooltips": {
         "emoji": "Emoji",
         "file": "Send file",

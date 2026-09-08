@@ -46,6 +46,15 @@
         "add": "添加",
         "join_group": "加入"
     },
+    "plus": {
+        "global_search": "🔍 打开综合搜索",
+        "create_group_chat": "💬 创建群聊",
+        "create_conference": "🎙 创建会议",
+        "add_friend": "🤝 添加好友",
+        "join_group": "👥 加入群组",
+        "join_conference": "📞 加入会议",
+        "speed_send_file": "⚡ 闪传文件"
+    },
     "tooltips": {
         "emoji": "表情",
         "file": "发送文件",
