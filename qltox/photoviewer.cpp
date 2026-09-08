@@ -28,6 +28,18 @@
 using std::min;
 using std::max;
 
+static QString humanBytes(int n) {
+    if (n < 1024) {
+        return QString::number(n) + " B";
+    }
+    double kb = n / 1024.0;
+    if (kb < 1024.0) {
+        return QString("%1 KB").arg(kb, 0, 'f', 1);
+    }
+    double mb = kb / 1024.0;
+    return QString("%1 MB").arg(mb, 0, 'f', 2);
+}
+
 // 魔数探测图片 mime；无法识别返回空串
 static QString sniffImageMime(const QByteArray& data) {
     if (data.size() >= 12) {
@@ -148,6 +160,7 @@ void PhotoCanvas::fitToWindow() {
     centerImage();
     rebuildCache();
     update();
+    emit viewChanged();
 }
 
 void PhotoCanvas::actualSize() {
@@ -156,6 +169,7 @@ void PhotoCanvas::actualSize() {
     centerImage();
     rebuildCache();
     update();
+    emit viewChanged();
 }
 
 void PhotoCanvas::toggleFitMode() {
@@ -172,6 +186,7 @@ void PhotoCanvas::zoomIn() {
     if (m_scale < 0.05) { m_scale = 0.05; }
     rebuildCache();
     update();
+    emit viewChanged();
 }
 
 void PhotoCanvas::zoomOut() {
@@ -180,6 +195,7 @@ void PhotoCanvas::zoomOut() {
     if (m_scale < 0.05) { m_scale = 0.05; }
     rebuildCache();
     update();
+    emit viewChanged();
 }
 
 void PhotoCanvas::rotateCW() {
@@ -191,6 +207,7 @@ void PhotoCanvas::rotateCW() {
         centerImage();
         rebuildCache();
         update();
+        emit viewChanged();
     }
 }
 
@@ -203,6 +220,7 @@ void PhotoCanvas::rotateCCW() {
         centerImage();
         rebuildCache();
         update();
+        emit viewChanged();
     }
 }
 
@@ -218,6 +236,14 @@ void PhotoCanvas::panBy(int dx, int dy) {
 
 int PhotoCanvas::zoomPercent() const {
     return qRound(m_scale * 100.0);
+}
+
+QSize PhotoCanvas::displayedSize() const {
+    double w = (m_rotation == 90.0 || m_rotation == 270.0)
+               ? (double)m_pixmap.height() : (double)m_pixmap.width();
+    double h = (m_rotation == 90.0 || m_rotation == 270.0)
+               ? (double)m_pixmap.width() : (double)m_pixmap.height();
+    return QSize(qRound(w * m_scale), qRound(h * m_scale));
 }
 
 void PhotoCanvas::centerImage() {
@@ -329,6 +355,7 @@ void PhotoCanvas::wheelEvent(QWheelEvent* event) {
     m_fitMode = false;
     rebuildCache();
     update();
+    emit viewChanged();
 }
 
 void PhotoCanvas::mousePressEvent(QMouseEvent* event) {
@@ -402,6 +429,7 @@ PhotoViewer::PhotoViewer(QWidget* parent, const QPixmap& pixmap,
     setAttribute(Qt::WA_DeleteOnClose);
 #endif
     m_canvas = new PhotoCanvas(this, pixmap);
+    connect(m_canvas, SIGNAL(viewChanged()), this, SLOT(onViewChanged()));
 
     QVBoxLayout* lay = new QVBoxLayout(this);
     lay->setMargin(0);
@@ -469,6 +497,9 @@ void PhotoViewer::updateTitle() {
         + QString::number(m_origPixmap.width()) + " × "
         + QString::number(m_origPixmap.height())
         + qFromUtf8("  —  缩放: ") + QString::number(m_canvas->zoomPercent()) + "%";
+    if (!m_origData.isEmpty()) {
+        title += qFromUtf8("  —  原图: ") + humanBytes(m_origData.size());
+    }
     if (m_fullscreen) {
         title += qFromUtf8("  [全屏]");
     }
@@ -479,11 +510,22 @@ void PhotoViewer::updateStatus() {
     if (!m_statusLabel) { return; }
     QString s = QString::number(m_origPixmap.width())
         + " × " + QString::number(m_origPixmap.height())
-        + qFromUtf8("  |  缩放: ") + QString::number(m_canvas->zoomPercent()) + "%";
+        + qFromUtf8("  |  显示: ")
+        + QString::number(m_canvas->displayedSize().width())
+        + " × " + QString::number(m_canvas->displayedSize().height())
+        + qFromUtf8("  |  倍率: ") + QString::number(m_canvas->zoomPercent()) + "%";
+    if (!m_origData.isEmpty()) {
+        s += qFromUtf8("  |  原图: ") + humanBytes(m_origData.size());
+    }
     if (m_canvas->showHelp()) {
         s += qFromUtf8("  |  [?]");
     }
     m_statusLabel->setText(s);
+}
+
+void PhotoViewer::onViewChanged() {
+    updateTitle();
+    updateStatus();
 }
 
 void PhotoViewer::keyPressEvent(QKeyEvent* e) {

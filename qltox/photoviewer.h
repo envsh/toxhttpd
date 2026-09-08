@@ -24,6 +24,10 @@ public:
     bool showHelp() const { return m_showHelp; }
     const QPixmap& pixmap() const { return m_pixmap; }
     int zoomPercent() const;
+    QSize displayedSize() const;
+
+signals:
+    void viewChanged();
 
 protected:
     void paintEvent(QPaintEvent* event);
@@ -77,6 +81,7 @@ private slots:
     void onRotateCCW();
     void onFullscreen();
     void onToggleHelp();
+    void onViewChanged();
 
 private:
     void setupToolbar(QVBoxLayout* lay);
