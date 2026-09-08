@@ -121,6 +121,7 @@ struct HistoryMessage {
     int fileSize    = 0;    // bytes
     std::vector<std::string> replyTos;    // 回复的 eventId 列表
     std::vector<std::string> mentions;    // 被 @ 的用户名/ID 列表
+    bool redacted = false;                // gomuks redacted_by 标记
 };
 
 struct TranslateApiResult {

@@ -85,6 +85,7 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
             continue;
 
         HistoryMessage hm;
+        hm.redacted = !jsonGetString(ev, "redacted_by").empty();
         hm.message       = jsonGetString(ev, "content.body");
         {
             // ── 媒体消息检测 ──
@@ -750,6 +751,19 @@ ParseResult UnknownParser::parse(const std::string& eventType, const std::string
         cJSON* dataItem = cJSON_GetObjectItem(valueItem, "data");
         if (dataItem && cJSON_IsString(dataItem)) {
             const char* dataStr = cJSON_GetStringValue(dataItem);
+            // 调试：输出符合 gomuks (sync_complete) 的原始数据（分析已确认，保留注释备用）
+            // {
+            //     cJSON* probe = cJSON_Parse(dataStr);
+            //     if (probe) {
+            //         cJSON* cmd = cJSON_GetObjectItem(probe, "command");
+            //         if (cmd && cJSON_IsString(cmd)
+            //             && std::string(cJSON_GetStringValue(cmd)) == "sync_complete") {
+            //             qWarning("UnknownParser: gomuks raw data len=%d\n%s",
+            //                      (int)strlen(dataStr), dataStr);
+            //         }
+            //         cJSON_Delete(probe);
+            //     }
+            // }
             if (tryParseGomuksSync(dataStr, ret))
                 goto done;
             if (tryParseToxMessage(dataStr, ret))

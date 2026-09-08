@@ -2076,6 +2076,7 @@ void MainWindow::handleEvents(const EventList& events) {
                     msg.peerNumber = (int)hm.sender_number;
                     msg.avatarUrl = avatarMxc;
                     msg.messageId = qFromUtf8(hm.eventId);
+                    msg.redacted = hm.redacted;
 
                     int chatId = VIRTUAL_REDDIT_ID;
                     std::string chatType = kTopicType;
