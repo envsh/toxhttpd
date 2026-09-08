@@ -2037,7 +2037,8 @@ void MainWindow::handleEvents(const EventList& events) {
                     ChatElement msg;
                     msg.messageText = qFromUtf8(hm.message);
                     msg.category = "other";
-                    msg.time = getCurrentTime();
+msg.time = hm.created_at.empty() ? getCurrentTime()
+                                                     : qFormatTime(qFromUtf8(hm.created_at));
 
                     QString senderLabel;
                     QString userName;

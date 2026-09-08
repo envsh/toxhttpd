@@ -2,6 +2,7 @@
 #include "cJSON.h"
 #include "compatcore34.h"
 #include <dlfcn.h>
+#include <ctime>
 
 // ── JSON 路径导航 ──
 
@@ -175,7 +176,17 @@ static void parseGomuksEvents(cJSON* roomObj, const std::string& roomId, ParseRe
         hm.sender_pubkey = jsonGetString(ev, "sender");
         hm.sender_number = i;
         hm.direction     = "received";
-        hm.created_at    = std::to_string(jsonGetInt64(ev, "timestamp"));
+        {
+            int64_t tsMs = jsonGetInt64(ev, "timestamp");
+            char tbuf[32] = {0};
+            if (tsMs > 0) {
+                time_t sec = (time_t)(tsMs / 1000);
+                struct tm tmv;
+                localtime_r(&sec, &tmv);
+                strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", &tmv);
+            }
+            hm.created_at = tbuf;
+        }
         hm.roomId        = roomId;
         hm.eventId       = jsonGetString(ev, "event_id");
         ret.messages.push_back(hm);
