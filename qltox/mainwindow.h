@@ -94,6 +94,7 @@ protected slots:
     void quitApp();                 // 真正退出应用（绕过 closeEvent 托盘拦截）
     void trayShowMainWindow();      // 从托盘恢复并激活主窗口
     void trayActivated(int reason); // 托盘点击：Trigger/DoubleClick 恢复窗口
+    void updateTrayBadge(int total);
     
 private:
     FramelessHelper* framelessHelper;

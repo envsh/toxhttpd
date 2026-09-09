@@ -924,21 +924,32 @@ void ContactListWidget::updateContactLastMessage(int id, const QString& type, co
 void ContactListWidget::incrementUnread(int id, const QString& type, int count) {
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
     m_unreadCounts[key] += count;
+    m_totalUnread += count;
     RowData* rd = m_list.get(id, type);
-    if (!rd) return;
+    if (!rd) {
+        emit unreadCountChanged(m_totalUnread);
+        return;
+    }
     rd->unread = m_unreadCounts[key];
     rd->cachedWidth = 0;
     if (!m_batchLevel) refreshView();
+    emit unreadCountChanged(m_totalUnread);
 }
 
 void ContactListWidget::resetUnread(int id, const QString& type) {
     auto key = std::make_pair(id, std::string(qToUtf8(type).data()));
+    m_totalUnread -= m_unreadCounts[key];
+    if (m_totalUnread < 0) m_totalUnread = 0;
     m_unreadCounts[key] = 0;
     RowData* rd = m_list.get(id, type);
-    if (!rd) return;
+    if (!rd) {
+        emit unreadCountChanged(m_totalUnread);
+        return;
+    }
     rd->unread = 0;
     rd->cachedWidth = 0;
     if (!m_batchLevel) refreshView();
+    emit unreadCountChanged(m_totalUnread);
 }
 
 int ContactListWidget::unreadCount(int id, const QString& type) const {

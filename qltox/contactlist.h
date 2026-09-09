@@ -157,6 +157,8 @@ public:
     void incrementUnread(int id, const QString& type, int count = 1);
     void resetUnread(int id, const QString& type);
     int unreadCount(int id, const QString& type) const;
+    int totalUnread() const { return m_totalUnread; }
+    void seedTotalUnread(int n) { m_totalUnread = n; }
 
     void beginBatch();
     void endBatch();
@@ -182,6 +184,7 @@ signals:
     void renameNickRequested(int groupId, const QString& groupName);
     void setGroupTopicRequested(int groupId);
     void setConferenceTitleRequested(int conferenceId);
+    void unreadCountChanged(int total);
 
 private slots:
     void onSearchTextChanged(const QString& text);
@@ -215,6 +218,7 @@ private:
     QPushButton* joinGroupBtn;
 
     std::map<std::pair<int, std::string>, int> m_unreadCounts;
+    int m_totalUnread = 0;
     std::map<std::pair<int, std::string>, QString> m_lastMessages;
     std::map<std::pair<int, std::string>, QString> m_lastMessageTimes;
     std::map<std::pair<int, std::string>, int> m_pinnedIndices;

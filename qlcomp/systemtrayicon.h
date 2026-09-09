@@ -46,6 +46,9 @@ public:
 	void setIcon(const QString& fileName);
 	QPixmap icon() const;
 
+	void setBadgeCount(int count);
+	int badgeCount() const;
+
 	void setToolTip(const QString& tip);
 	QString toolTip() const;
 
@@ -70,7 +73,12 @@ private:
 	friend class SystemTrayIconAdapter;
 	void fireActivated(int reason);
 	void initTray(const QPixmap& pm);
+	void applyIcon();
+	QPixmap renderBadgeIcon(const QPixmap& base, int count) const;
 
+	int m_badgeCount;
+	QPixmap m_baseIcon;
+	QString m_toolTip;
 	class Private;
 	Private* d;
 	bool m_visible;

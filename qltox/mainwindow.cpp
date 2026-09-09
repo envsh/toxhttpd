@@ -635,6 +635,14 @@ MainWindow::MainWindow(QWidget* parent)
         EmbeddedMenuBar::addItem(trayMenu, qFromUtf8("退出"), this, SLOT(quitApp()));
         m_tray->setContextMenu(trayMenu);
 
+        connect(contactListWidget, SIGNAL(unreadCountChanged(int)),
+                this, SLOT(updateTrayBadge(int)));
+        if (0) {
+            int n = (int)Storage::instance().channelDb()->totalUnread();
+            contactListWidget->seedTotalUnread(n);
+            updateTrayBadge(n);
+        }
+
         m_tray->show();
     }
 
@@ -1273,6 +1281,12 @@ void MainWindow::trayShowMainWindow() {
 void MainWindow::trayActivated(int reason) {
     if (reason == SystemTrayIcon::Trigger || reason == SystemTrayIcon::DoubleClick) {
         trayShowMainWindow();
+    }
+}
+
+void MainWindow::updateTrayBadge(int total) {
+    if (m_tray && m_tray->isVisible()) {
+        m_tray->setBadgeCount(total);
     }
 }
 

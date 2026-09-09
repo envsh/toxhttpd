@@ -1,7 +1,11 @@
 #include "systemtrayicon.h"
+#include "compatcore34.h"
 
 #include <stdio.h>
 #include <qimage.h>
+#include <qpainter.h>
+#include <qcolor.h>
+#include <qfontmetrics.h>
 
 #ifdef QT3_BUILD
 #include "trayicon.h"
@@ -93,7 +97,8 @@ static QPixmap trayNormalizeIcon(const QPixmap& pm)
 
 void SystemTrayIcon::initTray(const QPixmap& pm)
 {
-	d->tray = new SystemTrayIconAdapter(this, trayNormalizeIcon(pm));
+	m_baseIcon = pm;
+	d->tray = new SystemTrayIconAdapter(this, trayNormalizeIcon(m_baseIcon));
 }
 
 void SystemTrayIcon::fireActivated(int reason)
@@ -125,7 +130,8 @@ SystemTrayIcon::~SystemTrayIcon()
 
 void SystemTrayIcon::setIcon(const QPixmap& icon)
 {
-	d->tray->setIcon(trayNormalizeIcon(icon));
+	m_baseIcon = icon;
+	applyIcon();
 }
 
 void SystemTrayIcon::setIcon(const QString& fileName)
@@ -135,17 +141,80 @@ void SystemTrayIcon::setIcon(const QString& fileName)
 
 QPixmap SystemTrayIcon::icon() const
 {
-	return d->tray->icon();
+	return m_baseIcon;
+}
+
+void SystemTrayIcon::setBadgeCount(int count)
+{
+	m_badgeCount = count;
+	applyIcon();
+	if (!m_toolTip.isEmpty()) {
+		QString t = m_toolTip;
+		if (count > 0) {
+			t += qFromUtf8(" — 未读 ") + QString::number(count);
+		}
+		d->tray->setToolTip(t);
+	}
+}
+
+int SystemTrayIcon::badgeCount() const
+{
+	return m_badgeCount;
+}
+
+void SystemTrayIcon::applyIcon()
+{
+	d->tray->setIcon(trayNormalizeIcon(renderBadgeIcon(m_baseIcon, m_badgeCount)));
+}
+
+QPixmap SystemTrayIcon::renderBadgeIcon(const QPixmap& base, int count) const
+{
+	QPixmap pm = base;
+	if (count <= 0) {
+		return pm;
+	}
+	if (pm.width() > TRAY_ICON_SIZE || pm.height() > TRAY_ICON_SIZE) {
+		pm = trayNormalizeIcon(pm);
+	}
+	QString t = (count > 999) ? QString::fromLatin1("999") : QString::number(count);
+	QPainter p(&pm);
+	int px = (t.length() >= 3) ? 9 : 10;
+	QFont f = p.font();
+	f.setBold(true);
+	f.setPixelSize(px);
+	p.setFont(f);
+	QFontMetrics fm(f);
+	int tw = fm.width(t);
+	int th = fm.height();
+	int bw = tw + 6;
+	if (bw > 15) {
+		bw = 15;
+	}
+	int bh = 8;
+	int bx = pm.width() - 2 - bw;
+	int by = 2;
+	p.setPen(NoPen);
+	p.setBrush(QColor(0xD0, 0x20, 0x20));
+	p.drawEllipse(bx, by, bw, bh);
+	p.setPen(QColor(255, 255, 255));
+	p.drawText(bx + (bw - tw) / 2, by + (bh - th) / 2 + fm.ascent(), t);
+	p.end();
+	return pm;
 }
 
 void SystemTrayIcon::setToolTip(const QString& tip)
 {
-	d->tray->setToolTip(tip);
+	m_toolTip = tip;
+	if (m_badgeCount > 0) {
+		d->tray->setToolTip(m_toolTip + qFromUtf8(" — 未读 ") + QString::number(m_badgeCount));
+	} else {
+		d->tray->setToolTip(m_toolTip);
+	}
 }
 
 QString SystemTrayIcon::toolTip() const
 {
-	return d->tray->toolTip();
+	return m_toolTip;
 }
 
 void SystemTrayIcon::setVisible(bool visible)
@@ -215,13 +284,12 @@ public:
 	Private() : native(0), menu(0) {}
 	QSystemTrayIcon* native;
 	PopupMenu* menu;
-	QPixmap iconCache;
 };
 
 void SystemTrayIcon::initTray(const QPixmap& pm)
 {
-	d->iconCache = pm;
-	d->native = new QSystemTrayIcon(QIcon(pm), this);
+	m_baseIcon = pm;
+	d->native = new QSystemTrayIcon(QIcon(m_baseIcon), this);
 	connect(d->native, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
 		this, SLOT(nativeActivated(QSystemTrayIcon::ActivationReason)));
 }
@@ -255,8 +323,8 @@ SystemTrayIcon::~SystemTrayIcon()
 
 void SystemTrayIcon::setIcon(const QPixmap& icon)
 {
-	d->iconCache = icon;
-	d->native->setIcon(QIcon(icon));
+	m_baseIcon = icon;
+	applyIcon();
 }
 
 void SystemTrayIcon::setIcon(const QString& fileName)
@@ -266,17 +334,82 @@ void SystemTrayIcon::setIcon(const QString& fileName)
 
 QPixmap SystemTrayIcon::icon() const
 {
-	return d->iconCache;
+	return m_baseIcon;
+}
+
+void SystemTrayIcon::setBadgeCount(int count)
+{
+	m_badgeCount = count;
+	applyIcon();
+	if (!m_toolTip.isEmpty()) {
+		QString t = m_toolTip;
+		if (count > 0) {
+			t += qFromUtf8(" — 未读 ") + QString::number(count);
+		}
+		d->native->setToolTip(t);
+	}
+}
+
+int SystemTrayIcon::badgeCount() const
+{
+	return m_badgeCount;
+}
+
+void SystemTrayIcon::applyIcon()
+{
+	d->native->setIcon(QIcon(renderBadgeIcon(m_baseIcon, m_badgeCount)));
+}
+
+QPixmap SystemTrayIcon::renderBadgeIcon(const QPixmap& base, int count) const
+{
+	QPixmap pm = base;
+	if (count <= 0) {
+		return pm;
+	}
+	if (pm.width() > TRAY_ICON_SIZE || pm.height() > TRAY_ICON_SIZE) {
+		pm = pm.scaled(TRAY_ICON_SIZE, TRAY_ICON_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	}
+	QString t = (count > 999) ? QString::fromLatin1("999") : QString::number(count);
+	QPainter p(&pm);
+	p.setRenderHint(QPainter::Antialiasing);
+	int px = (t.length() >= 3) ? 9 : 10;
+	QFont f = p.font();
+	f.setBold(true);
+	f.setPixelSize(px);
+	p.setFont(f);
+	QFontMetrics fm(f);
+	int tw = fm.boundingRect(t).width();
+	int th = fm.boundingRect(t).height();
+	int bw = tw + 6;
+	if (bw > 15) {
+		bw = 15;
+	}
+	int bh = 8;
+	QRect rc(0, 0, bw, bh);
+	rc.moveRight(pm.width() - 2);
+	rc.moveTop(2);
+	p.setPen(Qt::NoPen);
+	p.setBrush(QColor(0xD0, 0x20, 0x20));
+	p.drawEllipse(QRectF(rc));
+	p.setPen(QColor(255, 255, 255));
+	p.drawText(rc, Qt::AlignCenter, t);
+	p.end();
+	return pm;
 }
 
 void SystemTrayIcon::setToolTip(const QString& tip)
 {
-	d->native->setToolTip(tip);
+	m_toolTip = tip;
+	if (m_badgeCount > 0) {
+		d->native->setToolTip(m_toolTip + qFromUtf8(" — 未读 ") + QString::number(m_badgeCount));
+	} else {
+		d->native->setToolTip(m_toolTip);
+	}
 }
 
 QString SystemTrayIcon::toolTip() const
 {
-	return d->native->toolTip();
+	return m_toolTip;
 }
 
 void SystemTrayIcon::setVisible(bool visible)
