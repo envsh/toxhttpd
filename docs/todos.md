@@ -12,16 +12,18 @@
 - [ ] impr fedmsg proper msgid/eventid
 - [ ] fedgif libgif/qmovie compare
 - [ ] fedvideo ffmpeg/mpv compare
+- [ ] fedaudio miniaudio/ffmpeg/mpv compare
 - [ ] restore translate button usable
 - [ ] chat message timestamp format, multiple style, proper short/long
 - [ ] chat message context menu, add
 	- [x] @ TA, 需要特定的格式或字段
-	- [ ] reply,
+	- [ ] reply, 需要特定的格式或字段
 	- [ ] publish website,
 	- [ ] forward fedsite
 	- [ ] 转发到其他群
 	- [ ] edit/resend
-	- [ ] delete/remove/redact,撤回消息
+	- [ ] delete/remove
+	- [x] redact,撤回消息
 	- [ ] favorit
 - [x] fix chat message identicon
 - [x] contact identicon fixed mode
@@ -34,6 +36,7 @@
 - [ ] peer info/profile dialog
 - [x] persist chat message history locally with sqlite
 - [ ] persist chat message history locally with bdb
+- [x] persist translate locally with sqlite
 - [ ] persist translate locally with bdb
 - [ ] maybe split msg parses to plugin is better
 - [ ] qltox memory keep increase
@@ -49,3 +52,4 @@
 - [ ] 图片/文件附件/sticker管理
 - [ ] 固定快速回复消息列表功能
 - [ ] 把fedbridge后端打包为子进程/库, 可以完整发布
+- [ ] systray unread count
