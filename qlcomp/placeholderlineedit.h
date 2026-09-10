@@ -10,6 +10,7 @@ public:
     
     void setPlaceholderText(const QString& text);
     QString placeholderText() const { return m_placeholder; }
+    void setRealText(const QString& text);
     
 protected:
     void focusInEvent(QFocusEvent* event);

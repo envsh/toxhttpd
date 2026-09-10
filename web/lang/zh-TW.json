@@ -271,6 +271,8 @@
         "page_prev": "上一頁",
         "page_next": "下一頁",
         "page_last": "最後一頁",
-        "page_indicator": "第 %1 / %2 頁"
+        "page_indicator": "第 {0} / {1} 頁",
+        "searching": "搜尋中...",
+        "result_summary": "共 {0} 個結果 · 花費 {1} 毫秒"
     }
 }

@@ -13,10 +13,13 @@
 #include <qstringlist.h>
 #ifdef QT3_BUILD
 #include <qevent.h>
+#include <qapplication.h>
 #else
 #include <QKeyEvent>
+#include <QApplication>
 #endif
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <string>
@@ -26,6 +29,7 @@ static const int VIRTUAL_SEARCH_UNKNOWN_ID = -100;
 static const int VIRTUAL_SEARCH_SYSEVENT_ID = -101;
 static const int VIRTUAL_SEARCH_REDDIT_ID = -102;
 static const int VIRTUAL_SEARCH_BOOKMARK_ID = -103;
+static const int kTestRows = 5;
 
 namespace {
 
@@ -112,6 +116,7 @@ CombineSearch::CombineSearch(QWidget* parent)
 
     QHBoxLayout* searchRow = new QHBoxLayout;
     m_input = new PlaceholderLineEdit(_("combine_search.placeholder"), this);
+    m_input->setRealText("kernel");
     connect(m_input, SIGNAL(returnPressed()), this, SLOT(runSearch()));
     m_searchBtn = new QPushButton(_("combine_search.button"), this);
     connect(m_searchBtn, SIGNAL(clicked()), this, SLOT(runSearch()));
@@ -144,14 +149,18 @@ CombineSearch::CombineSearch(QWidget* parent)
     (new QVBoxLayout(inner))->addStretch(1);
     (new QVBoxLayout(contactsPage))->addWidget(scroll);
     m_contactsInner = inner;
+    m_contactsScroll = scroll;
     m_pages.push_back(contactsPage);
     m_stack->addWidget(contactsPage);
 
-    inner = nullptr;
-    scroll = makeScrollArea(messagesPage, inner);
-    (new QVBoxLayout(inner))->addStretch(1);
-    (new QVBoxLayout(messagesPage))->addWidget(scroll);
-    m_messagesInner = inner;
+    m_viewMsg = new SearchListView(messagesPage);
+    m_msgBar = new LimeScrollBar(Qt::Vertical, messagesPage);
+    m_viewMsg->setScrollBar(m_msgBar);
+    connect(m_msgBar, SIGNAL(valueChanged(int)), this, SLOT(onViewScroll(int)));
+    QHBoxLayout* msgRow = new QHBoxLayout(messagesPage);
+    msgRow->setSpacing(0);
+    msgRow->addWidget(m_viewMsg, 1);
+    msgRow->addWidget(m_msgBar);
     m_pages.push_back(messagesPage);
     m_stack->addWidget(messagesPage);
 
@@ -176,6 +185,14 @@ CombineSearch::CombineSearch(QWidget* parent)
     pagerRow->addWidget(m_lastBtn);
     pagerRow->addStretch(1);
     root->addLayout(pagerRow);
+
+    m_statusLabel = new QLabel(this);
+#ifdef QT3_BUILD
+    m_statusLabel->setPaletteForegroundColor(QColor(0x70, 0x70, 0x70));
+#else
+    m_statusLabel->setStyleSheet("color:#707070");
+#endif
+    root->addWidget(m_statusLabel);
 
     m_firstBtn->setEnabled(false);
     m_prevBtn->setEnabled(false);
@@ -204,31 +221,58 @@ void CombineSearch::onTabClicked() {
     showPage(idx, m_curPage[idx]);
 }
 
+void CombineSearch::onViewScroll(int v) {
+    m_viewMsg->scrollTo(v);
+}
+
 int CombineSearch::rowTotal(int tab) const {
     const std::vector<RowInfo>& rows = (tab == 0) ? m_contactRows : m_messageRows;
     if (rows.empty()) { return 1; }
     return ((int)rows.size() + 49) / 50;
 }
 
-void CombineSearch::renderSlice(QWidget* inner, const std::vector<RowInfo>& rows, int page,
-                                const QString& emptyText) {
-    QVBoxLayout* lay = static_cast<QVBoxLayout*>(inner->layout());
-    clearLayout(lay);
-
+void CombineSearch::renderSlice(int tab, int page) {
+    const std::vector<RowInfo>& rows = (tab == 0) ? m_contactRows : m_messageRows;
     int total = rows.empty() ? 1 : ((int)rows.size() + 49) / 50;
     if (page < 0) { page = 0; }
     if (page >= total) { page = total - 1; }
 
-    if (rows.empty()) {
-        lay->addWidget(new QLabel(emptyText, inner));
-        lay->addStretch(1);
-    } else {
-        int off = page * 50;
-        int end = std::min(off + 50, (int)rows.size());
-        for (int i = off; i < end; ++i) {
-            lay->addWidget(makeRow(rows[i].title, rows[i].detail, inner));
+    if (tab == 0) {
+        QVBoxLayout* lay = static_cast<QVBoxLayout*>(m_contactsInner->layout());
+        clearLayout(lay);
+        if (rows.empty()) {
+            lay->addWidget(new QLabel(_("combine_search.no_contacts"), m_contactsInner));
+            lay->addStretch(1);
+        } else {
+            int off = page * 50;
+            int end = std::min(off + 50, (int)rows.size());
+            for (int i = off; i < end; ++i) {
+                lay->addWidget(makeRow(rows[i].title, rows[i].detail, m_contactsInner));
+            }
+            lay->addStretch(1);
         }
-        lay->addStretch(1);
+#ifdef QT3_BUILD
+        QScrollView* sv = m_contactsScroll;
+        int w = sv->visibleWidth();
+        int h = m_contactsInner->sizeHint().height();
+        if (h < sv->visibleHeight()) { h = sv->visibleHeight() - 2; }
+        sv->resizeContents(w, h);
+        sv->moveChild(m_contactsInner, 0, 0);
+        m_contactsInner->resize(w, h);
+        m_contactsInner->show();
+        m_contactsInner->update();
+        sv->viewport()->update();
+#endif
+    } else {
+        std::vector<RowInfo> slice;
+        if (!rows.empty()) {
+            int off = page * 50;
+            int end = std::min(off + 50, (int)rows.size());
+            for (int i = off; i < end; ++i) {
+                slice.push_back(rows[i]);
+            }
+        }
+        m_viewMsg->setRows(slice, _("combine_search.no_messages"));
     }
 
     m_pageLabel->setText(_A("combine_search.page_indicator",
@@ -241,11 +285,7 @@ void CombineSearch::renderSlice(QWidget* inner, const std::vector<RowInfo>& rows
 }
 
 void CombineSearch::showPage(int tab, int page) {
-    if (tab == 0) {
-        renderSlice(m_contactsInner, m_contactRows, page, _("combine_search.no_contacts"));
-    } else {
-        renderSlice(m_messagesInner, m_messageRows, page, _("combine_search.no_messages"));
-    }
+    renderSlice(tab, page);
 }
 
 void CombineSearch::goFirst() {
@@ -317,6 +357,10 @@ void CombineSearch::clearLayout(QLayout* lay) {
 }
 
 void CombineSearch::runSearch() {
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    m_statusLabel->setText(_("combine_search.searching"));
+    qApp->processEvents();
+
     QString query = trimStr(m_input->text());
     QString upperQ = qToUpper(query);
     m_contacts.clear();
@@ -405,5 +449,31 @@ void CombineSearch::runSearch() {
 
     m_curPage[0] = 0;
     m_curPage[1] = 0;
+    showPage(activeTab(), 0);
+
+    for (int i = 0; i < kTestRows; ++i) {
+        RowInfo r;
+        r.title = qFromUtf8("TEST-") + QString::number(i + 1)
+                  + qFromUtf8(" 测试数据 ") + QString::number(i + 1);
+        r.detail = qFromUtf8("test_chan") + qFromUtf8(" 渲染/滚动/分页验证用行");
+        m_messageRows.push_back(r);
+    }
+
+    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - t0).count();
+    int totalHit = (int)(m_contactRows.size() + m_messageRows.size()) - kTestRows;
+    m_statusLabel->setText(_A("combine_search.result_summary",
+                              QStringList() << QString::number(totalHit)
+                                            << QString::number(elapsed)));
+
+    bool hasMsg = (m_messageRows.size() > (size_t)kTestRows);
+    bool hasContacts = (!m_contactRows.empty());
+    int targetTab = (hasMsg || !hasContacts) ? 1 : 0;
+    if (targetTab == 1) {
+        qSetChecked(m_tabMessages, true);
+    } else {
+        qSetChecked(m_tabContacts, true);
+    }
+    qStackSetCurrent(m_stack, m_pages[targetTab]);
     showPage(activeTab(), 0);
 }

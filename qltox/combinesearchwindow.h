@@ -2,13 +2,15 @@
 #define COMBINESEARCHWINDOW_H
 
 #include "compat34.h"
+#include "searchlistview.h"
 #include <qdialog.h>
 #include <string>
 #include <vector>
 
-class QLineEdit;
 class QPushButton;
 class QLabel;
+class LimeScrollBar;
+class PlaceholderLineEdit;
 
 class CombineSearch : public QDialog {
     Q_OBJECT
@@ -21,6 +23,7 @@ protected:
 private slots:
     void runSearch();
     void onTabClicked();
+    void onViewScroll(int v);
     void goFirst();
     void goPrev();
     void goNext();
@@ -41,20 +44,16 @@ private:
         QString body;
         QString time;
     };
-    struct RowInfo {
-        QString title;
-        QString detail;
-    };
+    typedef SearchListView::RowInfo RowInfo;
 
     QWidget* makeRow(const QString& title, const QString& detail, QWidget* host);
     void clearLayout(QLayout* lay);
     int activeTab() const;
     int rowTotal(int tab) const;
-    void renderSlice(QWidget* inner, const std::vector<RowInfo>& rows, int page,
-                     const QString& emptyText);
+    void renderSlice(int tab, int page);
     void showPage(int tab, int page);
 
-    QLineEdit* m_input = nullptr;
+    PlaceholderLineEdit* m_input = nullptr;
     QPushButton* m_searchBtn = nullptr;
     QPushButton* m_tabContacts = nullptr;
     QPushButton* m_tabMessages = nullptr;
@@ -63,9 +62,12 @@ private:
     QPushButton* m_nextBtn = nullptr;
     QPushButton* m_lastBtn = nullptr;
     QLabel* m_pageLabel = nullptr;
+    QLabel* m_statusLabel = nullptr;
     StackedWidget* m_stack = nullptr;
     QWidget* m_contactsInner = nullptr;
-    QWidget* m_messagesInner = nullptr;
+    ScrollArea* m_contactsScroll = nullptr;
+    SearchListView* m_viewMsg = nullptr;
+    LimeScrollBar* m_msgBar = nullptr;
     std::vector<QWidget*> m_pages;
     std::vector<QPushButton*> m_tabButtons;
     std::vector<ContactHit> m_contacts;

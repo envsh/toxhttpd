@@ -12,6 +12,13 @@ void PlaceholderLineEdit::setPlaceholderText(const QString& text) {
     }
 }
 
+void PlaceholderLineEdit::setRealText(const QString& text) {
+    blockSignals(true);
+    QLineEdit::setText(text);
+    blockSignals(false);
+    m_showingPlaceholder = false;
+}
+
 void PlaceholderLineEdit::focusInEvent(QFocusEvent* event) {
     clearIfPlaceholder();
     QLineEdit::focusInEvent(event);
