@@ -29,6 +29,7 @@ SOURCES = main.cpp mainwindow.cpp storage.cpp restapi.cpp eventpoller.cpp \
                  msgdb_helper.cpp \
                  translation_cache.cpp \
                  statisticsdialog.cpp \
+                 combinesearchwindow.cpp \
                  sticker_db.cpp stickerpicker.cpp stickermanager.cpp \
                  seen_unknown.cpp \
                  ./vendor/barrust_bloom/bloom.c \
@@ -48,6 +49,7 @@ HEADERS = mainwindow.h storage.h restapi.h eventpoller.h \
                  msgdb_helper.h \
                  translation_cache.h \
                  statisticsdialog.h \
+                 combinesearchwindow.h \
                  sticker_db.h stickerpicker.h stickermanager.h \
                  seen_unknown.h \
                  ./vendor/bloom/bloom_filter.hpp \

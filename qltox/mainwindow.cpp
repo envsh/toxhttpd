@@ -28,6 +28,7 @@
 #include "placeholderlineedit.h"
 #include "stickermanager.h"
 #include "statisticsdialog.h"
+#include "combinesearchwindow.h"
 #include "sound.h"
 #include "screenshotmanager.h"
 #include "screenshotpreview.h"
@@ -637,6 +638,8 @@ MainWindow::MainWindow(QWidget* parent)
 
         connect(contactListWidget, SIGNAL(unreadCountChanged(int)),
                 this, SLOT(updateTrayBadge(int)));
+        connect(contactListWidget, SIGNAL(globalSearchRequested()),
+                this, SLOT(openCombineSearch()));
         if (0) {
             int n = (int)Storage::instance().channelDb()->totalUnread();
             contactListWidget->seedTotalUnread(n);
@@ -3373,6 +3376,11 @@ void MainWindow::openStickerManager() {
 
 void MainWindow::openStatistics() {
     StatisticsDialog* dlg = new StatisticsDialog(this);
+    dlg->show();
+}
+
+void MainWindow::openCombineSearch() {
+    CombineSearch* dlg = new CombineSearch(this);
     dlg->show();
 }
 

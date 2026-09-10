@@ -253,5 +253,24 @@
         "material": "Material You",
         "github": "GitHub"
     },
-    "n_new_messages": "%1 條新訊息"
+    "n_new_messages": "%1 條新訊息",
+    "combine_search": {
+        "entry": "開啟綜合搜尋",
+        "title": "綜合搜尋",
+        "placeholder": "搜尋聯絡人、訊息...",
+        "button": "搜尋",
+        "tabs": {
+            "all": "全部",
+            "contacts": "聯絡人",
+            "messages": "訊息"
+        },
+        "empty": "無結果",
+        "no_contacts": "無相符聯絡人",
+        "no_messages": "無相符訊息",
+        "page_first": "第一頁",
+        "page_prev": "上一頁",
+        "page_next": "下一頁",
+        "page_last": "最後一頁",
+        "page_indicator": "第 %1 / %2 頁"
+    }
 }

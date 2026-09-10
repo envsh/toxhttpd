@@ -79,6 +79,7 @@ protected slots:
     void openSettings();
     void openStickerManager();
     void openStatistics();
+    void openCombineSearch();
     void onMenu1Stub();
     void onMenu2Stub();
     void onAboutApp();

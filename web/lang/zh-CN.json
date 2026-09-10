@@ -270,5 +270,24 @@
         "material": "Material You",
         "github": "GitHub"
     },
-    "n_new_messages": "%1 条新消息"
+    "n_new_messages": "%1 条新消息",
+    "combine_search": {
+        "entry": "打开综合搜索",
+        "title": "综合搜索",
+        "placeholder": "搜索联系人、消息...",
+        "button": "搜索",
+        "tabs": {
+            "all": "全部",
+            "contacts": "联系人",
+            "messages": "消息"
+        },
+        "empty": "无结果",
+        "no_contacts": "无匹配联系人",
+        "no_messages": "无匹配消息",
+        "page_first": "第一页",
+        "page_prev": "上一页",
+        "page_next": "下一页",
+        "page_last": "最后一页",
+        "page_indicator": "第 %1 / %2 页"
+    }
 }

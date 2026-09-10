@@ -272,5 +272,24 @@
         "material": "Material You",
         "github": "GitHub"
     },
-    "n_new_messages": "%1 new messages"
+    "n_new_messages": "%1 new messages",
+    "combine_search": {
+        "entry": "Combined Search",
+        "title": "Combined Search",
+        "placeholder": "Search contacts and messages...",
+        "button": "Search",
+        "tabs": {
+            "all": "All",
+            "contacts": "Contacts",
+            "messages": "Messages"
+        },
+        "empty": "No results",
+        "no_contacts": "No matching contacts",
+        "no_messages": "No matching messages",
+        "page_first": "First",
+        "page_prev": "Previous",
+        "page_next": "Next",
+        "page_last": "Last",
+        "page_indicator": "Page %1 / %2"
+    }
 }

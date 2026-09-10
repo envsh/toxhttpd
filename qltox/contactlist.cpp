@@ -1144,24 +1144,30 @@ void ContactListWidget::onSortMenuClicked() {
 void ContactListWidget::onPlusMenuClicked() {
 #ifdef QT3_BUILD
     QPopupMenu menu(this);
-    menu.insertItem(_("plus.global_search"), 1);
+    menu.insertItem(_("combine_search.entry"), 1);
     menu.insertItem(_("plus.create_group_chat"), 2);
     menu.insertItem(_("plus.create_conference"), 3);
     menu.insertItem(_("plus.add_friend"), 4);
     menu.insertItem(_("plus.join_group"), 5);
     menu.insertItem(_("plus.join_conference"), 6);
     menu.insertItem(_("plus.speed_send_file"), 7);
-    menu.exec(plusBtn->mapToGlobal(QPoint(0, plusBtn->height())));
+    int sel = menu.exec(plusBtn->mapToGlobal(QPoint(0, plusBtn->height())));
+    if (sel == 1) {
+        emit globalSearchRequested();
+    }
 #else
     QMenu menu(this);
-    menu.addAction(_("plus.global_search"));
+    QAction* globalSearchAction = menu.addAction(_("combine_search.entry"));
     menu.addAction(_("plus.create_group_chat"));
     menu.addAction(_("plus.create_conference"));
     menu.addAction(_("plus.add_friend"));
     menu.addAction(_("plus.join_group"));
     menu.addAction(_("plus.join_conference"));
     menu.addAction(_("plus.speed_send_file"));
-    menu.exec(plusBtn->mapToGlobal(QPoint(0, plusBtn->height())));
+    QAction* acted = menu.exec(plusBtn->mapToGlobal(QPoint(0, plusBtn->height())));
+    if (acted == globalSearchAction) {
+        emit globalSearchRequested();
+    }
 #endif
 }
 

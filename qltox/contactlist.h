@@ -185,6 +185,7 @@ signals:
     void setGroupTopicRequested(int groupId);
     void setConferenceTitleRequested(int conferenceId);
     void unreadCountChanged(int total);
+    void globalSearchRequested();
 
 private slots:
     void onSearchTextChanged(const QString& text);
