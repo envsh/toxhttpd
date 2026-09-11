@@ -3542,7 +3542,8 @@ void ChatView::paintEvent(QPaintEvent* event) {
             if (el.downloadState == ChatElement::NotRequested
                 && el.scaledDisplay.isNull()
                 && !el.mediaUrl.isEmpty()
-                && (el.etype == ChatElement::Image || el.etype == ChatElement::Gif)
+                && (el.etype == ChatElement::Image || el.etype == ChatElement::Gif
+                    || el.etype == ChatElement::Video)
                 && el.fileSize > 0 && el.fileSize < 1048576)
             {
                 emit retryClicked((int)i, el.mediaUrl, qFromUtf8("autopaint"));

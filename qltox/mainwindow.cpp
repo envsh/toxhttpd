@@ -121,11 +121,13 @@ static bool isGifUrl(const std::string& mediaUrl) {
 }
 
 // ffmpeg 抽代表帧（长视频本地预览图，worker 线程调用）
-static bool extractVideoFrame(const std::string& srcFile, const std::string& outPath) {
+static bool extractVideoFrame(const std::string& srcFile, const std::string& outPath,
+                              int seekSec = 1) {
     QString err;
     QStringList a;
-    a << "-y" << "-i" << qFromUtf8(srcFile)
-      << "-vf" << "fps=1,thumbnail,scale='min(320,iw)':-2"
+    a << "-y" << "-ss" << QString::number(seekSec)
+      << "-i" << qFromUtf8(srcFile)
+      << "-vf" << "scale='min(320,iw)':-2"
       << "-frames:v" << "1"
       << "-f" << "image2" << "-update" << "1" << "-c:v" << "png"
       << qFromUtf8(outPath);
@@ -3315,7 +3317,8 @@ void MainWindow::runMediaPostproc(int msgIndex, bool pendingPlay,
                 urlIdPart(mediaUrl, &urlId);
                 std::string tkey = "thumb_" + urlId;
                 std::string tpath = base + "/" + makeCacheFsPath(tkey.c_str());
-                if (extractVideoFrame(fpath, tpath)) {
+                int seekSec = (durationMs >= 1000) ? 1 : 0;
+                if (extractVideoFrame(fpath, tpath, seekSec)) {
                     ev->thumbFile = tpath;
                 }
             }
