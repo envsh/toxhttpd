@@ -1928,6 +1928,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
 
 void ChatElement::startGifLikeAnimation(QWidget* parent, int msgIndex) {
     if (movie) { return; }
+    if (gifPath.isEmpty()) { return; }
     bool isGif = (etype == Gif) || isGifLikeVideo(*this);
     if (!isGif) { return; }
     if (etype == Video && !hasGifLiveMovie(*this)) { return; }

@@ -79,18 +79,6 @@ static const int VIRTUAL_PASTEBIN_ID  = -105;
 static const int VIRTUAL_TRANSLATE_ID = -106;
 
 // ── 媒体本机播放辅助（worker 线程调用，不触碰 UI）──
-static bool isGifLikeCandidate(const std::string& mediaUrl) {
-    size_t slash = mediaUrl.find_last_of('/');
-    std::string file = (slash == std::string::npos) ? mediaUrl : mediaUrl.substr(slash + 1);
-    std::string lower;
-    for (size_t i = 0; i < file.size(); ++i) {
-        char c = file[i];
-        lower += (char)((c >= 'A' && c <= 'Z') ? c + 32 : c);
-    }
-    return lower.rfind(".webm") == lower.size() - 5
-        || lower.rfind(".mp4")  == lower.size() - 4;
-}
-
 static void urlIdPart(const std::string& mediaUrl, std::string* out) {
     size_t slash = mediaUrl.find_last_of('/');
     std::string id = (slash == std::string::npos) ? mediaUrl : mediaUrl.substr(slash + 1);
@@ -99,13 +87,57 @@ static void urlIdPart(const std::string& mediaUrl, std::string* out) {
     *out = id;
 }
 
+static bool isGifLikeCandidate(const std::string& mediaUrl) {
+    std::string id;
+    urlIdPart(mediaUrl, &id);   // 剥离 ?query 后再判扩展名
+    std::string lower;
+    for (size_t i = 0; i < id.size(); ++i) {
+        char c = id[i];
+        lower += (char)((c >= 'A' && c <= 'Z') ? c + 32 : c);
+    }
+    return lower.rfind(".webm") == lower.size() - 5
+        || lower.rfind(".mp4")  == lower.size() - 4;
+}
+
 // ffprobe 输出的时长（Qt3 无 QString::trimmed）
-static double durationStr(const QString& s) {
+static double fromDurationStr(const QString& s) {
 #ifdef QT3_BUILD
     return s.stripWhiteSpace().toDouble();
 #else
     return s.trimmed().toDouble();
 #endif
+}
+
+// 媒体 URL 是否真 GIF（扩展名 .gif）
+static bool isGifUrl(const std::string& mediaUrl) {
+    std::string id;
+    urlIdPart(mediaUrl, &id);
+    std::string lower;
+    for (size_t i = 0; i < id.size(); ++i) {
+        char c = id[i];
+        lower += (char)((c >= 'A' && c <= 'Z') ? c + 32 : c);
+    }
+    return lower.rfind(".gif") == lower.size() - 4;
+}
+
+// ffmpeg 抽代表帧（长视频本地预览图，worker 线程调用）
+static bool extractVideoFrame(const std::string& srcFile, const std::string& outPath) {
+    QString err;
+    QStringList a;
+    a << "-y" << "-i" << qFromUtf8(srcFile)
+      << "-vf" << "fps=1,thumbnail,scale='min(320,iw)':-2"
+      << "-frames:v" << "1"
+      << qFromUtf8(outPath);
+    if (qRuncmdCaptureOuterr("ffmpeg", a, &err) != 0) {
+        qWarning("extractVideoFrame failed: %s", qToUtf8(err).data());
+        return false;
+    }
+    return true;
+}
+
+// 抽帧预览的独立缓存 key（与媒体原字节区分，避免 download 阶段的视频字节占位）
+static QString thumbCacheKey(const QString& mxcUrl) {
+    return QString("@thumb@") + mxcUrl;
 }
 
 // ── media thumbnail 辅助函数（从原始字节解码 → 缩放到显示尺寸）──
@@ -758,7 +790,8 @@ void MainWindow::customEvent(CustomEventBase* event) {
 
                     bool elPendingPlay = el.pendingPlay;
                     bool isVideo = (el.etype == ChatElement::Video);
-                    if (isVideo || elPendingPlay) {
+                    bool isGifElem = (el.etype == ChatElement::Gif);
+                    if (isVideo || isGifElem || elPendingPlay) {
                         std::vector<uint8_t> procData(e->rawData.begin(), e->rawData.end());
                         scheduleMediaPlayback(e->msgIndex, elPendingPlay, &procData);
                     }
@@ -2177,7 +2210,9 @@ msg.time = hm.created_at.empty() ? getCurrentTime()
                             ? msg.fileName.mid(slashPos + 1) : msg.fileName;
                         msg.fileSize = hm.fileSize;
                     } else if (hm.msgtype == "image") {
-                        msg.etype       = ChatElement::Image;
+                        bool isGif = (hm.mediaMime.find("image/gif") != std::string::npos)
+                                  || isGifUrl(hm.mediaUrl);
+                        msg.etype       = isGif ? ChatElement::Gif : ChatElement::Image;
                         msg.caption     = qFromUtf8(hm.message);
                         msg.messageText = qFromUtf8(hm.message);
                         msg.mediaWidth  = hm.mediaWidth;
@@ -2978,7 +3013,9 @@ void MainWindow::renderHistoryMessages(const std::vector<HistoryMessage>& messag
         }
 
         if (msg.msgtype == "image") {
-            el.etype = ChatElement::Image;
+            bool isGif = (msg.mediaMime.find("image/gif") != std::string::npos)
+                       || isGifUrl(msg.mediaUrl);
+            el.etype = isGif ? ChatElement::Gif : ChatElement::Image;
         } else if (msg.msgtype == "video") {
             el.etype       = ChatElement::Video;
             el.durationSec = msg.duration / 1000;
@@ -3129,6 +3166,7 @@ void MainWindow::onOpenMediaPlayer(int msgIndex) {
     ChatElement& el = chatWidget->mutableMessageAt(msgIndex);
     if (el.etype != ChatElement::Video && el.etype != ChatElement::Audio) { return; }
 
+    if (el.pendingPlay) { return; }   // 防重入：已等待自动播放
     if (el.downloadState == ChatElement::InProgress) {
         el.pendingPlay = true;   // 下载完成后自动交给播放器
         return;
@@ -3148,7 +3186,8 @@ void MainWindow::scheduleMediaPlayback(int msgIndex, bool pendingPlay,
     if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
     if (currentChatId < 0) { return; }
     const ChatElement& el = chatWidget->messageAt(msgIndex);
-    if (el.etype != ChatElement::Video && el.etype != ChatElement::Audio) { return; }
+    if (el.etype != ChatElement::Video && el.etype != ChatElement::Audio
+        && el.etype != ChatElement::Gif) { return; }
 
     int chatId = currentChatId;
     QString chatType = currentChatType;
@@ -3209,8 +3248,8 @@ void MainWindow::runMediaPostproc(int msgIndex, bool pendingPlay,
     }
     ev->localFile = fpath;
 
-    // 视频短片判定与转码（无 ffprobe/ffmpeg 时退化：不做动画，仅保留 ← 原文件可播放）
-    if (etype == (int)ChatElement::Video && isGifLikeCandidate(mediaUrl)) {
+    // 视频/真GIF 后处理：短片→转GIF；长视频→本地抽帧预览；真GIF→实体即 gifPath
+    if (etype == (int)ChatElement::Video) {
         QString out, err;
         int durationMs = 0;
         if (qRuncmdCaptureOuterr("ffprobe", QStringList()
@@ -3218,10 +3257,10 @@ void MainWindow::runMediaPostproc(int msgIndex, bool pendingPlay,
                 << "-show_entries" << "format=duration"
                 << "-of" << "default=noprint_wrappers=1:nokey=1"
                 << qFromUtf8(fpath), &out) == 0) {
-            durationMs = (int)(durationStr(out) * 1000.0);
+            durationMs = (int)(fromDurationStr(out) * 1000.0);
         }
         ev->durationSec = durationMs / 1000;
-        if (ev->durationSec >= 1 && ev->durationSec <= 3) {
+        if (durationMs >= 1000 && durationMs <= 3000 && isGifLikeCandidate(mediaUrl)) {
             ev->isShortGif = true;
             std::string urlId;
             urlIdPart(mediaUrl, &urlId);
@@ -3231,9 +3270,20 @@ void MainWindow::runMediaPostproc(int msgIndex, bool pendingPlay,
                 ev->gifFile = gpath;   // 转码产物存在，幂等跳过
             } else if (qRuncmdCaptureOuterr("ffmpeg", QStringList()
                         << "-y" << "-i" << qFromUtf8(fpath)
-                        << "-vf" << "fps=12,scale=min(320,iw):-2"
+                        << "-vf" << "fps=12,scale='min(320,iw)':-2"
                         << qFromUtf8(gpath), &err) == 0) {
                 ev->gifFile = gpath;
+            }
+        } else {
+            // 长视频（或非 webm/mp4 短片）：本地抽帧做预览；已缓存则跳过
+            if (MediaShmemCache::inst().getThumb(thumbCacheKey(qFromUtf8(mediaUrl))).isEmpty()) {
+                std::string urlId;
+                urlIdPart(mediaUrl, &urlId);
+                std::string tkey = "thumb_" + urlId;
+                std::string tpath = base + "/" + makeCacheFsPath(tkey.c_str());
+                if (extractVideoFrame(fpath, tpath)) {
+                    ev->thumbFile = tpath;
+                }
             }
         }
     }
@@ -3254,7 +3304,23 @@ void MainWindow::handleMediaPostproc(MediaDownloadEvent* e) {
     ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
     if (e->durationSec > 0) { el.durationSec = e->durationSec; }
     if (e->isShortGif) { el.gifLikeVideo = true; }
-    if (!qFromUtf8(e->gifFile).isEmpty()) { el.gifPath = qFromUtf8(e->gifFile); }
+    if (!qFromUtf8(e->gifFile).isEmpty()) {
+        el.gifPath = qFromUtf8(e->gifFile);
+    } else if (el.etype == ChatElement::Gif && !qFromUtf8(e->localFile).isEmpty()) {
+        el.gifPath = qFromUtf8(e->localFile);   // 真 GIF：原文件即动画源
+    }
+    if (!e->thumbFile.empty()) {
+        std::vector<uint8_t> thumb = readCacheFile(e->thumbFile);
+        if (!thumb.empty()) {
+            MediaShmemCache::inst().putThumb(thumbCacheKey(el.mediaUrl),
+                (const char*)thumb.data(), (int)thumb.size());
+            MediaShmemCache::inst().putThumb(el.mediaUrl,
+                (const char*)thumb.data(), (int)thumb.size());
+            el.scaledDisplay = decodeRawToThumb((const char*)thumb.data(), (int)thumb.size(),
+                el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
+        }
+        removeCacheFile(e->thumbFile);
+    }
     if (!el.mediaUrl.isEmpty()) {
         db_writeMessage(e->chatId, e->chatType, el);
     }

@@ -173,6 +173,7 @@ public:
     // 后处理字段（postprocDone 时填充）：实体化原文件 + 短动画探测/转码结果
     std::string localFile;    // 实体化后的原文件全路径
     std::string gifFile;      // 转码后 GIF 路径（仅短片）
+    std::string thumbFile;    // 本地抽帧预览图路径（仅长视频）
     int durationSec = 0;
     bool isShortGif  = false;
     bool pendingPlay = false;
