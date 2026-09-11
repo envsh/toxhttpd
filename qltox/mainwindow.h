@@ -103,7 +103,9 @@ protected slots:
 private:
     // 媒体本机播放：实体化缓存字节 → 探测/转码（worker） → 播放
     void scheduleMediaPlayback(int msgIndex, bool pendingPlay,
-                               const std::vector<uint8_t>* preloaded = nullptr);
+                               const std::vector<uint8_t>* preloaded = nullptr,
+                               int chatIdOverride = -1,
+                               const QString& chatTypeOverride = QString());
     void runMediaPostproc(int msgIndex, bool pendingPlay,
                           int chatId, const std::string& chatType, int etype,
                           const std::string& mediaUrl,

@@ -127,6 +127,7 @@ static bool extractVideoFrame(const std::string& srcFile, const std::string& out
     a << "-y" << "-i" << qFromUtf8(srcFile)
       << "-vf" << "fps=1,thumbnail,scale='min(320,iw)':-2"
       << "-frames:v" << "1"
+      << "-f" << "image2" << "-update" << "1" << "-c:v" << "png"
       << qFromUtf8(outPath);
     if (qRuncmdCaptureOuterr("ffmpeg", a, &err) != 0) {
         qWarning("extractVideoFrame failed: %s", qToUtf8(err).data());
@@ -763,48 +764,53 @@ void MainWindow::customEvent(CustomEventBase* event) {
     if (event->type() == MediaDownloadReadyType) {
         MediaDownloadEvent* e = static_cast<MediaDownloadEvent*>(event);
         if (e->postprocDone) { handleMediaPostproc(e); return; }
-        int cid = currentChatId;
-        QString ctype = currentChatType;
-        if (cid == e->chatId && ctype == qFromUtf8(e->chatType)) {
-            if (e->success) {
-                if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
-                    ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
 
-                    {
-                        // Cache raw bytes (JPEG/WebP), not QPixmap
-                        MediaShmemCache::inst().putThumb(qFromUtf8(e->mxcUrl), (const char*)e->rawData.data(), e->rawData.size());
-                        el.scaledDisplay = decodeRawToThumb((const char*)e->rawData.data(), e->rawData.size(),
-                            el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
-                    }
+        // 不依赖当前激活聊天：字节缓存、DB、状态都落到目标聊天的 buffer 元素上，
+        // 仅在目标聊天正是当前聊天时才刷新视图。
+        ChatHistory* target = m_chatbuf.ptr(e->chatId, e->chatType);
+        ChatElement* elp = nullptr;
+        if (target && e->msgIndex >= 0 && e->msgIndex < target->size()) {
+            elp = &(*target)[e->msgIndex];
+        }
+        bool isCurrent = (currentChatId == e->chatId
+                          && currentChatType == qFromUtf8(e->chatType));
 
-                    {
-                        std::string key = mediaCacheKey("file", qFromUtf8(e->mxcUrl));
-                        const auto& rd = e->rawData;
-                        std::vector<uint8_t> data(rd.begin(), rd.end());
-                        Storage::instance().cacheDbAsync()->storeMedia(
-                            std::move(key), std::move(data), "", 2, nullptr);
-                    }
+        if (e->success) {
+            if (elp) {
+                // Cache raw bytes (JPEG/WebP), not QPixmap
+                MediaShmemCache::inst().putThumb(qFromUtf8(e->mxcUrl), (const char*)e->rawData.data(), e->rawData.size());
+                elp->scaledDisplay = decodeRawToThumb((const char*)e->rawData.data(), e->rawData.size(),
+                    elp->mediaWidth, elp->mediaHeight, chatWidget->width() * 70 / 100);
 
-                    el.downloadState = ChatElement::Completed;
-                    chatWidget->updateElement(e->msgIndex);
-
-                    bool elPendingPlay = el.pendingPlay;
-                    bool isVideo = (el.etype == ChatElement::Video);
-                    bool isGifElem = (el.etype == ChatElement::Gif);
-                    if (isVideo || isGifElem || elPendingPlay) {
-                        std::vector<uint8_t> procData(e->rawData.begin(), e->rawData.end());
-                        scheduleMediaPlayback(e->msgIndex, elPendingPlay, &procData);
-                    }
+                {
+                    std::string key = mediaCacheKey("file", qFromUtf8(e->mxcUrl));
+                    const auto& rd = e->rawData;
+                    std::vector<uint8_t> data(rd.begin(), rd.end());
+                    Storage::instance().cacheDbAsync()->storeMedia(
+                        std::move(key), std::move(data), "", 2, nullptr);
                 }
-            } else {
-                qWarning("Media download failed: chat=%d/%s idx=%d err=%s",
-                         e->chatId, e->chatType.c_str(), e->msgIndex, e->errorInfo.c_str());
-                if (e->msgIndex >= 0 && e->msgIndex < chatWidget->messageCount()) {
-                    ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
-                    el.downloadState = ChatElement::Failed;
-                    el.mediaUrl = qFromUtf8(e->mxcUrl);
-                    chatWidget->updateElement(e->msgIndex);
+
+                elp->downloadState = ChatElement::Completed;
+            }
+
+            if (elp) {
+                bool elPendingPlay = elp->pendingPlay;
+                bool isVideo = (elp->etype == ChatElement::Video);
+                bool isGifElem = (elp->etype == ChatElement::Gif);
+                if (isVideo || isGifElem || elPendingPlay) {
+                    std::vector<uint8_t> procData(e->rawData.begin(), e->rawData.end());
+                    scheduleMediaPlayback(e->msgIndex, elPendingPlay, &procData,
+                                          e->chatId, qFromUtf8(e->chatType));
                 }
+            }
+            if (isCurrent && elp) { chatWidget->updateElement(e->msgIndex); }
+        } else {
+            qWarning("Media download failed: chat=%d/%s idx=%d err=%s",
+                     e->chatId, e->chatType.c_str(), e->msgIndex, e->errorInfo.c_str());
+            if (elp) {
+                elp->downloadState = ChatElement::Failed;
+                elp->mediaUrl = qFromUtf8(e->mxcUrl);
+                if (isCurrent) { chatWidget->updateElement(e->msgIndex); }
             }
         }
         return;
@@ -1507,7 +1513,20 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
             std::vector<ChatElement> els;
             els.reserve(rows.size());
             for (auto& row : rows) {
-                els.push_back(msgRowToElement(row));
+                ChatElement el = msgRowToElement(row);
+                // 已恢复动画源/本地文件的消息不显示下载覆盖（内容仍在缓存盘/DB）
+                if (el.etype == ChatElement::Video && !el.gifPath.isEmpty()) {
+                    el.downloadState = ChatElement::Completed;
+                } else if ((el.etype == ChatElement::Video || el.etype == ChatElement::Audio)
+                           && !el.mediaUrl.isEmpty()) {
+                    std::string fkey = mediaCacheKey("file", el.mediaUrl);
+                    std::string fpath = Storage::instance().dataDir() + "/"
+                                      + makeCacheFsPath(fkey.c_str());
+                    if (::access(fpath.c_str(), F_OK) == 0) {
+                        el.downloadState = ChatElement::Completed;
+                    }
+                }
+                els.push_back(el);
             }
             m_chatbuf.prepend(id, typeStr, els);
             chatWidget->relayout();
@@ -3062,6 +3081,7 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl, const QSt
             el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
         el.downloadState = ChatElement::Completed;
         chatWidget->updateElement(msgIndex);
+        if (el.pendingPlay) { scheduleMediaPlayback(msgIndex, true); }
         return;
     }
     auto dbData = Storage::instance().cacheDb()->loadMedia(
@@ -3072,6 +3092,7 @@ void MainWindow::onRetryClicked(int msgIndex, const QString& mediaUrl, const QSt
             el.mediaWidth, el.mediaHeight, chatWidget->width() * 70 / 100);
         el.downloadState = ChatElement::Completed;
         chatWidget->updateElement(msgIndex);
+        if (el.pendingPlay) { scheduleMediaPlayback(msgIndex, true); }
         return;
     }
 
@@ -3182,17 +3203,29 @@ void MainWindow::onOpenMediaPlayer(int msgIndex) {
 }
 
 void MainWindow::scheduleMediaPlayback(int msgIndex, bool pendingPlay,
-                                       const std::vector<uint8_t>* preloaded) {
-    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
-    if (currentChatId < 0) { return; }
-    const ChatElement& el = chatWidget->messageAt(msgIndex);
-    if (el.etype != ChatElement::Video && el.etype != ChatElement::Audio
-        && el.etype != ChatElement::Gif) { return; }
+                                       const std::vector<uint8_t>* preloaded,
+                                       int chatIdOverride, const QString& chatTypeOverride) {
+    if (msgIndex < 0) { return; }
+    int chatId;
+    QString chatType;
+    const ChatElement* el = nullptr;
+    if (chatIdOverride >= 0) {
+        chatId = chatIdOverride;
+        chatType = chatTypeOverride;
+        ChatHistory* t = m_chatbuf.ptr(chatId, std::string(qToUtf8(chatType).data()));
+        if (!t || msgIndex >= t->size()) { return; }
+        el = &(*t)[msgIndex];
+    } else {
+        if (msgIndex >= chatWidget->messageCount() || currentChatId < 0) { return; }
+        chatId = currentChatId;
+        chatType = currentChatType;
+        el = &chatWidget->mutableMessageAt(msgIndex);
+    }
+    if (el->etype != ChatElement::Video && el->etype != ChatElement::Audio
+        && el->etype != ChatElement::Gif) { return; }
 
-    int chatId = currentChatId;
-    QString chatType = currentChatType;
-    std::string mediaUrl = std::string(qToUtf8(el.mediaUrl).data());
-    int etype = (int)el.etype;
+    std::string mediaUrl = std::string(qToUtf8(el->mediaUrl).data());
+    int etype = (int)el->etype;
 
     if (preloaded) {
         // 已下载完成回调里有原始字节，直接后台处理
@@ -3271,6 +3304,7 @@ void MainWindow::runMediaPostproc(int msgIndex, bool pendingPlay,
             } else if (qRuncmdCaptureOuterr("ffmpeg", QStringList()
                         << "-y" << "-i" << qFromUtf8(fpath)
                         << "-vf" << "fps=12,scale='min(320,iw)':-2"
+                        << "-f" << "gif"
                         << qFromUtf8(gpath), &err) == 0) {
                 ev->gifFile = gpath;
             }
@@ -3298,10 +3332,11 @@ void MainWindow::handleMediaPostproc(MediaDownloadEvent* e) {
                  e->chatId, e->chatType.c_str(), e->msgIndex, e->errorInfo.c_str());
         return;
     }
-    if (e->chatId != currentChatId || qFromUtf8(e->chatType) != currentChatType) { return; }
-    if (e->msgIndex < 0 || e->msgIndex >= chatWidget->messageCount()) { return; }
-
-    ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
+    ChatHistory* target = m_chatbuf.ptr(e->chatId, e->chatType);
+    if (!target || e->msgIndex < 0 || e->msgIndex >= target->size()) { return; }
+    ChatElement& el = (*target)[e->msgIndex];
+    bool isCurrent = (e->chatId == currentChatId
+                      && qFromUtf8(e->chatType) == currentChatType);
     if (e->durationSec > 0) { el.durationSec = e->durationSec; }
     if (e->isShortGif) { el.gifLikeVideo = true; }
     if (!qFromUtf8(e->gifFile).isEmpty()) {
@@ -3324,7 +3359,7 @@ void MainWindow::handleMediaPostproc(MediaDownloadEvent* e) {
     if (!el.mediaUrl.isEmpty()) {
         db_writeMessage(e->chatId, e->chatType, el);
     }
-    chatWidget->updateElement(e->msgIndex);
+    if (isCurrent) { chatWidget->updateElement(e->msgIndex); }
 
     if (e->pendingPlay) {
         el.pendingPlay = false;
