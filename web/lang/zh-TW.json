@@ -273,6 +273,8 @@
         "page_last": "最後一頁",
         "page_indicator": "第 {0} / {1} 頁",
         "searching": "搜尋中...",
+        "cancel": "取消",
+        "cancelled": "已取消",
         "result_summary": "共 {0} 個結果 · 花費 {1} 毫秒"
     }
 }

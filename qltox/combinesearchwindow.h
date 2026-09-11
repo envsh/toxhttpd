@@ -4,6 +4,7 @@
 #include "compat34.h"
 #include "searchlistview.h"
 #include <qdialog.h>
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -16,12 +17,16 @@ class CombineSearch : public QDialog {
     Q_OBJECT
 public:
     explicit CombineSearch(QWidget* parent = nullptr);
+    bool isSearching() const { return m_searching; }
 
 protected:
     void keyPressEvent(QKeyEvent* e);
+    void closeEvent(QCloseEvent* e);
+    void customEvent(CustomEventBase* event);
 
 private slots:
     void runSearch();
+    void onCancelClicked();
     void onTabClicked();
     void onViewScroll(int v);
     void goFirst();
@@ -55,6 +60,7 @@ private:
 
     PlaceholderLineEdit* m_input = nullptr;
     QPushButton* m_searchBtn = nullptr;
+    QPushButton* m_cancelBtn = nullptr;
     QPushButton* m_tabContacts = nullptr;
     QPushButton* m_tabMessages = nullptr;
     QPushButton* m_firstBtn = nullptr;
@@ -75,6 +81,10 @@ private:
     std::vector<RowInfo> m_contactRows;
     std::vector<RowInfo> m_messageRows;
     int m_curPage[2] = {0, 0};
+    std::atomic<bool> m_closed;
+    std::atomic<bool> m_canceled;
+    bool m_searching = false;
+    int m_searchSeq = 0;
 };
 
 #endif

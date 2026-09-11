@@ -23,6 +23,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 static const int VIRTUAL_SEARCH_UNKNOWN_ID = -100;
@@ -95,6 +96,29 @@ const VirtualSeed kVirtualSeeds[] = {
     { VIRTUAL_SEARCH_BOOKMARK_ID, "Bookmark", kBookmarkType },
 };
 
+const EventType34 SearchReadyType = toEventType34(QEvent::User + 107);
+
+struct SearchMsgData {
+    std::string chanName;
+    std::string sender;
+    std::string body;
+    std::string time;
+};
+
+class SearchCompletedEvent : public CustomEventBase {
+public:
+    int seq;
+    long long elapsedMs;
+    std::vector<std::pair<std::string, std::string>> contacts;
+    std::vector<SearchMsgData> messages;
+
+    SearchCompletedEvent(int s, long long ms,
+                         std::vector<std::pair<std::string, std::string>> c,
+                         std::vector<SearchMsgData> m)
+        : CustomEventBase(SearchReadyType), seq(s), elapsedMs(ms),
+          contacts(std::move(c)), messages(std::move(m)) {}
+};
+
 }  // namespace
 
 CombineSearch::CombineSearch(QWidget* parent)
@@ -107,8 +131,11 @@ CombineSearch::CombineSearch(QWidget* parent)
     setAttribute(Qt::WA_DeleteOnClose);
 #endif
     qSetWindowTitle(this, _("combine_search.title"));
-    resize(600, 500);
-    setMinimumSize(600, 400);
+    resize(650, 550);
+    setMinimumSize(650, 450);
+
+    m_closed.store(false);
+    m_canceled.store(false);
 
     QVBoxLayout* root = new QVBoxLayout(this);
     root->setMargin(8);
@@ -120,8 +147,12 @@ CombineSearch::CombineSearch(QWidget* parent)
     connect(m_input, SIGNAL(returnPressed()), this, SLOT(runSearch()));
     m_searchBtn = new QPushButton(_("combine_search.button"), this);
     connect(m_searchBtn, SIGNAL(clicked()), this, SLOT(runSearch()));
+    m_cancelBtn = new QPushButton(_("combine_search.cancel"), this);
+    m_cancelBtn->setEnabled(false);
+    connect(m_cancelBtn, SIGNAL(clicked()), this, SLOT(onCancelClicked()));
     searchRow->addWidget(m_input, 1);
     searchRow->addWidget(m_searchBtn);
+    searchRow->addWidget(m_cancelBtn);
     root->addLayout(searchRow);
 
     QHBoxLayout* tabRow = new QHBoxLayout;
@@ -357,123 +388,217 @@ void CombineSearch::clearLayout(QLayout* lay) {
 }
 
 void CombineSearch::runSearch() {
-    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-    m_statusLabel->setText(_("combine_search.searching"));
-    qApp->processEvents();
+    if (m_searching) { return; }
 
-    QString query = trimStr(m_input->text());
-    QString upperQ = qToUpper(query);
+    m_searching = true;
+    m_canceled.store(false);
+    ++m_searchSeq;
+    int seq = m_searchSeq;
+
     m_contacts.clear();
     m_messages.clear();
-
-    std::map<std::pair<int, std::string>, QString> nameMap;
-    if (!query.isEmpty()) {
-        {
-            auto channels = Storage::instance().channelDb()->load_all_channels();
-            for (const auto& row : channels) {
-                auto sep = row.chanid.rfind('_');
-                if (sep == std::string::npos) { continue; }
-                std::string type = row.chanid.substr(0, sep);
-                int id = 0;
-                try {
-                    id = std::stoi(row.chanid.substr(sep + 1));
-                } catch (...) {
-                    continue;
-                }
-                QString name = qFromUtf8(row.name.c_str());
-                nameMap[std::make_pair(id, type)] = name;
-                if (qToUpper(name).contains(upperQ)) {
-                    ContactHit h;
-                    h.id = id;
-                    h.type = type;
-                    h.name = name;
-                    h.typeLabel = typeLabel(type);
-                    m_contacts.push_back(h);
-                }
-            }
-        }
-        for (const VirtualSeed& s : kVirtualSeeds) {
-            QString name = qFromUtf8(s.name);
-            if (qToUpper(name).contains(upperQ)) {
-                ContactHit h;
-                h.id = s.id;
-                h.type = s.type;
-                h.name = name;
-                h.typeLabel = typeLabel(s.type);
-                m_contacts.push_back(h);
-            }
-        }
-
-        std::vector<int64_t> ids = Storage::instance().messageDb()->search_messages(
-            qToUtf8(query).data(), 100);
-        for (int64_t rowid : ids) {
-            std::unique_ptr<MessageRow> row = Storage::instance().messageDb()->get_message(rowid);
-            if (!row) { continue; }
-            auto sep = row->chanid.rfind('_');
-            if (sep == std::string::npos) { continue; }
-            std::string type = row->chanid.substr(0, sep);
-            int id = 0;
-            try {
-                id = std::stoi(row->chanid.substr(sep + 1));
-            } catch (...) {
-                continue;
-            }
-            MessageHit h;
-            h.id = id;
-            h.type = type;
-            std::map<std::pair<int, std::string>, QString>::const_iterator it =
-                nameMap.find(std::make_pair(id, type));
-            h.chanName = (it != nameMap.end()) ? it->second : qFromUtf8(row->chanid.c_str());
-            h.sender = qFromUtf8(row->sender_name.c_str());
-            if (h.sender.isEmpty()) { h.sender = qFromUtf8("未知"); }
-            h.body = qFromUtf8(row->data.c_str());
-            h.time = qFromUtf8(row->time_text.c_str());
-            m_messages.push_back(h);
-        }
-    }
-
     m_contactRows.clear();
-    for (const auto& c : m_contacts) {
-        RowInfo r;
-        r.title = c.name;
-        r.detail = c.typeLabel;
-        m_contactRows.push_back(r);
-    }
     m_messageRows.clear();
-    for (const auto& m : m_messages) {
-        RowInfo r;
-        r.title = qFromUtf8("[") + m.sender + qFromUtf8("] ") + m.body;
-        r.detail = m.chanName + qFromUtf8(" · ") + m.time;
-        m_messageRows.push_back(r);
+
+    QString query = trimStr(m_input->text());
+    std::string qquery;
+    if (!query.isEmpty()) {
+        QByteArray qb = qToUtf8(query);
+        qquery.assign(qb.data(), (size_t)qb.size());
     }
 
+    m_statusLabel->setText(_("combine_search.searching"));
+    m_searchBtn->setEnabled(false);
+    m_cancelBtn->setEnabled(true);
+    m_firstBtn->setEnabled(false);
+    m_prevBtn->setEnabled(false);
+    m_nextBtn->setEnabled(false);
+    m_lastBtn->setEnabled(false);
     m_curPage[0] = 0;
     m_curPage[1] = 0;
     showPage(activeTab(), 0);
 
-    for (int i = 0; i < kTestRows; ++i) {
-        RowInfo r;
-        r.title = qFromUtf8("TEST-") + QString::number(i + 1)
-                  + qFromUtf8(" 测试数据 ") + QString::number(i + 1);
-        r.detail = qFromUtf8("test_chan") + qFromUtf8(" 渲染/滚动/分页验证用行");
-        m_messageRows.push_back(r);
-    }
+    std::thread t([this, seq, qquery] {
+        std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
 
-    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - t0).count();
-    int totalHit = (int)(m_contactRows.size() + m_messageRows.size()) - kTestRows;
-    m_statusLabel->setText(_A("combine_search.result_summary",
-                              QStringList() << QString::number(totalHit)
-                                            << QString::number(elapsed)));
+        std::vector<ContactHit> contactHits;
+        std::vector<MessageHit> messageHits;
 
-    bool hasMsg = (m_messageRows.size() > (size_t)kTestRows);
-    bool hasContacts = (!m_contactRows.empty());
-    int targetTab = (hasMsg || !hasContacts) ? 1 : 0;
-    if (targetTab == 1) {
-        qSetChecked(m_tabMessages, true);
-    } else {
-        qSetChecked(m_tabContacts, true);
-    }
-    qStackSetCurrent(m_stack, m_pages[targetTab]);
+        if (!qquery.empty()) {
+            QString q = qFromUtf8(qquery.c_str());
+            QString upperQ = qToUpper(q);
+
+            std::map<std::pair<int, std::string>, QString> nameMap;
+            {
+                auto channels = Storage::instance().channelDb()->load_all_channels();
+                for (const auto& row : channels) {
+                    auto sep = row.chanid.rfind('_');
+                    if (sep == std::string::npos) { continue; }
+                    std::string type = row.chanid.substr(0, sep);
+                    int id = 0;
+                    try {
+                        id = std::stoi(row.chanid.substr(sep + 1));
+                    } catch (...) {
+                        continue;
+                    }
+                    QString name = qFromUtf8(row.name.c_str());
+                    nameMap[std::make_pair(id, type)] = name;
+                    if (qToUpper(name).contains(upperQ)) {
+                        ContactHit h;
+                        h.id = id;
+                        h.type = type;
+                        h.name = name;
+                        contactHits.push_back(h);
+                    }
+                }
+            }
+            for (const VirtualSeed& s : kVirtualSeeds) {
+                QString name = qFromUtf8(s.name);
+                if (qToUpper(name).contains(upperQ)) {
+                    ContactHit h;
+                    h.id = s.id;
+                    h.type = s.type;
+                    h.name = name;
+                    contactHits.push_back(h);
+                }
+            }
+            if (m_canceled.load()) { return; }
+
+            std::vector<int64_t> ids = Storage::instance().messageDb()->search_messages(
+                qquery.c_str(), 100);
+            int n = 0;
+            for (int64_t rowid : ids) {
+                std::unique_ptr<MessageRow> row = Storage::instance().messageDb()->get_message(rowid);
+                if (!row) { continue; }
+                auto sep = row->chanid.rfind('_');
+                if (sep == std::string::npos) { continue; }
+                std::string type = row->chanid.substr(0, sep);
+                int id = 0;
+                try {
+                    id = std::stoi(row->chanid.substr(sep + 1));
+                } catch (...) {
+                    continue;
+                }
+                MessageHit h;
+                h.id = id;
+                h.type = type;
+                std::map<std::pair<int, std::string>, QString>::const_iterator it =
+                    nameMap.find(std::make_pair(id, type));
+                h.chanName = (it != nameMap.end()) ? it->second : qFromUtf8(row->chanid.c_str());
+                h.sender = qFromUtf8(row->sender_name.c_str());
+                h.body = qFromUtf8(row->data.c_str());
+                h.time = qFromUtf8(row->time_text.c_str());
+                messageHits.push_back(h);
+                if (++n % 25 == 0 && m_canceled.load()) { return; }
+            }
+        }
+        if (m_canceled.load()) { return; }
+
+        std::vector<std::pair<std::string, std::string>> contacts;
+        contacts.reserve(contactHits.size());
+        for (const auto& c : contactHits) {
+            contacts.push_back(std::make_pair(std::string(qToUtf8(c.name).data()),
+                                              c.type));
+        }
+        std::vector<SearchMsgData> messages;
+        messages.reserve(messageHits.size());
+        for (const auto& m : messageHits) {
+            SearchMsgData d;
+            d.chanName = std::string(qToUtf8(m.chanName).data());
+            d.sender = std::string(qToUtf8(m.sender).data());
+            d.body = std::string(qToUtf8(m.body).data());
+            d.time = std::string(qToUtf8(m.time).data());
+            messages.push_back(std::move(d));
+        }
+
+        long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0).count();
+
+        if (m_canceled.load() || m_closed.load()) { return; }
+
+        QApplication::postEvent(this, new SearchCompletedEvent(
+            seq, elapsed, std::move(contacts), std::move(messages)));
+    });
+    t.detach();
+}
+
+void CombineSearch::onCancelClicked() {
+    m_searching = false;
+    m_canceled.store(true);
+    m_searchBtn->setEnabled(true);
+    m_cancelBtn->setEnabled(false);
+    m_statusLabel->setText(_("combine_search.cancelled"));
+    m_firstBtn->setEnabled(false);
+    m_prevBtn->setEnabled(false);
+    m_nextBtn->setEnabled(false);
+    m_lastBtn->setEnabled(false);
+    m_curPage[0] = 0;
+    m_curPage[1] = 0;
     showPage(activeTab(), 0);
+}
+
+void CombineSearch::customEvent(CustomEventBase* event) {
+    if (event->type() == SearchReadyType) {
+        SearchCompletedEvent* e = static_cast<SearchCompletedEvent*>(event);
+        if (m_canceled.load() || e->seq != m_searchSeq) { return; }
+
+        m_contactRows.clear();
+        for (size_t i = 0; i < e->contacts.size(); ++i) {
+            RowInfo r;
+            r.title = qFromUtf8(e->contacts[i].first.c_str());
+            r.detail = typeLabel(e->contacts[i].second);
+            m_contactRows.push_back(r);
+        }
+        m_messageRows.clear();
+        for (size_t i = 0; i < e->messages.size(); ++i) {
+            RowInfo r;
+            QString sender = qFromUtf8(e->messages[i].sender.c_str());
+            if (sender.isEmpty()) {
+                sender = qFromUtf8("未知");
+            }
+            r.title = qFromUtf8("[") + sender + qFromUtf8("] ")
+                      + qFromUtf8(e->messages[i].body.c_str());
+            r.detail = qFromUtf8(e->messages[i].chanName.c_str())
+                       + qFromUtf8(" · ") + qFromUtf8(e->messages[i].time.c_str());
+            m_messageRows.push_back(r);
+        }
+        for (int i = 0; i < kTestRows; ++i) {
+            RowInfo r;
+            r.title = qFromUtf8("TEST-") + QString::number(i + 1)
+                      + qFromUtf8(" 测试数据 ") + QString::number(i + 1);
+            r.detail = qFromUtf8("test_chan") + qFromUtf8(" 渲染/滚动/分页验证用行");
+            m_messageRows.push_back(r);
+        }
+
+        int totalHit = (int)(m_contactRows.size() + m_messageRows.size()) - kTestRows;
+        m_statusLabel->setText(_A("combine_search.result_summary",
+                                  QStringList() << QString::number(totalHit)
+                                                << QString::number(e->elapsedMs)));
+
+        m_searching = false;
+        m_searchBtn->setEnabled(true);
+        m_cancelBtn->setEnabled(false);
+
+        bool hasMsg = (m_messageRows.size() > (size_t)kTestRows);
+        bool hasContacts = (!m_contactRows.empty());
+        int targetTab = (hasMsg || !hasContacts) ? 1 : 0;
+        if (targetTab == 1) {
+            qSetChecked(m_tabMessages, true);
+        } else {
+            qSetChecked(m_tabContacts, true);
+        }
+        qStackSetCurrent(m_stack, m_pages[targetTab]);
+        m_curPage[0] = 0;
+        m_curPage[1] = 0;
+        showPage(targetTab, 0);
+        return;
+    }
+    QDialog::customEvent(event);
+}
+
+void CombineSearch::closeEvent(QCloseEvent* e) {
+    m_closed.store(true);
+    m_canceled.store(true);
+    QApplication::removePostedEvents(this);
+    QDialog::closeEvent(e);
 }

@@ -292,6 +292,8 @@
         "page_last": "Last",
         "page_indicator": "Page {0} / {1}",
         "searching": "Searching...",
+        "cancel": "Cancel",
+        "cancelled": "Search cancelled",
         "result_summary": "Found {0} result(s) in {1} ms"
     }
 }

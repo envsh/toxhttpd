@@ -290,6 +290,8 @@
         "page_last": "最后一页",
         "page_indicator": "第 {0} / {1} 页",
         "searching": "搜索中...",
+        "cancel": "取消",
+        "cancelled": "已取消",
         "result_summary": "共 {0} 条结果 · 用时 {1} 毫秒"
     }
 }
