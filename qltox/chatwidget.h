@@ -60,6 +60,7 @@ signals:
     void sourceClicked(int msgIndex);
     void retryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
+    void openMediaPlayer(int msgIndex);
     void resendMessage(int msgIndex);
     void requestRedactMessage(int msgIndex);
 

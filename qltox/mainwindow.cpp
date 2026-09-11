@@ -14,6 +14,7 @@
 #include "storage.h"
 #include "channel_db.h"
 #include "cache_db.h"
+#include "cache_fs.h"
 #include "config.h"
 #include "cJSON.h"
 #include "msgdb_helper.h"
@@ -33,6 +34,12 @@
 #include "screenshotmanager.h"
 #include "screenshotpreview.h"
 #include <qfile.h>
+#include <unistd.h>     // access()
+#ifdef QT3_BUILD
+#include <qurl.h>
+#else
+#include <QUrl>
+#endif
 #ifdef QT3_BUILD
 #include <qdatetime.h>
 #else
@@ -70,6 +77,36 @@ static const int VIRTUAL_BOOKMARK_ID  = -103;
 static const int VIRTUAL_AICHAT_ID    = -104;
 static const int VIRTUAL_PASTEBIN_ID  = -105;
 static const int VIRTUAL_TRANSLATE_ID = -106;
+
+// ── 媒体本机播放辅助（worker 线程调用，不触碰 UI）──
+static bool isGifLikeCandidate(const std::string& mediaUrl) {
+    size_t slash = mediaUrl.find_last_of('/');
+    std::string file = (slash == std::string::npos) ? mediaUrl : mediaUrl.substr(slash + 1);
+    std::string lower;
+    for (size_t i = 0; i < file.size(); ++i) {
+        char c = file[i];
+        lower += (char)((c >= 'A' && c <= 'Z') ? c + 32 : c);
+    }
+    return lower.rfind(".webm") == lower.size() - 5
+        || lower.rfind(".mp4")  == lower.size() - 4;
+}
+
+static void urlIdPart(const std::string& mediaUrl, std::string* out) {
+    size_t slash = mediaUrl.find_last_of('/');
+    std::string id = (slash == std::string::npos) ? mediaUrl : mediaUrl.substr(slash + 1);
+    size_t q = id.find('?');
+    if (q != std::string::npos) { id = id.substr(0, q); }
+    *out = id;
+}
+
+// ffprobe 输出的时长（Qt3 无 QString::trimmed）
+static double durationStr(const QString& s) {
+#ifdef QT3_BUILD
+    return s.stripWhiteSpace().toDouble();
+#else
+    return s.trimmed().toDouble();
+#endif
+}
 
 // ── media thumbnail 辅助函数（从原始字节解码 → 缩放到显示尺寸）──
 static QPixmap decodeRawToThumb(const char* data, int len, int mediaW, int mediaH, int maxW) {
@@ -505,6 +542,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(requestRedactMessage(int)), this, SLOT(onRequestRedactMessage(int)));
     connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
+    connect(chatWidget, SIGNAL(openMediaPlayer(int)),
+            this, SLOT(onOpenMediaPlayer(int)));
     connect(chatWidget, SIGNAL(fileSendRequested(const QString&, const QString&)),
             this, SLOT(onFileSendRequested(const QString&, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
@@ -691,6 +730,7 @@ void MainWindow::customEvent(CustomEventBase* event) {
     // 媒体下载完成
     if (event->type() == MediaDownloadReadyType) {
         MediaDownloadEvent* e = static_cast<MediaDownloadEvent*>(event);
+        if (e->postprocDone) { handleMediaPostproc(e); return; }
         int cid = currentChatId;
         QString ctype = currentChatType;
         if (cid == e->chatId && ctype == qFromUtf8(e->chatType)) {
@@ -715,6 +755,13 @@ void MainWindow::customEvent(CustomEventBase* event) {
 
                     el.downloadState = ChatElement::Completed;
                     chatWidget->updateElement(e->msgIndex);
+
+                    bool elPendingPlay = el.pendingPlay;
+                    bool isVideo = (el.etype == ChatElement::Video);
+                    if (isVideo || elPendingPlay) {
+                        std::vector<uint8_t> procData(e->rawData.begin(), e->rawData.end());
+                        scheduleMediaPlayback(e->msgIndex, elPendingPlay, &procData);
+                    }
                 }
             } else {
                 qWarning("Media download failed: chat=%d/%s idx=%d err=%s",
@@ -3073,6 +3120,177 @@ void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {
             }
             QApplication::postEvent(this, ev);
         });
+}
+
+void MainWindow::onOpenMediaPlayer(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    if (currentChatId < 0) { return; }
+
+    ChatElement& el = chatWidget->mutableMessageAt(msgIndex);
+    if (el.etype != ChatElement::Video && el.etype != ChatElement::Audio) { return; }
+
+    if (el.downloadState == ChatElement::InProgress) {
+        el.pendingPlay = true;   // 下载完成后自动交给播放器
+        return;
+    }
+    if (el.downloadState == ChatElement::Completed) {
+        el.pendingPlay = true;
+        scheduleMediaPlayback(msgIndex, true);
+        return;
+    }
+    // 未下载/失败 → 触发下载 + 待播放
+    el.pendingPlay = true;
+    onRetryClicked(msgIndex, el.mediaUrl, "open_player");
+}
+
+void MainWindow::scheduleMediaPlayback(int msgIndex, bool pendingPlay,
+                                       const std::vector<uint8_t>* preloaded) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    if (currentChatId < 0) { return; }
+    const ChatElement& el = chatWidget->messageAt(msgIndex);
+    if (el.etype != ChatElement::Video && el.etype != ChatElement::Audio) { return; }
+
+    int chatId = currentChatId;
+    QString chatType = currentChatType;
+    std::string mediaUrl = std::string(qToUtf8(el.mediaUrl).data());
+    int etype = (int)el.etype;
+
+    if (preloaded) {
+        // 已下载完成回调里有原始字节，直接后台处理
+        std::vector<uint8_t> data = *preloaded;
+        std::thread worker([this, msgIndex, pendingPlay, chatId, chatType, etype, mediaUrl, data]() {
+            runMediaPostproc(msgIndex, pendingPlay, chatId,
+                std::string(qToUtf8(chatType).data()), etype, mediaUrl, data);
+        });
+        worker.detach();
+        return;
+    }
+
+    std::string key = mediaCacheKey("file", qFromUtf8(mediaUrl));
+    Storage::instance().cacheDbAsync()->loadMedia(
+        key,
+        [this, msgIndex, pendingPlay, chatId, chatType, etype, mediaUrl](
+            std::vector<uint8_t> data, std::string) {
+            runMediaPostproc(msgIndex, pendingPlay, chatId,
+                std::string(qToUtf8(chatType).data()), etype, mediaUrl, data);
+        });
+}
+
+void MainWindow::runMediaPostproc(int msgIndex, bool pendingPlay,
+                                  int chatId, const std::string& chatType, int etype,
+                                  const std::string& mediaUrl,
+                                  std::vector<uint8_t> data) {
+    auto* ev = new MediaDownloadEvent();
+    ev->chatId = chatId;
+    ev->chatType = chatType;
+    ev->msgIndex = msgIndex;
+    ev->mxcUrl = mediaUrl;
+    ev->pendingPlay = pendingPlay;
+    ev->postprocDone = true;
+
+    if (data.empty()) {
+        ev->success = false;
+        ev->errorInfo = "cache miss";
+        QApplication::postEvent(this, ev);
+        return;
+    }
+
+    // 实体化原文件（相同 key 已落盘则跳过，兼容 >1MB 文件下载时的 put_ref 路径）
+    std::string base = Storage::instance().dataDir();
+    std::string fkey = mediaCacheKey("file", qFromUtf8(mediaUrl));
+    std::string fpath = base + "/" + makeCacheFsPath(fkey.c_str());
+    if (::access(fpath.c_str(), F_OK) != 0) {
+        if (!writeCacheFile(fpath, data.data(), data.size())) {
+            ev->success = false;
+            ev->errorInfo = "write file failed";
+            QApplication::postEvent(this, ev);
+            return;
+        }
+    }
+    ev->localFile = fpath;
+
+    // 视频短片判定与转码（无 ffprobe/ffmpeg 时退化：不做动画，仅保留 ← 原文件可播放）
+    if (etype == (int)ChatElement::Video && isGifLikeCandidate(mediaUrl)) {
+        QString out, err;
+        int durationMs = 0;
+        if (qRuncmdCaptureOuterr("ffprobe", QStringList()
+                << "-v" << "error"
+                << "-show_entries" << "format=duration"
+                << "-of" << "default=noprint_wrappers=1:nokey=1"
+                << qFromUtf8(fpath), &out) == 0) {
+            durationMs = (int)(durationStr(out) * 1000.0);
+        }
+        ev->durationSec = durationMs / 1000;
+        if (ev->durationSec >= 1 && ev->durationSec <= 3) {
+            ev->isShortGif = true;
+            std::string urlId;
+            urlIdPart(mediaUrl, &urlId);
+            std::string gkey = "gifplay_" + urlId;
+            std::string gpath = base + "/" + makeCacheFsPath(gkey.c_str());
+            if (::access(gpath.c_str(), F_OK) == 0) {
+                ev->gifFile = gpath;   // 转码产物存在，幂等跳过
+            } else if (qRuncmdCaptureOuterr("ffmpeg", QStringList()
+                        << "-y" << "-i" << qFromUtf8(fpath)
+                        << "-vf" << "fps=12,scale=min(320,iw):-2"
+                        << qFromUtf8(gpath), &err) == 0) {
+                ev->gifFile = gpath;
+            }
+        }
+    }
+
+    ev->success = true;
+    QApplication::postEvent(this, ev);
+}
+
+void MainWindow::handleMediaPostproc(MediaDownloadEvent* e) {
+    if (!e->success) {
+        qWarning("Media postproc failed: chat=%d/%s idx=%d err=%s",
+                 e->chatId, e->chatType.c_str(), e->msgIndex, e->errorInfo.c_str());
+        return;
+    }
+    if (e->chatId != currentChatId || qFromUtf8(e->chatType) != currentChatType) { return; }
+    if (e->msgIndex < 0 || e->msgIndex >= chatWidget->messageCount()) { return; }
+
+    ChatElement& el = chatWidget->mutableMessageAt(e->msgIndex);
+    if (e->durationSec > 0) { el.durationSec = e->durationSec; }
+    if (e->isShortGif) { el.gifLikeVideo = true; }
+    if (!qFromUtf8(e->gifFile).isEmpty()) { el.gifPath = qFromUtf8(e->gifFile); }
+    if (!el.mediaUrl.isEmpty()) {
+        db_writeMessage(e->chatId, e->chatType, el);
+    }
+    chatWidget->updateElement(e->msgIndex);
+
+    if (e->pendingPlay) {
+        el.pendingPlay = false;
+        launchPlayer(qFromUtf8(e->localFile), el.gifLikeVideo);
+    }
+}
+
+void MainWindow::launchPlayer(const QString& filePath, bool gifLike) {
+    if (filePath.isEmpty()) { return; }
+    QStringList args;
+    if (gifLike) { args << "--loop-file=inf" << "--no-audio"; }
+    args << filePath;
+
+    bool ok = false;
+    if (QFile::exists("/usr/bin/mpv")) { ok = qStartProcessDetached("mpv", args); }
+    if (!ok) { ok = qStartProcessDetached("mpv", args); }   // PATH 兜底
+#if defined(Q_OS_MACX)
+    if (!ok) {
+        QStringList iargs;
+        iargs << "-a" << "IINA" << filePath;
+        ok = qStartProcessDetached("open", iargs);
+    }
+#endif
+    if (!ok) {
+        qWarning("launchPlayer: no player for [%s], fallback system default",
+                 qToUtf8(filePath).data());
+#ifdef QT3_BUILD
+        qOpenUrl(QString("file://") + filePath);
+#else
+        qOpenUrl(QUrl::fromLocalFile(filePath).toString());
+#endif
+    }
 }
 
 void MainWindow::onFileSendRequested(const QString& filePath, const QString& caption) {

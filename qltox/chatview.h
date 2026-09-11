@@ -83,6 +83,8 @@ struct ChatElement {
 
     // Video only
     int durationSec;
+    bool gifLikeVideo;     // ≤3s webm/mp4，当作动图循环展示
+    bool pendingPlay;      // 双击触发，下载完成后自动交给播放器
 
     // Gif only
     QString gifPath;
@@ -107,7 +109,8 @@ struct ChatElement {
         , transState(TransState::None), needsTranslateComputed(false), needsTranslateResult(false)
         , downloadState(NotRequested)
         , mediaWidth(0), mediaHeight(0)
-        , fileSize(0), progress(0), durationSec(0), movie(nullptr)
+        , fileSize(0), progress(0), durationSec(0), gifLikeVideo(false), pendingPlay(false)
+        , movie(nullptr)
         , cachedWidth(-1), height(0), firstInGroup(1), sendState(SendSending) {}
 
     int calcHeight(int viewWidth, const QFontMetrics& fm, int emojiW, const QFont& baseFont);
@@ -115,8 +118,8 @@ struct ChatElement {
                const std::vector<QRect>& selRects,
                const QFontMetrics& fm, int emojiW,
                const QFont& baseFont, const StyleParams::Palette& pal);
-    void startAnimation(QWidget* parent, int msgIndex);
-    void stopAnimation();
+    void startGifLikeAnimation(QWidget* parent, int msgIndex);
+    void stopGifLikeAnimation();
 };
 
 QPixmap makeScaledThumb(const QPixmap& src, int mediaW, int mediaH, int maxContainW);
@@ -191,6 +194,7 @@ signals:
     void retryClicked(int msgIndex, const QString& mediaUrl, const QString& source);
     void downloadNeeded(int msgIndex, const QString& mediaUrl);
     void openFullSizeImage(int msgIndex, const QString& mediaUrl);
+    void openMediaPlayer(int msgIndex);
     void resendMessage(int msgIndex);
     void autoTranslateRequested(int msgIndex, const QString& text, const QString& toLang);
     void replyRequested(int msgIndex);
@@ -224,7 +228,7 @@ private:
     QRect messageRect(int msgIndex) const;
     int contentWidth() const;
     int charWidth(uint32_t cp);
-    void manageAnimations();
+    void manageGifLikeAnimations();
     std::pair<int,int> visibleMessageRange() const;
     void _updateScrollState();
 

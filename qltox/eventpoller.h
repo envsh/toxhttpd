@@ -170,6 +170,13 @@ public:
     std::string rawData;   // 原始字节，WebP 等 Qt 不支持时 fallback
     bool success = false;
     std::string errorInfo;
+    // 后处理字段（postprocDone 时填充）：实体化原文件 + 短动画探测/转码结果
+    std::string localFile;    // 实体化后的原文件全路径
+    std::string gifFile;      // 转码后 GIF 路径（仅短片）
+    int durationSec = 0;
+    bool isShortGif  = false;
+    bool pendingPlay = false;
+    bool postprocDone = false;   // true=后处理完成，走播放/动图落地；false=下载完成
 };
 
 class AvatarDownloadEvent : public CustomEventBase {

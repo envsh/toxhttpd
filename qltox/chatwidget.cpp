@@ -200,6 +200,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(messageArea, SIGNAL(resendMessage(int)), this, SIGNAL(resendMessage(int)));
     connect(messageArea, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SIGNAL(openFullSizeImage(int, const QString&)));
+    connect(messageArea, SIGNAL(openMediaPlayer(int)),
+            this, SIGNAL(openMediaPlayer(int)));
     connect(messageArea, SIGNAL(mentionClicked(const QString&)),
             this, SLOT(onMentionClicked(const QString&)));
     connect(messageArea, SIGNAL(autoTranslateRequested(int, const QString&, const QString&)),

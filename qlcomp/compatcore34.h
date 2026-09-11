@@ -64,6 +64,12 @@ QString getCurrentTime();
 // 系统打开 URL（非 QT3: QDesktopServices::openUrl；QT3: 平台 shell 命令）
 void qOpenUrl(const QString& url);
 
+// 同步运行命令并捕获 stdout+stderr；返回退出码（-1=启动失败）
+int qRuncmdCaptureOuterr(const QString& program, const QStringList& args, QString* outErr);
+
+// 分离启动外部进程（播放器等）；返回是否成功启动
+bool qStartProcessDetached(const QString& program, const QStringList& args);
+
 // ========== QPtrList 兼容（Qt4 模拟） ==========
 #ifndef QT3_BUILD
 template<typename T>

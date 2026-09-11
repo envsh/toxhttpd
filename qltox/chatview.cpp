@@ -361,8 +361,21 @@ static int paintThumbnail(QPainter& p, const QRect& imgRect,
     return dh;
 }
 
+// ───── 短动图（≤3s webm/mp4）───
+// 写死默认自动：下载完成的短动画在消息列表内嵌循环预览；改 false 即关
+static bool g_autoPreviewGifLikeVideo = true;
+
+static bool isGifLikeVideo(const ChatElement& el) {
+    if (el.etype != ChatElement::Video) { return false; }
+    return el.gifLikeVideo || !el.gifPath.isEmpty();
+}
+
+static bool hasGifLiveMovie(const ChatElement& el) {
+    return el.etype == ChatElement::Video && !el.gifPath.isEmpty();
+}
+
 static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
-    ChatElement::ElementType etype,
+    ChatElement::ElementType etype, bool gifLikeVideo,
     const QPixmap& fullImage, const QString& caption,
     int mediaWidth, int mediaHeight, int durationSec,
     QMovie* movie,
@@ -378,7 +391,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 
     // Thumbnail / GIF frame
     QPixmap frame;
-    if (etype == ChatElement::Gif) {
+    if (etype == ChatElement::Gif || gifLikeVideo) {
 #ifndef QT3_BUILD
         if (movie && movie->isValid())
             frame = movie->currentPixmap();
@@ -388,7 +401,7 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
     int imgDispH = paintThumbnail(p, imgRect, src, mediaWidth, mediaHeight, baseFont, fm, pal, state, downloadBtnOut, retryBtnOut, fileSize);
 
     // GIF badge
-    if (etype == ChatElement::Gif) {
+    if (etype == ChatElement::Gif || gifLikeVideo) {
         int bw = 30, bh = 16;
         QRect badgeR(imgRect.x() + 4, imgRect.y() + 4, bw, bh);
 #ifdef QT3_BUILD
@@ -404,7 +417,8 @@ static void paintMediaContent(QPainter& p, const QRect& bubbleRect,
 #endif
         p.setPen(Qt::white);
         QFont bf = baseFont; bf.setPointSize(9); bf.setBold(true); p.setFont(bf);
-        p.drawText(badgeR, Qt::AlignCenter, qFromUtf8("GIF"));
+        p.drawText(badgeR, Qt::AlignCenter,
+                   etype == ChatElement::Gif ? qFromUtf8("GIF") : qFromUtf8("动图"));
         p.setFont(baseFont);
     }
 
@@ -1376,7 +1390,8 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
             thumbnailRect = QRect(bubbleRect.x() + kBubbleHPad, bubbleRect.y() + kBubbleVPad,
                                   bubbleRect.width() - 2*kBubbleHPad, bubbleRect.height() - 2*kBubbleVPad);
         }
-        paintMediaContent(p, bubbleRect, etype, scaledDisplay, caption,
+        paintMediaContent(p, bubbleRect, etype, isGifLikeVideo(*this),
+                          scaledDisplay, caption,
                           mediaWidth, mediaHeight, durationSec, movie,
                           baseFont, fm, emojiW, pal, downloadState,
                            &downloadBtnRect, &retryBtnRect, fileSize);
@@ -1548,6 +1563,7 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
         }
 
         paintAudioContent(p, bubbleRect, caption, durationSec, baseFont, fm, pal);
+        thumbnailRect = bubbleRect;   // 双击命中区（复用媒体字段）
         {
             DownloadBarInfo bi = paintDownloadStatusBar(p, bubbleRect, baseFont, pal,
                 downloadState, fileSize);
@@ -1910,8 +1926,12 @@ void ChatElement::paint(QPainter& p, int y, int viewWidth, bool isSelected,
     }
 }
 
-void ChatElement::startAnimation(QWidget* parent, int msgIndex) {
-    if (etype != Gif || movie) { return; }
+void ChatElement::startGifLikeAnimation(QWidget* parent, int msgIndex) {
+    if (movie) { return; }
+    bool isGif = (etype == Gif) || isGifLikeVideo(*this);
+    if (!isGif) { return; }
+    if (etype == Video && !hasGifLiveMovie(*this)) { return; }
+    if (etype == Video && !g_autoPreviewGifLikeVideo) { return; }
 #ifndef QT3_BUILD
     movie = new QMovie(gifPath);
     {
@@ -1928,7 +1948,7 @@ void ChatElement::startAnimation(QWidget* parent, int msgIndex) {
 #endif
 }
 
-void ChatElement::stopAnimation() {
+void ChatElement::stopGifLikeAnimation() {
     if (!movie) { return; }
 #ifndef QT3_BUILD
     movie->stop();
@@ -2201,7 +2221,7 @@ void ChatView::scrollBottomIfNeeded() {
 
 void ChatView::resetCanvas() {
     if (m_history) {
-        for (auto& el : *m_history) { el.stopAnimation(); }
+        for (auto& el : *m_history) { el.stopGifLikeAnimation(); }
     }
     m_gifFrameUpdated.clear();
     m_blocks.clear();
@@ -3237,13 +3257,19 @@ void ChatView::mouseDoubleClickEvent(QMouseEvent* event) {
                 (*m_history)[msgIndex].retryBtnRect.contains(event->pos())) {
                 return;
             }
-            // 双击媒体缩略图 → 异步从磁盘加载原图
+            // 双击缩略图：
+            //   Image/Gif → 原图查看器；Video/Audio → 本机播放器
             if (((*m_history)[msgIndex].etype == ChatElement::Image ||
-                 (*m_history)[msgIndex].etype == ChatElement::Video ||
                  (*m_history)[msgIndex].etype == ChatElement::Gif) &&
                 !(*m_history)[msgIndex].scaledDisplay.isNull() &&
                 (*m_history)[msgIndex].thumbnailRect.contains(event->pos())) {
                 emit openFullSizeImage(msgIndex, (*m_history)[msgIndex].mediaUrl);
+                return;
+            }
+            if (((*m_history)[msgIndex].etype == ChatElement::Video ||
+                 (*m_history)[msgIndex].etype == ChatElement::Audio) &&
+                (*m_history)[msgIndex].thumbnailRect.contains(event->pos())) {
+                emit openMediaPlayer(msgIndex);
                 return;
             }
         }
@@ -3429,7 +3455,7 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
 #endif
 }
 
-void ChatView::manageAnimations() {
+void ChatView::manageGifLikeAnimations() {
     if (!m_history) { return; }
     int viewBottom = m_scrollPos + height();
     int first = findByAbsY(m_scrollPos);
@@ -3439,17 +3465,19 @@ void ChatView::manageAnimations() {
     for (size_t i = first; i < m_history->size(); ++i) {
         int h = (*m_history)[i].height;
         bool visible = (absY + h > m_scrollPos) && (absY < viewBottom);
-        if ((*m_history)[i].etype == ChatElement::Gif) {
+        bool isGifLike = ((*m_history)[i].etype == ChatElement::Gif)
+                      || isGifLikeVideo((*m_history)[i]);
+        if (isGifLike) {
             if (visible) {
                 if (!(*m_history)[i].movie) {
-                    (*m_history)[i].startAnimation(this, i);
+                    (*m_history)[i].startGifLikeAnimation(this, i);
                 }
                 if ((*m_history)[i].movie && i < m_gifFrameUpdated.size() && m_gifFrameUpdated[i]) {
                     m_gifFrameUpdated[i] = 0;
                     update(QRect(0, y, width(), h));
                 }
             } else {
-                (*m_history)[i].stopAnimation();
+                (*m_history)[i].stopGifLikeAnimation();
             }
         }
         if (absY > viewBottom) { break; }
@@ -3459,7 +3487,7 @@ void ChatView::manageAnimations() {
 }
 
 void ChatView::onAnimTick() {
-    manageAnimations();
+    manageGifLikeAnimations();
 }
 
 void ChatView::onGifFrameUpdated(int msgIndex) {

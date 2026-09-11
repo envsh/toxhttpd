@@ -26,6 +26,8 @@
 #include "plugin_loader.h"
 #include "EmbeddedMenuBar.h"
 #include "mdeditor.h"
+#include <thread>
+#include <vector>
 #ifdef QT3_BUILD
 #include <qmap.h>
 #else
@@ -75,6 +77,7 @@ protected slots:
     void onResendMessage(int msgIndex);
     void onRequestRedactMessage(int msgIndex);
     void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
+    void onOpenMediaPlayer(int msgIndex);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
     void openStickerManager();
@@ -98,6 +101,15 @@ protected slots:
     void updateTrayBadge(int total);
     
 private:
+    // 媒体本机播放：实体化缓存字节 → 探测/转码（worker） → 播放
+    void scheduleMediaPlayback(int msgIndex, bool pendingPlay,
+                               const std::vector<uint8_t>* preloaded = nullptr);
+    void runMediaPostproc(int msgIndex, bool pendingPlay,
+                          int chatId, const std::string& chatType, int etype,
+                          const std::string& mediaUrl,
+                          std::vector<uint8_t> data);
+    void launchPlayer(const QString& filePath, bool gifLike);
+    void handleMediaPostproc(MediaDownloadEvent* e);
     FramelessHelper* framelessHelper;
     std::string selfPubkey;  // 自己的公钥（地址前64字符）
     std::map<std::string, PeerInfo> peerInfoMap;  // 会议/群组 peer info 缓存: "conf_N_M" / "group_N_M"

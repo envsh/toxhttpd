@@ -1,6 +1,9 @@
 #include "compatcore34.h"
 #include <stdlib.h>
 #include <unistd.h>
+#ifndef QT3_BUILD
+#include <QProcess>
+#endif
 
 // ========== 实现所需的 Qt 头文件 ==========
 #include <qdir.h>            // QDir (qGetHomePath, qAppDir, qCurrDir, qMkdir)
@@ -366,3 +369,48 @@ void qOpenUrl(const QString& url) {
     QDesktopServices::openUrl(QUrl(url));
 }
 #endif
+
+// ========== 进程/命令兼容 ==========
+// shell 单引号转义（QT3 走 popen/system 时需要）
+static QString shellQuote(const QString& s) {
+    QString t = s;
+    t.replace("'", "'\\''");
+    return QString("'") + t + QString("'");
+}
+
+int qRuncmdCaptureOuterr(const QString& program, const QStringList& args, QString* outErr) {
+#ifdef QT3_BUILD
+    QString cmd = program;
+    for (int i = 0; i < args.size(); i++) { cmd += " " + shellQuote(args[i]); }
+    FILE* f = ::popen(cmd.local8Bit().data(), "r");
+    if (!f) { return -1; }
+    std::string buf;
+    char tmp[4096];
+    size_t n;
+    while ((n = fread(tmp, 1, sizeof(tmp), f)) > 0) { buf.append(tmp, n); }
+    int rc = ::pclose(f);
+    if (outErr) { *outErr = qFromUtf8(buf.data(), (int)buf.size()); }
+    return rc;
+#else
+    QProcess proc;
+    proc.start(program, args);
+    if (!proc.waitForStarted(3000)) { return -1; }
+    proc.waitForFinished(-1);
+    QByteArray all = proc.readAllStandardOutput();
+    all += proc.readAllStandardError();
+    if (outErr) { *outErr = QString::fromUtf8(all.constData(), all.size()); }
+    return proc.exitCode();
+#endif
+}
+
+bool qStartProcessDetached(const QString& program, const QStringList& args) {
+#ifdef QT3_BUILD
+    QString cmd = program;
+    for (int i = 0; i < args.size(); i++) { cmd += " " + shellQuote(args[i]); }
+    QString full = cmd + " >/dev/null 2>&1 &";
+    int rc = ::system(full.local8Bit().data());
+    return rc != -1;
+#else
+    return QProcess::startDetached(program, args);
+#endif
+}
