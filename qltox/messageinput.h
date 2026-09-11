@@ -15,7 +15,7 @@ public:
 
 signals:
     void sendRequested();
-    void filePasteRequested(const QString& filePath);
+    void filePasteRequested(const QString& filePath, const QString& caption);
 
 protected:
     void keyPressEvent(QKeyEvent* e);
@@ -26,10 +26,10 @@ protected:
     void dropEvent(QDropEvent* e);
 
 #ifdef QT3_BUILD
-    bool handleMimeSource(QMimeSource* src);
+    bool handleMimeSource(QMimeSource* src, int srcMode);
 #else
     void insertFromMimeData(const QMimeData* source);
-    bool handleMimeData(const QMimeData* data);
+    bool handleMimeData(const QMimeData* data, int srcMode);
 #endif
 
 private:

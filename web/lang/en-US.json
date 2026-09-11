@@ -273,6 +273,19 @@
         "github": "GitHub"
     },
     "n_new_messages": "%1 new messages",
+    "paste_image": {
+        "title": "Send Picture Preview & Confirm",
+        "resolution": "Resolution: {0} × {1}",
+        "caption": "Caption (optional):",
+        "confirm": "Send this picture? ({1})\n{0}",
+        "source": "Source: {0}",
+        "source.paste_image": "Paste image",
+        "source.paste_path": "Paste path",
+        "source.drop_image": "Drop image",
+        "source.drop_path": "Drop path",
+        "source.share_image": "Share image",
+        "source.share_path": "Share path"
+    },
     "combine_search": {
         "entry": "Combined Search",
         "title": "Combined Search",

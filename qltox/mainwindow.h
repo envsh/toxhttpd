@@ -51,7 +51,7 @@ protected slots:
     public slots:
     void onContactSelected(int id, const QString& type, const QString& name);
     void onMessageSending(const QString& message, const QMap<QString,QString>& context);
-    void onFileSendRequested(const QString& filePath);
+    void onFileSendRequested(const QString& filePath, const QString& caption);
     void onLanguageChanged(const QString& langCode);
     void retranslateUi();
     void handleEvents(const EventList& events);

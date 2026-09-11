@@ -1,5 +1,6 @@
 #include "messageinput.h"
 #include "translator.h"
+#include "imageinputconfirm.h"
 #include <qmessagebox.h>
 #ifdef QT3_BUILD
 #include <qfile.h>
@@ -39,6 +40,36 @@ static QString formatFileSize(uint bytes) {
     double mb = kb / 1024.0;
     if (mb < 1024.0) { return QString("%1 MB").arg(mb, 0, 'f', 1); }
     return QString("%1 GB").arg(mb / 1024.0, 0, 'f', 2);
+}
+
+static bool tryLoadImage(const QString& path, QImage& out) {
+    out = QImage(path);
+    return !out.isNull();
+}
+
+enum MimeMode { kModePaste = 0, kModeDrop = 1, kModeShare = 2 };
+enum ImageSrc { kSrcPasteImage, kSrcPastePath, kSrcDropImage,
+                kSrcDropPath,   kSrcShareImage, kSrcSharePath };
+
+static int kindImage(int mode) {
+    if (mode == kModePaste) { return kSrcPasteImage; }
+    if (mode == kModeShare) { return kSrcShareImage; }
+    return kSrcDropImage;
+}
+
+static int kindPath(int mode) {
+    if (mode == kModePaste) { return kSrcPastePath; }
+    if (mode == kModeShare) { return kSrcSharePath; }
+    return kSrcDropPath;
+}
+
+static QString srcText(int kind) {
+    if (kind == kSrcPasteImage) { return _("paste_image.source.paste_image"); }
+    if (kind == kSrcPastePath)  { return _("paste_image.source.paste_path"); }
+    if (kind == kSrcDropImage)  { return _("paste_image.source.drop_image"); }
+    if (kind == kSrcDropPath)   { return _("paste_image.source.drop_path"); }
+    if (kind == kSrcShareImage) { return _("paste_image.source.share_image"); }
+    return _("paste_image.source.share_path");
 }
 
 MessageInput::MessageInput(QWidget* parent)
@@ -160,7 +191,7 @@ void MessageInput::keyPressEvent(QKeyEvent* e) {
 #ifdef QT3_BUILD
     if (e->key() == Qt::Key_V && (mod & ctrl)) {
         QMimeSource* src = QApplication::clipboard()->data();
-        if (src && handleMimeSource(src)) return;
+        if (src && handleMimeSource(src, kModePaste)) return;
     }
 #endif
 
@@ -174,12 +205,12 @@ void MessageInput::dragEnterEvent(QDragEnterEvent* e) {
 
 void MessageInput::dropEvent(QDropEvent* e) {
 #ifdef QT3_BUILD
-    if (handleMimeSource(e)) {
+    if (handleMimeSource(e, kModeDrop)) {
         e->accept();
         return;
     }
 #else
-    if (handleMimeData(e->mimeData())) {
+    if (handleMimeData(e->mimeData(), kModeDrop)) {
         e->acceptProposedAction();
         return;
     }
@@ -189,7 +220,7 @@ void MessageInput::dropEvent(QDropEvent* e) {
 
 #ifdef QT3_BUILD
 
-bool MessageInput::handleMimeSource(QMimeSource* src) {
+bool MessageInput::handleMimeSource(QMimeSource* src, int srcMode) {
     const char* fmt;
     for (int i = 0; (fmt = src->format(i)) != 0; i++) {
         if (qstrcmp(fmt, "text/uri-list") == 0) {
@@ -201,11 +232,19 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
             QString path = uris;
             if (path.startsWith("file://")) path = path.mid(7);
             if (path.isEmpty() || !QFile::exists(path)) { return false; }
+            QImage pv;
+            if (tryLoadImage(path, pv)) {
+                QString sizeStr = formatFileSize((uint)QFileInfo(path).size());
+                ImageInputConfirmDialog dlg(pv, path, sizeStr, srcText(kindPath(srcMode)), this);
+                if (dlg.exec() != QDialog::Accepted) { return false; }
+                emit filePasteRequested(path, dlg.caption());
+                return true;
+            }
             QString sizeStr = formatFileSize((uint)QFileInfo(path).size());
             int ret = QMessageBox::question(this, _("confirm"),
                         _A("confirm_send_file", QStringList() << path << sizeStr),
                         QMessageBox::Yes, QMessageBox::No);
-            if (ret == QMessageBox::Yes) { emit filePasteRequested(path); return true; }
+            if (ret == QMessageBox::Yes) { emit filePasteRequested(path, QString()); return true; }
             return false;
         }
     }
@@ -216,11 +255,13 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
                               .arg(s_pasteCounter++);
             img.save(tmpPath, "PNG");
             QString sizeStr = formatFileSize((uint)QFileInfo(tmpPath).size());
-            int ret = QMessageBox::question(this, _("confirm"),
-                        _A("confirm_send_file", QStringList() << tmpPath << sizeStr),
-                        QMessageBox::Yes, QMessageBox::No);
-            if (ret == QMessageBox::Yes) { emit filePasteRequested(tmpPath); return true; }
-            return false;
+            ImageInputConfirmDialog dlg(img, tmpPath, sizeStr, srcText(kindImage(srcMode)), this);
+            if (dlg.exec() != QDialog::Accepted) {
+                QFile::remove(tmpPath);
+                return false;
+            }
+            emit filePasteRequested(tmpPath, dlg.caption());
+            return true;
         }
     }
     if (QTextDrag::canDecode(src)) {
@@ -228,11 +269,19 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
         if (QTextDrag::decode(src, text)) {
             text = text.stripWhiteSpace();
             if (QFile::exists(text)) {
+                QImage pv;
+                if (tryLoadImage(text, pv)) {
+                    QString sizeStr = formatFileSize((uint)QFileInfo(text).size());
+                    ImageInputConfirmDialog dlg(pv, text, sizeStr, srcText(kindPath(srcMode)), this);
+                    if (dlg.exec() != QDialog::Accepted) { return false; }
+                    emit filePasteRequested(text, dlg.caption());
+                    return true;
+                }
                 QString sizeStr = formatFileSize((uint)QFileInfo(text).size());
                 int ret = QMessageBox::question(this, _("confirm"),
                             _A("confirm_send_file", QStringList() << text << sizeStr),
                             QMessageBox::Yes, QMessageBox::No);
-                if (ret == QMessageBox::Yes) { emit filePasteRequested(text); return true; }
+                if (ret == QMessageBox::Yes) { emit filePasteRequested(text, QString()); return true; }
                 return false;
             }
         }
@@ -243,21 +292,29 @@ bool MessageInput::handleMimeSource(QMimeSource* src) {
 #else
 
 void MessageInput::insertFromMimeData(const QMimeData* source) {
-    if (handleMimeData(source)) return;
+    if (handleMimeData(source, kModePaste)) return;
     QTextEdit::insertFromMimeData(source);
 }
 
-bool MessageInput::handleMimeData(const QMimeData* data) {
+bool MessageInput::handleMimeData(const QMimeData* data, int srcMode) {
     if (data->hasUrls()) {
         QList<QUrl> urls = data->urls();
         for (int i = 0; i < urls.size(); i++) {
             QString path = urls[i].toLocalFile();
             if (!path.isEmpty() && QFile::exists(path)) {
+                QImage pv;
+                if (tryLoadImage(path, pv)) {
+                    QString sizeStr = formatFileSize((uint)QFileInfo(path).size());
+                    ImageInputConfirmDialog dlg(pv, path, sizeStr, srcText(kindPath(srcMode)), this);
+                    if (dlg.exec() != QDialog::Accepted) { return false; }
+                    emit filePasteRequested(path, dlg.caption());
+                    return true;
+                }
                 QString sizeStr = formatFileSize((uint)QFileInfo(path).size());
                 int ret = QMessageBox::question(this, _("confirm"),
                             _A("confirm_send_file", QStringList() << path << sizeStr),
                             QMessageBox::Yes, QMessageBox::No);
-                if (ret == QMessageBox::Yes) { emit filePasteRequested(path); return true; }
+                if (ret == QMessageBox::Yes) { emit filePasteRequested(path, QString()); return true; }
                 return false;
             }
         }
@@ -269,21 +326,31 @@ bool MessageInput::handleMimeData(const QMimeData* data) {
                               .arg(s_pasteCounter++);
             img.save(tmpPath, "PNG");
             QString sizeStr = formatFileSize((uint)QFileInfo(tmpPath).size());
-            int ret = QMessageBox::question(this, _("confirm"),
-                        _A("confirm_send_file", QStringList() << tmpPath << sizeStr),
-                        QMessageBox::Yes, QMessageBox::No);
-            if (ret == QMessageBox::Yes) { emit filePasteRequested(tmpPath); return true; }
-            return false;
+            ImageInputConfirmDialog dlg(img, tmpPath, sizeStr, srcText(kindImage(srcMode)), this);
+            if (dlg.exec() != QDialog::Accepted) {
+                QFile::remove(tmpPath);
+                return false;
+            }
+            emit filePasteRequested(tmpPath, dlg.caption());
+            return true;
         }
     }
     {
         QString text = data->text().trimmed();
         if (!text.isEmpty() && QFile::exists(text)) {
+            QImage pv;
+            if (tryLoadImage(text, pv)) {
+                QString sizeStr = formatFileSize((uint)QFileInfo(text).size());
+                ImageInputConfirmDialog dlg(pv, text, sizeStr, srcText(kindPath(srcMode)), this);
+                if (dlg.exec() != QDialog::Accepted) { return false; }
+                emit filePasteRequested(text, dlg.caption());
+                return true;
+            }
             QString sizeStr = formatFileSize((uint)QFileInfo(text).size());
             int ret = QMessageBox::question(this, _("confirm"),
                         _A("confirm_send_file", QStringList() << text << sizeStr),
                         QMessageBox::Yes, QMessageBox::No);
-            if (ret == QMessageBox::Yes) { emit filePasteRequested(text); return true; }
+            if (ret == QMessageBox::Yes) { emit filePasteRequested(text, QString()); return true; }
             return false;
         }
     }

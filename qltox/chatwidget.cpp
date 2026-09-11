@@ -290,7 +290,7 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(fileBtn, SIGNAL(clicked()), this, SLOT(onFileClicked()));
     connect(stickerBtn, SIGNAL(clicked()), this, SLOT(onStickerClicked()));
     connect(quickReplyBtn, SIGNAL(clicked()), this, SLOT(onQuickReplyClicked()));
-    connect(inputEdit, SIGNAL(filePasteRequested(const QString&)), this, SLOT(onFilePaste(const QString&)));
+    connect(inputEdit, SIGNAL(filePasteRequested(const QString&, const QString&)), this, SLOT(onFilePaste(const QString&, const QString&)));
     
     mainLayout->addLayout(inputGrid);
 }
@@ -589,9 +589,9 @@ void ChatWidget::onFileClicked() {
     emit fileSendRequested(path);
 }
 
-void ChatWidget::onFilePaste(const QString& filePath) {
+void ChatWidget::onFilePaste(const QString& filePath, const QString& caption) {
     if (filePath.isEmpty()) { return; }
-    emit fileSendRequested(filePath);
+    emit fileSendRequested(filePath, caption);
 }
 
 void ChatWidget::onStickerClicked() {

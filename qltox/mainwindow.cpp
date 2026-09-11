@@ -505,8 +505,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(chatWidget, SIGNAL(requestRedactMessage(int)), this, SLOT(onRequestRedactMessage(int)));
     connect(chatWidget, SIGNAL(openFullSizeImage(int, const QString&)),
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
-    connect(chatWidget, SIGNAL(fileSendRequested(const QString&)),
-            this, SLOT(onFileSendRequested(const QString&)));
+    connect(chatWidget, SIGNAL(fileSendRequested(const QString&, const QString&)),
+            this, SLOT(onFileSendRequested(const QString&, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
     
     // 启动事件轮询引擎
@@ -3075,7 +3075,7 @@ void MainWindow::onOpenFullSizeImage(int msgIndex, const QString& mediaUrl) {
         });
 }
 
-void MainWindow::onFileSendRequested(const QString& filePath) {
+void MainWindow::onFileSendRequested(const QString& filePath, const QString& caption) {
     if (currentChatId == -1 || currentChatType.isEmpty()) { return; }
 
     std::string fileType = std::string(qToUtf8(currentChatType).data());
@@ -3143,7 +3143,7 @@ void MainWindow::onFileSendRequested(const QString& filePath) {
         db_writeMessage(currentChatId, typeStr, el);
     }
     int sendmsgseq = ToxAPI::sendMessage(currentChatId, fileType,
-                         std::string(), fileIdOverride,
+                         std::string(qToUtf8(caption).data()), fileIdOverride,
                          std::string(data.data(), data.size()),
                          std::string(qToUtf8(fn)));
     if (sendmsgseq > 0) {

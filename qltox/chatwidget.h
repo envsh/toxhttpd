@@ -54,7 +54,7 @@ public:
 signals:
     void messageSent(const QString& message, const QMap<QString,QString>& context);
     void languageChanged(const QString& langCode);
-    void fileSendRequested(const QString& filePath);
+    void fileSendRequested(const QString& filePath, const QString& caption = QString());
     void translateRequested(int msgIndex, const QString& text, const QString& targetLang);
     void translateForSendRequested(const QString& text, const QString& targetLang);
     void sourceClicked(int msgIndex);
@@ -72,7 +72,7 @@ private slots:
     void onEmojiClicked();
     void onEmojiInsert(const QString& emoji);
     void onFileClicked();
-    void onFilePaste(const QString& filePath);
+    void onFilePaste(const QString& filePath, const QString& caption);
     void onStickerClicked();
     void onQuickReplyClicked();
     void onSendEnClicked();

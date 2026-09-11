@@ -271,6 +271,19 @@
         "github": "GitHub"
     },
     "n_new_messages": "%1 条新消息",
+    "paste_image": {
+        "title": "发送图片预览及确认",
+        "resolution": "分辨率：{0} × {1}",
+        "caption": "附带文本(可选):",
+        "confirm": "确认发送该图片？（大小：{1}）\n{0}",
+        "source": "来源：{0}",
+        "source.paste_image": "粘贴图片",
+        "source.paste_path": "粘贴路径",
+        "source.drop_image": "拖拽图片",
+        "source.drop_path": "拖拽路径",
+        "source.share_image": "分享图片",
+        "source.share_path": "分享路径"
+    },
     "combine_search": {
         "entry": "打开综合搜索",
         "title": "综合搜索",

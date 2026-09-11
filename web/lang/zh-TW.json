@@ -254,6 +254,19 @@
         "github": "GitHub"
     },
     "n_new_messages": "%1 條新訊息",
+    "paste_image": {
+        "title": "發送圖片預覽及確認",
+        "resolution": "解析度：{0} × {1}",
+        "caption": "附註文字(可選):",
+        "confirm": "確認傳送此圖片？（大小：{1}）\n{0}",
+        "source": "來源：{0}",
+        "source.paste_image": "貼上圖片",
+        "source.paste_path": "貼上路徑",
+        "source.drop_image": "拖曳圖片",
+        "source.drop_path": "拖曳路徑",
+        "source.share_image": "分享圖片",
+        "source.share_path": "分享路徑"
+    },
     "combine_search": {
         "entry": "開啟綜合搜尋",
         "title": "綜合搜尋",
