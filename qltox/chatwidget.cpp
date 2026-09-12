@@ -210,6 +210,8 @@ ChatWidget::ChatWidget(QWidget* parent) : QWidget(parent) {
     connect(messageArea, SIGNAL(editRequested(int)), this, SLOT(onEditRequested(int)));
     connect(messageArea, SIGNAL(deleteRequested(int)), this, SLOT(onDeleteRequested(int)));
     connect(messageArea, SIGNAL(redactRequested(int)), this, SLOT(onRedactRequested(int)));
+    connect(messageArea, SIGNAL(favoriteClicked(int)), this, SIGNAL(favoriteClicked(int)));
+    connect(messageArea, SIGNAL(forwardClicked(int)), this, SLOT(onForwardRequested(int)));
     
     // 输入区域 (2行 x 3列)
 #ifdef QT3_BUILD
@@ -838,4 +840,18 @@ void ChatWidget::onRedactRequested(int msgIndex) {
     // const ChatElement& el = messageArea->messageAt(msgIndex);
     // if (el.category != "self" || el.messageId.isEmpty()) { return; }
     emit requestRedactMessage(msgIndex);
+}
+
+void ChatWidget::onForwardRequested(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= messageCount()) { return; }
+    QString text = messageArea->messageAt(msgIndex).messageText;
+    if (text.isEmpty()) { return; }
+    resetPendingContext();
+    inputEdit->clearPlaceholder();
+#ifdef QT3_BUILD
+    inputEdit->setText(text);
+#else
+    inputEdit->setPlainText(text);
+#endif
+    inputEdit->setFocus();
 }

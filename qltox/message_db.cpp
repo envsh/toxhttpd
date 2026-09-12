@@ -398,6 +398,17 @@ row->reply_to_rowid = stmt.columnInt64(i++);
         return row;
     }
 
+    std::vector<int64_t> list_bookmark_rowids(const char* chanid) override {
+        auto _ = m_conn->get();
+        auto stmt = _->prepare(
+            "SELECT message_rowid FROM bookmarks WHERE chanid=?1");
+        if (!stmt.isPrepared()) { return {}; }
+        if (!stmt.bind(1, chanid)) { return {}; }
+        std::vector<int64_t> out;
+        while (stmt.stepRow()) { out.push_back(stmt.columnInt64(0)); }
+        return out;
+    }
+
     bool clear_channel(const char* chanid) override {
         auto _ = m_conn->get();
         auto s1 = _->prepare(

@@ -579,6 +579,7 @@ MainWindow::MainWindow(QWidget* parent)
             this, SLOT(onOpenFullSizeImage(int, const QString&)));
     connect(chatWidget, SIGNAL(openMediaPlayer(int)),
             this, SLOT(onOpenMediaPlayer(int)));
+    connect(chatWidget, SIGNAL(favoriteClicked(int)), this, SLOT(onFavoriteClicked(int)));
     connect(chatWidget, SIGNAL(fileSendRequested(const QString&, const QString&)),
             this, SLOT(onFileSendRequested(const QString&, const QString&)));
     connect(&Translator::instance(), SIGNAL(languageChanged()), this, SLOT(retranslateUi()));
@@ -1534,6 +1535,17 @@ void MainWindow::onContactSelected(int id, const QString& type, const QString& n
             chatWidget->relayout();
         }
         hist.loadedLatest50FromDB = true;
+    }
+
+    // ── 收藏集内存加载：聊天切换时一次性读全量收藏，右键菜单零查库 ──
+    if (id >= 0) {
+        auto* db = Storage::instance().messageDb();
+        if (db) {
+            std::string chanid = typeStr + "_" + std::to_string(id);
+            std::vector<int64_t> favs =
+                db->list_bookmark_rowids(chanid.c_str());
+            chatWidget->setFavRowids(favs);
+        }
     }
 
     // 写入读游标：取最新消息的 rowid
@@ -3476,6 +3488,28 @@ void MainWindow::onFileSendRequested(const QString& filePath, const QString& cap
         if (!hist.empty()) {
             hist.back().sendmsgseq = sendmsgseq;
         }
+    }
+}
+
+void MainWindow::onFavoriteClicked(int msgIndex) {
+    if (msgIndex < 0 || msgIndex >= chatWidget->messageCount()) { return; }
+    if (currentChatId < 0) { return; }
+    const ChatElement& el = chatWidget->messageAt(msgIndex);
+    int64_t rowid = el.dbRowid;
+    if (rowid <= 0) {
+        qWarning("favorite: rowid not ready, skip chat=%d idx=%d", currentChatId, msgIndex);
+        return;
+    }
+    std::string chanid = std::string(qToUtf8(currentChatType).data())
+                       + "_" + std::to_string(currentChatId);
+    if (chatWidget->isFavRowid(rowid)) {
+        chatWidget->setFavRowid(rowid, false);
+        Storage::instance().messageDbAsync()->remove_bookmark(
+            rowid, [rowid](bool ok) { qWarning("favorite remove rowid=%lld ok=%d", (long long)rowid, ok); });
+    } else {
+        chatWidget->setFavRowid(rowid, true);
+        Storage::instance().messageDbAsync()->add_bookmark(
+            rowid, chanid, "", [rowid](bool ok) { qWarning("favorite add rowid=%lld ok=%d", (long long)rowid, ok); });
     }
 }
 

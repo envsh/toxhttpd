@@ -9,6 +9,11 @@
 #include <vector>
 #include <deque>
 #include <cstdint>
+#ifdef QT3_BUILD
+#include <qmap.h>
+#else
+#include <QMap>
+#endif
 #include <qdatetime.h>
 #include <qrect.h>
 #include <qwidget.h>
@@ -157,6 +162,9 @@ public:
     void scrollBottomIfNeeded();
     ChatElement& messageAt(int index);
     int messageCount() const;
+    void setFavRowids(const std::vector<int64_t>& favRowids);
+    bool isFavRowid(int64_t rowid) const;
+    void setFavRowid(int64_t rowid, bool fav);
     void updateElement(int msgIndex);
     void relayout();
     void onGifFrameUpdated(int msgIndex);
@@ -201,6 +209,8 @@ signals:
     void editRequested(int msgIndex);
     void deleteRequested(int msgIndex);
     void redactRequested(int msgIndex);
+    void favoriteClicked(int msgIndex);
+    void forwardClicked(int msgIndex);
 
 private slots:
     void onScrollChanged(int value);
@@ -256,6 +266,8 @@ private:
     bool m_selecting;
 
     ChatHistory* m_history;
+    // 当前聊天的收藏 rowid 集合（聊天切换时一次性加载，切换即时更新；菜单/点击零查库）
+    QMap<int64_t, int> m_favRowids;
     std::vector<char> m_gifFrameUpdated;
     int m_totalHeight;
     int m_scrollPos;

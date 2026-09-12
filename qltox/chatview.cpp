@@ -2423,6 +2423,19 @@ int ChatView::messageCount() const {
     return m_history ? (int)m_history->size() : 0;
 }
 
+void ChatView::setFavRowids(const std::vector<int64_t>& favRowids) {
+    m_favRowids.clear();
+    for (int64_t r : favRowids) { if (r > 0) m_favRowids.insert(r, 1); }
+}
+
+bool ChatView::isFavRowid(int64_t rowid) const {
+    return m_favRowids.contains(rowid);
+}
+
+void ChatView::setFavRowid(int64_t rowid, bool fav) {
+    if (fav) m_favRowids.insert(rowid, 1); else m_favRowids.remove(rowid);
+}
+
 void ChatView::updateElement(int msgIndex) {
     if (!m_history || msgIndex < 0 || msgIndex >= (int)m_history->size()) { return; }
     ChatElement& el = (*m_history)[msgIndex];
@@ -3334,11 +3347,23 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     int selectAllId = menu.insertItem(_("context.select_all"));
     bool hasSource = false, hasTranslate = false;
     int sourceMsgId = 0, translateMsgId = 0;
+    bool hasFav = false, hasForward = false;
+    int favMsgId = 0, forwardMsgId = 0;
     if (msgIndex >= 0 && (*m_history)[msgIndex].etype != ChatElement::File) {
         hasSource = true;
         sourceMsgId = menu.insertItem(qFromUtf8("查看原文"));
         hasTranslate = true;
         translateMsgId = menu.insertItem(qFromUtf8("翻译"));
+        QString favLabel;
+        if ((*m_history)[msgIndex].dbRowid > 0)
+            favLabel = isFavRowid((*m_history)[msgIndex].dbRowid)
+                       ? qFromUtf8("取消收藏") : qFromUtf8("收藏");
+        else
+            favLabel = qFromUtf8("收藏/取消");
+        hasFav = true;
+        favMsgId = menu.insertItem(favLabel);
+        hasForward = true;
+        forwardMsgId = menu.insertItem(qFromUtf8("转发"));
     }
     bool hasNick = onName;
     int copyNickId = 0, mentionId = 0;
@@ -3364,9 +3389,19 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
     QAction* selectAllAction = menu.addAction(_("context.select_all"));
     QAction* sourceMsgAction = nullptr;
     QAction* translateMsgAction = nullptr;
+    QAction* favMsgAction = nullptr;
+    QAction* forwardMsgAction = nullptr;
     if (msgIndex >= 0 && (*m_history)[msgIndex].etype != ChatElement::File) {
         sourceMsgAction = menu.addAction("查看原文");
         translateMsgAction = menu.addAction("翻译");
+        QString favLabel;
+        if ((*m_history)[msgIndex].dbRowid > 0)
+            favLabel = isFavRowid((*m_history)[msgIndex].dbRowid)
+                       ? qFromUtf8("取消收藏") : qFromUtf8("收藏");
+        else
+            favLabel = qFromUtf8("收藏/取消");
+        favMsgAction = menu.addAction(favLabel);
+        forwardMsgAction = menu.addAction(qFromUtf8("转发"));
     }
     QAction* copyNickAction = nullptr;
     QAction* mentionAction = nullptr;
@@ -3408,6 +3443,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         emit sourceClicked(msgIndex);
     } else if (hasTranslate && choice == translateMsgId) {
         emit translateClicked(msgIndex);
+    } else if (hasFav && choice == favMsgId) {
+        emit favoriteClicked(msgIndex);
+    } else if (hasForward && choice == forwardMsgId) {
+        emit forwardClicked(msgIndex);
     } else if (hasNick && choice == copyNickId) {
         QApplication::clipboard()->setText(displayName);
     } else if (hasNick && choice == mentionId) {
@@ -3440,6 +3479,10 @@ void ChatView::contextMenuEvent(QContextMenuEvent* event) {
         emit sourceClicked(msgIndex);
     } else if (translateMsgAction && chosen == translateMsgAction) {
         emit translateClicked(msgIndex);
+    } else if (favMsgAction && chosen == favMsgAction) {
+        emit favoriteClicked(msgIndex);
+    } else if (forwardMsgAction && chosen == forwardMsgAction) {
+        emit forwardClicked(msgIndex);
     } else if (chosen == copyNickAction) {
         QApplication::clipboard()->setText(displayName);
     } else if (chosen == mentionAction) {

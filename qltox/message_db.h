@@ -118,6 +118,7 @@ public:
                               const char* note) = 0;
     virtual bool remove_bookmark(int64_t msg_rowid) = 0;
     virtual std::unique_ptr<BookmarkRow> get_bookmark(int64_t msg_rowid) = 0;
+    virtual std::vector<int64_t> list_bookmark_rowids(const char* chanid) = 0;
 
     virtual bool clear_channel(const char* chanid) = 0;
 

@@ -50,6 +50,9 @@ public:
     void showUnreadBanner(int count);
     void setAutoTranslateEnabled(bool enabled) { m_autoTranslateEnabled = enabled; }
     void resetPendingContext();                       // 会话切换/发送后清空待发扩展上下文
+    void setFavRowids(const std::vector<int64_t>& favRowids) { messageArea->setFavRowids(favRowids); }
+    bool isFavRowid(int64_t rowid) const { return messageArea->isFavRowid(rowid); }
+    void setFavRowid(int64_t rowid, bool fav) { messageArea->setFavRowid(rowid, fav); }
     
 signals:
     void messageSent(const QString& message, const QMap<QString,QString>& context);
@@ -63,6 +66,7 @@ signals:
     void openMediaPlayer(int msgIndex);
     void resendMessage(int msgIndex);
     void requestRedactMessage(int msgIndex);
+    void favoriteClicked(int msgIndex);
 
 private slots:
     void onSendClicked();
@@ -84,6 +88,7 @@ private slots:
     void onEditRequested(int msgIndex);
     void onDeleteRequested(int msgIndex);
     void onRedactRequested(int msgIndex);
+    void onForwardRequested(int msgIndex);
     void onReplyStripClose();
     void hideUnreadBanner();
 

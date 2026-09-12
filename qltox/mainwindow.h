@@ -78,6 +78,7 @@ protected slots:
     void onRequestRedactMessage(int msgIndex);
     void onOpenFullSizeImage(int msgIndex, const QString& mediaUrl);
     void onOpenMediaPlayer(int msgIndex);
+    void onFavoriteClicked(int msgIndex);
     void renderHistoryMessages(const std::vector<HistoryMessage>& messages);
     void openSettings();
     void openStickerManager();
