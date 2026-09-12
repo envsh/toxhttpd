@@ -3375,6 +3375,9 @@ void MainWindow::launchPlayer(const QString& filePath, bool gifLike) {
     QStringList args;
     if (gifLike) { args << "--loop-file=inf" << "--no-audio"; }
     args << filePath;
+#if !defined(Q_OS_MACX)
+    args << "-vo=xv"; // TODO check x11?
+#endif
 
     bool ok = false;
     if (QFile::exists("/usr/bin/mpv")) { ok = qStartProcessDetached("mpv", args); }
